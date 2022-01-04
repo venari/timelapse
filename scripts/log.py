@@ -8,7 +8,7 @@ pj = PiJuice(1, 0x14) #?
 
 log = f'{time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())}, {pj.status.GetChargeLevel()["data"]}, {pj.status.GetBatteryTemperature()["data"]}\n'
 
-outFile = os.path.dirname(os.path.realpath(__file__)) + '/log.csv'
+outFile = os.path.dirname(os.path.realpath(__file__)) + '/../output/log.csv'
 
 with open(outFile, 'a') as f:
     f.write(log)

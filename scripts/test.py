@@ -12,6 +12,9 @@ from gpiozero import CPUTemperature
 DELTA_MIN=10
 SHUTDOWN_TILL_MORNING=False
 
+LOGFILE = os.path.dirname(os.path.realpath(__file__)) + '/../output/test.log'
+CSVOUTPUTFILE = os.path.dirname(os.path.realpath(__file__)) + '/../output/test.csv'
+
 if datetime.datetime.now().hour >=21 or datetime.datetime.now().hour <= 5:
 #    DELTA_MIN=60
     SHUTDOWN_TILL_MORNING=True
@@ -28,7 +31,7 @@ subprocess.call(["sudo", "hwclock", "--hctosys"])
 # Record start time
 txtTime = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 txt = txtTime + ' -- Started\n'
-with open('/home/pi/test.log','a') as f:
+with open(LOGFILE,'a') as f:
     f.write(txtTime)
 
 
@@ -41,13 +44,13 @@ except:
 txtStatus = str(pj.status.GetStatus())
 txtChargeLevel = str(pj.status.GetChargeLevel())
 txtCPUTemp =str(CPUTemperature().temperature)
-with open('/home/pi/test.log','a') as f:
+with open(LOGFILE,'a') as f:
     f.write(txtStatus + "\n")
     f.write(txtChargeLevel + "\n")
     f.write("CPU Tempperature: " + txtCPUTemp + "\n")
 
 
-with open('/home/pi/test.csv','a') as f:
+with open(CSVOUTPUTFILE,'a') as f:
     f.write(txtTime + ", " + str(pj.status.GetChargeLevel()['data']) + ", " + str(CPUTemperature().temperature) + "," + str(pj.status.GetStatus()['data']['battery']) + "\n")
 
 # Do the work
