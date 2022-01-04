@@ -8,12 +8,16 @@ import datetime
 import os
 import sys 
 from gpiozero import CPUTemperature
+from picamera import PiCamera
 
 DELTA_MIN=10
 SHUTDOWN_TILL_MORNING=False
 
+OUTPUTIMAGEFOLDER = os.path.dirname(os.path.realpath(__file__)) + '/../output/images/'
 LOGFILE = os.path.dirname(os.path.realpath(__file__)) + '/../output/test.log'
 CSVOUTPUTFILE = os.path.dirname(os.path.realpath(__file__)) + '/../output/test.csv'
+
+os.makedirs(OUTPUTIMAGEFOLDER, exist_ok = True)
 
 if datetime.datetime.now().hour >=21 or datetime.datetime.now().hour <= 5:
 #    DELTA_MIN=60
@@ -53,12 +57,26 @@ with open(LOGFILE,'a') as f:
 with open(CSVOUTPUTFILE,'a') as f:
     f.write(txtTime + ", " + str(pj.status.GetChargeLevel()['data']) + ", " + str(CPUTemperature().temperature) + "," + str(pj.status.GetStatus()['data']['battery']) + "\n")
 
-# Do the work
-for i in range(60):
-   print('*', end='', flush=True)
-   #sys.stdout.flush()
-   time.sleep(1)
-print()
+## Do the work
+#for i in range(60):
+#   print('*', end='', flush=True)
+#   #sys.stdout.flush()
+#   time.sleep(1)
+#print()
+
+# take the picture
+#DATE=$(date +"%Y-%m-%d_%H%M")
+#mkdir -p $OUTPUTIMAGEFOLDER
+#raspistill -vf -hf --nopreview -o $OUTPUTIMAGEFOLDER/$DATE.jpg
+
+camera = PiCamera()
+#camera.resolution = (1024, 768)
+camera.start_preview()
+# Camera warm-up time
+time.sleep(2)
+IMAGEFILENAME = OUTPUTIMAGEFOLDER + datetime.datetime.now().strftime('%Y-%m-%d_%H%M.jpg')
+camera.capture(IMAGEFILENAME)
+
 
 # Set RTC alarm 5 minutes from now
 # RTC is kept in UTC
@@ -87,6 +105,6 @@ time.sleep(0.4)
 
 # PiJuice shuts down power to Rpi after 20 sec from now
 # This leaves sufficient time to execute the shutdown sequence
-#pj.power.SetPowerOff(20)
-#subprocess.call(["sudo", "poweroff"])
+pj.power.SetPowerOff(20)
+subprocess.call(["sudo", "poweroff"])
 
