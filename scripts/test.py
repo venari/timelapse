@@ -52,30 +52,30 @@ with open(LOGFILE,'a') as f:
     f.write(txtStatus + "\n")
     f.write(txtChargeLevel + "\n")
     f.write("CPU Tempperature: " + txtCPUTemp + "\n")
-
+    f.write(txtTime + " - rtcAlarm.GetTime(): " + str(pj.rtcAlarm.GetTime()))
 
 with open(CSVOUTPUTFILE,'a') as f:
     f.write(txtTime + ", " + str(pj.status.GetChargeLevel()['data']) + ", " + str(CPUTemperature().temperature) + "," + str(pj.status.GetStatus()['data']['battery']) + "\n")
 
-## Do the work
-#for i in range(60):
-#   print('*', end='', flush=True)
-#   #sys.stdout.flush()
-#   time.sleep(1)
-#print()
+# Do the work
+for i in range(60):
+   print('*', end='', flush=True)
+   #sys.stdout.flush()
+   time.sleep(1)
+print()
 
 # take the picture
 #DATE=$(date +"%Y-%m-%d_%H%M")
 #mkdir -p $OUTPUTIMAGEFOLDER
 #raspistill -vf -hf --nopreview -o $OUTPUTIMAGEFOLDER/$DATE.jpg
 
-camera = PiCamera()
-#camera.resolution = (1024, 768)
-camera.start_preview()
-# Camera warm-up time
-time.sleep(2)
-IMAGEFILENAME = OUTPUTIMAGEFOLDER + datetime.datetime.now().strftime('%Y-%m-%d_%H%M.jpg')
-camera.capture(IMAGEFILENAME)
+#camera = PiCamera()
+##camera.resolution = (1024, 768)
+#camera.start_preview()
+## Camera warm-up time
+#time.sleep(2)
+#IMAGEFILENAME = OUTPUTIMAGEFOLDER + datetime.datetime.now().strftime('%Y-%m-%d_%H%M.jpg')
+#camera.capture(IMAGEFILENAME)
 
 
 # Set RTC alarm 5 minutes from now
@@ -105,6 +105,6 @@ time.sleep(0.4)
 
 # PiJuice shuts down power to Rpi after 20 sec from now
 # This leaves sufficient time to execute the shutdown sequence
-#pj.power.SetPowerOff(20)
-#subprocess.call(["sudo", "poweroff"])
+pj.power.SetPowerOff(20)
+subprocess.call(["sudo", "poweroff"])
 
