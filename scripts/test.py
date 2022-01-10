@@ -82,6 +82,7 @@ camera.capture(IMAGEFILENAME)
 
 with open(LOGFILE,'a') as f:
     f.write(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S') + " - Picture taken and saved.\n")
+    f.write("Checking if git pull works.\n")
 
 # Set RTC alarm 5 minutes from now
 # RTC is kept in UTC
