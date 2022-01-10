@@ -57,12 +57,12 @@ with open(LOGFILE,'a') as f:
 with open(CSVOUTPUTFILE,'a') as f:
     f.write(txtTime + ", " + str(pj.status.GetChargeLevel()['data']) + ", " + str(CPUTemperature().temperature) + "," + str(pj.status.GetStatus()['data']['battery']) + "\n")
 
-## Do the work
-#for i in range(60):
-#   print('*', end='', flush=True)
-#   #sys.stdout.flush()
-#   time.sleep(1)
-#print()
+# Do the work
+for i in range(60):
+   print('*', end='', flush=True)
+   #sys.stdout.flush()
+   time.sleep(1)
+print()
 
 # take the picture
 #DATE=$(date +"%Y-%m-%d_%H%M")
