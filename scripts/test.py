@@ -36,7 +36,7 @@ subprocess.call(["sudo", "hwclock", "--hctosys"])
 txtTime = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 txt = txtTime + ' -- Started\n'
 with open(LOGFILE,'a') as f:
-    f.write(txtTime)
+    f.write(txt)
 
 
 try:
@@ -48,16 +48,16 @@ except:
 txtStatus = str(pj.status.GetStatus())
 txtChargeLevel = str(pj.status.GetChargeLevel())
 txtCPUTemp =str(CPUTemperature().temperature)
-with open(LOGFILE,'a') as f:
-    f.write(txtStatus + "\n")
-    f.write(txtChargeLevel + "\n")
-    f.write("CPU Tempperature: " + txtCPUTemp + "\n")
-    f.write(txtTime + " - rtcAlarm.GetTime(): " + str(pj.rtcAlarm.GetTime()))
+#with open(LOGFILE,'a') as f:
+#    f.write(txtStatus + "\n")
+#    f.write(txtChargeLevel + "\n")
+#    f.write("CPU Tempperature: " + txtCPUTemp + "\n")
+#    f.write(txtTime + " - rtcAlarm.GetTime(): " + str(pj.rtcAlarm.GetTime()))
 
-with open(CSVOUTPUTFILE,'a') as f:
-    f.write(txtTime + ", " + str(pj.status.GetChargeLevel()['data']) + ", " + str(CPUTemperature().temperature) + "," + str(pj.status.GetStatus()['data']['battery']) + "\n")
+#with open(CSVOUTPUTFILE,'a') as f:
+#    f.write(txtTime + ", " + str(pj.status.GetChargeLevel()['data']) + ", " + str(CPUTemperature().temperature) + "," + str(pj.status.GetStatus()['data']['battery']) + "\n")
 
-# Do the work
+## Do the work
 for i in range(60):
    print('*', end='', flush=True)
    #sys.stdout.flush()
@@ -69,14 +69,19 @@ print()
 #mkdir -p $OUTPUTIMAGEFOLDER
 #raspistill -vf -hf --nopreview -o $OUTPUTIMAGEFOLDER/$DATE.jpg
 
-#camera = PiCamera()
-##camera.resolution = (1024, 768)
-#camera.start_preview()
-## Camera warm-up time
-#time.sleep(2)
-#IMAGEFILENAME = OUTPUTIMAGEFOLDER + datetime.datetime.now().strftime('%Y-%m-%d_%H%M.jpg')
-#camera.capture(IMAGEFILENAME)
+with open(LOGFILE,'a') as f:
+    f.write(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S') + "- About to take picture....\n")
 
+camera = PiCamera()
+#camera.resolution = (1024, 768)
+camera.start_preview()
+# Camera warm-up time
+time.sleep(2)
+IMAGEFILENAME = OUTPUTIMAGEFOLDER + datetime.datetime.now().strftime('%Y-%m-%d_%H%M.jpg')
+camera.capture(IMAGEFILENAME)
+
+with open(LOGFILE,'a') as f:
+    f.write(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S') + " - Picture taken and saved.\n")
 
 # Set RTC alarm 5 minutes from now
 # RTC is kept in UTC
