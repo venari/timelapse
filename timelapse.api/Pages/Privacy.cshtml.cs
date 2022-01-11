@@ -1,7 +1,7 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 
-namespace api.Pages;
+namespace timelapse.api.Pages;
 
 public class PrivacyModel : PageModel
 {
