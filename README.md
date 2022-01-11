@@ -8,3 +8,12 @@ A set of tools/scripts to automate the taking and creation of timelapse videos a
 # On board timelapse generation
 
 ffmpeg -r 30 -f image2 -pattern_type glob -i "./<YYYY-MM-DD>*.jpg" -s 1014x760 -vcodec libx264 <YYYY-MM-DD>.mp4
+
+
+# API Setup
+Prerequisites:
+- [Dotnet 6](https://dotnet.microsoft.com/en-us/download)
+- [EFCore Tooling](https://docs.microsoft.com/en-au/ef/)
+```
+brew install dotnet-sdk
+```
