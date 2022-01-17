@@ -18,6 +18,7 @@ Prerequisites:
 ```
 brew install dotnet-sdk
 brew install pgadmin4
+dotnet tool install --global dotnet-ef
 ```
 
 Postgres DB Server:
@@ -43,4 +44,11 @@ User Secrets:
 ```
 dotnet user-secrets --project timelapse.api init
 dotnet user-secrets --project timelapse.api set "ConnectionStrings:DefaultConnection" "Server=tcp:localhost,5432;User ID=postgres;Password=Pass2020!;Database=timelapse"
+```
+
+
+When making changes to the objects in the code, add migrations and update the database script:
+```
+dotnet ef --project timelapse.api migrations add --context "AppDbContext" <migrationName>
+dotnet ef --project timelapse.api migrations script -i --context "AppDbContext" -o timelapse.api/Migrations/scripts.sql
 ```
