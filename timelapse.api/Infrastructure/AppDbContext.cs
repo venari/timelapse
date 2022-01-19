@@ -21,7 +21,8 @@ namespace timelapse.infrastructure
         protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
         {
             var connectionString = _configuration.GetConnectionString("DefaultConnection");
-            optionsBuilder.UseNpgsql(connectionString);
+            optionsBuilder.UseNpgsql(connectionString)
+            .UseSnakeCaseNamingConvention();
         }
     }
 }
