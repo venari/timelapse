@@ -13,6 +13,8 @@ public class IndexModel : PageModel
     {
         _logger = logger;
         _appDbContext = appDbContext;
+
+        // _appDbContext.Database.EnsureCreated();
     }
 
     public void OnGet()
