@@ -6,6 +6,10 @@ var builder = WebApplication.CreateBuilder(args);
 // Add services to the container.
 builder.Services.AddRazorPages();
 
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen();
+builder.Services.AddControllers();
+
 builder.Services.AddDbContext<AppDbContext>();
 
 var app = builder.Build();
@@ -26,5 +30,14 @@ app.UseRouting();
 app.UseAuthorization();
 
 app.MapRazorPages();
+
+app.MapSwagger();
+app.UseSwaggerUI();
+
+app.UseEndpoints(endpoints =>
+{
+    endpoints.MapControllers();
+    // endpoints.MapRazorPages();
+});
 
 app.Run();

@@ -52,3 +52,8 @@ When making changes to the objects in the code, add migrations and update the da
 dotnet ef --project timelapse.api migrations add --context "AppDbContext" <migrationName>
 dotnet ef --project timelapse.api migrations script -i --context "AppDbContext" -o timelapse.api/Migrations/scripts.sql
 ```
+
+Updating database:
+```
+dotnet ef --project timelapse.api database update
+```
