@@ -20,5 +20,13 @@ namespace timelapse.api{
             _logger.LogInformation("Get all devices");
             return _appDbContext.Devices.ToList();
         }
+
+        [HttpPost]
+        public ActionResult<Device> Post([FromQuery] Device device){
+            _logger.LogInformation("Add device");
+            _appDbContext.Devices.Add(device);
+            _appDbContext.SaveChanges();
+            return device;
+        }
     }
 }
