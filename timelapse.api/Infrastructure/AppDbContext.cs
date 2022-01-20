@@ -4,10 +4,11 @@ using System.ComponentModel.DataAnnotations.Schema;
 using timelapse.core.models;
 using Microsoft.EntityFrameworkCore;
 // using Microsoft.Extensions.Logging;
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 
 namespace timelapse.infrastructure
 {
-    public class AppDbContext : DbContext
+    public class AppDbContext : IdentityDbContext 
     {
         private IConfiguration _configuration;
         public AppDbContext(DbContextOptions<AppDbContext> options, IConfiguration configuration)
