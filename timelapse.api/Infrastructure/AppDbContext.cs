@@ -17,6 +17,7 @@ namespace timelapse.infrastructure
         }
 
         public DbSet<Device> Devices { get; set; }
+        public DbSet<Telemetry> Telemetry { get; set; }
 
         protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
         {
