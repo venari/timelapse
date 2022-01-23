@@ -2,6 +2,7 @@ print('Logging...')
 
 from pijuice import PiJuice
 import time
+import psutil
 import os
 import json
 try:
@@ -11,6 +12,7 @@ except ImportError:
 
 
 config = json.load(open(os.path.dirname(os.path.realpath(__file__)) + '/config.json'))
+log = f'{time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())}, {pj.status.GetChargeLevel()["data"]}, {pj.status.GetBatteryTemperature()["data"]}, {pj.status.GetStatus()["data"]["battery"]}, {time.time() - psutil.boot_time()}\n'
 
 if config['logToFile']:
     pj = PiJuice(1, 0x14) #?
