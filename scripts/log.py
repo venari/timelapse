@@ -3,6 +3,10 @@ print('Logging...')
 from pijuice import PiJuice
 import time
 import os
+try:
+    import requests
+except ImportError:
+    print('requests module not found, try "python3 -m pip install requests"')
 
 pj = PiJuice(1, 0x14) #?
 
@@ -13,4 +17,14 @@ outFile = os.path.dirname(os.path.realpath(__file__)) + '/../output/log.csv'
 with open(outFile, 'a') as f:
     f.write(log)
 
-print('Logging complete')
+print('Logged to file.')
+
+api_url = 'http://?'
+
+api_data = {
+        'time': time.time(),
+        'charge': pj.status.GetChargeLevel(),
+        'temp': pj.status.GetBatteryTemperature()
+    }
+
+requests.post(api_url, json=api_data)
