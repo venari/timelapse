@@ -3,28 +3,35 @@ print('Logging...')
 from pijuice import PiJuice
 import time
 import os
+import json
 try:
     import requests
 except ImportError:
     print('requests module not found, try "python3 -m pip install requests"')
 
-pj = PiJuice(1, 0x14) #?
 
-log = f'{time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())}, {pj.status.GetChargeLevel()["data"]}, {pj.status.GetBatteryTemperature()["data"]}\n'
+config = json.load(open(os.path.dirname(os.path.realpath(__file__)) + '/config.json'))
 
-outFile = os.path.dirname(os.path.realpath(__file__)) + '/../output/log.csv'
+if config['logToFile']:
+    pj = PiJuice(1, 0x14) #?
 
-with open(outFile, 'a') as f:
-    f.write(log)
+    log = f'{time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())}, {pj.status.GetChargeLevel()["data"]}, {pj.status.GetBatteryTemperature()["data"]}\n'
 
-print('Logged to file.')
+    outFile = os.path.dirname(os.path.realpath(__file__)) + '/../output/log.csv'
 
-api_url = 'http://?'
+    with open(outFile, 'a') as f:
+        f.write(log)
 
-api_data = {
-        'time': time.time(),
-        'charge': pj.status.GetChargeLevel(),
-        'temp': pj.status.GetBatteryTemperature()
-    }
+    print('Logged to file.')
 
-requests.post(api_url, json=api_data)
+if config['logToAPI']:
+
+    api_data = {
+            'time': time.time(),
+            'charge': pj.status.GetChargeLevel(),
+            'temp': pj.status.GetBatteryTemperature()
+        }
+
+    requests.post(config['apiUrl'], json=api_data)
+
+    print('Logged to API.')
