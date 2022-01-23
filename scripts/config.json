@@ -1,6 +1,6 @@
 {
     "logToAPI": true,
-    "logToFile": true,
+    "logToFile": false,
 
     "APIUrl": "http://?"
 }
