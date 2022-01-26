@@ -40,7 +40,7 @@ fi
 
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 source $DIR/database-connection-strings.secret.sh
-ConnectionStrings__DefaultConnection=$Timelapse_ConnectionStrings__DefaultConnection
+ConnectionStrings__DefaultConnection=$TimelapseDev_ConnectionStrings__DefaultConnection
 
 
 
@@ -56,7 +56,6 @@ ConnectionStrings__DefaultConnection=$Timelapse_ConnectionStrings__DefaultConnec
 # echo Determining IP Address...
 # export IP_ADDRESS=$(curl ipecho.net/plain)
 # echo Configuring database firewall entry.... 
-# az sql server firewall-rule create --name 'database-scaffold-script'  --server $DB_SERVER_NAME --resource-group $AZURE_RESOURCE_GROUP --start-ip-address $IP_ADDRESS --end-ip-address $IP_ADDRESS
 # az postgres flexible-server firewall-rule create --name $DB_SERVER --resource-group $AZURE_RESOURCE_GROUP --start-ip-address $IP_ADDRESS --end-ip-address $IP_ADDRESS --rule-name 'create_script'
 
 
