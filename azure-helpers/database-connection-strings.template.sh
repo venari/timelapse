@@ -1,1 +1,6 @@
 export Timelapse_ConnectionStrings__DefaultConnection="Host=timelapse.postgres.database.azure.com;Port=5432;User ID=postgres;Password=<SUPER SECRET PASSWORD>;Database=timelapse"
+export TimelapseDev_ConnectionStrings__DefaultConnection="Host=timelapse-dev.postgres.database.azure.com;Port=5432;User ID=postgres;Password=<SUPER SECRET PASSWORD>;Database=timelapse"
+export Timelapse_DBadmin_user="postgres"
+export Timelapse_DBadmin_password="<SUPER SECRET PASSWORD>"
+export TimelapseDev_DBadmin_user="postgres"
+export TimelapseDev_DBadmin_password="<SUPER SECRET PASSWORD>"

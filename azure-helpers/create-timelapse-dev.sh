@@ -5,15 +5,17 @@
 AZURE_RESOURCE_GROUP=timelapse
 AZURE_APP_NAME=timelapse-dev
 AZURE_APP_PLAN_NAME=timelapse
+AZURE_LOCATION=australiasoutheast
+DB_SERVER=timelapse-dev
+DB_NAME=timelapse
 # KEYVAULT_NAME=timelapse-dev
-
 
 echo "Checking if app service plan $AZURE_APP_PLAN_NAME already exists...."
 MATCHING_APP_PLAN_NAME_COUNT=$(az appservice plan list --query "[?name=='$AZURE_APP_PLAN_NAME'].{name:name}.length(@)")
 if [ $MATCHING_APP_PLAN_NAME_COUNT = 0 ]
 then
     echo "Creating app service plan $AZURE_APP_PLAN_NAME..."
-    az appservice plan create --name $AZURE_APP_PLAN_NAME --resource-group $AZURE_RESOURCE_GROUP --sku F1 --is-linux --location "australiasoutheast"
+    az appservice plan create --name $AZURE_APP_PLAN_NAME --resource-group $AZURE_RESOURCE_GROUP --sku F1 --is-linux --location $AZURE_LOCATION
 else
     echo "App Service Plan $AZURE_APP_PLAN_NAME already exists."
 fi
@@ -41,6 +43,23 @@ source $DIR/database-connection-strings.secret.sh
 ConnectionStrings__DefaultConnection=$Timelapse_ConnectionStrings__DefaultConnection
 
 
+
+# az postgres flexible-server create --admin-user $TimelapseDev_DBadmin_user --admin-password $TimelapseDev_DBadmin_password --location $AZURE_LOCATION --name $DB_SERVER --public none --resource-group timelapse --tier Burstable --sku-name Standard_B1ms  --storage-size 32  --version 13
+# az postgres flexible-server db create --resource-group $AZURE_RESOURCE_GROUP --server-name $DB_SERVER --database-name $DB_NAME
+
+# az postgres flexible-server db list --server-name $DB_SERVER --resource-group timelapse
+# az postgres flexible-server db list --server-name $DB_SERVER --resource-group timelapse
+# az postgres flexible-server db create --resource-group timelapse --server-name timelapse --database-name timelapse
+# az postgres flexible-server db create --resource-group $AZURE_RESOURCE_GROUP --server-name $DB_SERVER --database-name $DB_NAME
+
+
+# echo Determining IP Address...
+# export IP_ADDRESS=$(curl ipecho.net/plain)
+# echo Configuring database firewall entry.... 
+# az sql server firewall-rule create --name 'database-scaffold-script'  --server $DB_SERVER_NAME --resource-group $AZURE_RESOURCE_GROUP --start-ip-address $IP_ADDRESS --end-ip-address $IP_ADDRESS
+# az postgres flexible-server firewall-rule create --name $DB_SERVER --resource-group $AZURE_RESOURCE_GROUP --start-ip-address $IP_ADDRESS --end-ip-address $IP_ADDRESS --rule-name 'create_script'
+
+
 az webapp config connection-string set --name $AZURE_APP_NAME --resource-group $AZURE_RESOURCE_GROUP --connection-string-type PostgreSQL --settings DefaultConnection="$ConnectionStrings__DefaultConnection"
 # az webapp config connection-string set --name $AZURE_APP_NAME --resource-group $AZURE_RESOURCE_GROUP --connection-string-type PostgreSQL --settings DefaultConnection='Host=timelapse.postgres.database.azure.com;Port=5432;User ID={DBUsername};Password={DBPassword};Database=timelapse'
 # az keyvault secret set --vault-name "$KEYVAULT_NAME" --name "DBUsername" --value "api"
@@ -58,7 +77,7 @@ az webapp log config --name $AZURE_APP_NAME --resource-group $AZURE_RESOURCE_GRO
     # if [ $MATCHING_KEYVAULT_NAME_COUNT = 0 ]
     # then
     #     echo "Creating keyvault $KEYVAULT_NAME..."
-    #     az keyvault create --name ${KEYVAULT_NAME} --resource-group ${AZURE_RESOURCE_GROUP} --location "westus"
+    #     az keyvault create --name ${KEYVAULT_NAME} --resource-group ${AZURE_RESOURCE_GROUP} --location "$AZURE_LOCATION"
     # else
     #     echo "Keyvault $KEYVAULT_NAME already exists."
     # fi
