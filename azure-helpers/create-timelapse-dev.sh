@@ -5,7 +5,7 @@
 AZURE_RESOURCE_GROUP=timelapse
 AZURE_APP_NAME=timelapse-dev
 AZURE_APP_PLAN_NAME=timelapse
-KEYVAULT_NAME=timelapse-dev
+# KEYVAULT_NAME=timelapse-dev
 
 
 echo "Checking if app service plan $AZURE_APP_PLAN_NAME already exists...."
@@ -25,30 +25,57 @@ if [ $MATCHING_APP_NAME_COUNT = 0 ]
 then
     echo "Creating webapp $AZURE_APP_NAME..."
     az webapp create --name $AZURE_APP_NAME --resource-group $AZURE_RESOURCE_GROUP  --plan $AZURE_APP_PLAN_NAME --runtime "DOTNET|6.0"
+
+
+    # az webapp deployment github-actions add --name timelapse-dev --repo venari/timelapse --resource-group timelapse --branch development --token ghp_xxx --runtime "DOTNET|6.0"    
+    # Command group 'webapp deployment github-actions' is in preview and under development. Reference and support levels: https://aka.ms/CLI_refstatus
+    # Verified GitHub repo and branch
+    # Runtime DOTNET|6.0 is not supported for GitHub Actions deployments.
 else
     echo "Webapp $AZURE_APP_NAME already exists."
 fi
 
-echo "Checking if keyvault $KEYVAULT_NAME already exists...."
-MATCHING_KEYVAULT_NAME_COUNT=$(az keyvault list --query "[?name=='$KEYVAULT_NAME'].{name:name}.length(@)")
-if [ $MATCHING_KEYVAULT_NAME_COUNT = 0 ]
-then
-    echo "Creating keyvault $KEYVAULT_NAME..."
-    az keyvault create --name ${KEYVAULT_NAME} --resource-group ${AZURE_RESOURCE_GROUP} --location "westus"
-else
-    echo "Keyvault $KEYVAULT_NAME already exists."
-fi
 
-echo "az webapp identity assign...."
-PRINCIPAL_ID=$(az webapp identity assign --name ${AZURE_APP_NAME}  --resource-group ${AZURE_RESOURCE_GROUP} --query "[principalId]" -o tsv)
-echo "Granting access to KeyVault $KEYVAULT_NAME..."
-az keyvault set-policy --name ${KEYVAULT_NAME} --object-id $PRINCIPAL_ID --secret-permissions get list
+DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+source $DIR/database-connection-strings.secret.sh
+ConnectionStrings__DefaultConnection=$Timelapse_ConnectionStrings__DefaultConnection
 
-echo "Setting KeyVaultName application setting to $KEYVAULT_NAME..."
-az webapp config appsettings set --name ${AZURE_APP_NAME} --resource-group ${AZURE_RESOURCE_GROUP} --settings KeyVaultName=$KEYVAULT_NAME
 
-# echo "az webapp identity assign for deploy slot...."
-# PRINCIPAL_ID=$(az webapp identity assign --name ${AZURE_APP_NAME}  --slot deploy --resource-group ${AZURE_RESOURCE_GROUP} --query "[principalId]" -o tsv)
+az webapp config connection-string set --name $AZURE_APP_NAME --resource-group $AZURE_RESOURCE_GROUP --connection-string-type PostgreSQL --settings DefaultConnection="$ConnectionStrings__DefaultConnection"
+# az webapp config connection-string set --name $AZURE_APP_NAME --resource-group $AZURE_RESOURCE_GROUP --connection-string-type PostgreSQL --settings DefaultConnection='Host=timelapse.postgres.database.azure.com;Port=5432;User ID={DBUsername};Password={DBPassword};Database=timelapse'
+# az keyvault secret set --vault-name "$KEYVAULT_NAME" --name "DBUsername" --value "api"
+# az keyvault secret set --vault-name "$KEYVAULT_NAME" --name "DBPassword" --value "<Super Secret Password>"
 
-# echo "Granting access to KeyVault $KEYVAULT_NAME for deploy slot..."
-# az keyvault set-policy --name ${KEYVAULT_NAME} --object-id $PRINCIPAL_ID --secret-permissions get list 
+
+# az webapp log config --name $AZURE_APP_NAME --resource-group $AZURE_RESOURCE_GROUP --application-logging azureblobstorage --docker-container-logging off --detailed-error-messages true --web-server-logging off  --level information
+# az webapp log config --name $AZURE_APP_NAME --resource-group $AZURE_RESOURCE_GROUP --application-logging azureblobstorage --docker-container-logging filesystem --web-server-logging off  --level information
+az webapp log config --name $AZURE_APP_NAME --resource-group $AZURE_RESOURCE_GROUP --application-logging azureblobstorage --docker-container-logging filesystem --web-server-logging filesystem  --level information
+
+# Not using Key vault
+
+    # echo "Checking if keyvault $KEYVAULT_NAME already exists...."
+    # MATCHING_KEYVAULT_NAME_COUNT=$(az keyvault list --query "[?name=='$KEYVAULT_NAME'].{name:name}.length(@)")
+    # if [ $MATCHING_KEYVAULT_NAME_COUNT = 0 ]
+    # then
+    #     echo "Creating keyvault $KEYVAULT_NAME..."
+    #     az keyvault create --name ${KEYVAULT_NAME} --resource-group ${AZURE_RESOURCE_GROUP} --location "westus"
+    # else
+    #     echo "Keyvault $KEYVAULT_NAME already exists."
+    # fi
+
+    # echo "az webapp identity assign...."
+    # PRINCIPAL_ID=$(az webapp identity assign --name ${AZURE_APP_NAME}  --resource-group ${AZURE_RESOURCE_GROUP} --query "[principalId]" -o tsv)
+    # echo "Granting access to KeyVault $KEYVAULT_NAME..."
+    # az keyvault set-policy --name ${KEYVAULT_NAME} --object-id $PRINCIPAL_ID --secret-permissions get list
+
+    # echo "Setting KeyVaultName application setting to $KEYVAULT_NAME..."
+    # az webapp config appsettings set --name ${AZURE_APP_NAME} --resource-group ${AZURE_RESOURCE_GROUP} --settings KeyVaultName=$KEYVAULT_NAME
+
+# Not using deployment slot - for keyvault
+
+    # echo "az webapp identity assign for deploy slot...."
+    # PRINCIPAL_ID=$(az webapp identity assign --name ${AZURE_APP_NAME}  --slot deploy --resource-group ${AZURE_RESOURCE_GROUP} --query "[principalId]" -o tsv)
+
+    # echo "Granting access to KeyVault $KEYVAULT_NAME for deploy slot..."
+    # az keyvault set-policy --name ${KEYVAULT_NAME} --object-id $PRINCIPAL_ID --secret-permissions get list 
+
