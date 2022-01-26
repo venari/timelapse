@@ -62,9 +62,9 @@ namespace timelapse.api.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("battery_percent");
 
-                    b.Property<string>("DeviceId")
+                    b.Property<int>("DeviceId")
                         .IsRequired()
-                        .HasColumnType("text")
+                        .HasColumnType("integer")
                         .HasColumnName("device_id");
 
                     b.Property<int>("DiskSpaceFree")

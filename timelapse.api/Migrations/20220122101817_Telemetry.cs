@@ -16,7 +16,7 @@ namespace timelapse.api.Migrations
                 {
                     id = table.Column<int>(type: "integer", nullable: false)
                         .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
-                    device_id = table.Column<string>(type: "text", nullable: false),
+                    device_id = table.Column<int>(type: "integer", nullable: false),
                     timestamp = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
                     temperature_c = table.Column<int>(type: "integer", nullable: false),
                     battery_percent = table.Column<int>(type: "integer", nullable: false),
