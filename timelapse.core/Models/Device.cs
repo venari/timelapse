@@ -11,4 +11,11 @@ public class Device
 
     [System.Text.Json.Serialization.JsonIgnore]
     public List<Telemetry> Telemetries {get;} = new List<Telemetry>();
+
+    public Telemetry? LatestTelemetry {
+        get{
+            var latestTelemetry = Telemetries.OrderByDescending(t => t.Timestamp).FirstOrDefault();
+            return latestTelemetry;
+        }
+    }
 }

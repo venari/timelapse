@@ -22,7 +22,16 @@ namespace timelapse.api{
         }
 
         [HttpPost]
-        public ActionResult<Telemetry> Post([FromQuery] Telemetry telemetry){
+        public ActionResult<Telemetry> Post([FromQuery] TelemetryPostModel model){
+
+            Telemetry telemetry = new Telemetry(){
+                DeviceId = model.DeviceId,
+                Timestamp = model.Timestamp==DateTime.MinValue?DateTime.Now.ToUniversalTime():model.Timestamp,
+                TemperatureC = model.TemperatureC,
+                BatteryPercent = model.BatteryPercent,
+                DiskSpaceFree = model.DiskSpaceFree,
+                UptimeSeconds = model.UptimeSeconds
+            };
             _logger.LogInformation("Add Telemetry");
             _appDbContext.Telemetry.Add(telemetry);
             _appDbContext.SaveChanges();

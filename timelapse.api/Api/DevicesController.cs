@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using timelapse.core.models;
 using timelapse.infrastructure;
 
@@ -18,7 +19,7 @@ namespace timelapse.api{
         [HttpGet]
         public ActionResult<IEnumerable<Device>> Get(){
             _logger.LogInformation("Get all devices");
-            return _appDbContext.Devices.ToList();
+            return _appDbContext.Devices.Include(d => d.Telemetries).ToList();
         }
 
         [HttpPost]

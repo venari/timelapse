@@ -8,3 +8,36 @@
     <h1 class="display-4">Welcome</h1>
     <p>Learn about <a href="https://docs.microsoft.com/aspnet/core">building Web apps with ASP.NET Core</a>.</p>
 </div>
+
+<div>
+    <table class="table">
+        <thead>
+            <tr>
+            <th scope="col">Id</th>
+            <th scope="col">Name</th>
+            <th scope="col">Description</th>
+            @* <th scope="col"></th> *@
+            </tr>
+        </thead>
+        <tbody>
+                @foreach (var device in Model.devices){
+                    <tr>
+                        <td>
+                            @Html.DisplayFor(modelItem => device.Id)
+                        </td>
+                        <td>
+                            @Html.DisplayFor(modelItem => device.Name)
+                        </td>
+                        <td>
+                            @Html.DisplayFor(modelItem => device.Description)
+                        </td>
+                        @* <td>
+                            @Html.ActionLink("Edit", "Edit", new { id=device.Id }) |
+                            @Html.ActionLink("Details", "Details", new { id=device.Id})  |
+                            @Html.ActionLink("Delete", "Delete", new { id=device.Id }) 
+                        </td> *@
+                    </tr>
+                }
+        </tbody>
+    </table>
+</div>
