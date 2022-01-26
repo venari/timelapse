@@ -8,4 +8,7 @@ public class Device
     [Required]
     public string Name {get; set;}
     public string Description {get; set;}
+
+    [System.Text.Json.Serialization.JsonIgnore]
+    public List<Telemetry> Telemetries {get;} = new List<Telemetry>();
 }
