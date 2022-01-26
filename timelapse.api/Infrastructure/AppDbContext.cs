@@ -10,11 +10,14 @@ namespace timelapse.infrastructure
     public class AppDbContext : DbContext
     {
         private IConfiguration _configuration;
-        public AppDbContext(DbContextOptions<AppDbContext> options, IConfiguration configuration)
-        :base(options)
+        public AppDbContext(DbContextOptions<AppDbContext> options, IConfiguration configuration, ILogger<AppDbContext> logger)
+            : base(options)
         {
             _configuration = configuration;
+            _logger = logger;
         }
+
+        private ILogger _logger;
 
         public DbSet<Device> Devices { get; set; }
         public DbSet<Telemetry> Telemetry { get; set; }
@@ -22,6 +25,7 @@ namespace timelapse.infrastructure
         protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
         {
             var connectionString = _configuration.GetConnectionString("DefaultConnection");
+            _logger.LogInformation(connectionString);
             optionsBuilder.UseNpgsql(connectionString)
             .UseSnakeCaseNamingConvention();
         }
