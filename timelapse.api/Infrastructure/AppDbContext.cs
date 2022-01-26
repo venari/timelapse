@@ -24,7 +24,7 @@ namespace timelapse.infrastructure
 
         protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
         {
-            _logger.LogInformation("OnConfiguring");
+            _logger.LogInformation("OnConfiguring 2");
             _logger.LogInformation("_configuration[\"ConnectionStrings:DefaultConnection\"]");
             _logger.LogInformation(_configuration["ConnectionStrings:DefaultConnection"]);
             _logger.LogInformation("_configuration.GetConnectionString(\"DefaultConnection\")");
