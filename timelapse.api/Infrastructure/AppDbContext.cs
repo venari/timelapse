@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations.Schema;
 using timelapse.core.models;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 // using Microsoft.Extensions.Logging;
 
 namespace timelapse.infrastructure
@@ -24,11 +25,14 @@ namespace timelapse.infrastructure
 
         protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
         {
-            _logger.LogInformation("OnConfiguring 2");
+            _logger.LogInformation("OnConfiguring 4");
             _logger.LogInformation("_configuration[\"ConnectionStrings:DefaultConnection\"]");
             _logger.LogInformation(_configuration["ConnectionStrings:DefaultConnection"]);
             _logger.LogInformation("_configuration.GetConnectionString(\"DefaultConnection\")");
             _logger.LogInformation(_configuration.GetConnectionString("DefaultConnection"));
+
+            _logger.LogInformation("_configuration[\"POSTGRESQLCONNSTR_DefaultConnection\"]");
+            _logger.LogInformation(_configuration["POSTGRESQLCONNSTR_DefaultConnection"]);
             _logger.LogInformation("_configuration[\"KeyVaultName\"]");
             _logger.LogInformation(_configuration["KeyVaultName"]);
 
