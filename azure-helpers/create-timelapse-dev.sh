@@ -95,7 +95,7 @@ then
     az postgres flexible-server create --admin-user $Timelapse_DBadmin_user --admin-password $Timelapse_DBadmin_password  --name $DB_SERVER --location $AZURE_LOCATION  --resource-group $AZURE_RESOURCE_GROUP \
     --database-name $DB_NAME \
     --tier Burstable --sku-name Standard_B1ms  --storage-size 32  --version 13
-    --public-access $IP_ADDRESS
+    # --public-access $IP_ADDRESS
     # --vnet $VNET_NAME --private-dns-zone $PRIVATE_DNS_ZONE_PREFIX.private.postgres.database.azure.com --subnet $SUBNET_NAME
 else
     echo "PostgreSQL Server $DB_SERVER already exists."
@@ -111,6 +111,11 @@ then
 else
     echo "PostgreSQL Database $DB_NAME already exists."
 fi
+
+echo "Updating PostgreSQL firewall rules..."
+az postgres flexible-server firewall-rule create --name $DB_SERVER --resource-group $AZURE_RESOURCE_GROUP --start-ip-address $IP_ADDRESS --end-ip-address $IP_ADDRESS --rule-name 'WEBAPP-ACCESS'
+az postgres flexible-server firewall-rule create --name $DB_SERVER --resource-group $AZURE_RESOURCE_GROUP --start-ip-address 0.0.0.0 --end-ip-address 0.0.0.0 --rule-name 'AZURE_ACCESS'
+
 
 echo "Running migrations..."
 dotnet ef --project timelapse.api database update --connection "$ConnectionStrings__DefaultConnection"
