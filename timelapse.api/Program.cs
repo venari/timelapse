@@ -1,7 +1,6 @@
 using System.Text.Json.Serialization;
 using Microsoft.EntityFrameworkCore;
 using timelapse.infrastructure;
-// using Microsoft.Extensions.Configuration;
 
 var builder = WebApplication.CreateBuilder(args);
 
