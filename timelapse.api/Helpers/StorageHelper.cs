@@ -45,6 +45,20 @@ namespace timelapse.api.Helpers
             }
         }
 
+        public string Upload(string blobName, Stream stream){
+            try{
+                _logger.LogDebug($"Upload(\"{blobName}\")");
+                Azure.Storage.Blobs.BlobClient blobClient = blobContainerClient.GetBlobClient(blobName);
+                var blobContentInfo = blobClient.Upload(stream, false);
+                return blobClient.Uri.ToString() + blobName;
+            }
+            catch(Exception ex){
+                _logger.LogError($"Error trying to access blob {blobName}");
+                _logger.LogError(ex.ToString());
+                throw;
+            }
+        }
+
         public bool Upload(string blobName, string localFilePath){
             try{
                 _logger.LogDebug($"Upload(\"{blobName}\")");

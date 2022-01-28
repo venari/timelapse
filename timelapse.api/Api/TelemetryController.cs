@@ -3,6 +3,7 @@ using timelapse.core.models;
 using timelapse.infrastructure;
 
 namespace timelapse.api{
+    
     [Route("api/[controller]")]
     [ApiController]
     public class TelemetryController{

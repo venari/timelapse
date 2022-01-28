@@ -158,7 +158,7 @@ fi
 
 # STORAGE_KEY1=$(az storage account keys list --account-name $STORAGE_ACCOUNT_NAME --resource-group $AZURE_RESOURCE_GROUP --query "[?keyName=='key1'].{value:value}[0].value")
 # STORAGE_KEY2=$(az storage account keys list --account-name $STORAGE_ACCOUNT_NAME --resource-group $AZURE_RESOURCE_GROUP --query "[?keyName=='key2'].{value:value}[0].value")
-STORAGE_CONNECTION_STRING=$(az storage account show-connection-string --name $STORAGE_ACCOUNT_NAME --key primary --query "connectionString")
+STORAGE_CONNECTION_STRING=$(az storage account show-connection-string --name $STORAGE_ACCOUNT_NAME --key primary --query "connectionString" -o tsv)
 
 
 echo "Checking if Storage Container $STORAGE_CONTAINER_NAME already exists...."
