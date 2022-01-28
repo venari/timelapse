@@ -27,13 +27,15 @@ if config['logToFile']:
     print('Logged to file.')
 
 if config['logToAPI']:
-
     api_data = {
-            'time': time.time(),
-            'charge': pj.status.GetChargeLevel(),
-            'temp': pj.status.GetBatteryTemperature()
-        }
+    #            'time': time.time(), <--- leave empty - API will populate it.
+                'batteryPercent': pj.status.GetChargeLevel(),
+                'temperatureC': pj.status.GetBatteryTemperature(),
+                'diskSpaceFree': 0,
+                'uptimeSeconds': time.time() - psutil.boot_time(),
+                'deviceId': 1,      # I'll sort this out in a bit.
+            }
 
-    requests.post(config['apiUrl'], json=api_data)
+    requests.post(config['apiUrl'] + '/Telemetry', json=api_data)
 
     print('Logged to API.')
