@@ -30,7 +30,7 @@ namespace timelapse.api{
 
             Image image = new Image(){
                 DeviceId = model.DeviceId,
-                Timestamp = model.Timestamp==DateTime.MinValue?DateTime.Now.ToUniversalTime():model.Timestamp,
+                Timestamp = model.Timestamp.HasValue?model.Timestamp.Value:DateTime.Now.ToUniversalTime(),
                 // file = model.file
             };
 

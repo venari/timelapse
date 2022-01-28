@@ -31,7 +31,7 @@ namespace timelapse.api{
 
             Telemetry telemetry = new Telemetry(){
                 DeviceId = model.DeviceId,
-                Timestamp = model.Timestamp==DateTime.MinValue?DateTime.Now.ToUniversalTime():model.Timestamp,
+                Timestamp = model.Timestamp.HasValue?model.Timestamp.Value:DateTime.Now.ToUniversalTime(),
                 TemperatureC = model.TemperatureC,
                 BatteryPercent = model.BatteryPercent,
                 DiskSpaceFree = model.DiskSpaceFree,
