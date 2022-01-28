@@ -24,7 +24,7 @@ namespace timelapse.api{
         }
 
         [HttpPost]
-        public ActionResult<Device> Post([FromQuery] DevicePostModel model){
+        public ActionResult<Device> Post([FromForm] DevicePostModel model){
             _logger.LogInformation("Add device");
             
             Device device = new Device(){

@@ -3,7 +3,7 @@ using timelapse.core.models;
 using timelapse.infrastructure;
 
 namespace timelapse.api{
-    
+
     [Route("api/[controller]")]
     [ApiController]
     public class TelemetryController{
@@ -23,7 +23,7 @@ namespace timelapse.api{
         }
 
         [HttpPost]
-        public ActionResult<Telemetry> Post([FromQuery] TelemetryPostModel model){
+        public ActionResult<Telemetry> Post([FromForm] TelemetryPostModel model){
 
             Telemetry telemetry = new Telemetry(){
                 DeviceId = model.DeviceId,

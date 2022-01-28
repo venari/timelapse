@@ -26,7 +26,7 @@ namespace timelapse.api{
         }
 
         [HttpPost]
-        public ActionResult<Image> Post([FromQuery] ImagePostModel model){
+        public ActionResult<Image> Post([FromForm] ImagePostModel model){
 
             Image image = new Image(){
                 DeviceId = model.DeviceId,
