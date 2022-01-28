@@ -2,5 +2,5 @@
     "logToFile": true,
     "logToAPI": true,
 
-    "apiUrl": "http://ethan-ubuntu"
+    "apiUrl": "https://timelapse-dev.azurewebsites.net/api/"
 }
