@@ -11,12 +11,11 @@ except ImportError:
     print('requests module not found, try "python3 -m pip install requests"')
 
 
+pj = PiJuice(1, 0x14)
 config = json.load(open(os.path.dirname(os.path.realpath(__file__)) + '/config.json'))
 log = f'{time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())}, {pj.status.GetChargeLevel()["data"]}, {pj.status.GetBatteryTemperature()["data"]}, {pj.status.GetStatus()["data"]["battery"]}, {time.time() - psutil.boot_time()}\n'
 
 if config['logToFile']:
-    pj = PiJuice(1, 0x14) #?
-
     log = f'{time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())}, {pj.status.GetChargeLevel()["data"]}, {pj.status.GetBatteryTemperature()["data"]}\n'
 
     outFile = os.path.dirname(os.path.realpath(__file__)) + '/../output/log.csv'
