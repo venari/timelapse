@@ -1,0 +1,6 @@
+{
+    "logToFile": true,
+    "logToAPI": true,
+
+    "apiUrl": "http://ethan-ubuntu"
+}
