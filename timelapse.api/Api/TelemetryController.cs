@@ -25,6 +25,10 @@ namespace timelapse.api{
         [HttpPost]
         public ActionResult<Telemetry> Post([FromForm] TelemetryPostModel model){
 
+            _logger.LogInformation("In Telemenrty Post");
+            _logger.LogInformation("DeviceId: " + model.DeviceId);
+            _logger.LogInformation("Timestamp: " + model.Timestamp);
+            
             Telemetry telemetry = new Telemetry(){
                 DeviceId = model.DeviceId,
                 Timestamp = model.Timestamp==DateTime.MinValue?DateTime.Now.ToUniversalTime():model.Timestamp,
