@@ -35,7 +35,7 @@ namespace timelapse.api{
             };
 
             string blobName = model.DeviceId + "_" + model.File.FileName;
-            image.BlobUri = new Uri(_storageHelper.Upload(blobName, model.File.OpenReadStream()));
+            image.BlobUri = _storageHelper.Upload(blobName, model.File.OpenReadStream());
 
             _logger.LogInformation("Add Image");
             _appDbContext.Images.Add(image);

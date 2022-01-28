@@ -45,12 +45,12 @@ namespace timelapse.api.Helpers
             }
         }
 
-        public string Upload(string blobName, Stream stream){
+        public Uri Upload(string blobName, Stream stream){
             try{
                 _logger.LogDebug($"Upload(\"{blobName}\")");
                 Azure.Storage.Blobs.BlobClient blobClient = blobContainerClient.GetBlobClient(blobName);
                 var blobContentInfo = blobClient.Upload(stream, false);
-                return blobClient.Uri.ToString() + blobName;
+                return blobClient.Uri;
             }
             catch(Exception ex){
                 _logger.LogError($"Error trying to access blob {blobName}");
@@ -78,6 +78,7 @@ namespace timelapse.api.Helpers
 
         public Uri GenerateSasUri(){
             try{
+                // Need to optimise to cache token.
                 var sasUri = blobContainerClient.GenerateSasUri(Azure.Storage.Sas.BlobContainerSasPermissions.Read, DateTimeOffset.UtcNow.AddHours(1));
                 return sasUri;
             }

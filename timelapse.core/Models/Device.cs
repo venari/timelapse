@@ -12,10 +12,20 @@ public class Device
     [System.Text.Json.Serialization.JsonIgnore]
     public List<Telemetry> Telemetries {get;} = new List<Telemetry>();
 
+    [System.Text.Json.Serialization.JsonIgnore]
+    public List<Image> Images {get;} = new List<Image>();
+
     public Telemetry? LatestTelemetry {
         get{
             var latestTelemetry = Telemetries.OrderByDescending(t => t.Timestamp).FirstOrDefault();
             return latestTelemetry;
+        }
+    }
+
+    public Image? LatestImage {
+        get{
+            var latestImage = Images.OrderByDescending(i => i.Timestamp).FirstOrDefault();
+            return latestImage;
         }
     }
 }
