@@ -28,7 +28,7 @@ namespace timelapse.api{
             _logger.LogInformation("In Telemenrty Post");
             _logger.LogInformation("DeviceId: " + model.DeviceId);
             _logger.LogInformation("Timestamp: " + model.Timestamp);
-            
+
             Telemetry telemetry = new Telemetry(){
                 DeviceId = model.DeviceId,
                 Timestamp = model.Timestamp==DateTime.MinValue?DateTime.Now.ToUniversalTime():model.Timestamp,
@@ -37,7 +37,7 @@ namespace timelapse.api{
                 DiskSpaceFree = model.DiskSpaceFree,
                 UptimeSeconds = model.UptimeSeconds
             };
-            _logger.LogInformation("Add Telemetry");
+            _logger.LogInformation("Add Telemetry BLAH");
             _appDbContext.Telemetry.Add(telemetry);
             _appDbContext.SaveChanges();
             return telemetry;
