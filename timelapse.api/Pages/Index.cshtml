@@ -51,8 +51,9 @@
                             @(device.LatestImage!=null?device.LatestImage.Timestamp:"---")
                         </td>
                         <td>
-                            <img class="img-thumbnail" src="@(device.LatestImage!=null?device.LatestImage.BlobUri + Model.SasToken:"---")"></img>
-                            @* @Html.DisplayFor(modelItem => device.LatestTelemetry!=null?device.LatestTelemetry.BatteryPercent:-999) *@
+                            @if(device.LatestImage!=null){
+                                <img class="img-thumbnail" src="@(device.LatestImage.BlobUri + Model.SasToken)" width=100></img>
+                            }
                         </td>
                         @* <td>
                             @Html.ActionLink("Edit", "Edit", new { id=device.Id }) |
