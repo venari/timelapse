@@ -2,5 +2,7 @@
     "logToFile": true,
     "logToAPI": true,
 
-    "apiUrl": "https://timelapse-dev.azurewebsites.net/api/"
+    "apiUrl": "https://timelapse-dev.azurewebsites.net/api/",
+
+    "shutdown": false
 }

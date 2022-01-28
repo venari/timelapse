@@ -6,9 +6,12 @@ import pijuice
 import subprocess
 import datetime
 import os
-import sys 
+import sys
 from gpiozero import CPUTemperature
 from picamera import PiCamera
+import json
+
+config = json.load(open('./config.json'))
 
 DELTA_MIN=10
 SHUTDOWN_TILL_MORNING=False
@@ -109,8 +112,9 @@ else:
 pj.rtcAlarm.SetWakeupEnabled(True)
 time.sleep(0.4)
 
-# PiJuice shuts down power to Rpi after 20 sec from now
-# This leaves sufficient time to execute the shutdown sequence
-pj.power.SetPowerOff(20)
-subprocess.call(["sudo", "poweroff"])
+if config['shutdown']:
+    # PiJuice shuts down power to Rpi after 20 sec from now
+    # This leaves sufficient time to execute the shutdown sequence
+    pj.power.SetPowerOff(20)
+    subprocess.call(["sudo", "poweroff"])
 
