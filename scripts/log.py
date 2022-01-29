@@ -2,7 +2,7 @@ print('Logging...')
 
 from pijuice import PiJuice
 import time
-import psutil
+import shutil
 import os
 import json
 try:
@@ -29,7 +29,7 @@ if config['logToAPI']:
     api_data = {
                 'batteryPercent': pj.status.GetChargeLevel()['data'],
                 'temperatureC': pj.status.GetBatteryTemperature()['data'],
-                'diskSpaceFree': 0,
+                'diskSpaceFree': shutil.disk_usage('/')[2], # shutil.disk_usage returns tuple of (total, used, free)
                 'uptimeSeconds': int(time.time() - psutil.boot_time()),
                 'deviceId': 1,      # I'll sort this out in a bit.
             }
