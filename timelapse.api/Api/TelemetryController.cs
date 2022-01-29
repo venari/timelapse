@@ -34,6 +34,7 @@ namespace timelapse.api{
                 Timestamp = model.Timestamp.HasValue?model.Timestamp.Value:DateTime.Now.ToUniversalTime(),
                 TemperatureC = model.TemperatureC,
                 BatteryPercent = model.BatteryPercent,
+                Status = model.Status,
                 DiskSpaceFree = model.DiskSpaceFree,
                 UptimeSeconds = model.UptimeSeconds
             };

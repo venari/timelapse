@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using timelapse.infrastructure;
@@ -11,9 +12,10 @@ using timelapse.infrastructure;
 namespace timelapse.api.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20220129080604_TelemetryFieldTweaks")]
+    partial class TelemetryFieldTweaks
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -100,6 +102,7 @@ namespace timelapse.api.Migrations
                         .HasColumnName("disk_space_free");
 
                     b.Property<string>("Status")
+                        .IsRequired()
                         .HasColumnType("text")
                         .HasColumnName("status");
 

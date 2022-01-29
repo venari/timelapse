@@ -19,6 +19,7 @@
             <th scope="col">Latest Telemetry</th>
             <th scope="col">Battery %</th>
             <th scope="col">Temperature (C)</th>
+            <th scope="col">Status</th>
             <th scope="col">Latest Image</th>
             <th scope="col"></th>
             @* <th scope="col"></th> *@
@@ -40,12 +41,13 @@
                             @(device.LatestTelemetry!=null?device.LatestTelemetry.Timestamp:"---")
                         </td>
                         <td>
-                            @(device.LatestTelemetry!=null?device.LatestTelemetry.BatteryPercent:"---")
-                            @* @Html.DisplayFor(modelItem => device.LatestTelemetry!=null?device.LatestTelemetry.BatteryPercent:-999) *@
+                            @(device.LatestTelemetry!=null?device.LatestTelemetry.BatteryPercent:"-")
                         </td>
                         <td>
-                            @(device.LatestTelemetry!=null?device.LatestTelemetry.TemperatureC:"---")
-                            @* @Html.DisplayFor(modelItem => device.LatestTelemetry!=null?device.LatestTelemetry.TemperatureC:-999) *@
+                            @(device.LatestTelemetry!=null?device.LatestTelemetry.TemperatureC:"-")
+                        </td>
+                        <td>
+                            @(device.LatestTelemetry!=null?device.LatestTelemetry.Status:"-")
                         </td>
                         <td>
                             @(device.LatestImage!=null?device.LatestImage.Timestamp:"---")

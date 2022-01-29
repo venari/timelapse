@@ -11,10 +11,10 @@ public class Telemetry
     public int TemperatureC {get; set;}
     [Required]
     public int BatteryPercent {get; set;}
-    [Required]
-    public int DiskSpaceFree {get; set;}
-    [Required]
-    public int UptimeSeconds {get; set;}
+    
+    public string? Status {get; set;}
+    public int? DiskSpaceFree {get; set;}
+    public int? UptimeSeconds {get; set;}
 
     [Required]
     public int DeviceId {get; set;}
