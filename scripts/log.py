@@ -12,19 +12,19 @@ except ImportError:
 
 
 pj = PiJuice(1, 0x14)
-config = json.load(open(os.path.dirname(os.path.realpath(__file__)) + '/config.json'))
+config = json.load(open('./config.json'))
 log = f'{time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())}, {pj.status.GetChargeLevel()["data"]}, {pj.status.GetBatteryTemperature()["data"]}, {pj.status.GetStatus()["data"]["battery"]}, {time.time() - time.clock_gettime(time.CLOCK_BOOTTIME)}\n'
 
 if config['logToFile']:
     log = f'{time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())}, {pj.status.GetChargeLevel()["data"]}, {pj.status.GetBatteryTemperature()["data"]}\n'
 
-    outFile = os.path.dirname(os.path.realpath(__file__)) + '/../output/log.csv'
+    outFile = './../output/log.csv'
 
     with open(outFile, 'a') as f:
         f.write(log)
 
     if pj.status.GetBatteryTemperature()["data"] > tempWarning:
-        with open(os.path.dirname(os.path.realpath(__file__)) + '/tempWarning.log', 'a') as f:
+        with open('./tempWarning.log', 'a') as f:
             f.write(f'{time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())}, {pj.status.GetBatteryTemperature()["data"]}')
 
     print('Logged to file.')
