@@ -49,7 +49,7 @@ namespace timelapse.api.Helpers
             try{
                 _logger.LogDebug($"Upload(\"{blobName}\")");
                 Azure.Storage.Blobs.BlobClient blobClient = blobContainerClient.GetBlobClient(blobName);
-                var blobContentInfo = blobClient.Upload(stream, false);
+                var blobContentInfo = blobClient.Upload(stream, true);
                 return blobClient.Uri;
             }
             catch(Exception ex){
