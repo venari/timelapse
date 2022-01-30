@@ -3,7 +3,6 @@
     "logToAPI": true,
 
     "apiUrl": "https://timelapse-dev.azurewebsites.net/api/",
-    "deviceId": 1,
 
     "shutdown": false
 }
