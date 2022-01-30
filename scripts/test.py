@@ -12,6 +12,7 @@ from picamera import PiCamera
 import json
 
 config = json.load(open('./config.json'))
+localConfig = json.load(open('./localConfig.json'))
 
 DELTA_MIN=10
 SHUTDOWN_TILL_MORNING=False
@@ -83,8 +84,27 @@ time.sleep(2)
 IMAGEFILENAME = OUTPUTIMAGEFOLDER + datetime.datetime.now().strftime('%Y-%m-%d_%H%M.jpg')
 camera.capture(IMAGEFILENAME)
 
-with open('./lastImage.path', 'w') as f:
-    f.write(IMAGEFILENAME)
+# Send image to api
+files = {
+    'File': open(IMAGEFILENAME, 'rb'),
+}
+
+data = {
+    'DeviceId': localConfig['deviceId']
+}
+
+print('data:')
+print(data)
+
+session = requests.Session()
+response = session.post(config['apiUrl'] + 'Image', files=files, data=data)
+
+print(f'Response code: {response.status_code}')
+print(f'Response text:')
+try:
+    print(json.dumps(json.loads(response.text), indent = 4))
+except json.decoder.JSONDecodeError:
+    print(response.text)
 
 with open(LOGFILE,'a') as f:
     f.write(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S') + " - Picture taken and saved.\n")
