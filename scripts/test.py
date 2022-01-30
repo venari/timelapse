@@ -83,7 +83,7 @@ time.sleep(2)
 IMAGEFILENAME = OUTPUTIMAGEFOLDER + datetime.datetime.now().strftime('%Y-%m-%d_%H%M.jpg')
 camera.capture(IMAGEFILENAME)
 
-with open('/lastImage.path', 'w') as f:
+with open('./lastImage.path', 'w') as f:
     f.write(IMAGEFILENAME)
 
 with open(LOGFILE,'a') as f:
