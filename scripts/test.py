@@ -16,9 +16,9 @@ config = json.load(open('./config.json'))
 DELTA_MIN=10
 SHUTDOWN_TILL_MORNING=False
 
-OUTPUTIMAGEFOLDER = os.path.dirname(os.path.realpath(__file__)) + '/../output/images/'
-LOGFILE = os.path.dirname(os.path.realpath(__file__)) + '/../output/test.log'
-CSVOUTPUTFILE = os.path.dirname(os.path.realpath(__file__)) + '/../output/test.csv'
+OUTPUTIMAGEFOLDER = './../output/images/'
+LOGFILE = './../output/test.log'
+CSVOUTPUTFILE = './../output/test.csv'
 
 os.makedirs(OUTPUTIMAGEFOLDER, exist_ok = True)
 
@@ -83,6 +83,9 @@ time.sleep(2)
 IMAGEFILENAME = OUTPUTIMAGEFOLDER + datetime.datetime.now().strftime('%Y-%m-%d_%H%M.jpg')
 camera.capture(IMAGEFILENAME)
 
+with open('./lastImage.path', 'w') as f:
+    f.write(IMAGEFILENAME)
+
 with open(LOGFILE,'a') as f:
     f.write(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S') + " - Picture taken and saved.\n")
     f.write("Checking if git pull works.\n")
@@ -117,4 +120,5 @@ if config['shutdown']:
     # This leaves sufficient time to execute the shutdown sequence
     pj.power.SetPowerOff(20)
     subprocess.call(["sudo", "poweroff"])
+    print('shutdown scheduled')
 
