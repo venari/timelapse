@@ -23,6 +23,10 @@ if config['logToFile']:
     with open(outFile, 'a') as f:
         f.write(log)
 
+    if pj.status.GetBatteryTemperature()["data"] > tempWarning:
+        with open(os.path.dirname(os.path.realpath(__file__)) + '/tempWarning.log', 'a') as f:
+            f.write(f'{time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())}, {pj.status.GetBatteryTemperature()["data"]}')
+
     print('Logged to file.')
 
 if config['logToAPI']:
