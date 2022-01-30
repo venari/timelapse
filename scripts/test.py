@@ -120,4 +120,5 @@ if config['shutdown']:
     # This leaves sufficient time to execute the shutdown sequence
     pj.power.SetPowerOff(20)
     subprocess.call(["sudo", "poweroff"])
+    print('shutdown scheduled')
 
