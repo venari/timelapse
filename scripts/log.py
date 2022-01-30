@@ -3,7 +3,6 @@ print('Logging...')
 from pijuice import PiJuice
 import time
 import shutil
-import psutil
 import os
 import json
 try:
