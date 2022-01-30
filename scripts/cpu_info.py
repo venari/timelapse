@@ -13,4 +13,5 @@ def cpu_info():
         return os.popen(command).read().strip()
     return 'platform not identified'
 
-print(cpu_info())
+if __name__ == '__main__':
+    print(cpu_info())
