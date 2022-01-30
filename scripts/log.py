@@ -36,7 +36,7 @@ if config['logToAPI']:
                 'temperatureC': pj.status.GetBatteryTemperature()['data'],
                 'diskSpaceFree': shutil.disk_usage('/')[2] // (1024**3), # shutil.disk_usage returns tuple of (total, used, free), converted to int gb
                 'uptimeSeconds': int(time.clock_gettime(time.CLOCK_BOOTTIME)),
-                'deviceId': 1,      # I'll sort this out in a bit.
+                'deviceId': config['deviceId'],      # I'll sort this out in a bit.
             }
 
     #requests.post(config['apiUrl'] + '/Telemetry', json=api_data)
@@ -44,7 +44,9 @@ if config['logToAPI']:
 
     print(api_data)
 
-    print(session.post(config['apiUrl'] + 'Telemetry',data=api_data))
+    postResponse = session.post(config['apiUrl'] + 'Telemetry',data=api_data)
+    print(postResponse)
+    assert postResponse.status_code == 200, "API returned error code"
     #requests.post(config['apiUrl'] + '/Telemetry', json=api_data)
 
     print('Logged to API.')
