@@ -1,0 +1,6 @@
+py-cpuinfo
+pijuice
+requests
+...
+
+incomplete
