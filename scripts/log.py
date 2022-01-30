@@ -24,7 +24,7 @@ if config['logToFile']:
     with open(outFile, 'a') as f:
         f.write(log)
 
-    if pj.status.GetBatteryTemperature()["data"] > tempWarning:
+    if pj.status.GetBatteryTemperature()["data"] > config['tempWarning']:
         with open('./tempWarning.log', 'a') as f:
             f.write(f'{time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())}, {pj.status.GetBatteryTemperature()["data"]}')
 
