@@ -4,10 +4,6 @@
 
     "apiUrl": "https://timelapse-dev.azurewebsites.net/api/",
 
-<<<<<<< HEAD
-    "shutdown": true
-=======
-    "shutdown": false,
+    "shutdown": true,
     "tempWarning": 50
->>>>>>> 1d27b73d975f3c877ea13ab82b176b48480b50ca
 }
