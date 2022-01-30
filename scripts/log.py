@@ -31,7 +31,7 @@ if config['logToAPI']:
                 'batteryPercent': pj.status.GetChargeLevel()['data'],
                 'temperatureC': pj.status.GetBatteryTemperature()['data'],
                 'diskSpaceFree': shutil.disk_usage('/')[2], # shutil.disk_usage returns tuple of (total, used, free)
-                'uptimeSeconds': time.clock_gettime(time.CLOCK_BOOTTIME),
+                'uptimeSeconds': int(time.clock_gettime(time.CLOCK_BOOTTIME)),
                 'deviceId': 1,      # I'll sort this out in a bit.
             }
 
