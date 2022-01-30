@@ -13,6 +13,7 @@ except ImportError:
 
 pj = PiJuice(1, 0x14)
 config = json.load(open('./config.json'))
+localConfig = json.load(open('./localConfig.json'))
 log = f'{time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())}, {pj.status.GetChargeLevel()["data"]}, {pj.status.GetBatteryTemperature()["data"]}, {pj.status.GetStatus()["data"]["battery"]}, {time.time() - time.clock_gettime(time.CLOCK_BOOTTIME)}\n'
 
 if config['logToFile']:
@@ -36,7 +37,7 @@ if config['logToAPI']:
                 'temperatureC': pj.status.GetBatteryTemperature()['data'],
                 'diskSpaceFree': shutil.disk_usage('/')[2] // (1024**3), # shutil.disk_usage returns tuple of (total, used, free), converted to int gb
                 'uptimeSeconds': int(time.clock_gettime(time.CLOCK_BOOTTIME)),
-                'deviceId': config['deviceId'],      # I'll sort this out in a bit.
+                'deviceId': localConfig['deviceId'],      # I'll sort this out in a bit.
             }
 
     #requests.post(config['apiUrl'] + '/Telemetry', json=api_data)
