@@ -13,7 +13,7 @@ except ImportError:
 
 pj = PiJuice(1, 0x14)
 config = json.load(open(os.path.dirname(os.path.realpath(__file__)) + '/config.json'))
-log = f'{time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())}, {pj.status.GetChargeLevel()["data"]}, {pj.status.GetBatteryTemperature()["data"]}, {pj.status.GetStatus()["data"]["battery"]}, {time.time() - time.clock.gettime(time.CLOCK_BOOTTIME)}\n'
+log = f'{time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())}, {pj.status.GetChargeLevel()["data"]}, {pj.status.GetBatteryTemperature()["data"]}, {pj.status.GetStatus()["data"]["battery"]}, {time.time() - time.clock_gettime(time.CLOCK_BOOTTIME)}\n'
 
 if config['logToFile']:
     log = f'{time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())}, {pj.status.GetChargeLevel()["data"]}, {pj.status.GetBatteryTemperature()["data"]}\n'
