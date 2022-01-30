@@ -13,7 +13,7 @@ except ImportError:
 
 pj = PiJuice(1, 0x14)
 config = json.load(open(os.path.dirname(os.path.realpath(__file__)) + '/config.json'))
-log = f'{time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())}, {pj.status.GetChargeLevel()["data"]}, {pj.status.GetBatteryTemperature()["data"]}, {pj.status.GetStatus()["data"]["battery"]}, {time.time() - psutil.boot_time()}\n'
+log = f'{time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())}, {pj.status.GetChargeLevel()["data"]}, {pj.status.GetBatteryTemperature()["data"]}, {pj.status.GetStatus()["data"]["battery"]}, {time.time() - time.clock.gettime(time.CLOCK_BOOTTIME)}\n'
 
 if config['logToFile']:
     log = f'{time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())}, {pj.status.GetChargeLevel()["data"]}, {pj.status.GetBatteryTemperature()["data"]}\n'
@@ -26,11 +26,12 @@ if config['logToFile']:
     print('Logged to file.')
 
 if config['logToAPI']:
+
     api_data = {
                 'batteryPercent': pj.status.GetChargeLevel()['data'],
                 'temperatureC': pj.status.GetBatteryTemperature()['data'],
                 'diskSpaceFree': shutil.disk_usage('/')[2], # shutil.disk_usage returns tuple of (total, used, free)
-                'uptimeSeconds': int(time.time() - psutil.boot_time()),
+                'uptimeSeconds': time.clock_gettime(time.CLOCK_BOOTTIME),
                 'deviceId': 1,      # I'll sort this out in a bit.
             }
 
