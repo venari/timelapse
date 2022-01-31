@@ -10,6 +10,7 @@ import sys
 from gpiozero import CPUTemperature
 from picamera import PiCamera
 import json
+import requests
 
 config = json.load(open('./config.json'))
 localConfig = json.load(open('./localConfig.json'))
@@ -62,11 +63,12 @@ txtCPUTemp =str(CPUTemperature().temperature)
 #    f.write(txtTime + ", " + str(pj.status.GetChargeLevel()['data']) + ", " + str(CPUTemperature().temperature) + "," + str(pj.status.GetStatus()['data']['battery']) + "\n")
 
 ## Do the work
-for i in range(60):
-   print('*', end='', flush=True)
-   #sys.stdout.flush()
-   time.sleep(1)
-print()
+if '--fast' not in sys.argv:
+    for i in range(60):
+       print('*', end='', flush=True)
+       #sys.stdout.flush()
+       time.sleep(1)
+    print()
 
 # take the picture
 #DATE=$(date +"%Y-%m-%d_%H%M")
