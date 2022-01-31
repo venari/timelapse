@@ -144,11 +144,9 @@ try:
 
 finally:
     if config['shutdown']:
-        # wait 20 seconds for other processes to finish
-        time.sleep(20)
         # PiJuice shuts down power to Rpi after 20 sec from now
         # This leaves sufficient time to execute the shutdown sequence
-        pj.power.SetPowerOff(20)
-        subprocess.call(["sudo", "poweroff"])
+        pj.power.SetPowerOff(60 + 20)
+        subprocess.call(["sudo", "shutdown"])
         print('shutdown scheduled')
 
