@@ -78,13 +78,17 @@ if '--fast' not in sys.argv:
 with open(LOGFILE,'a') as f:
     f.write(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S') + "- About to take picture....\n")
 
+print('beginning capture')
 camera = PiCamera()
 #camera.resolution = (1024, 768)
 camera.start_preview()
 # Camera warm-up time
+print('warming up...')
 time.sleep(2)
+print('ready')
 IMAGEFILENAME = OUTPUTIMAGEFOLDER + datetime.datetime.now().strftime('%Y-%m-%d_%H%M.jpg')
 camera.capture(IMAGEFILENAME)
+print('image saved')
 
 # Send image to api
 files = {
