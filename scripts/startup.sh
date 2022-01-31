@@ -1,4 +1,5 @@
 pushd /home/pi/dev/timelapse/scripts
+set -x
 rm *.err
 rm *.out
 /usr/bin/python3 test.py > test.py.out 2> test.py.err
