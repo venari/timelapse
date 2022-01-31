@@ -81,6 +81,8 @@ try:
 
     print('beginning capture')
     camera = PiCamera()
+    camera.vflip = True
+    camera.hflip = True
     #camera.resolution = (1024, 768)
     camera.start_preview()
     # Camera warm-up time
