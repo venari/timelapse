@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using timelapse.core.models;
 using timelapse.infrastructure;
 
@@ -41,6 +42,21 @@ namespace timelapse.api{
             _logger.LogInformation("Add Telemetry BLAH");
             _appDbContext.Telemetry.Add(telemetry);
             _appDbContext.SaveChanges();
+            return telemetry;
+        }
+
+        [HttpGet("GetLatest24HoursTelemetry")]
+        public ActionResult<IEnumerable<Telemetry>> GetLatest24HoursTelemetry([FromQuery] int deviceId){
+            _logger.LogInformation("Get latest 24 hours' telemetry");
+            Device? device = _appDbContext.Devices
+                .Include(d => d.Telemetries)
+                .FirstOrDefault(d => d.Id == deviceId);
+
+            List<Telemetry> telemetry = new List<Telemetry>();
+            if(device != null){
+                telemetry =  device.Telemetries.Where(t =>t.Timestamp.Date >= DateTime.UtcNow.AddDays(-1).Date).ToList();
+            }
+
             return telemetry;
         }
     }
