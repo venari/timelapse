@@ -2,7 +2,7 @@ print('Logging...')
 
 from pijuice import PiJuice
 import time
-import psutil
+import shutil
 import os
 import json
 try:
@@ -12,26 +12,32 @@ except ImportError:
 
 
 pj = PiJuice(1, 0x14)
-config = json.load(open(os.path.dirname(os.path.realpath(__file__)) + '/config.json'))
-log = f'{time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())}, {pj.status.GetChargeLevel()["data"]}, {pj.status.GetBatteryTemperature()["data"]}, {pj.status.GetStatus()["data"]["battery"]}, {time.time() - psutil.boot_time()}\n'
+config = json.load(open('./config.json'))
+localConfig = json.load(open('./localConfig.json'))
+log = f'{time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())}, {pj.status.GetChargeLevel()["data"]}, {pj.status.GetBatteryTemperature()["data"]}, {pj.status.GetStatus()["data"]["battery"]}, {time.time() - time.clock_gettime(time.CLOCK_BOOTTIME)}\n'
 
 if config['logToFile']:
     log = f'{time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())}, {pj.status.GetChargeLevel()["data"]}, {pj.status.GetBatteryTemperature()["data"]}\n'
 
-    outFile = os.path.dirname(os.path.realpath(__file__)) + '/../output/log.csv'
+    outFile = './../output/log.csv'
 
     with open(outFile, 'a') as f:
         f.write(log)
 
+    if pj.status.GetBatteryTemperature()["data"] > config['tempWarning']:
+        with open('./tempWarning.log', 'a') as f:
+            f.write(f'{time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())}, {pj.status.GetBatteryTemperature()["data"]}')
+
     print('Logged to file.')
 
 if config['logToAPI']:
+
     api_data = {
                 'batteryPercent': pj.status.GetChargeLevel()['data'],
                 'temperatureC': pj.status.GetBatteryTemperature()['data'],
-                'diskSpaceFree': 0,
-                'uptimeSeconds': int(time.time() - psutil.boot_time()),
-                'deviceId': 1,      # I'll sort this out in a bit.
+                'diskSpaceFree': shutil.disk_usage('/')[2] // (1024**3), # shutil.disk_usage returns tuple of (total, used, free), converted to int gb
+                'uptimeSeconds': int(time.clock_gettime(time.CLOCK_BOOTTIME)),
+                'deviceId': localConfig['deviceId'],      # I'll sort this out in a bit.
             }
 
     #requests.post(config['apiUrl'] + '/Telemetry', json=api_data)
@@ -39,7 +45,9 @@ if config['logToAPI']:
 
     print(api_data)
 
-    print(session.post(config['apiUrl'] + 'Telemetry',data=api_data))
+    postResponse = session.post(config['apiUrl'] + 'Telemetry',data=api_data)
+    print(postResponse)
+    assert postResponse.status_code == 200, "API returned error code"
     #requests.post(config['apiUrl'] + '/Telemetry', json=api_data)
 
     print('Logged to API.')
