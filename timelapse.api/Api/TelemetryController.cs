@@ -54,7 +54,7 @@ namespace timelapse.api{
 
             List<Telemetry> telemetry = new List<Telemetry>();
             if(device != null){
-                telemetry =  device.Telemetries.Where(t =>t.Timestamp.Date >= DateTime.UtcNow.AddDays(-1).Date).ToList();
+                telemetry =  device.Telemetries.Where(t =>t.Timestamp.Date >= DateTime.UtcNow.AddDays(-1).Date).OrderBy(t => t.Timestamp).ToList();
             }
 
             return telemetry;
