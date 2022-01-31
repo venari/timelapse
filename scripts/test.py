@@ -84,6 +84,7 @@ try:
     camera.vflip = True
     camera.hflip = True
     #camera.resolution = (1024, 768)
+    camera.resolution = (3280,2464)
     camera.start_preview()
     # Camera warm-up time
     print('warming up...')
