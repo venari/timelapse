@@ -8,6 +8,7 @@ import shutil
 import datetime
 
 config = json.load(open('config.json'))
+localConfig = json.load(open('localConfig.json'))
 
 # clock
 while not os.path.exists('/dev/i2c-1'):
