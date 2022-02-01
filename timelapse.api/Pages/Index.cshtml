@@ -26,6 +26,7 @@
         console.log("showTelemtery");
         console.log(data)
         chart.config.data.datasets[0].data = data.map(d => ({x: new Date(d.timestamp), y: d.batteryPercent}));
+        chart.config.data.datasets[1].data = data.map(d => ({x: new Date(d.timestamp), y: d.temperatureC}));
         chart.update();
     }
 </script>
@@ -39,6 +40,7 @@
             <th scope="col">Description</th>
             <th scope="col">Latest Telemetry</th>
             <th scope="col">Battery %</th>
+            <th scope="col"></th>
             <th scope="col">Temperature (C)</th>
             <th scope="col">Status</th>
             <th scope="col">Latest Image</th>
@@ -63,11 +65,12 @@
                         </td>
                         <td>
                             @(device.LatestTelemetry!=null?device.LatestTelemetry.BatteryPercent:"-")
-                                <canvas id="myChart_@(device.Id)" width="100" height="50"></canvas>
+                        </td>
+                        <td>
+                            <canvas id="myChart_@(device.Id)" width="100" height="50"></canvas>
 
                             <script>
 
-                                
                                 var config = {
                                     type: 'line',
                                     options: {
@@ -106,6 +109,9 @@
                                 data = {
                                     @* labels: labels, *@
                                     datasets: [{
+                                        backgroundColor: 'rgb(99, 99, 255)',
+                                        borderColor: 'rgb(99, 99, 255)',
+                                    }, {
                                         backgroundColor: 'rgb(255, 99, 132)',
                                         borderColor: 'rgb(255, 99, 132)',
                                     }]
