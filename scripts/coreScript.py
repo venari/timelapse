@@ -12,7 +12,7 @@ config = json.load(open('config.json'))
 # clock
 while not os.path.exists('/dev/i2c-1'):
     time.sleep(0.1)
-subprocess.call(['sudo', 'hwclock', '-hctosys'])
+subprocess.call(['sudo', 'hwclock', '--hctosys'])
 
 # pijuice
 pj = pijuice.PiJuice(1, 0x14)
