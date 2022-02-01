@@ -6,6 +6,7 @@ import os
 import time
 import shutil
 import datetime
+import sys
 
 config = json.load(open('config.json'))
 localConfig = json.load(open('localConfig.json'))
@@ -125,7 +126,9 @@ def uploadTelemetry():
 
 
 try:
-    time.sleep(60) # Wait for the camera to warm up
+    if '--fast' not in sys.argv:
+        print('warming up')
+        time.sleep(60) # Wait for the camera to warm up
     uploadTelemetry()
     saveAndUploadPhoto()
     scheduleShutdown()
