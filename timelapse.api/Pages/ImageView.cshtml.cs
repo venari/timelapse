@@ -13,7 +13,6 @@ public class ImageViewModel : PageModel
     private AppDbContext _appDbContext;
     private StorageHelper _storageHelper;
 
-    public List<Device> devices {get;}
     public Device device {get; private set;}
     public string SasToken {get; private set;}
 
@@ -21,21 +20,26 @@ public class ImageViewModel : PageModel
     {
         _logger = logger;
         _appDbContext = appDbContext;
-        devices = _appDbContext.Devices
-            .Include(d => d.Telemetries)
-            .Include(d => d.Images)
-            .ToList();
         _storageHelper = new StorageHelper(configuration, logger);
 
         var sasUri = _storageHelper.GenerateSasUri();
         // Extract the Token from the URI
         SasToken = sasUri.Query;
-
-        // _appDbContext.Database.EnsureCreated();
     }
 
-    public void OnGet(int id)
+    public IActionResult OnGet(int id)
     {
-        device = devices.Find(d => d.Id == id);
+        var d = _appDbContext.Devices
+            .Include(d => d.Images)
+            .FirstOrDefault(d => d.Id == id);
+
+        if(d==null){
+            return RedirectToPage("/NotFound");
+        }
+
+        device = d;
+
+        return Page();
+
     }
 }
