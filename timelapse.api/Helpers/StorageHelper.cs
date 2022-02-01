@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Caching.Memory;
 
 namespace timelapse.api.Helpers
 {
@@ -11,15 +12,19 @@ namespace timelapse.api.Helpers
 
         private IConfiguration config;
         private ILogger _logger { get; }
+        private readonly IMemoryCache _memoryCache;
 
         private Azure.Storage.Blobs.BlobServiceClient blobServiceClient = null;
         private Azure.Storage.Blobs.BlobContainerClient blobContainerClient = null;
         private string azureStorageConnectionString = null;
         private string azureBlobContainerName = null;
 
-        public StorageHelper(IConfiguration configuration, ILogger logger){
+        // public string SasUri {get; private set;}
+
+        public StorageHelper(IConfiguration configuration, ILogger logger, IMemoryCache memoryCache){
             config = configuration;
             _logger = logger;
+            _memoryCache = memoryCache;
 
             azureStorageConnectionString = config["STORAGE_CONNECTION_STRING"];
             azureBlobContainerName = config["STORAGE_CONTAINER_NAME"];
@@ -78,14 +83,25 @@ namespace timelapse.api.Helpers
 
         public Uri GenerateSasUri(){
             try{
-                // Need to optimise to cache token.
-                var sasUri = blobContainerClient.GenerateSasUri(Azure.Storage.Sas.BlobContainerSasPermissions.Read, DateTimeOffset.UtcNow.AddHours(1));
+
+                Uri sasUri;
+                if(!_memoryCache.TryGetValue("SasUri", out sasUri)){
+                    sasUri = blobContainerClient.GenerateSasUri(Azure.Storage.Sas.BlobContainerSasPermissions.Read, DateTimeOffset.UtcNow.AddHours(1));
+                    _memoryCache.Set("SasUri", sasUri, TimeSpan.FromHours(1));
+                } 
+
                 return sasUri;
             }
             catch(Exception ex){
                 _logger.LogError($"Error trying to GenerateSasUri");
                 _logger.LogError(ex.ToString());
                 throw;
+            }
+        }
+
+        public string SasToken{
+            get{
+                return GenerateSasUri().Query;
             }
         }
     }

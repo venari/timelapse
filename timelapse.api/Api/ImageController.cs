@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Caching.Memory;
 using timelapse.api.Helpers;
 using timelapse.core.models;
 using timelapse.infrastructure;
@@ -9,10 +10,10 @@ namespace timelapse.api{
     [ApiController]
     public class ImageController{
 
-        public ImageController(AppDbContext appDbContext, ILogger<ImageController> logger, IConfiguration configuration){
+        public ImageController(AppDbContext appDbContext, ILogger<ImageController> logger, IConfiguration configuration, IMemoryCache memoryCache){
             _appDbContext = appDbContext;
             _logger = logger;
-            _storageHelper = new StorageHelper(configuration, logger);
+            _storageHelper = new StorageHelper(configuration, logger, memoryCache);
         }
 
         private AppDbContext _appDbContext;

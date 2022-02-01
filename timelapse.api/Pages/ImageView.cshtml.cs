@@ -4,6 +4,7 @@ using timelapse.core.models;
 using timelapse.infrastructure;
 using Microsoft.EntityFrameworkCore;
 using timelapse.api.Helpers;
+using Microsoft.Extensions.Caching.Memory;
 
 namespace timelapse.api.Pages;
 
@@ -16,15 +17,12 @@ public class ImageViewModel : PageModel
     public Device device {get; private set;}
     public string SasToken {get; private set;}
 
-    public ImageViewModel(ILogger<ImageViewModel> logger, AppDbContext appDbContext, IConfiguration configuration)
+    public ImageViewModel(ILogger<ImageViewModel> logger, AppDbContext appDbContext, IConfiguration configuration, IMemoryCache memoryCache)
     {
         _logger = logger;
         _appDbContext = appDbContext;
-        _storageHelper = new StorageHelper(configuration, logger);
-
-        var sasUri = _storageHelper.GenerateSasUri();
-        // Extract the Token from the URI
-        SasToken = sasUri.Query;
+        _storageHelper = new StorageHelper(configuration, logger, memoryCache);
+        SasToken = _storageHelper.SasToken;
     }
 
     public IActionResult OnGet(int id)
