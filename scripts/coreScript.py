@@ -7,6 +7,7 @@ import time
 import shutil
 import datetime
 import sys
+import requests
 
 config = json.load(open('config.json'))
 localConfig = json.load(open('localConfig.json'))
