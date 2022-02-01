@@ -60,12 +60,7 @@ def saveAndUploadPhoto():
 
     txtTime = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
-    camera.start_preview()
-    time.sleep(2)
-    camera.capture(outputImageFolder + txtTime + '.jpg')
-
     print('beginning capture')
-    camera = PiCamera()
     camera.vflip = True
     camera.hflip = True
     #camera.resolution = (1024, 768)
