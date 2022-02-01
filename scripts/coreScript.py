@@ -5,6 +5,7 @@ from picamera import PiCamera
 import os
 import time
 import shutil
+import datetime
 
 config = json.load(open('config.json'))
 
@@ -17,6 +18,7 @@ subprocess.call(['sudo', 'hwclock', '-hctosys'])
 pj = pijuice.PiJuice(1, 0x14)
 
 def scheduleShutdown():
+    print('scheduling shutdown')
     DELTA_MIN=10
     SHUTDOWN_TILL_MORNING=False
 
@@ -39,7 +41,7 @@ def scheduleShutdown():
     else:
         print('Alarm set for ' + str(pj.rtcAlarm.GetAlarm()))
 
-    subprocess.call(['sudo', 'shutdown', '-h', 'now'])
+    subprocess.call(['sudo', 'shutdown'])
 
 
 def saveAndUploadPhoto():
@@ -115,8 +117,10 @@ def uploadTelemetry():
 
 
 try:
+    time.sleep(60) # Wait for the camera to warm up
     uploadTelemetry()
     saveAndUploadPhoto()
-
-finally:
+    scheduleShutdown()
+except Exception as e:
+    print(e)
     scheduleShutdown()
