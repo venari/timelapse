@@ -20,6 +20,9 @@ subprocess.call(['sudo', 'hwclock', '--hctosys'])
 # pijuice
 pj = pijuice.PiJuice(1, 0x14)
 
+# camera
+camera = PiCamera()
+
 def scheduleShutdown():
     if config['shutdown']:
         print('scheduling shutdown')
@@ -57,7 +60,6 @@ def saveAndUploadPhoto():
 
     txtTime = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
-    camera = PiCamera()
     camera.start_preview()
     time.sleep(2)
     camera.capture(outputImageFolder + txtTime + '.jpg')
@@ -113,7 +115,7 @@ def uploadTelemetry():
     if api_data['temperatureC'] > warningTemp:
         print(f'WARNING: temperature is {api_data["temperatureC"]}C')
         with open('tempWarning.log', 'a') as f:
-            f.write(f'{datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")}{api_data["temperatureC"]}C\n')
+            f.write(f'{datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")}: {api_data["temperatureC"]}C\n')
 
     #requests.post(config['apiUrl'] + '/Telemetry', json=api_data)
     session = requests.Session()
