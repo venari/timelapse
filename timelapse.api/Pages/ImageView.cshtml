@@ -1,0 +1,32 @@
+﻿@page "{id:int}"
+@model ImageViewModel
+@{
+    ViewData["Title"] = "Image View";
+}
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+
+<div class="text-center">
+    <h1 class="display-4">Welcome</h1>
+    <p>Learn about <a href="https://docs.microsoft.com/aspnet/core">building Web apps with ASP.NET Core</a>.</p>
+</div>
+
+<div>
+    <table class="table">
+        <thead>
+            <tr>
+            <th scope="col">Latest Image for @(Model.device.Name) as at @(Model.device.LatestImage!=null?Model.device.LatestImage.Timestamp:"---")</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>
+                    @if(Model.device.LatestImage!=null){
+                        <img class="img-fluid" src="@(Model.device.LatestImage.BlobUri + Model.SasToken)"></img>
+                    }
+                </td>
+            </tr>
+        </tbody>
+    </table>
+</div>

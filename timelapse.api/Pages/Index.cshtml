@@ -67,7 +67,7 @@
                             @(device.LatestTelemetry!=null?device.LatestTelemetry.BatteryPercent:"-")
                         </td>
                         <td>
-                            <canvas id="myChart_@(device.Id)" width="100" height="50"></canvas>
+                            <a href="TelemetryGraph/@(device.Id)"><canvas id="myChart_@(device.Id)" width="100" height="50"></canvas></a>
 
                             <script>
 
@@ -139,7 +139,7 @@
                         </td>
                         <td>
                             @if(device.LatestImage!=null){
-                                <img class="img-thumbnail" src="@(device.LatestImage.BlobUri + Model.SasToken)" width=100></img>
+                                <a href="ImageView/@(device.Id)"><img class="img-thumbnail" src="@(device.LatestImage.BlobUri + Model.SasToken)" width=100></img></a>
                             }
                         </td>
                         @* <td>
