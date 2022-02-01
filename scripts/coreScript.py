@@ -95,6 +95,7 @@ def saveAndUploadPhoto():
 
 
 def uploadTelemetry():
+    warningTemp = 50
     api_data = {
                 'batteryPercent': pj.status.GetChargeLevel()['data'],
                 'temperatureC': pj.status.GetBatteryTemperature()['data'],
@@ -102,6 +103,11 @@ def uploadTelemetry():
                 'uptimeSeconds': int(time.clock_gettime(time.CLOCK_BOOTTIME)),
                 'deviceId': localConfig['deviceId'],      # I'll sort this out in a bit.
             }
+
+    if api_data['temperatureC'] > warningTemp:
+        print(f'WARNING: temperature is {api_data["temperatureC"]}C')
+        with open('tempWarning.log', 'a') as f:
+            f.write(f'{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}{api_data["temperatureC"]}C\n')
 
     #requests.post(config['apiUrl'] + '/Telemetry', json=api_data)
     session = requests.Session()
