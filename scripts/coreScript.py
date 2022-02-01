@@ -42,6 +42,7 @@ def scheduleShutdown():
         print('Alarm set for ' + str(pj.rtcAlarm.GetAlarm()))
 
     subprocess.call(['sudo', 'shutdown'])
+    pj.power.SetPowerOff(60+20)
 
 
 def saveAndUploadPhoto():
