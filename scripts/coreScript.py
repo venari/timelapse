@@ -70,7 +70,7 @@ def saveAndUploadPhoto():
     print('warming up...')
     time.sleep(2)
     print('ready')
-    IMAGEFILENAME = OUTPUTIMAGEFOLDER + datetime.datetime.now().strftime('%Y-%m-%d_%H%M.jpg')
+    IMAGEFILENAME = '../output/images/' + datetime.datetime.now().strftime('%Y-%m-%d_%H%M.jpg')
     camera.capture(IMAGEFILENAME)
     print('image saved')
 
