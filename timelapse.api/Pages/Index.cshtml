@@ -1,4 +1,5 @@
 ﻿@page
+@using Humanizer
 @model IndexModel
 @{
     ViewData["Title"] = "Home page";
@@ -62,6 +63,10 @@
                         </td>
                         <td>
                             @(device.LatestTelemetry!=null?device.LatestTelemetry.Timestamp:"---")
+                            @if (device.LatestTelemetry!=null && DateTime.UtcNow - device.LatestTelemetry.Timestamp > TimeSpan.FromMinutes(15)){
+                                <span class="badge bg-warning text-dark">Warning - @((DateTime.UtcNow - device.LatestTelemetry.Timestamp).Humanize()) old</span>
+                            }
+
                         </td>
                         <td>
                             @(device.LatestTelemetry!=null?device.LatestTelemetry.BatteryPercent:"-")
@@ -140,6 +145,9 @@
                         <td>
                             @if(device.LatestImage!=null){
                                 <a href="ImageView/@(device.Id)"><img class="img-thumbnail" src="@(device.LatestImage.BlobUri + Model.SasToken)" width=100></img></a>
+                                @if (device.LatestImage!=null && DateTime.UtcNow - device.LatestImage.Timestamp > TimeSpan.FromMinutes(15)){
+                                    <span class="badge bg-warning text-dark">Warning - @((DateTime.UtcNow - device.LatestImage.Timestamp).Humanize()) old</span>
+                                }
                             }
                         </td>
                         @* <td>

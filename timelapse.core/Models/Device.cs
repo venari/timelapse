@@ -23,6 +23,17 @@ public class Device
         }
     }
 
+    // [System.Text.Json.Serialization.JsonIgnore]
+    // public string HumanizedLatestTelemetryAge {
+    //     get{
+    //         var latestTelemetry = Telemetries.OrderByDescending(t => t.Timestamp).FirstOrDefault();
+    //         if(latestTelemetry!=null){
+    //             return $"{(DateTime.UtcNow - latestTelemetry.Timestamp).Humanize()} ago";
+    //         }
+    //         return "Missing";
+    //     }
+    // }
+
     // public string Last24HoursBatteryAsText{
     //     get{
     //         var last24HoursBatteryAsText = "";
@@ -50,5 +61,16 @@ public class Device
             return latestImage;
         }
     }
+
+    // [System.Text.Json.Serialization.JsonIgnore]
+    // public string HumanizedLatestImageAge {
+    //     get{
+    //         var latestImage = Images.OrderByDescending(i => i.Timestamp).FirstOrDefault();
+    //         if(latestImage!=null){
+    //             return $"{(DateTime.UtcNow - latestImage.Timestamp).Humanize()} ago";
+    //         }
+    //         return "Missing";
+    //     }
+    // }
 }
 

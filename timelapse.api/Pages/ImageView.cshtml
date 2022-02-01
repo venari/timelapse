@@ -1,4 +1,5 @@
 ﻿@page "{id:int}"
+@using Humanizer
 @model ImageViewModel
 @{
     ViewData["Title"] = "Image View";
@@ -16,7 +17,11 @@
     <table class="table">
         <thead>
             <tr>
-            <th scope="col">Latest Image for @(Model.device.Name) as at @(Model.device.LatestImage!=null?Model.device.LatestImage.Timestamp:"---")</th>
+            <th scope="col">Latest Image for @(Model.device.Name) as at @(Model.device.LatestImage!=null?Model.device.LatestImage.Timestamp:"---")
+            @if (Model.device.LatestImage!=null && DateTime.UtcNow - Model.device.LatestImage.Timestamp > TimeSpan.FromMinutes(15)){
+                <span class="badge bg-warning text-dark">Warning - @((DateTime.UtcNow - Model.device.LatestImage.Timestamp).Humanize()) old</span>
+            }
+            </th>
             </tr>
         </thead>
         <tbody>
