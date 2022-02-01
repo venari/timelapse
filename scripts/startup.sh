@@ -5,5 +5,5 @@ rm *.out
 echo >> gitPull.log
 date >> gitPull.log
 echo "> git pull" >> gitPull.log
-/usr/bin/git pull >> gitPull.log
+/usr/bin/git pull 2&>> gitPull.log
 popd
