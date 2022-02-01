@@ -21,31 +21,34 @@ subprocess.call(['sudo', 'hwclock', '--hctosys'])
 pj = pijuice.PiJuice(1, 0x14)
 
 def scheduleShutdown():
-    print('scheduling shutdown')
-    DELTA_MIN=10
-    SHUTDOWN_TILL_MORNING=False
+    if config['shutdown']:
+        print('scheduling shutdown')
+        DELTA_MIN=10
+        SHUTDOWN_TILL_MORNING=False
 
-    if datetime.datetime.now().hour >=21 or datetime.datetime.now().hour <= 5:
-        SHUTDOWN_TILL_MORNING=True
+        if datetime.datetime.now().hour >=21 or datetime.datetime.now().hour <= 5:
+            SHUTDOWN_TILL_MORNING=True
 
-    alarmObj = {
-            'year': 'EVERY_YEAR',
-            'month': 'EVERY_MONTH',
-            'day': 'EVERY_DAY',
-            'hour': 18 if SHUTDOWN_TILL_MORNING else 'EVERY_HOUR',
-            'minute_period': DELTA_MIN,
-            'second': 0,
-        }
-    status = pj.rtcAlarm.SetAlarm(alarmObj)
+        alarmObj = {
+                'year': 'EVERY_YEAR',
+                'month': 'EVERY_MONTH',
+                'day': 'EVERY_DAY',
+                'hour': 18 if SHUTDOWN_TILL_MORNING else 'EVERY_HOUR',
+                'minute_period': DELTA_MIN,
+                'second': 0,
+            }
+        status = pj.rtcAlarm.SetAlarm(alarmObj)
 
-    if status['error'] != 'NO_ERROR':
-        print('Cannot set alarm\n')
-        sys.exit()
+        if status['error'] != 'NO_ERROR':
+            print('Cannot set alarm\n')
+            sys.exit()
+        else:
+            print('Alarm set for ' + str(pj.rtcAlarm.GetAlarm()))
+
+        subprocess.call(['sudo', 'shutdown'])
+        pj.power.SetPowerOff(60+20)
     else:
-        print('Alarm set for ' + str(pj.rtcAlarm.GetAlarm()))
-
-    subprocess.call(['sudo', 'shutdown'])
-    pj.power.SetPowerOff(60+20)
+        print('skipping shutdown scheduling because of config.json')
 
 
 def saveAndUploadPhoto():
@@ -127,9 +130,8 @@ def uploadTelemetry():
 
 
 try:
-    if '--fast' not in sys.argv:
-        print('warming up')
-        time.sleep(60) # Wait for the camera to warm up
+    print('warming up')
+    time.sleep(60) # Wait for the camera to warm up
     uploadTelemetry()
     saveAndUploadPhoto()
     scheduleShutdown()
