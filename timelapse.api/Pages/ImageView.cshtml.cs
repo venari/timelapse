@@ -17,6 +17,10 @@ public class ImageViewModel : PageModel
     public Device device {get; private set;}
     public string SasToken {get; private set;}
 
+    // public DateTime oldestImageTimestamp {get; private set;}
+    // public DateTime newestImageTimestamp {get; private set;}
+    public int imageCount {get; private set;}
+
     public ImageViewModel(ILogger<ImageViewModel> logger, AppDbContext appDbContext, IConfiguration configuration, IMemoryCache memoryCache)
     {
         _logger = logger;
@@ -36,6 +40,13 @@ public class ImageViewModel : PageModel
         }
 
         device = d;
+
+        var images = d.Images.OrderBy(i => i.Timestamp).ToList();
+        imageCount = images.Count;
+
+        if(imageCount==0){
+            return RedirectToPage("/NotFound");
+        }
 
         return Page();
 

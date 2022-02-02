@@ -5,6 +5,20 @@
     ViewData["Title"] = "Home page";
 }
 
+<script>
+    function localize(t)
+    {
+        var d=new Date(t+" UTC");
+        document.write(d.toLocaleString());
+    }
+
+    function localizeDate(t)
+    {
+        var d=new Date(t);
+        return d.toLocaleString();
+    }
+</script>
+
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
 
@@ -62,7 +76,8 @@
                             @Html.DisplayFor(modelItem => device.Description)
                         </td>
                         <td>
-                            @(device.LatestTelemetry!=null?device.LatestTelemetry.Timestamp:"---")
+                            @* @(device.LatestTelemetry!=null?device.LatestTelemetry.Timestamp:"---") *@
+                            <script type="text/javascript">localize('@(device.LatestTelemetryTimestamp)')</script>
                             @if (device.LatestTelemetry!=null && DateTime.UtcNow - device.LatestTelemetry.Timestamp > TimeSpan.FromMinutes(15)){
                                 <span class="badge bg-warning text-dark">Warning - @((DateTime.UtcNow - device.LatestTelemetry.Timestamp).Humanize()) old</span>
                             }
@@ -141,7 +156,8 @@
                             @(device.LatestTelemetry!=null?device.LatestTelemetry.Status:"-")
                         </td>
                         <td>
-                            @(device.LatestImage!=null?device.LatestImage.Timestamp:"---")
+                            @* @(device.LatestImage!=null?device.LatestImage.Timestamp:"---") *@
+                            <script type="text/javascript">localize('@(device.LatestImageTimestamp)')</script>
                         </td>
                         <td>
                             @if(device.LatestImage!=null){
