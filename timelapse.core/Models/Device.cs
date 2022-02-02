@@ -23,6 +23,18 @@ public class Device
         }
     }
 
+    [System.Text.Json.Serialization.JsonIgnore]
+    public DateTime? LatestTelemetryTimestamp {
+        get{
+            var latestTelemetry = Telemetries.OrderByDescending(t => t.Timestamp).FirstOrDefault();
+            if(latestTelemetry!=null){
+                return latestTelemetry.Timestamp;
+            } else {
+                return null;
+            }
+        }
+    }
+
     // [System.Text.Json.Serialization.JsonIgnore]
     // public string HumanizedLatestTelemetryAge {
     //     get{
@@ -59,6 +71,18 @@ public class Device
         get{
             var latestImage = Images.OrderByDescending(i => i.Timestamp).FirstOrDefault();
             return latestImage;
+        }
+    }
+
+    [System.Text.Json.Serialization.JsonIgnore]
+    public DateTime? LatestImageTimestamp {
+        get{
+            var latestImage = Images.OrderByDescending(i => i.Timestamp).FirstOrDefault();
+            if(latestImage!=null){
+                return latestImage.Timestamp;
+            } else {
+                return null;
+            }
         }
     }
 

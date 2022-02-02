@@ -5,6 +5,20 @@
     ViewData["Title"] = "Image View";
 }
 
+<script>
+    function localize(t)
+    {
+        var d=new Date(t+" UTC");
+        document.write(d.toLocaleString());
+    }
+
+    function localizeDate(t)
+    {
+        var d=new Date(t);
+        return d.toLocaleString();
+    }
+</script>
+
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
 
@@ -17,8 +31,8 @@
     <table class="table">
         <thead>
             <tr>
-            <th scope="col">Latest Image for @(Model.device.Name) as at @(Model.device.LatestImage!=null?Model.device.LatestImage.Timestamp:"---")
-            @if (Model.device.LatestImage!=null && DateTime.UtcNow - Model.device.LatestImage.Timestamp > TimeSpan.FromMinutes(15)){
+            <th id="imageHeader" scope="col">Image for @(Model.device.Name) as at <script type="text/javascript">localize('@(Model.device.LatestImageTimestamp)');</script>
+            @if (DateTime.UtcNow - Model.device.LatestImage.Timestamp > TimeSpan.FromMinutes(15)){
                 <span class="badge bg-warning text-dark">Warning - @((DateTime.UtcNow - Model.device.LatestImage.Timestamp).Humanize()) old</span>
             }
             </th>
@@ -28,10 +42,47 @@
             <tr>
                 <td>
                     @if(Model.device.LatestImage!=null){
-                        <img class="img-fluid" src="@(Model.device.LatestImage.BlobUri + Model.SasToken)"></img>
+                        <img class="img-fluid" id="image" src="@(Model.device.LatestImage.BlobUri + Model.SasToken)"></img>
                     }
                 </td>
+            </tr>
+            <tr>
+                <label id="imageDateSliderValue"></label>
+                <input type="range" class="form-range" min="0" max="@(Model.imageCount - 1)" value="@(Model.imageCount - 1)" id="imageDateSlider">
             </tr>
         </tbody>
     </table>
 </div>
+
+<script>
+
+    const getImageUri = '/api/Image/GetImage'
+
+    function getImage(deviceId, imageIndex, image) {
+        fetch(getImageUri + '?deviceId=' + deviceId + '&imageIndex=' + imageIndex)
+            .then(response => response.json())
+            .then(data => showImage(image, data))
+            .catch(error => console.error('Unable to get image.', error));
+    }
+
+    function showImage(chart, data){
+        console.log("showImage");
+        console.log(data)
+        var imageHeader = document.getElementById("imageHeader");
+        imageHeader.innerHTML = "Image for @(Model.device.Name) as at " + localizeDate(data.timestamp)
+        console.log(image.src)
+        image.src = data.blobUri + '@(Model.SasToken)'.replace(/&amp;/g, '&')
+        console.log(image.src)
+    }
+
+    var slider = document.getElementById("imageDateSlider")
+    var output = document.getElementById("imageDateSliderValue")
+    var image = document.getElementById("image");
+    output.innerHTML = slider.value; // Display the default slider value
+
+    // Update the current slider value (each time you drag the slider handle)
+    slider.oninput = function() {
+        console.log(this.value)
+        getImage(@(Model.device.Id), this.value);
+    }
+</script>

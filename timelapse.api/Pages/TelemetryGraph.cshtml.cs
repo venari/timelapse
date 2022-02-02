@@ -33,6 +33,10 @@ public class TelemetryGraphModel : PageModel
 
         device = d;
 
+        if(d.Telemetries.Count()==0){
+            return RedirectToPage("/NotFound");
+        }
+
         return Page();
 
     }

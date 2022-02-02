@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using timelapse.api.Helpers;
 using timelapse.core.models;
@@ -26,6 +27,27 @@ namespace timelapse.api{
             return _appDbContext.Images.ToList();
         }
 
+        [HttpGet("GetImage")]
+        public ActionResult<Image> GetImage([FromQuery] int deviceId, int imageIndex){
+            _logger.LogInformation("Get Image");
+            // var device = _appDbContext.Devices.Find(deviceId);
+            var device = _appDbContext.Devices
+                .Include(d => d.Images)
+                .FirstOrDefault(d => d.Id == deviceId);
+
+            if(device==null){
+                return new NotFoundResult();
+            }
+            var images = device.Images.OrderBy(i => i.Timestamp).ToList();
+            if(imageIndex<0 || imageIndex>=images.Count){
+                return new NotFoundResult();
+            }
+            var image = images[imageIndex];
+            return image;
+            // var imageUrl = image.BlobUri + _storageHelper.SasToken;
+            // return sasUri.ToString();
+        }
+        
         [HttpPost]
         public ActionResult<Image> Post([FromForm] ImagePostModel model){
 
