@@ -1,0 +1,137 @@
+import subprocess
+import json
+import pijuice
+from picamera import PiCamera
+import os
+import time
+import shutil
+import datetime
+import sys
+import requests
+
+config = json.load(open('config.json'))
+localConfig = json.load(open('localConfig.json'))
+
+# clock
+while not os.path.exists('/dev/i2c-1'):
+    time.sleep(0.1)
+subprocess.call(['sudo', 'hwclock', '--hctosys'])
+
+# pijuice
+pj = pijuice.PiJuice(1, 0x14)
+
+# camera
+camera = PiCamera()
+
+def scheduleShutdown():
+    if config['shutdown']:
+        print('scheduling shutdown')
+        DELTA_MIN=10
+        SHUTDOWN_TILL_MORNING=False
+
+        if datetime.datetime.now().hour >=21 or datetime.datetime.now().hour <= 5:
+            SHUTDOWN_TILL_MORNING=True
+
+        alarmObj = {
+                'year': 'EVERY_YEAR',
+                'month': 'EVERY_MONTH',
+                'day': 'EVERY_DAY',
+                'hour': 18 if SHUTDOWN_TILL_MORNING else 'EVERY_HOUR',
+                'minute_period': DELTA_MIN,
+                'second': 0,
+            }
+        status = pj.rtcAlarm.SetAlarm(alarmObj)
+
+        if status['error'] != 'NO_ERROR':
+            print('Cannot set alarm\n')
+            sys.exit()
+        else:
+            print('Alarm set for ' + str(pj.rtcAlarm.GetAlarm()))
+
+        subprocess.call(['sudo', 'shutdown'])
+        pj.power.SetPowerOff(60+20)
+    else:
+        print('skipping shutdown scheduling because of config.json')
+
+
+def saveAndUploadPhoto():
+    outputImageFolder = '../output/images/'
+    os.makedirs(outputImageFolder, exist_ok = True)
+
+    txtTime = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
+    print('beginning capture')
+    camera.vflip = True
+    camera.hflip = True
+    #camera.resolution = (1024, 768)
+    #camera.resolution = (3280,2464) # Didn't work
+    camera.start_preview()
+    # Camera warm-up time
+    print('warming up...')
+    time.sleep(2)
+    print('ready')
+    IMAGEFILENAME = '../output/images/' + datetime.datetime.now().strftime('%Y-%m-%d_%H%M.jpg')
+    camera.capture(IMAGEFILENAME)
+    print('image saved')
+
+    # Send image to api
+    files = {
+        'File': open(IMAGEFILENAME, 'rb'),
+    }
+
+    data = {
+        'DeviceId': localConfig['deviceId']
+    }
+
+    print('data:')
+    print(data)
+
+    session = requests.Session()
+    response = session.post(config['apiUrl'] + 'Image', files=files, data=data)
+
+    print(f'Response code: {response.status_code}')
+    print(f'Response text:')
+    try:
+        print(json.dumps(json.loads(response.text), indent = 4))
+    except json.decoder.JSONDecodeError:
+        print(response.text)
+
+
+def uploadTelemetry():
+    warningTemp = 50
+    api_data = {
+                'batteryPercent': pj.status.GetChargeLevel()['data'],
+                'temperatureC': pj.status.GetBatteryTemperature()['data'],
+                'diskSpaceFree': shutil.disk_usage('/')[2] // (1024**3), # shutil.disk_usage returns tuple of (total, used, free), converted to int gb
+                'uptimeSeconds': int(time.clock_gettime(time.CLOCK_BOOTTIME)),
+                'deviceId': localConfig['deviceId'],      # I'll sort this out in a bit.
+            }
+
+    if api_data['temperatureC'] > warningTemp:
+        print(f'WARNING: temperature is {api_data["temperatureC"]}C')
+        with open('tempWarning.log', 'a') as f:
+            f.write(f'{datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")}: {api_data["temperatureC"]}C\n')
+
+    #requests.post(config['apiUrl'] + '/Telemetry', json=api_data)
+    session = requests.Session()
+
+    print(api_data)
+
+    postResponse = session.post(config['apiUrl'] + 'Telemetry',data=api_data)
+    print(postResponse)
+    assert postResponse.status_code == 200, "API returned error code"
+    #requests.post(config['apiUrl'] + '/Telemetry', json=api_data)
+
+    print('Logged to API.')
+
+
+
+try:
+    print('warming up')
+    time.sleep(60) # Wait for the camera to warm up
+    uploadTelemetry()
+    saveAndUploadPhoto()
+    scheduleShutdown()
+except Exception as e:
+    print(e)
+    scheduleShutdown()
