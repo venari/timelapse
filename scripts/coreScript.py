@@ -49,7 +49,7 @@ def scheduleShutdown():
             print('Alarm set for ' + str(pj.rtcAlarm.GetAlarm()))
 
         subprocess.call(['sudo', 'shutdown'])
-        pj.power.SetPowerOff(60+20)
+        pj.power.SetPowerOff(30)
     else:
         print('skipping shutdown scheduling because of config.json')
 
@@ -68,7 +68,7 @@ def saveAndUploadPhoto():
     camera.start_preview()
     # Camera warm-up time
     print('warming up...')
-    time.sleep(2)
+    time.sleep(5)
     print('ready')
     IMAGEFILENAME = '../output/images/' + datetime.datetime.now().strftime('%Y-%m-%d_%H%M.jpg')
     camera.capture(IMAGEFILENAME)
@@ -128,9 +128,11 @@ def uploadTelemetry():
 
 try:
     print('warming up')
-    time.sleep(60) # Wait for the camera to warm up
+    pj.power.SetPowerOff(120)   # Fail safe turn the thing off
     uploadTelemetry()
+    time.sleep(20) # Wait for the camera to warm up
     saveAndUploadPhoto()
+    uploadTelemetry()
     scheduleShutdown()
 except Exception as e:
     print(e)
