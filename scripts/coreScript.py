@@ -29,7 +29,7 @@ def scheduleShutdown():
         DELTA_MIN=10
         SHUTDOWN_TILL_MORNING=False
 
-        if datetime.datetime.now().hour >=21 or datetime.datetime.now().hour <= 5:
+        if datetime.datetime.now().hour >=23 or datetime.datetime.now().hour <= 5:
             SHUTDOWN_TILL_MORNING=True
 
         alarmObj = {
