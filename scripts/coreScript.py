@@ -130,7 +130,7 @@ try:
     print('warming up')
     pj.power.SetPowerOff(120)   # Fail safe turn the thing off
     uploadTelemetry()
-    time.sleep(20) # Wait for the camera to warm up
+    time.sleep(60) # Wait for the camera & wireless/cellular to warm up
     saveAndUploadPhoto()
     uploadTelemetry()
     scheduleShutdown()
