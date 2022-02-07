@@ -53,25 +53,25 @@ def scheduleShutdown():
 
 
 def saveAndUploadPhoto():
-    camera = PiCamera()
     outputImageFolder = '../output/images/'
     os.makedirs(outputImageFolder, exist_ok = True)
-
     txtTime = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
-    print('beginning capture')
-    camera.vflip = True
-    camera.hflip = True
-    #camera.resolution = (1024, 768)
-    #camera.resolution = (3280,2464) # Didn't work
-    camera.start_preview()
-    # Camera warm-up time
-    print('warming up...')
-    time.sleep(5)
-    print('ready')
-    IMAGEFILENAME = '../output/images/' + datetime.datetime.now().strftime('%Y-%m-%d_%H%M.jpg')
-    camera.capture(IMAGEFILENAME)
-    print('image saved')
+    with PiCamera() as camera:
+
+        print('beginning capture')
+        camera.vflip = True
+        camera.hflip = True
+        #camera.resolution = (1024, 768)
+        #camera.resolution = (3280,2464) # Didn't work
+        camera.start_preview()
+        # Camera warm-up time
+        print('warming up...')
+        time.sleep(5)
+        print('ready')
+        IMAGEFILENAME = '../output/images/' + datetime.datetime.now().strftime('%Y-%m-%d_%H%M.jpg')
+        camera.capture(IMAGEFILENAME)
+        print('image saved')
 
     # Send image to api
     files = {
