@@ -20,8 +20,6 @@ subprocess.call(['sudo', 'hwclock', '--hctosys'])
 # pijuice
 pj = pijuice.PiJuice(1, 0x14)
 
-# camera
-camera = PiCamera()
 
 def scheduleShutdown():
     if config['shutdown']:
@@ -55,6 +53,7 @@ def scheduleShutdown():
 
 
 def saveAndUploadPhoto():
+    camera = PiCamera()
     outputImageFolder = '../output/images/'
     os.makedirs(outputImageFolder, exist_ok = True)
 
