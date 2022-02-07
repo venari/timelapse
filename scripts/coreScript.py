@@ -127,6 +127,8 @@ def uploadTelemetry():
 
 try:
     print('warming up')
+    # Give everything a chance to settle down.
+    time.sleep(10)
 
     if config['shutdown']:
         pj.power.SetPowerOff(120)   # Fail safe turn the thing off
