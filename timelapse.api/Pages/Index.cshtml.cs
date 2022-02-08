@@ -25,6 +25,7 @@ public class IndexModel : PageModel
         // Need to optimise this
             .Include(d => d.Telemetries)
             .Include(d => d.Images)
+            .AsSplitQuery()
             .ToList();
         _storageHelper = new StorageHelper(configuration, logger, memoryCache);
 
