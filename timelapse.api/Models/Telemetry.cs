@@ -5,7 +5,7 @@ namespace timelapse.api{
     public class TelemetryPostModel
     {
         [Required]
-        public int DeviceId {get; set;}
+        public string SerialNumber {get; set;}
         public DateTime? Timestamp {get; set;}
         [Required]
         public int TemperatureC {get; set;}

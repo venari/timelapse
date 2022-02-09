@@ -21,6 +21,7 @@ namespace timelapse.infrastructure
         private ILogger _logger;
 
         public DbSet<Device> Devices { get; set; }
+        public DbSet<UnregisteredDevice> UnregisteredDevices { get; set; }
         public DbSet<Telemetry> Telemetry { get; set; }
         public DbSet<Image> Images { get; set; }
 

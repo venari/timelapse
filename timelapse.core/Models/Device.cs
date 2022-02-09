@@ -6,6 +6,8 @@ public class Device
 {
     public int Id {get; set;}
     [Required]
+    public string SerialNumber {get; set;}
+    [Required]
     public string Name {get; set;}
     public string Description {get; set;}
 
