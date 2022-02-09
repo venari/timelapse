@@ -59,9 +59,10 @@ def scheduleShutdown():
         else:
             print('Alarm set for ' + str(pj.rtcAlarm.GetAlarm()))
 
+        print(str(datetime.datetime.now()) + ' Shutting down...')
         subprocess.call(['sudo', 'shutdown'])
+        print(str(datetime.datetime.now()) + ' Power off scheduled for 30s from now')
         pj.power.SetPowerOff(30)
-        print(str(datetime.datetime.now()) + ' shutdown scheduled for 30s from now')
     else:
         print(str(datetime.datetime.now()) + ' skipping shutdown scheduling because of config.json')
 
@@ -146,7 +147,7 @@ try:
     time.sleep(30)
 
     if config['shutdown']:
-        print(str(datetime.datetime.now()) + ' Setting failsafe shutdown for 2 minutes from now.')
+        print(str(datetime.datetime.now()) + ' Setting failsafe power off for 2 minutes from now.')
         pj.power.SetPowerOff(120)   # Fail safe turn the thing off
     uploadTelemetry()
     
