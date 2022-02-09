@@ -1,0 +1,35 @@
+@page
+@model UnregisteredDevicesModel
+@{
+    ViewData["Title"] = "Unregistered Devices";
+}
+
+<div class="text-center">
+    <h1 class="display-4">Welcome</h1>
+    <p>Learn about <a href="https://docs.microsoft.com/aspnet/core">building Web apps with ASP.NET Core</a>.</p>
+</div>
+
+<div>
+    <table class="table">
+        <thead>
+            <tr>
+            <th scope="col">Serial Number</th>
+            <th scope="col"></th>
+            </tr>
+        </thead>
+        <tbody>
+                @foreach (var unregisteredDevice in Model.unregisteredDevices){
+                    <tr>
+                        <td>
+                            @Html.DisplayFor(modelItem => unregisteredDevice.SerialNumber)
+                        </td>
+                        <td>
+                            @Html.ActionLink("Register", "DeviceCreate", new { serialNumber=unregisteredDevice.SerialNumber }) |
+                            @* @Html.ActionLink("Details", "Details", new { id=device.Id})  |
+                            @Html.ActionLink("Delete", "Delete", new { id=device.Id })  *@
+                        </td>
+                    </tr>
+                }
+        </tbody>
+    </table>
+</div>

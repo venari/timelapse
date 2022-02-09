@@ -22,7 +22,6 @@ public class IndexModel : PageModel
         _logger = logger;
         _appDbContext = appDbContext;
         devices = _appDbContext.Devices
-        // Need to optimise this
             .Include(d => d.Telemetries)
             .Include(d => d.Images)
             .AsSplitQuery()

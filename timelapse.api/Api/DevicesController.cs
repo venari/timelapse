@@ -23,12 +23,19 @@ namespace timelapse.api{
             return _appDbContext.Devices.Include(d => d.Telemetries).ToList();
         }
 
+        [HttpGet("UnregisteredDevices")]
+        public ActionResult<IEnumerable<UnregisteredDevice>> GetUnregisteredDecices(){
+            _logger.LogInformation("Get unregistered devices");
+            return _appDbContext.UnregisteredDevices.ToList();
+        }
+
         [HttpPost]
         public ActionResult<Device> Post([FromForm] DevicePostModel model){
             _logger.LogInformation("Add device");
             
             Device device = new Device(){
                 Name = model.Name,
+                SerialNumber = model.SerialNumber,
                 Description = model.Description
             };
             

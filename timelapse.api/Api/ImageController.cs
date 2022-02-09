@@ -51,13 +51,36 @@ namespace timelapse.api{
         [HttpPost]
         public ActionResult<Image> Post([FromForm] ImagePostModel model){
 
+            _logger.LogInformation("In Image Post");
+            // _logger.LogInformation("DeviceId: " + model.DeviceId);
+            _logger.LogInformation("SerialNumber: " + model.SerialNumber);
+            _logger.LogInformation("Timestamp: " + model.Timestamp);
+
+
+            Device device = _appDbContext.Devices.FirstOrDefault(d => d.SerialNumber == model.SerialNumber);
+
+           if(device==null){
+                UnregisteredDevice unregistered = _appDbContext.UnregisteredDevices.FirstOrDefault(d => d.SerialNumber == model.SerialNumber);
+
+                if(unregistered==null){
+                    unregistered = new UnregisteredDevice(){
+                        SerialNumber = model.SerialNumber
+                    };
+
+                    _appDbContext.UnregisteredDevices.Add(unregistered);
+                    _appDbContext.SaveChanges();
+                }
+
+                return new NotFoundResult();
+            }
+
             Image image = new Image(){
-                DeviceId = model.DeviceId,
+                DeviceId = device.Id,
                 Timestamp = model.Timestamp.HasValue?model.Timestamp.Value:DateTime.Now.ToUniversalTime(),
                 // file = model.file
             };
 
-            string blobName = model.DeviceId + "_" + model.File.FileName;
+            string blobName = device.Id + "_" + model.File.FileName;
             image.BlobUri = _storageHelper.Upload(blobName, model.File.OpenReadStream());
 
             _logger.LogInformation("Add Image");

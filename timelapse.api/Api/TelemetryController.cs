@@ -27,11 +27,29 @@ namespace timelapse.api{
         public ActionResult<Telemetry> Post([FromForm] TelemetryPostModel model){
 
             _logger.LogInformation("In Telemenrty Post");
-            _logger.LogInformation("DeviceId: " + model.DeviceId);
+            // _logger.LogInformation("DeviceId: " + model.DeviceId);
+            _logger.LogInformation("SerialNumber: " + model.SerialNumber);
             _logger.LogInformation("Timestamp: " + model.Timestamp);
 
+            Device device = _appDbContext.Devices.FirstOrDefault(d => d.SerialNumber == model.SerialNumber);
+
+            if(device==null){
+                UnregisteredDevice unregistered = _appDbContext.UnregisteredDevices.FirstOrDefault(d => d.SerialNumber == model.SerialNumber);
+
+                if(unregistered==null){
+                    unregistered = new UnregisteredDevice(){
+                        SerialNumber = model.SerialNumber
+                    };
+
+                    _appDbContext.UnregisteredDevices.Add(unregistered);
+                    _appDbContext.SaveChanges();
+                }
+
+                return new NotFoundResult();
+            }
+
             Telemetry telemetry = new Telemetry(){
-                DeviceId = model.DeviceId,
+                DeviceId = device.Id,
                 Timestamp = model.Timestamp.HasValue?model.Timestamp.Value:DateTime.Now.ToUniversalTime(),
                 TemperatureC = model.TemperatureC,
                 BatteryPercent = model.BatteryPercent,
