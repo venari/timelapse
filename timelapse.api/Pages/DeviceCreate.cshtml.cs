@@ -30,17 +30,14 @@ namespace timelapse.api.Pages
                 .ToList();
         }
  
-        // public IActionResult OnGet()
-        // {
-        //     Movie = new Movie
-        //     {
-        //         Genre = "Western",
-        //         Price = 3.99M,
-        //         ReleaseDate = DateTime.Today,
-        //         Title = "Conan"
-        //     };
-        //     return Page();
-        // }
+        public IActionResult OnGet(string id)
+        {
+            Device = new Device
+            {
+                SerialNumber = id
+            };
+            return Page();
+        }
 
         [BindProperty]
         public Device Device { get; set; }
@@ -54,6 +51,13 @@ namespace timelapse.api.Pages
             }
 
             _appDbContext.Devices.Add(Device);
+            var unregisteredDevice = _appDbContext.UnregisteredDevices.FirstOrDefault(u => u.SerialNumber==Device.SerialNumber);
+            if(unregisteredDevice != null)
+            {
+                _appDbContext.UnregisteredDevices.Remove(unregisteredDevice);
+            } else {
+                _logger.LogInformation($"Unregistered Device with serial number {Device.SerialNumber} not found!");
+            }
             await _appDbContext.SaveChangesAsync();
 
             return RedirectToPage("./Index");

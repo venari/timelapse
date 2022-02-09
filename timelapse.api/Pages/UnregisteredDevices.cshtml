@@ -24,7 +24,8 @@
                             @Html.DisplayFor(modelItem => unregisteredDevice.SerialNumber)
                         </td>
                         <td>
-                            @Html.ActionLink("Register", "DeviceCreate", new { serialNumber=unregisteredDevice.SerialNumber }) |
+                            <a asp-page="DeviceCreate" asp-route-id="@unregisteredDevice.SerialNumber">Register</a> |
+                            @* @Html.ActionLink("Register", "DeviceCreate", new { serialNumber=unregisteredDevice.SerialNumber }) | *@
                             @* @Html.ActionLink("Details", "Details", new { id=device.Id})  |
                             @Html.ActionLink("Delete", "Delete", new { id=device.Id })  *@
                         </td>
