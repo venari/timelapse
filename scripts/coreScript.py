@@ -127,7 +127,7 @@ def uploadTelemetry():
 
 
 try:
-    print(str(datetime.datetime.now()) + ' warming up')
+    print(str(datetime.datetime.now()) + ' warming up... waiting 30s')
     # Give everything a chance to settle down.
     time.sleep(30)
 
