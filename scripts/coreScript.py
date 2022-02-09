@@ -10,8 +10,6 @@ import sys
 import requests
 
 config = json.load(open('config.json'))
-localConfig = json.load(open('localConfig.json'))
-
 # clock
 while not os.path.exists('/dev/i2c-1'):
     time.sleep(0.1)
@@ -20,6 +18,21 @@ subprocess.call(['sudo', 'hwclock', '--hctosys'])
 # pijuice
 pj = pijuice.PiJuice(1, 0x14)
 
+def getSerialNumber():
+  # Extract serial from cpuinfo file
+  cpuserial = "0000000000000000"
+  try:
+    f = open('/proc/cpuinfo','r')
+    for line in f:
+      if line[0:6]=='Serial':
+        cpuserial = line[10:26]
+    f.close()
+  except:
+    cpuserial = "ERROR000000000"
+
+  return cpuserial
+
+serialNumber = getSerialNumber()
 
 def scheduleShutdown():
     if config['shutdown']:
@@ -80,7 +93,7 @@ def saveAndUploadPhoto():
     }
 
     data = {
-        'DeviceId': localConfig['deviceId']
+        'SerialNumber': serialNumber
     }
 
     print('data:')
@@ -104,7 +117,7 @@ def uploadTelemetry():
                 'temperatureC': pj.status.GetBatteryTemperature()['data'],
                 'diskSpaceFree': shutil.disk_usage('/')[2] // (1024**3), # shutil.disk_usage returns tuple of (total, used, free), converted to int gb
                 'uptimeSeconds': int(time.clock_gettime(time.CLOCK_BOOTTIME)),
-                'deviceId': localConfig['deviceId'],      # I'll sort this out in a bit.
+                'SerialNumber': serialNumber
             }
 
     if api_data['temperatureC'] > warningTemp:

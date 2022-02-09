@@ -1,4 +1,3 @@
-py-cpuinfo
 pijuice
 requests
 gpiozero
