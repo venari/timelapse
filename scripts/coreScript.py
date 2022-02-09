@@ -23,7 +23,7 @@ pj = pijuice.PiJuice(1, 0x14)
 
 def scheduleShutdown():
     if config['shutdown']:
-        print('scheduling shutdown')
+        print(str(datetime.datetime.now()) + ' scheduling shutdown')
         DELTA_MIN=10
         SHUTDOWN_TILL_MORNING=False
 
@@ -48,30 +48,31 @@ def scheduleShutdown():
 
         subprocess.call(['sudo', 'shutdown'])
         pj.power.SetPowerOff(30)
+        print(str(datetime.datetime.now()) + ' shutdown scheduled for 30s from now')
     else:
-        print('skipping shutdown scheduling because of config.json')
+        print(str(datetime.datetime.now()) + ' skipping shutdown scheduling because of config.json')
 
 
 def saveAndUploadPhoto():
     outputImageFolder = '../output/images/'
     os.makedirs(outputImageFolder, exist_ok = True)
-    txtTime = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    # txtTime = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
     with PiCamera() as camera:
 
-        print('beginning capture')
+        print(str(datetime.datetime.now()) + ' beginning capture')
         camera.vflip = True
         camera.hflip = True
         #camera.resolution = (1024, 768)
         #camera.resolution = (3280,2464) # Didn't work
         camera.start_preview()
         # Camera warm-up time
-        print('warming up...')
+        print(str(datetime.datetime.now()) + ' warming up camera...')
         time.sleep(5)
-        print('ready')
-        IMAGEFILENAME = '../output/images/' + datetime.datetime.now().strftime('%Y-%m-%d_%H%M.jpg')
+        print(str(datetime.datetime.now()) + ' ready')
+        IMAGEFILENAME = '../output/images/' + datetime.datetime.now().strftime('%Y-%m-%d_%H%M%S.jpg')
         camera.capture(IMAGEFILENAME)
-        print('image saved')
+        print(str(datetime.datetime.now()) + ' image saved')
 
     # Send image to api
     files = {
@@ -121,16 +122,17 @@ def uploadTelemetry():
     assert postResponse.status_code == 200, "API returned error code"
     #requests.post(config['apiUrl'] + '/Telemetry', json=api_data)
 
-    print('Logged to API.')
+    print(str(datetime.datetime.now()) + ' Logged to API.')
 
 
 
 try:
-    print('warming up')
+    print(str(datetime.datetime.now()) + ' warming up')
     # Give everything a chance to settle down.
     time.sleep(30)
 
     if config['shutdown']:
+        print(str(datetime.datetime.now()) + ' Setting failsafe shutdown for 2 minutes from now.')
         pj.power.SetPowerOff(120)   # Fail safe turn the thing off
     uploadTelemetry()
     
