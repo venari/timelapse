@@ -8,7 +8,7 @@
 <script>
     function localize(t)
     {
-        var d=new Date(t+" UTC");
+        var d=new Date(t+"Z");
         document.write(d.toLocaleString());
     }
 
@@ -31,7 +31,7 @@
     <table class="table">
         <thead>
             <tr>
-            <th id="imageHeader" scope="col">Image for @(Model.device.Name) as at <script type="text/javascript">localize('@(Model.device.LatestImageTimestamp)');</script>
+            <th id="imageHeader" scope="col">Image for @(Model.device.Name) as at <script type="text/javascript">localize('@(Model.device.LatestImageTimestamp.Value.ToString("s"))');</script>
             @if (DateTime.UtcNow - Model.device.LatestImage.Timestamp > TimeSpan.FromMinutes(15)){
                 <span class="badge bg-warning text-dark">Warning - @((DateTime.UtcNow - Model.device.LatestImage.Timestamp).Humanize()) old</span>
             }
