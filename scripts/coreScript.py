@@ -118,6 +118,12 @@ def uploadTelemetry():
                 'temperatureC': pj.status.GetBatteryTemperature()['data'],
                 'diskSpaceFree': shutil.disk_usage('/')[2] // (1024**3), # shutil.disk_usage returns tuple of (total, used, free), converted to int gb
                 'uptimeSeconds': int(time.clock_gettime(time.CLOCK_BOOTTIME)),
+                'status': { 'status': pj.status.GetStatus()['data'],
+                            'batteryVoltage': pj.status.GetBatteryVoltage()['data'],
+                            'batteryCurrent': pj.status.GetBatteryCurrent()['data'],
+                            'ioVoltage': pj.status.GetIoVoltage()['data'],
+                            'ioCurrent': pj.status.GetIoCurrent()['data']
+                        },
                 'SerialNumber': serialNumber
             }
 
