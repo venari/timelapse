@@ -3,7 +3,7 @@ set -x
 echo `date` >> startup.sh.out
 echo "Uploading telemetry..." >> startup.sh.out
 echo >> uploadTelemetry.py.out
-date >> uploadtelemetry.py.out
+date >> uploadTelemetry.py.out
 /usr/bin/python3 uploadTelemetry.py >> uploadTelemetry.py.out
 
 popd
