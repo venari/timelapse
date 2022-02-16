@@ -162,5 +162,5 @@ try:
     uploadTelemetry()
     scheduleShutdown()
 except Exception as e:
-    print(e)
+    print(str(datetime.datetime.now()) + e)
     scheduleShutdown()
