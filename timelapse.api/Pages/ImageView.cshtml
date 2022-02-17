@@ -19,9 +19,6 @@
     }
 </script>
 
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
-
 <div class="text-center">
     <h1 class="display-4">Welcome</h1>
     <p>Learn about <a href="https://docs.microsoft.com/aspnet/core">building Web apps with ASP.NET Core</a>.</p>
@@ -47,8 +44,8 @@
                 </td>
             </tr>
             <tr>
-                <label id="imageDateSliderValue"></label>
-                <input type="range" class="form-range" min="0" max="@(Model.imageCount - 1)" value="@(Model.imageCount - 1)" id="imageDateSlider">
+                @* <label id="imageDateSliderValue"></label> *@
+                <input type="range" class="form-range" min="0" max="@(Model.imagesLast24Hours.Count() - 1)" value="@(Model.imagesLast24Hours.Count() - 1)" id="imageDateSlider">
             </tr>
         </tbody>
     </table>
@@ -58,27 +55,16 @@
 
     const getImageUri = '/api/Image/GetImage'
 
-    function getImage(deviceId, imageIndex, image) {
-        fetch(getImageUri + '?deviceId=' + deviceId + '&imageIndex=' + imageIndex)
-            .then(response => response.json())
-            .then(data => showImage(image, data))
-            .catch(error => console.error('Unable to get image.', error));
-    }
-
-    function showImage(chart, data){
-        console.log("showImage");
-        console.log(data)
-        var imageHeader = document.getElementById("imageHeader");
-        imageHeader.innerHTML = "Image for @(Model.device.Name) as at " + localizeDate(data.timestamp)
-        console.log(image.src)
-        image.src = data.blobUri + '@(Model.SasToken)'.replace(/&amp;/g, '&')
-        console.log(image.src)
-    }
-
+    var last24HoursImages = @(Json.Serialize(Model.imagesLast24Hours));
     var slider = document.getElementById("imageDateSlider")
-    var output = document.getElementById("imageDateSliderValue")
     var image = document.getElementById("image");
-    output.innerHTML = slider.value; // Display the default slider value
+
+    function getImage(deviceId, imageIndex) {
+        imageBlobUri = last24HoursImages[imageIndex].blobUri + '@(Model.SasToken)'.replace(/&amp;/g, '&')
+        image.src = imageBlobUri
+        var imageHeader = document.getElementById("imageHeader");
+        imageHeader.innerHTML = "Image for @(Model.device.Name) as at " + localizeDate(last24HoursImages[imageIndex].timestamp)
+    }
 
     // Update the current slider value (each time you drag the slider handle)
     slider.oninput = function() {

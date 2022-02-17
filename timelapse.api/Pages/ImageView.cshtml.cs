@@ -19,7 +19,7 @@ public class ImageViewModel : PageModel
 
     // public DateTime oldestImageTimestamp {get; private set;}
     // public DateTime newestImageTimestamp {get; private set;}
-    public int imageCount {get; private set;}
+    public Image[] imagesLast24Hours {get; private set;}
 
     public ImageViewModel(ILogger<ImageViewModel> logger, AppDbContext appDbContext, IConfiguration configuration, IMemoryCache memoryCache)
     {
@@ -41,10 +41,8 @@ public class ImageViewModel : PageModel
 
         device = d;
 
-        var images = d.Images.OrderBy(i => i.Timestamp).ToList();
-        imageCount = images.Count;
-
-        if(imageCount==0){
+        imagesLast24Hours = d.Images.Where(i =>i.Timestamp.Date >= DateTime.UtcNow.AddDays(-1).Date).OrderBy(i => i.Timestamp).ToArray();
+        if(imagesLast24Hours.Count()==0){
             return RedirectToPage("/NotFound");
         }
 
