@@ -8,7 +8,7 @@
 <script>
     function localize(t)
     {
-        var d=new Date(t+" UTC");
+        var d=new Date(t+"Z");
         document.write(d.toLocaleString());
     }
 
@@ -19,9 +19,6 @@
     }
 </script>
 
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
-
 <div class="text-center">
     <h1 class="display-4">Welcome</h1>
     <p>Learn about <a href="https://docs.microsoft.com/aspnet/core">building Web apps with ASP.NET Core</a>.</p>
@@ -31,7 +28,7 @@
     <table class="table">
         <thead>
             <tr>
-            <th id="imageHeader" scope="col">Image for @(Model.device.Name) as at <script type="text/javascript">localize('@(Model.device.LatestImageTimestamp)');</script>
+            <th id="imageHeader" scope="col">Image for @(Model.device.Name) as at <script type="text/javascript">localize('@(Model.device.LatestImageTimestamp.Value.ToString("s"))');</script>
             @if (DateTime.UtcNow - Model.device.LatestImage.Timestamp > TimeSpan.FromMinutes(15)){
                 <span class="badge bg-warning text-dark">Warning - @((DateTime.UtcNow - Model.device.LatestImage.Timestamp).Humanize()) old</span>
             }
@@ -47,8 +44,9 @@
                 </td>
             </tr>
             <tr>
-                <label id="imageDateSliderValue"></label>
-                <input type="range" class="form-range" min="0" max="@(Model.imageCount - 1)" value="@(Model.imageCount - 1)" id="imageDateSlider">
+                @* <label id="imageDateSliderValue"></label> *@
+                <input type="range" class="form-range" min="0" max="@(Model.imagesLast24Hours.Count() - 1)" value="@(Model.imagesLast24Hours.Count() - 1)" id="imageDateSlider">
+                <button id="togglePlay" onclick="togglePlay()" type="button" class="btn btn-primary"><i class="fa fa-play"></i></button>
             </tr>
         </tbody>
     </table>
@@ -58,27 +56,49 @@
 
     const getImageUri = '/api/Image/GetImage'
 
-    function getImage(deviceId, imageIndex, image) {
-        fetch(getImageUri + '?deviceId=' + deviceId + '&imageIndex=' + imageIndex)
-            .then(response => response.json())
-            .then(data => showImage(image, data))
-            .catch(error => console.error('Unable to get image.', error));
-    }
-
-    function showImage(chart, data){
-        console.log("showImage");
-        console.log(data)
-        var imageHeader = document.getElementById("imageHeader");
-        imageHeader.innerHTML = "Image for @(Model.device.Name) as at " + localizeDate(data.timestamp)
-        console.log(image.src)
-        image.src = data.blobUri + '@(Model.SasToken)'.replace(/&amp;/g, '&')
-        console.log(image.src)
-    }
-
+    var last24HoursImages = @(Json.Serialize(Model.imagesLast24Hours));
     var slider = document.getElementById("imageDateSlider")
-    var output = document.getElementById("imageDateSliderValue")
-    var image = document.getElementById("image");
-    output.innerHTML = slider.value; // Display the default slider value
+    var image = document.getElementById("image")
+
+    var bPlaying=false
+
+    var togglePlayButton = document.getElementById("togglePlay")
+
+    function togglePlay(){
+        bPlaying=!bPlaying;
+        if(bPlaying){
+            togglePlayButton.innerHTML = '<i class="fa fa-pause"></i>'
+
+            nextFrame();
+            @* play() *@
+        }
+        else{
+            togglePlayButton.innerHTML = '<i class="fa fa-play"></i>'
+            @* stop() *@
+        }
+    }
+
+    function nextFrame(){
+        if(bPlaying){
+            if(parseInt(slider.value)<parseInt(slider.max)){
+                ++slider.value
+            } else {
+                slider.value = 0
+            }
+
+            image.onload=function(){
+                setTimeout(nextFrame, 50);
+            }
+            getImage(@(Model.device.Id), slider.value);
+        }
+    }
+
+    function getImage(deviceId, imageIndex) {
+        imageBlobUri = last24HoursImages[imageIndex].blobUri + '@(Model.SasToken)'.replace(/&amp;/g, '&')
+        image.src = imageBlobUri
+        var imageHeader = document.getElementById("imageHeader");
+        imageHeader.innerHTML = "Image for @(Model.device.Name) as at " + localizeDate(last24HoursImages[imageIndex].timestamp)
+    }
 
     // Update the current slider value (each time you drag the slider handle)
     slider.oninput = function() {
