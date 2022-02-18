@@ -46,6 +46,7 @@
             <tr>
                 @* <label id="imageDateSliderValue"></label> *@
                 <input type="range" class="form-range" min="0" max="@(Model.imagesLast24Hours.Count() - 1)" value="@(Model.imagesLast24Hours.Count() - 1)" id="imageDateSlider">
+                <button id="togglePlay" onclick="togglePlay()" type="button" class="btn btn-primary"><i class="fa fa-play"></i></button>
             </tr>
         </tbody>
     </table>
@@ -57,7 +58,40 @@
 
     var last24HoursImages = @(Json.Serialize(Model.imagesLast24Hours));
     var slider = document.getElementById("imageDateSlider")
-    var image = document.getElementById("image");
+    var image = document.getElementById("image")
+
+    var bPlaying=false
+
+    var togglePlayButton = document.getElementById("togglePlay")
+
+    function togglePlay(){
+        bPlaying=!bPlaying;
+        if(bPlaying){
+            togglePlayButton.innerHTML = '<i class="fa fa-pause"></i>'
+
+            nextFrame();
+            @* play() *@
+        }
+        else{
+            togglePlayButton.innerHTML = '<i class="fa fa-play"></i>'
+            @* stop() *@
+        }
+    }
+
+    function nextFrame(){
+        if(bPlaying){
+            if(parseInt(slider.value)<parseInt(slider.max)){
+                ++slider.value
+            } else {
+                slider.value = 0
+            }
+
+            image.onload=function(){
+                setTimeout(nextFrame, 50);
+            }
+            getImage(@(Model.device.Id), slider.value);
+        }
+    }
 
     function getImage(deviceId, imageIndex) {
         imageBlobUri = last24HoursImages[imageIndex].blobUri + '@(Model.SasToken)'.replace(/&amp;/g, '&')
