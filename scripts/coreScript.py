@@ -67,7 +67,7 @@ def scheduleShutdown():
         print(str(datetime.datetime.now()) + ' skipping shutdown scheduling because of config.json')
 
 
-def saveAndUploadPhoto():
+def savePhoto():
     outputImageFolder = '../output/images/'
     os.makedirs(outputImageFolder, exist_ok = True)
     # txtTime = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
@@ -84,31 +84,43 @@ def saveAndUploadPhoto():
         print(str(datetime.datetime.now()) + ' warming up camera...')
         time.sleep(5)
         print(str(datetime.datetime.now()) + ' ready')
-        IMAGEFILENAME = '../output/images/' + datetime.datetime.now().strftime('%Y-%m-%d_%H%M%S.jpg')
+
+        IMAGEFILENAME = '../output/images/pending' + datetime.datetime.now().strftime('%Y-%m-%d_%H%M%S.jpg')
         camera.capture(IMAGEFILENAME)
         print(str(datetime.datetime.now()) + ' image saved')
 
-    # Send image to api
-    files = {
-        'File': open(IMAGEFILENAME, 'rb'),
-    }
+def uploadPendingPhotos():
+    for IMAGEFILENAME in os.listdir('../output/images/pending'):
+        if IMAGEFILENAME.startswith('pending'):
+            print(str(datetime.datetime.now()) + ' uploading ' + IMAGEFILENAME)
 
-    data = {
-        'SerialNumber': serialNumber
-    }
+            files = {
+                'File': open(IMAGEFILENAME, 'rb'),
+            }
 
-    print('data:')
-    print(data)
+            data = {
+                'SerialNumber': serialNumber
+            }
 
-    session = requests.Session()
-    response = session.post(config['apiUrl'] + 'Image', files=files, data=data)
+            print('data:')
+            print(data)
 
-    print(f'Response code: {response.status_code}')
-    print(f'Response text:')
-    try:
-        print(json.dumps(json.loads(response.text), indent = 4))
-    except json.decoder.JSONDecodeError:
-        print(response.text)
+            session = requests.Session()
+            response = session.post(config['apiUrl'] + 'Image', files=files, data=data)
+
+            print(f'Response code: {response.status_code}')
+            if response.status_code == 200:
+                print(f'Image uploaded successfully')
+                shutil.move(IMAGEFILENAME, '../output/images/200/' + os.path.basename(IMAGEFILENAME))
+
+            else:
+                print(f'Image upload failed')
+
+            print(f'Response text:')
+            try:
+                print(json.dumps(json.loads(response.text), indent = 4))
+            except json.decoder.JSONDecodeError:
+                print(response.text)
 
 
 def uploadTelemetry():
@@ -158,7 +170,8 @@ try:
     uploadTelemetry()
     
     #time.sleep(40) # Wait for the camera and network to warm up
-    saveAndUploadPhoto()
+    savePhoto()
+    uploadPendingPhotos()
     uploadTelemetry()
     scheduleShutdown()
 except Exception as e:
