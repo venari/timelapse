@@ -452,3 +452,64 @@ BEGIN
 END $EF$;
 COMMIT;
 
+START TRANSACTION;
+
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "migration_id" = '20220222070635_Projects') THEN
+    ALTER TABLE device_placement DROP CONSTRAINT fk_device_placement_project_project_id;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "migration_id" = '20220222070635_Projects') THEN
+    ALTER TABLE project_user DROP CONSTRAINT fk_project_user_project_project_id;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "migration_id" = '20220222070635_Projects') THEN
+    ALTER TABLE project DROP CONSTRAINT pk_project;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "migration_id" = '20220222070635_Projects') THEN
+    ALTER TABLE project RENAME TO projects;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "migration_id" = '20220222070635_Projects') THEN
+    ALTER TABLE projects ADD CONSTRAINT pk_projects PRIMARY KEY (id);
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "migration_id" = '20220222070635_Projects') THEN
+    ALTER TABLE device_placement ADD CONSTRAINT fk_device_placement_projects_project_id FOREIGN KEY (project_id) REFERENCES projects (id) ON DELETE CASCADE;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "migration_id" = '20220222070635_Projects') THEN
+    ALTER TABLE project_user ADD CONSTRAINT fk_project_user_projects_project_id FOREIGN KEY (project_id) REFERENCES projects (id) ON DELETE CASCADE;
+    END IF;
+END $EF$;
+
+DO $EF$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM "__EFMigrationsHistory" WHERE "migration_id" = '20220222070635_Projects') THEN
+    INSERT INTO "__EFMigrationsHistory" (migration_id, product_version)
+    VALUES ('20220222070635_Projects', '6.0.1');
+    END IF;
+END $EF$;
+COMMIT;
+
