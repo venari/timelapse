@@ -6,6 +6,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 // using Microsoft.Extensions.Logging;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
+using Microsoft.AspNetCore.Identity;
 
 namespace timelapse.infrastructure
 {
@@ -41,8 +42,26 @@ namespace timelapse.infrastructure
 
             var connectionString = _configuration.GetConnectionString("DefaultConnection");
             // _logger.LogInformation(connectionString);
-            optionsBuilder.UseNpgsql(connectionString)
+            optionsBuilder.UseNpgsql(connectionString, o => o.UseNetTopologySuite())
             .UseSnakeCaseNamingConvention();
         }
+
+        // protected override void OnModelCreating(ModelBuilder modelBuilder)
+        // {
+        //     base.OnModelCreating(modelBuilder);
+
+        //     modelBuilder.Entity<DevicePlacement>(entity =>
+        //     {
+        //         entity.HasKey(e => new {e.DeviceId, e.ProjectId, e.StartDate, e.EndDate});
+
+        //         entity.HasOne(e => e.Device)
+        //             .WithMany(e => e.DevicePlacements)
+        //             .HasForeignKey(e => e.DeviceId);
+
+        //         entity.HasOne(e => e.Project)
+        //             .WithMany(e => e.DevicePlacements)
+        //             .HasForeignKey(e => e.ProjectId);
+        //     });
+        // }
     }
 }

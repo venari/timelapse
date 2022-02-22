@@ -18,6 +18,9 @@ public class Device
     public List<Image> Images {get;} = new List<Image>();
 
     [System.Text.Json.Serialization.JsonIgnore]
+    public List<DevicePlacement> DevicePlacements {get;} = new List<DevicePlacement>();
+
+    [System.Text.Json.Serialization.JsonIgnore]
     public Telemetry? LatestTelemetry {
         get{
             var latestTelemetry = Telemetries.OrderByDescending(t => t.Timestamp).FirstOrDefault();
