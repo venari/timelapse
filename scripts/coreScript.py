@@ -164,14 +164,15 @@ def uploadTelemetry():
 
 
 try:
+    if config['shutdown']:
+        print(str(datetime.datetime.now()) + ' Setting failsafe power off for 2 minutes 30 seconds from now.')
+        pj.power.SetPowerOff(150)   # Fail safe turn the thing off
+
     uploadTelemetry()
     print(str(datetime.datetime.now()) + ' warming up... waiting 30s')
     # Give everything a chance to settle down.
     time.sleep(30)
 
-    if config['shutdown']:
-        print(str(datetime.datetime.now()) + ' Setting failsafe power off for 2 minutes from now.')
-        pj.power.SetPowerOff(120)   # Fail safe turn the thing off
     uploadTelemetry()
     
     #time.sleep(40) # Wait for the camera and network to warm up
