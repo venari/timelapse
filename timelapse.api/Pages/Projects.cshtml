@@ -1,0 +1,60 @@
+@page
+@model ProjectsModel
+@{
+    ViewData["Title"] = "Projects";
+}
+
+<div class="text-center">
+    <h1 class="display-4">Welcome</h1>
+    <p>Learn about <a href="https://docs.microsoft.com/aspnet/core">building Web apps with ASP.NET Core</a>.</p>
+</div>
+
+<div>
+    <table class="table">
+        <thead>
+            <tr>
+            <th scope="col">Name</th>
+            <th scope="col">Description</th>
+            <th scope="col">Start Date</th>
+            <th scope="col">End Date</th>
+            <th scope="col"></th>
+            </tr>
+        </thead>
+        <tbody>
+                @foreach (var project in Model.projects){
+                    <tr>
+                        <td>
+                            @Html.DisplayFor(modelItem => project.Name)
+                        </td>
+                        <td>
+                            @Html.DisplayFor(modelItem => project.Description)
+                        </td>
+                        <td>
+                            <script type="text/javascript">localizeDate('@(project.StartDate.HasValue?project.StartDate.Value.ToString("s"):"---")')</script>                            
+                        </td>
+                        <td>
+                            <script type="text/javascript">localizeDate('@(project.EndDate.HasValue?project.EndDate.Value.ToString("s"):"---")')</script>                            
+                        </td>
+                        <td>
+                            @Html.ActionLink("Edit", "Edit", new { id=project.Id }) |
+                            @Html.ActionLink("Details", "Details", new { id=project.Id})  |
+                            @Html.ActionLink("Delete", "Delete", new { id=project.Id }) 
+                        </td>
+                    </tr>
+                }
+                    <tr>
+                        <td>
+                        </td>
+                        <td>
+                        </td>
+                        <td>
+                        </td>
+                        <td>
+                        </td>
+                        <td>
+                            <a asp-page="ProjectCreate">Create</a> |
+                        </td>
+                    </tr>
+        </tbody>
+    </table>
+</div>

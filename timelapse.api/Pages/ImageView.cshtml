@@ -5,20 +5,6 @@
     ViewData["Title"] = "Image View";
 }
 
-<script>
-    function localize(t)
-    {
-        var d=new Date(t+"Z");
-        document.write(d.toLocaleString());
-    }
-
-    function localizeDate(t)
-    {
-        var d=new Date(t);
-        return d.toLocaleString();
-    }
-</script>
-
 <div class="text-center">
     <h1 class="display-4">Welcome</h1>
     <p>Learn about <a href="https://docs.microsoft.com/aspnet/core">building Web apps with ASP.NET Core</a>.</p>
@@ -28,7 +14,7 @@
     <table class="table">
         <thead>
             <tr>
-            <th id="imageHeader" scope="col">Image for @(Model.device.Name) as at <script type="text/javascript">localize('@(Model.device.LatestImageTimestamp.Value.ToString("s"))');</script>
+            <th id="imageHeader" scope="col">Image for @(Model.device.Name) as at <script type="text/javascript">localizeDateTime('@(Model.device.LatestImageTimestamp.Value.ToString("s"))');</script>
             @if (DateTime.UtcNow - Model.device.LatestImage.Timestamp > TimeSpan.FromMinutes(15)){
                 <span class="badge bg-warning text-dark">Warning - @((DateTime.UtcNow - Model.device.LatestImage.Timestamp).Humanize()) old</span>
             }
@@ -97,7 +83,7 @@
         imageBlobUri = last24HoursImages[imageIndex].blobUri + '@(Model.SasToken)'.replace(/&amp;/g, '&')
         image.src = imageBlobUri
         var imageHeader = document.getElementById("imageHeader");
-        imageHeader.innerHTML = "Image for @(Model.device.Name) as at " + localizeDate(last24HoursImages[imageIndex].timestamp)
+        imageHeader.innerHTML = "Image for @(Model.device.Name) as at " + localizeDateTime(last24HoursImages[imageIndex].timestamp)
     }
 
     // Update the current slider value (each time you drag the slider handle)

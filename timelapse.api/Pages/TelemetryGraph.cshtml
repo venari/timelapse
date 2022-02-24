@@ -5,20 +5,6 @@
     ViewData["Title"] = "Telemetry Graph";
 }
 
-<script>
-    function localize(t)
-    {
-        var d=new Date(t+" UTC");
-        document.write(d.toLocaleString());
-    }
-
-    function localizeDate(t)
-    {
-        var d=new Date(t);
-        return d.toLocaleString();
-    }
-</script>
-
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
 
@@ -50,7 +36,7 @@
     <table class="table">
         <thead>
             <tr>
-            <th scope="col">Latest Telemetry for @(Model.device.Name) as at <script type="text/javascript">localize('@(Model.device.LatestTelemetryTimestamp)');</script>
+            <th scope="col">Latest Telemetry for @(Model.device.Name) as at <script type="text/javascript">localizeDateTime('@(Model.device.LatestTelemetryTimestamp.HasValue?Model.device.LatestTelemetryTimestamp.Value.ToString("s"):"---")');</script>
             @if (Model.device.LatestTelemetry!=null && DateTime.UtcNow - Model.device.LatestTelemetry.Timestamp > TimeSpan.FromMinutes(15)){
                 <span class="badge bg-warning text-dark">Warning - @((DateTime.UtcNow - Model.device.LatestTelemetry.Timestamp).Humanize()) old</span>
             }
