@@ -15,6 +15,10 @@ while not os.path.exists('/dev/i2c-1'):
     time.sleep(0.1)
 subprocess.call(['sudo', 'hwclock', '--hctosys'])
 
+outputImageFolder = '../output/images/'
+pendingImageFolder = outputImageFolder + 'pending/'
+uploadedImageFolder = outputImageFolder + 'uploaded/'
+
 # pijuice
 pj = pijuice.PiJuice(1, 0x14)
 
@@ -68,8 +72,8 @@ def scheduleShutdown():
 
 
 def savePhoto():
-    outputImageFolder = '../output/images/'
     os.makedirs(outputImageFolder, exist_ok = True)
+    os.makedirs(pendingImageFolder, exist_ok = True)
     # txtTime = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
     with PiCamera() as camera:
@@ -85,42 +89,43 @@ def savePhoto():
         time.sleep(5)
         print(str(datetime.datetime.now()) + ' ready')
 
-        IMAGEFILENAME = '../output/images/pending' + datetime.datetime.now().strftime('%Y-%m-%d_%H%M%S.jpg')
+        IMAGEFILENAME = pendingImageFolder + datetime.datetime.now().strftime('%Y-%m-%d_%H%M%S.jpg')
         camera.capture(IMAGEFILENAME)
         print(str(datetime.datetime.now()) + ' image saved')
 
 def uploadPendingPhotos():
-    for IMAGEFILENAME in os.listdir('../output/images/pending'):
-        if IMAGEFILENAME.startswith('pending'):
-            print(str(datetime.datetime.now()) + ' uploading ' + IMAGEFILENAME)
+    os.makedirs(pendingImageFolder, exist_ok = True)
+    os.makedirs(uploadedImageFolder, exist_ok = True)
+    for IMAGEFILENAME in os.listdir(pendingImageFolder):
+        print(str(datetime.datetime.now()) + ' uploading ' + IMAGEFILENAME)
 
-            files = {
-                'File': open(IMAGEFILENAME, 'rb'),
-            }
+        files = {
+            'File': open(IMAGEFILENAME, 'rb'),
+        }
 
-            data = {
-                'SerialNumber': serialNumber
-            }
+        data = {
+            'SerialNumber': serialNumber
+        }
 
-            print('data:')
-            print(data)
+        print('data:')
+        print(data)
 
-            session = requests.Session()
-            response = session.post(config['apiUrl'] + 'Image', files=files, data=data)
+        session = requests.Session()
+        response = session.post(config['apiUrl'] + 'Image', files=files, data=data)
 
-            print(f'Response code: {response.status_code}')
-            if response.status_code == 200:
-                print(f'Image uploaded successfully')
-                shutil.move(IMAGEFILENAME, '../output/images/200/' + os.path.basename(IMAGEFILENAME))
+        print(f'Response code: {response.status_code}')
+        if response.status_code == 200:
+            print(f'Image uploaded successfully')
+            shutil.move(IMAGEFILENAME, uploadedImageFolder + os.path.basename(IMAGEFILENAME))
 
-            else:
-                print(f'Image upload failed')
+        else:
+            print(f'Image upload failed')
 
-            print(f'Response text:')
-            try:
-                print(json.dumps(json.loads(response.text), indent = 4))
-            except json.decoder.JSONDecodeError:
-                print(response.text)
+        print(f'Response text:')
+        try:
+            print(json.dumps(json.loads(response.text), indent = 4))
+        except json.decoder.JSONDecodeError:
+            print(response.text)
 
 
 def uploadTelemetry():
