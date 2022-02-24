@@ -100,15 +100,17 @@ def uploadPendingPhotos():
         print(str(datetime.datetime.now()) + ' uploading ' + IMAGEFILENAME)
 
         imageTimestamp = datetime.datetime.strptime(IMAGEFILENAME, '%Y-%m-%d_%H%M%S.jpg')
+        print('imageTimestamp:')
+        print(imageTimestamp)
 
         files = {
-            'File': open(IMAGEFILENAME, 'rb'),
+            'File': open(pendingImageFolder + IMAGEFILENAME, 'rb'),
         }
 
         data = {
             'SerialNumber': serialNumber,
             # 'Timestamp': (datetime.datetime.utcfromtimestamp(imageTimestamp.timestamp)).strftime('%Y-%m-%d %H:%M:%S')
-            'Timestamp': imageTimestamp.astimezone.isoformat()
+            'Timestamp': imageTimestamp.astimezone().isoformat()
         }
 
         print('data:')
@@ -120,7 +122,7 @@ def uploadPendingPhotos():
         print(f'Response code: {response.status_code}')
         if response.status_code == 200:
             print(f'Image uploaded successfully')
-            shutil.move(IMAGEFILENAME, uploadedImageFolder + os.path.basename(IMAGEFILENAME))
+            shutil.move(pendingImageFolder + IMAGEFILENAME, uploadedImageFolder + IMAGEFILENAME)
 
         else:
             print(f'Image upload failed')
@@ -160,7 +162,7 @@ def uploadTelemetry():
 
     postResponse = session.post(config['apiUrl'] + 'Telemetry',data=api_data)
     print(postResponse)
-    assert postResponse.status_code == 200, "API returned error code"
+    #assert postResponse.status_code == 200, "API returned error code"
     #requests.post(config['apiUrl'] + '/Telemetry', json=api_data)
 
     print(str(datetime.datetime.now()) + ' Logged to API.')
