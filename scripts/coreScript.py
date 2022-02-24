@@ -99,12 +99,16 @@ def uploadPendingPhotos():
     for IMAGEFILENAME in os.listdir(pendingImageFolder):
         print(str(datetime.datetime.now()) + ' uploading ' + IMAGEFILENAME)
 
+        imageTimestamp = datetime.datetime.strptime(IMAGEFILENAME, '%Y-%m-%d_%H%M%S.jpg')
+
         files = {
             'File': open(IMAGEFILENAME, 'rb'),
         }
 
         data = {
-            'SerialNumber': serialNumber
+            'SerialNumber': serialNumber,
+            # 'Timestamp': (datetime.datetime.utcfromtimestamp(imageTimestamp.timestamp)).strftime('%Y-%m-%d %H:%M:%S')
+            'Timestamp': imageTimestamp.astimezone.isoformat()
         }
 
         print('data:')
