@@ -36,9 +36,9 @@
                             <script type="text/javascript">localizeDate('@(project.EndDate.HasValue?project.EndDate.Value.ToString("s"):"---")')</script>                            
                         </td>
                         <td>
-                            @Html.ActionLink("Edit", "Edit", new { id=project.Id }) |
-                            @Html.ActionLink("Details", "Details", new { id=project.Id})  |
-                            @Html.ActionLink("Delete", "Delete", new { id=project.Id }) 
+                            <a asp-page="ProjectEdit" asp-route-id="@(project.Id)" class="btn btn-primary">Edit</a> |
+                            <a asp-page="ProjectDetails" asp-route-id="@(project.Id)" class="btn btn-primary">Details</a> |
+                            <a asp-page="ProjectDelete" asp-route-id="@(project.Id)" class="btn btn-danger">Delete</a> |
                         </td>
                     </tr>
                 }
@@ -52,7 +52,7 @@
                         <td>
                         </td>
                         <td>
-                            <a asp-page="ProjectCreate">Create</a> |
+                            <a asp-page="ProjectCreate" class="btn btn-primary">Create</a> |
                         </td>
                     </tr>
         </tbody>

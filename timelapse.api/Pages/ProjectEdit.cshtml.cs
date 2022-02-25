@@ -73,7 +73,7 @@ namespace timelapse.api.Pages
                 EndDate = ProjectEndDate.HasValue?ProjectEndDate.Value.ToUniversalTime():null
             };
 
-            _appDbContext.Projects.Add(project);
+            _appDbContext.Projects.Update(project);
             await _appDbContext.SaveChangesAsync();
 
             return RedirectToPage("./Projects");

@@ -83,7 +83,7 @@
         imageBlobUri = last24HoursImages[imageIndex].blobUri + '@(Model.SasToken)'.replace(/&amp;/g, '&')
         image.src = imageBlobUri
         var imageHeader = document.getElementById("imageHeader");
-        imageHeader.innerHTML = "Image for @(Model.device.Name) as at " + localizeDateTime(last24HoursImages[imageIndex].timestamp)
+        imageHeader.innerHTML = "Image for @(Model.device.Name) as at " + localizeDateTimeAsString(last24HoursImages[imageIndex].timestamp)
     }
 
     // Update the current slider value (each time you drag the slider handle)

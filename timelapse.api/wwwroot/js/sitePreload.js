@@ -28,6 +28,32 @@ function localizeDate(t)
     }
 }
 
+function localizeDateTimeAsString(t)
+{
+    if(t && t!='---'){
+        if(t.indexOf('Z')==-1){
+            t+='Z'
+        }
+        var d=new Date(t);
+        return d.toLocaleString();
+    } else {
+        return '---';
+    }
+}
+
+function localizeDateAsString(t)
+{
+    if(t && t!='---'){
+        if(t.indexOf('Z')==-1){
+            t+='Z'
+        }
+        var d=new Date(t);
+        return d.toLocaleDateString();
+    } else {
+        return '---';
+    }
+}
+
 // function localizeDate(t)
 // {
 //     var d=new Date(t);
