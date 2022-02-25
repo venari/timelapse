@@ -15,6 +15,10 @@ while not os.path.exists('/dev/i2c-1'):
     time.sleep(0.1)
 subprocess.call(['sudo', 'hwclock', '--hctosys'])
 
+outputImageFolder = '../output/images/'
+pendingImageFolder = outputImageFolder + 'pending/'
+uploadedImageFolder = outputImageFolder + 'uploaded/'
+
 # pijuice
 pj = pijuice.PiJuice(1, 0x14)
 
@@ -68,8 +72,8 @@ def scheduleShutdown():
 
 
 def savePhoto():
-    outputImageFolder = '../output/images/'
     os.makedirs(outputImageFolder, exist_ok = True)
+    os.makedirs(pendingImageFolder, exist_ok = True)
     # txtTime = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
     with PiCamera() as camera:
@@ -85,42 +89,49 @@ def savePhoto():
         time.sleep(5)
         print(str(datetime.datetime.now()) + ' ready')
 
-        IMAGEFILENAME = '../output/images/pending' + datetime.datetime.now().strftime('%Y-%m-%d_%H%M%S.jpg')
+        IMAGEFILENAME = pendingImageFolder + datetime.datetime.now().strftime('%Y-%m-%d_%H%M%S.jpg')
         camera.capture(IMAGEFILENAME)
         print(str(datetime.datetime.now()) + ' image saved')
 
 def uploadPendingPhotos():
-    for IMAGEFILENAME in os.listdir('../output/images/pending'):
-        if IMAGEFILENAME.startswith('pending'):
-            print(str(datetime.datetime.now()) + ' uploading ' + IMAGEFILENAME)
+    os.makedirs(pendingImageFolder, exist_ok = True)
+    os.makedirs(uploadedImageFolder, exist_ok = True)
+    for IMAGEFILENAME in os.listdir(pendingImageFolder):
+        print(str(datetime.datetime.now()) + ' uploading ' + IMAGEFILENAME)
 
-            files = {
-                'File': open(IMAGEFILENAME, 'rb'),
-            }
+        imageTimestamp = datetime.datetime.strptime(IMAGEFILENAME, '%Y-%m-%d_%H%M%S.jpg')
+        print('imageTimestamp:')
+        print(imageTimestamp)
 
-            data = {
-                'SerialNumber': serialNumber
-            }
+        files = {
+            'File': open(pendingImageFolder + IMAGEFILENAME, 'rb'),
+        }
 
-            print('data:')
-            print(data)
+        data = {
+            'SerialNumber': serialNumber,
+            # 'Timestamp': (datetime.datetime.utcfromtimestamp(imageTimestamp.timestamp)).strftime('%Y-%m-%d %H:%M:%S')
+            'Timestamp': imageTimestamp.astimezone().isoformat()
+        }
 
-            session = requests.Session()
-            response = session.post(config['apiUrl'] + 'Image', files=files, data=data)
+        print('data:')
+        print(data)
 
-            print(f'Response code: {response.status_code}')
-            if response.status_code == 200:
-                print(f'Image uploaded successfully')
-                shutil.move(IMAGEFILENAME, '../output/images/200/' + os.path.basename(IMAGEFILENAME))
+        session = requests.Session()
+        response = session.post(config['apiUrl'] + 'Image', files=files, data=data)
 
-            else:
-                print(f'Image upload failed')
+        print(f'Response code: {response.status_code}')
+        if response.status_code == 200:
+            print(f'Image uploaded successfully')
+            shutil.move(pendingImageFolder + IMAGEFILENAME, uploadedImageFolder + IMAGEFILENAME)
 
-            print(f'Response text:')
-            try:
-                print(json.dumps(json.loads(response.text), indent = 4))
-            except json.decoder.JSONDecodeError:
-                print(response.text)
+        else:
+            print(f'Image upload failed')
+
+        print(f'Response text:')
+        try:
+            print(json.dumps(json.loads(response.text), indent = 4))
+        except json.decoder.JSONDecodeError:
+            print(response.text)
 
 
 def uploadTelemetry():
@@ -151,7 +162,7 @@ def uploadTelemetry():
 
     postResponse = session.post(config['apiUrl'] + 'Telemetry',data=api_data)
     print(postResponse)
-    assert postResponse.status_code == 200, "API returned error code"
+    #assert postResponse.status_code == 200, "API returned error code"
     #requests.post(config['apiUrl'] + '/Telemetry', json=api_data)
 
     print(str(datetime.datetime.now()) + ' Logged to API.')
@@ -159,14 +170,15 @@ def uploadTelemetry():
 
 
 try:
+    if config['shutdown']:
+        print(str(datetime.datetime.now()) + ' Setting failsafe power off for 2 minutes 30 seconds from now.')
+        pj.power.SetPowerOff(150)   # Fail safe turn the thing off
+
     uploadTelemetry()
     print(str(datetime.datetime.now()) + ' warming up... waiting 30s')
     # Give everything a chance to settle down.
     time.sleep(30)
 
-    if config['shutdown']:
-        print(str(datetime.datetime.now()) + ' Setting failsafe power off for 2 minutes from now.')
-        pj.power.SetPowerOff(120)   # Fail safe turn the thing off
     uploadTelemetry()
     
     #time.sleep(40) # Wait for the camera and network to warm up
