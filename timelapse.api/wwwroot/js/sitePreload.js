@@ -4,14 +4,28 @@
 // Write your JavaScript code.
 function localizeDateTime(t)
 {
-    var d=new Date(t+"Z");
-    document.write(d.toLocaleString());
+    if(t && t!='---'){
+        if(t.indexOf('Z')==-1){
+            t+='Z'
+        }
+        var d=new Date(t);
+        document.write(d.toLocaleString());
+    } else {
+        document.write('---');
+    }
 }
 
 function localizeDate(t)
 {
-    var d=new Date(t+"Z");
-    document.write(d.toLocaleDateString());
+    if(t && t!='---'){
+        if(t.indexOf('Z')==-1){
+            t+='Z'
+        }
+        var d=new Date(t);
+        document.write(d.toLocaleDateString());
+    } else {
+        document.write('---');
+    }
 }
 
 // function localizeDate(t)
