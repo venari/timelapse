@@ -41,7 +41,7 @@ namespace timelapse.api.Pages
 
             ProjectName = p.Name;
             ProjectDescription = p.Description;
-            ProjectId = p.Id;
+            // ProjectId = p.Id;
             ProjectStartDate = p.StartDate;
             ProjectEndDate = p.EndDate;
 
@@ -51,27 +51,29 @@ namespace timelapse.api.Pages
         // [BindProperty]
         // public Project Project { get; set; }
 
-        [BindProperty] public int ProjectId { get; set; }
+        // [BindProperty] public int ProjectId { get; set; }
         [BindProperty] public string ProjectName { get; set; }
         [BindProperty] public string ProjectDescription { get; set; }
         [BindProperty, DataType(DataType.Date)] public DateTime? ProjectStartDate { get; set; }
         [BindProperty, DataType(DataType.Date)] public DateTime? ProjectEndDate { get; set; }
 
         // To protect from overposting attacks, see https://aka.ms/RazorPagesCRUD
-        public async Task<IActionResult> OnPostAsync()
+        public async Task<IActionResult> OnPostAsync(int id)
         {
             if (!ModelState.IsValid)
             {
                 return Page();
             }
 
-            Project project = new Project(){
-                Id = ProjectId,
-                Name = ProjectName,
-                Description = ProjectDescription,
-                StartDate = ProjectStartDate.HasValue?ProjectStartDate.Value.ToUniversalTime():null,
-                EndDate = ProjectEndDate.HasValue?ProjectEndDate.Value.ToUniversalTime():null
-            };
+            Project? project = _appDbContext.Projects.Find(id); //FirstOrDefault(p => p.Id == id);
+            if(project==null){
+                return RedirectToPage("/NotFound");
+            }
+            
+            project.Name = ProjectName;
+            project.Description = ProjectDescription;
+            project.StartDate = ProjectStartDate.HasValue?ProjectStartDate.Value.ToUniversalTime():null;
+            project.EndDate = ProjectEndDate.HasValue?ProjectEndDate.Value.ToUniversalTime():null;
 
             _appDbContext.Projects.Update(project);
             await _appDbContext.SaveChangesAsync();
