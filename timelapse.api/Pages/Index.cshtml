@@ -77,7 +77,7 @@
                         </td>
                         <td>
                             @* @(device.LatestTelemetry!=null?device.LatestTelemetry.Timestamp:"---") *@
-                            <script type="text/javascript">localize('@(device.LatestImageTimestamp.HasValue?device.LatestImageTimestamp.Value.ToString("s"):"---")')</script>
+                            <script type="text/javascript">localize('@(device.LatestTelemetryTimestamp.HasValue?device.LatestTelemetryTimestamp.Value.ToString("s"):"---")')</script>
                             @if (device.LatestTelemetry!=null && DateTime.UtcNow - device.LatestTelemetry.Timestamp > TimeSpan.FromMinutes(15)){
                                 <span class="badge bg-warning text-dark">Warning - @((DateTime.UtcNow - device.LatestTelemetry.Timestamp).Humanize()) old</span>
                             }
