@@ -41,7 +41,7 @@ public class ImageViewModel : PageModel
 
         device = d;
 
-        imagesLast24Hours = d.Images.Where(i =>i.Timestamp.Date >= DateTime.UtcNow.AddDays(-1).Date).OrderBy(i => i.Timestamp).ToArray();
+        imagesLast24Hours = d.Images.Where(i =>i.Timestamp.Date >= DateTime.UtcNow.AddDays(-2).Date).OrderBy(i => i.Timestamp).ToArray();
         if(imagesLast24Hours.Count()==0){
             return RedirectToPage("/NotFound");
         }

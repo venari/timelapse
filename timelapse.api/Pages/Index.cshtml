@@ -14,10 +14,10 @@
 </div>
 
 <script>
-    const latest24HoursTelemetryUri = 'api/Telemetry/GetLatest24HoursTelemetry'
+    const latestTelemetryUri = 'api/Telemetry/GetLatestTelemetry'
 
     function getTelemetry(deviceId, chart) {
-        fetch(latest24HoursTelemetryUri + '?deviceId=' + deviceId)
+        fetch(latestTelemetryUri + '?deviceId=' + deviceId + '&hours=24')
             .then(response => response.json())
             .then(data => showTelemetry(chart, data))
             .catch(error => console.error('Unable to get telemetry.', error));
