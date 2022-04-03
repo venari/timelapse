@@ -40,7 +40,7 @@ sudo apt-get upgrade
 
 # Enable camera interface
 sudo raspi-config nonint do_camera 0
-```
+
 sudo apt-get install git pijuice-base gphoto2 python3-pip -y
 
 pip3 install picamera
@@ -48,15 +48,14 @@ pip3 install picamera
 git clone https://github.com/venari/timelapse.git
 
 cd timelapse
-
-
 ```
 
 
 # On board timelapse generation
 
+```
 ffmpeg -r 30 -f image2 -pattern_type glob -i "./<YYYY-MM-DD>*.jpg" -s 1014x760 -vcodec libx264 <YYYY-MM-DD>.mp4
-
+```
 
 # API Setup
 Prerequisites:
