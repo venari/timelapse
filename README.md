@@ -45,9 +45,19 @@ sudo apt-get install git pijuice-base gphoto2 python3-pip -y
 
 pip3 install picamera
 
+mkdir -p dev
+cd dev
 git clone https://github.com/venari/timelapse.git
-
 cd timelapse
+```
+
+Add scheduled tasks:
+```
+crontab -e
+```
+```
+@reboot /usr/bin/bash /home/pi/dev/timelapse/scripts/startup.sh
+* * * * * /usr/bin/bash /home/pi/dev/timelapse/scripts/uploadTelemetry.sh 
 ```
 
 
@@ -102,4 +112,54 @@ dotnet ef --project timelapse.api migrations script -i --context "AppDbContext" 
 Updating database:
 ```
 dotnet ef --project timelapse.api database update
+```
+
+
+
+
+
+# Battery Profiles
+
+Ali Express, likely-not-really 10,000mAh battery...
+
+```
+
+░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+░░░░░┌───────────────────────── PiJuice CLI ────────────────────────┐░░░░░
+░░░░░│  Battery settings                                            │░░░░░
+░░░░░│                                                              │░░░░░
+░░░░░│  Status: Custom profile by: HOST                             │░░░░░
+░░░░░│  < Profile: CUSTOM       >                                   │░░░░░
+░░░░░│                                                              │░░░░░
+░░░░░│  [X] Custom                                                  │░░░░░  <-- Set to Custom
+░░░░░│  Chemistry:                LIPO                              │░░░░░  
+░░░░░│  Capacity [mAh]:           10000                             │░░░░░  <-- Set to 10000
+░░░░░│  Charge current [mA]:      1225                              │░░░░░  <-- Set to 1250 or 1000
+░░░░░│  Termination current [mA]: 50                                │░░░░░
+░░░░░│  Regulation voltage [mV]:  4180                              │░░░░░
+░░░░░│  Cutoff voltage [mV]:      3000                              │░░░░░
+░░░░░│  Cold temperature [C]:     0                                 │░░░░░
+░░░░░│  Cool temperature [C]:     2                                 │░░░░░
+░░░░░│  Warm temperature [C]:     49                                │░░░░░
+░░░░░│  Hot temperature [C]:      65                                │░░░░░
+░░░░░│  NTC B constant [1k]:      3450                              │░░░░░
+░░░░░│  NTC resistance [ohm]:     10000                             │░░░░░
+░░░░░│  OCV10 [mV]:               3743                              │░░░░░
+░░░░░│  OCV50 [mV]:               3933                              │░░░░░
+░░░░░│  OCV90 [mV]:               4057                              │░░░░░
+░░░░░│  R10 [mOhm]:               135.0                             │░░░░░
+░░░░░│  R50 [mOhm]:               133.0                             │░░░░░
+░░░░░│  R90 [mOhm]:               133.0                             │░░░░░
+░░░░░│                                                              │░░░░░
+░░░░░│  < Temperature sense: ON_BOARD    >                          │░░░░░
+░░░░░│                                                              │░░░░░
+░░░░░│  < Rsoc estimation: AUTO_DETECT   >                          │░░░░░
+░░░░░│                                                              │░░░░░
+░░░░░│  < Refresh        >                                          │░░░░░
+░░░░░│  < Apply settings >                                          │░░░░░
+░░░░░│  < Back           >                                          │░░░░░
+░░░░░└──────────────────────────────────────────────────────────────┘░░░░░
+░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+
 ```
