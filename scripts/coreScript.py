@@ -187,5 +187,6 @@ try:
     uploadTelemetry()
     scheduleShutdown()
 except Exception as e:
-    print(str(datetime.datetime.now()) + e)
+    print(str(datetime.datetime.now()) + " Catastrophic failure.")
     scheduleShutdown()
+    print(e)
