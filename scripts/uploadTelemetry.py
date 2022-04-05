@@ -31,6 +31,22 @@ serialNumber = getSerialNumber()
 
 def uploadTelemetry():
     warningTemp = 50
+
+    print('A')
+    print(pj.status.GetChargeLevel()['data'])
+    print(pj.status.GetBatteryTemperature()['data'])
+    print(shutil.disk_usage('/')[2] // (1024**3)) # shutil.disk_usage returns tuple of (total, used, free), converted to int gb
+    print(int(time.clock_gettime(time.CLOCK_BOOTTIME)))
+    print(str({ 'status': pj.status.GetStatus()['data'],
+                'batteryVoltage': pj.status.GetBatteryVoltage()['data'],
+                'batteryCurrent': pj.status.GetBatteryCurrent()['data'],
+                'ioVoltage': pj.status.GetIoVoltage()['data'],
+                'ioCurrent': pj.status.GetIoCurrent()['data']
+            }))
+    print(serialNumber)
+    print('Z')
+
+
     api_data = {
                 'batteryPercent': pj.status.GetChargeLevel()['data'],
                 'temperatureC': pj.status.GetBatteryTemperature()['data'],
