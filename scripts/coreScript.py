@@ -76,22 +76,27 @@ def savePhoto():
     os.makedirs(pendingImageFolder, exist_ok = True)
     # txtTime = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
-    with PiCamera() as camera:
+    try:
+        with PiCamera() as camera:
 
-        print(str(datetime.datetime.now()) + ' beginning capture')
-        camera.vflip = True
-        camera.hflip = True
-        #camera.resolution = (1024, 768)
-        #camera.resolution = (3280,2464) # Didn't work
-        camera.start_preview()
-        # Camera warm-up time
-        print(str(datetime.datetime.now()) + ' warming up camera...')
-        time.sleep(5)
-        print(str(datetime.datetime.now()) + ' ready')
+            print(str(datetime.datetime.now()) + ' beginning capture')
+            camera.vflip = True
+            camera.hflip = True
+            #camera.resolution = (1024, 768)
+            #camera.resolution = (3280,2464) # Didn't work
+            camera.start_preview()
+            # Camera warm-up time
+            print(str(datetime.datetime.now()) + ' warming up camera...')
+            time.sleep(5)
+            print(str(datetime.datetime.now()) + ' ready')
 
-        IMAGEFILENAME = pendingImageFolder + datetime.datetime.now().strftime('%Y-%m-%d_%H%M%S.jpg')
-        camera.capture(IMAGEFILENAME)
-        print(str(datetime.datetime.now()) + ' image saved')
+            IMAGEFILENAME = pendingImageFolder + datetime.datetime.now().strftime('%Y-%m-%d_%H%M%S.jpg')
+            camera.capture(IMAGEFILENAME)
+            print(str(datetime.datetime.now()) + ' image saved')
+
+    except Exception as e:
+        print(str(datetime.datetime.now()) + " SavePhoto() failed.")
+        print(e)
 
 def uploadPendingPhotos():
     os.makedirs(pendingImageFolder, exist_ok = True)
