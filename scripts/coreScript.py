@@ -59,9 +59,20 @@ def scheduleShutdown():
 
         if status['error'] != 'NO_ERROR':
             print('Cannot set alarm\n')
-            sys.exit()
+            # sys.exit()
         else:
             print('Alarm set for ' + str(pj.rtcAlarm.GetAlarm()))
+
+        # Ensure Wake up alarm is actually enabled!
+        status = pj.rtcAlarm.SetWakeupEnabled(True)
+
+        if status['error'] != 'NO_ERROR':
+            print('Cannot enable wakeup\n')
+            # sys.exit()
+        else:
+            print('Alarm set for ' + str(pj.rtcAlarm.GetAlarm()))
+
+            
 
         print(str(datetime.datetime.now()) + ' Shutting down...')
         subprocess.call(['sudo', 'shutdown'])

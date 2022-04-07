@@ -118,8 +118,9 @@ dotnet ef --project timelapse.api database update
 ```
 
 
-# Enable Wke Up and set RTC Time
+# Enable Wake Up and set RTC Time
 
+Note - Wake up should be automatically enabled in `coreScript.py`.
 ```
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
