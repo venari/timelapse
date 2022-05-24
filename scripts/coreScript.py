@@ -151,38 +151,42 @@ def uploadPendingPhotos():
 
 
 def uploadTelemetry():
-    warningTemp = 50
-    api_data = {
-                'batteryPercent': pj.status.GetChargeLevel()['data'],
-                'temperatureC': pj.status.GetBatteryTemperature()['data'],
-                'diskSpaceFree': shutil.disk_usage('/')[2] // (1024**3), # shutil.disk_usage returns tuple of (total, used, free), converted to int gb
-                'uptimeSeconds': int(time.clock_gettime(time.CLOCK_BOOTTIME)),
-                'status': str({ 'status': pj.status.GetStatus()['data'],
-                            'batteryVoltage': pj.status.GetBatteryVoltage()['data'],
-                            'batteryCurrent': pj.status.GetBatteryCurrent()['data'],
-                            'ioVoltage': pj.status.GetIoVoltage()['data'],
-                            'ioCurrent': pj.status.GetIoCurrent()['data']
-                        }),
-                'SerialNumber': serialNumber
-            }
+    try:
+        warningTemp = 50
+        api_data = {
+                    'batteryPercent': pj.status.GetChargeLevel()['data'],
+                    'temperatureC': pj.status.GetBatteryTemperature()['data'],
+                    'diskSpaceFree': shutil.disk_usage('/')[2] // (1024**3), # shutil.disk_usage returns tuple of (total, used, free), converted to int gb
+                    'uptimeSeconds': int(time.clock_gettime(time.CLOCK_BOOTTIME)),
+                    'status': str({ 'status': pj.status.GetStatus()['data'],
+                                'batteryVoltage': pj.status.GetBatteryVoltage()['data'],
+                                'batteryCurrent': pj.status.GetBatteryCurrent()['data'],
+                                'ioVoltage': pj.status.GetIoVoltage()['data'],
+                                'ioCurrent': pj.status.GetIoCurrent()['data']
+                            }),
+                    'SerialNumber': serialNumber
+                }
 
-    if api_data['temperatureC'] > warningTemp:
-        print(f'WARNING: temperature is {api_data["temperatureC"]}C')
-        with open('tempWarning.log', 'a') as f:
-            f.write(f'{datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")}: {api_data["temperatureC"]}C\n')
+        if api_data['temperatureC'] > warningTemp:
+            print(f'WARNING: temperature is {api_data["temperatureC"]}C')
+            with open('tempWarning.log', 'a') as f:
+                f.write(f'{datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")}: {api_data["temperatureC"]}C\n')
 
-    #requests.post(config['apiUrl'] + '/Telemetry', json=api_data)
-    session = requests.Session()
+        #requests.post(config['apiUrl'] + '/Telemetry', json=api_data)
+        session = requests.Session()
 
-    print(api_data)
+        print(api_data)
 
-    postResponse = session.post(config['apiUrl'] + 'Telemetry',data=api_data)
-    print(postResponse)
-    #assert postResponse.status_code == 200, "API returned error code"
-    #requests.post(config['apiUrl'] + '/Telemetry', json=api_data)
+        postResponse = session.post(config['apiUrl'] + 'Telemetry',data=api_data)
+        print(postResponse)
+        #assert postResponse.status_code == 200, "API returned error code"
+        #requests.post(config['apiUrl'] + '/Telemetry', json=api_data)
 
-    print(str(datetime.datetime.now()) + ' Logged to API.')
+        print(str(datetime.datetime.now()) + ' Logged to API.')
 
+    except Exception as e:
+        print(str(datetime.datetime.now()) + " uploadTelemetry() failed.")
+        print(e)
 
 
 try:

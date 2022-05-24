@@ -3,7 +3,7 @@ A set of tools/scripts to automate the taking and creation of timelapse videos a
 
 # PI Setup
 
-For now, use Buster ratherr than Bullseye - owing to raspicam issues on Pi Zero.
+For now, use Buster rather than Bullseye - owing to raspicam issues on Pi Zero.
 
 Raspberry Pi OS Lite (Legacy) 
 Debian version 10 - https://downloads.raspberrypi.org/raspios_oldstable_lite_armhf/images/raspios_oldstable_lite_armhf-2022-01-28/2022-01-28-raspios-buster-armhf-lite.zip
@@ -62,6 +62,24 @@ crontab -e
 @reboot /usr/bin/bash /home/pi/dev/timelapse/scripts/startup.sh
 * * * * * /usr/bin/bash /home/pi/dev/timelapse/scripts/uploadTelemetry.sh 
 ```
+
+# preview image over VNC
+https://www.youtube.com/watch?v=dbBWyeHbGs0&ab_channel=WillyKjellstrom
+
+Set screen VNC resolution:
+sudo raspi-config
+	-> 2 Display Options
+		-> D5 VNC Resolution
+
+To disable:
+https://help.realvnc.com/hc/en-us/articles/5060068870813-Disabling-direct-capture-on-Raspberry-Pi-using-the-command-line
+sudo sed -i '/CaptureTech/d' /root/.vnc/config.d/vncserver-x11
+sudo vncserver-x11 -service -reload
+
+Issues in Bullseye on Zero2? https://www.raspberrypi.com/news/bullseye-camera-system/
+
+- related - possibly not - https://github.com/raspberrypi/libcamera-apps/issues/278
+- 
 
 
 # On board timelapse generation
@@ -230,3 +248,13 @@ Ali Express, likely-not-really 10,000mAh battery...
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 
 ```
+
+
+# Battery notes
+
+Naccon 3.7V 26650HP 5000mAh
+On continuously
+Charge from wall charger about 5 hours
+Discharge 95 -> 5% about 12 hours.
+Discharge 4 -> 1$ about 10 hours.
+

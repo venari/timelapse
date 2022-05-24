@@ -9,8 +9,8 @@ while ! ping -c 1 -W 1 venari.co.nz; do
     echo `date` >> startup.sh.out
     echo "Waiting for venari.co.nz - network interface might be down..." >> startup.sh.out
     sleep 1
-    ((tries++))
-    if [[ $i -gt 60 ]]; then
+    tries=$(( $tries + 1 ))
+    if [[ $tries -gt 30 ]]; then
         echo "Giving up waiting" >> startup.sh.out
         break
     fi
