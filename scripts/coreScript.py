@@ -80,6 +80,8 @@ def scheduleShutdown():
         pj.power.SetPowerOff(30)
     else:
         print(str(datetime.datetime.now()) + ' skipping shutdown scheduling because of config.json')
+        # Ensure Wake up alarm is *not* enabled - or it will cause pi to reboot
+        status = pj.rtcAlarm.SetWakeupEnabled(False)
 
 
 def savePhoto():
