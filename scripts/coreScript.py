@@ -13,7 +13,6 @@ config = json.load(open('config.json'))
 # clock
 while not os.path.exists('/dev/i2c-1'):
     time.sleep(0.1)
-subprocess.call(['sudo', 'hwclock', '--hctosys'])
 
 outputImageFolder = '../output/images/'
 pendingImageFolder = outputImageFolder + 'pending/'
@@ -190,6 +189,16 @@ def uploadTelemetry():
         print(str(datetime.datetime.now()) + " uploadTelemetry() failed.")
         print(e)
 
+
+try:
+    print(str(datetime.datetime.now()) + ' setting sys clock from RTC...')
+    subprocess.call(['sudo', 'hwclock', '--hctosys'])
+    print(str(datetime.datetime.now()) + " sudo hwclock --hctosys succeeded")
+except Exception as e:
+    print(str(datetime.datetime.now()) + " sudo hwclock --hctosys failed")
+    scheduleShutdown()
+    print(e)
+    
 
 try:
     if config['shutdown']:
