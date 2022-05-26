@@ -5,5 +5,14 @@
     "apiUrl": "https://timelapse-dev.azurewebsites.net/api/",
 
     "shutdown": true,
-    "tempWarning": 50
+    "tempWarning": 50,
+
+    "camera.vflip": true,
+    "camera.hflip": true,
+    "camera.rotation": 0,
+    "camera.resolution.width_": 3280,
+    "camera.resolution.height_": 2464,
+    "camera.resolution.width": 1024,
+    "camera.resolution.height": 768
+
 }

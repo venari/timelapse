@@ -92,8 +92,11 @@ def savePhoto():
         with PiCamera() as camera:
 
             print(str(datetime.datetime.now()) + ' beginning capture')
-            camera.vflip = True
-            camera.hflip = True
+            camera.vflip = config['camera.vflip']
+            camera.hflip = config['camera.hflip']
+            camera.resolution = (config['camera.resolution.width'], config['camera.resolution.height'])
+            camera.rotation = config['camera.rotation']
+
             #camera.resolution = (1024, 768)
             #camera.resolution = (3280,2464) # Didn't work
             camera.start_preview()
@@ -111,44 +114,49 @@ def savePhoto():
         print(e)
 
 def uploadPendingPhotos():
-    os.makedirs(pendingImageFolder, exist_ok = True)
-    os.makedirs(uploadedImageFolder, exist_ok = True)
-    for IMAGEFILENAME in os.listdir(pendingImageFolder):
-        print(str(datetime.datetime.now()) + ' uploading ' + IMAGEFILENAME)
+    try:
+        os.makedirs(pendingImageFolder, exist_ok = True)
+        os.makedirs(uploadedImageFolder, exist_ok = True)
+        for IMAGEFILENAME in os.listdir(pendingImageFolder):
+            print(str(datetime.datetime.now()) + ' uploading ' + IMAGEFILENAME)
 
-        imageTimestamp = datetime.datetime.strptime(IMAGEFILENAME, '%Y-%m-%d_%H%M%S.jpg')
-        print('imageTimestamp:')
-        print(imageTimestamp)
+            imageTimestamp = datetime.datetime.strptime(IMAGEFILENAME, '%Y-%m-%d_%H%M%S.jpg')
+            print('imageTimestamp:')
+            print(imageTimestamp)
 
-        files = {
-            'File': open(pendingImageFolder + IMAGEFILENAME, 'rb'),
-        }
+            files = {
+                'File': open(pendingImageFolder + IMAGEFILENAME, 'rb'),
+            }
 
-        data = {
-            'SerialNumber': serialNumber,
-            # 'Timestamp': (datetime.datetime.utcfromtimestamp(imageTimestamp.timestamp)).strftime('%Y-%m-%d %H:%M:%S')
-            'Timestamp': imageTimestamp.astimezone().isoformat()
-        }
+            data = {
+                'SerialNumber': serialNumber,
+                # 'Timestamp': (datetime.datetime.utcfromtimestamp(imageTimestamp.timestamp)).strftime('%Y-%m-%d %H:%M:%S')
+                'Timestamp': imageTimestamp.astimezone().isoformat()
+            }
 
-        print('data:')
-        print(data)
+            print('data:')
+            print(data)
 
-        session = requests.Session()
-        response = session.post(config['apiUrl'] + 'Image', files=files, data=data)
+            session = requests.Session()
+            print('Posting image to API...')
+            response = session.post(config['apiUrl'] + 'Image', files=files, data=data)
 
-        print(f'Response code: {response.status_code}')
-        if response.status_code == 200:
-            print(f'Image uploaded successfully')
-            shutil.move(pendingImageFolder + IMAGEFILENAME, uploadedImageFolder + IMAGEFILENAME)
+            print(f'Response code: {response.status_code}')
+            if response.status_code == 200:
+                print(f'Image uploaded successfully')
+                shutil.move(pendingImageFolder + IMAGEFILENAME, uploadedImageFolder + IMAGEFILENAME)
 
-        else:
-            print(f'Image upload failed')
+            else:
+                print(f'Image upload failed')
 
-        print(f'Response text:')
-        try:
-            print(json.dumps(json.loads(response.text), indent = 4))
-        except json.decoder.JSONDecodeError:
-            print(response.text)
+            print(f'Response text:')
+            try:
+                print(json.dumps(json.loads(response.text), indent = 4))
+            except json.decoder.JSONDecodeError:
+                print(response.text)
+    except Exception as e:
+        print(str(datetime.datetime.now()) + " uploadPendingPhotos() failed.")
+        print(e)
 
 
 def uploadTelemetry():
