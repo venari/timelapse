@@ -31,8 +31,9 @@ public class ImageViewModel : PageModel
 
     public IActionResult OnGet(int id)
     {
+        DateTime cutOff = DateTime.UtcNow.AddDays(-1).Date;
         var d = _appDbContext.Devices
-            .Include(d => d.Images)
+            .Include(d => d.Images.Where(i =>i.Timestamp.Date >= cutOff))
             .FirstOrDefault(d => d.Id == id);
 
         if(d==null){
@@ -41,7 +42,7 @@ public class ImageViewModel : PageModel
 
         device = d;
 
-        imagesLast24Hours = d.Images.Where(i =>i.Timestamp.Date >= DateTime.UtcNow.AddDays(-1).Date).OrderBy(i => i.Timestamp).ToArray();
+        imagesLast24Hours = d.Images.OrderBy(i => i.Timestamp).ToArray();
         if(imagesLast24Hours.Count()==0){
             return RedirectToPage("/NotFound");
         }

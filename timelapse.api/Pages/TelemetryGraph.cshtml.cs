@@ -23,8 +23,10 @@ public class TelemetryGraphModel : PageModel
 
     public IActionResult OnGet(int id)
     {
+        DateTime cutOff = DateTime.UtcNow.AddDays(-2);
+        
         var d = _appDbContext.Devices
-            .Include(d => d.Telemetries)
+            .Include(d => d.Telemetries.Where(t => t.Timestamp >= cutOff))
             .FirstOrDefault(d => d.Id == id);
 
         if(d==null){

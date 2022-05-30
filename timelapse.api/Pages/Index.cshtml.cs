@@ -21,9 +21,13 @@ public class IndexModel : PageModel
     {
         _logger = logger;
         _appDbContext = appDbContext;
+
+        DateTime cutOff = DateTime.UtcNow.AddDays(-2);
+
+
         devices = _appDbContext.Devices
-            .Include(d => d.Telemetries)
-            .Include(d => d.Images)
+            .Include(d => d.Telemetries.Where(t => t.Timestamp >= cutOff))
+            .Include(d => d.Images.OrderByDescending(i => i.Timestamp).Take(1))
             .AsSplitQuery()
             .ToList();
         _storageHelper = new StorageHelper(configuration, logger, memoryCache);
