@@ -204,7 +204,6 @@ try:
     print(str(datetime.datetime.now()) + " sudo hwclock --hctosys succeeded")
 except Exception as e:
     print(str(datetime.datetime.now()) + " sudo hwclock --hctosys failed")
-    scheduleShutdown()
     print(e)
     
 
