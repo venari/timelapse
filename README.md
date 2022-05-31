@@ -258,3 +258,65 @@ Charge from wall charger about 5 hours
 Discharge 95 -> 5% about 12 hours.
 Discharge 4 -> 1$ about 10 hours.
 
+
+
+# Balena notes
+
+https://www.balena.io/docs/learn/getting-started/raspberrypi3/nodejs/
+
+https://github.com/balena-os/wifi-connect/blob/master/README.md
+
+https://www.balena.io/blog/how-to-protect-your-device-with-pijuice-and-balenacloud/
+
+https://www.balena.io/docs/learn/develop/dockerfile/ - especially replacing `%%BALENA_MACHINE_NAME%%` with `aarch64`, etc.
+https://www.balena.io/docs/reference/base-images/base-images/
+https://www.balena.io/docs/reference/base-images/devicetypes/
+
+## timelapse_zero2 fleet:
+https://dashboard.balena-cloud.com/fleets/1887284
+
+```
+ timelapse git:(feature/balena) ✗ balena push gh_leighghunt/timelapse_zero2
+--------------------------------------------------------------------------------
+[Warn] Node.js version "14.19.3" does not satisfy requirement ">=12.8.0 <13.0.0"
+[Warn] This may cause unexpected behavior.
+--------------------------------------------------------------------------------
+[Info]          Starting build for timelapse_zero2, user gh_leighghunt
+[Info]          Dashboard link: https://dashboard.balena-cloud.com/apps/1887284/devices
+[Info]          Building on arm01
+[Info]          No suitable previous release for caching, skipping cache pull
+[Info]          Uploading images
+[Success]       Successfully uploaded images
+[Info]          Built on arm01
+[Success]       Release successfully created!
+[Info]          Release: 027164029471c54c61694409080f6895 (id: 2182416)
+[Info]          ┌──────────────┬────────────┬────────────┐
+[Info]          │ Service      │ Image Size │ Build Time │
+[Info]          ├──────────────┼────────────┼────────────┤
+[Info]          │ wifi-connect │ 13.21 MB   │ 4 seconds  │
+[Info]          └──────────────┴────────────┴────────────┘
+[Info]          Build finished in 1 minute, 27 seconds
+			    \
+			     \
+			      \\
+			       \\
+			        >\/7
+			    _.-(6'  \
+			   (=___._/` \
+			        )  \ |
+			       /   / |
+			      /    > /
+			     j    < _\
+			 _.-' :      ``.
+			 \ r=._\        `.
+			<`\\_  \         .`-.
+			 \ r-7  `-. ._  ' .  `\
+			  \`,      `-.`7  7)   )
+			   \/         \|  \'  / `-._
+			              ||    .'
+			               \\  (
+			                >\  >
+			            ,.-' >.'
+			           <.'_.''
+			             <'
+```

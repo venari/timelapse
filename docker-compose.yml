@@ -9,3 +9,13 @@ services:
     labels:
       io.balena.features.dbus: "1"
       io.balena.features.firmware: "1"
+
+
+  pijuice:
+    build: ./pijuice
+    privileged: true
+    labels: 
+      io.balena.features.balena-api: '1'
+      
+  sample:
+    build: ./sample
