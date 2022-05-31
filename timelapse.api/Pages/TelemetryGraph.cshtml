@@ -1,0 +1,131 @@
+﻿@page "{id:int}"
+@using Humanizer
+@model TelemetryGraphModel
+@{
+    ViewData["Title"] = "Telemetry Graph";
+}
+
+<script>
+    function localize(t)
+    {
+        var d=new Date(t+" UTC");
+        document.write(d.toLocaleString());
+    }
+
+    function localizeDate(t)
+    {
+        var d=new Date(t);
+        return d.toLocaleString();
+    }
+</script>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+
+<div class="text-center">
+    <h1 class="display-4">Welcome</h1>
+    <p>Learn about <a href="https://docs.microsoft.com/aspnet/core">building Web apps with ASP.NET Core</a>.</p>
+</div>
+
+<script>
+    const latest24HoursTelemetryUri = '/api/Telemetry/GetLatest24HoursTelemetry'
+
+    function getTelemetry(deviceId, chart) {
+        fetch(latest24HoursTelemetryUri + '?deviceId=' + deviceId)
+            .then(response => response.json())
+            .then(data => showTelemetry(chart, data))
+            .catch(error => console.error('Unable to get telemetry.', error));
+    }
+
+    function showTelemetry(chart, data){
+        console.log("showTelemtery");
+        console.log(data)
+        chart.config.data.datasets[0].data = data.map(d => ({x: new Date(d.timestamp), y: d.batteryPercent}));
+        chart.config.data.datasets[1].data = data.map(d => ({x: new Date(d.timestamp), y: d.temperatureC}));
+        chart.update();
+    }
+</script>
+
+<div>
+    <table class="table">
+        <thead>
+            <tr>
+            <th scope="col">Latest Telemetry for @(Model.device.Name) as at <script type="text/javascript">localize('@(Model.device.LatestTelemetryTimestamp)');</script>
+            @if (Model.device.LatestTelemetry!=null && DateTime.UtcNow - Model.device.LatestTelemetry.Timestamp > TimeSpan.FromMinutes(15)){
+                <span class="badge bg-warning text-dark">Warning - @((DateTime.UtcNow - Model.device.LatestTelemetry.Timestamp).Humanize()) old</span>
+            }
+            </th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>
+                    <canvas id="myChart_@(Model.device.Id)"></canvas>
+
+                    <script>
+
+                        var config = {
+                            type: 'line',
+                            options: {
+                                plugins: {
+                                    legend: {
+                                        @* display: false, *@
+                                    }
+                                },
+                                scales: {
+                                    x: {
+                                            parsing: false,
+                                            @* display: false, *@
+                                            type: 'time',
+                                            time: {
+                                                max: new Date(),
+                                                unit: 'hour'
+                                            }
+                                    },
+                                    y: {
+                                            @* display: false, *@
+                                            beginAtZero: true
+                                    }
+                                },
+                                elements: {
+                                    line: {
+                                        borderColor: '#000000',
+                                        borderWidth: 1
+                                    },
+                                        point: {
+                                            radius: 2 
+                                    } 
+                                },
+                                animation: false
+                                @* responsive: false, *@
+                            }
+                        };
+
+                        data = {
+                            @* labels: labels, *@
+                            datasets: [{
+                                label: "Battery",
+                                backgroundColor: 'rgb(99, 99, 255)',
+                                borderColor: 'rgb(99, 99, 255)',
+                            }, {
+                                label: "Temperature",
+                                backgroundColor: 'rgb(255, 99, 132)',
+                                borderColor: 'rgb(255, 99, 132)',
+                            }]
+                        };
+
+                        config.data=data;
+
+                        const myChart_@(Model.device.Id) = new Chart(
+                            document.getElementById('myChart_@(Model.device.Id)'),
+                            config
+                        );
+
+                        getTelemetry(@(Model.device.Id), myChart_@(Model.device.Id));
+
+                    </script>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+</div>

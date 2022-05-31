@@ -1,0 +1,108 @@
+﻿@page "{id:int}"
+@using Humanizer
+@model ImageViewModel
+@{
+    ViewData["Title"] = "Image View";
+}
+
+<script>
+    function localize(t)
+    {
+        var d=new Date(t+"Z");
+        document.write(d.toLocaleString());
+    }
+
+    function localizeDate(t)
+    {
+        var d=new Date(t);
+        return d.toLocaleString();
+    }
+</script>
+
+<div class="text-center">
+    <h1 class="display-4">Welcome</h1>
+    <p>Learn about <a href="https://docs.microsoft.com/aspnet/core">building Web apps with ASP.NET Core</a>.</p>
+</div>
+
+<div>
+    <table class="table">
+        <thead>
+            <tr>
+            <th id="imageHeader" scope="col">Image for @(Model.device.Name) as at <script type="text/javascript">localize('@(Model.device.LatestImageTimestamp.Value.ToString("s"))');</script>
+            @if (DateTime.UtcNow - Model.device.LatestImage.Timestamp > TimeSpan.FromMinutes(15)){
+                <span class="badge bg-warning text-dark">Warning - @((DateTime.UtcNow - Model.device.LatestImage.Timestamp).Humanize()) old</span>
+            }
+            </th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>
+                    @if(Model.device.LatestImage!=null){
+                        <img class="img-fluid" id="image" src="@(Model.device.LatestImage.BlobUri + Model.SasToken)"></img>
+                    }
+                </td>
+            </tr>
+            <tr>
+                @* <label id="imageDateSliderValue"></label> *@
+                <input type="range" class="form-range" min="0" max="@(Model.imagesLast24Hours.Count() - 1)" value="@(Model.imagesLast24Hours.Count() - 1)" id="imageDateSlider">
+                <button id="togglePlay" onclick="togglePlay()" type="button" class="btn btn-primary"><i class="fa fa-play"></i></button>
+            </tr>
+        </tbody>
+    </table>
+</div>
+
+<script>
+
+    const getImageUri = '/api/Image/GetImage'
+
+    var last24HoursImages = @(Json.Serialize(Model.imagesLast24Hours));
+    var slider = document.getElementById("imageDateSlider")
+    var image = document.getElementById("image")
+
+    var bPlaying=false
+
+    var togglePlayButton = document.getElementById("togglePlay")
+
+    function togglePlay(){
+        bPlaying=!bPlaying;
+        if(bPlaying){
+            togglePlayButton.innerHTML = '<i class="fa fa-pause"></i>'
+
+            nextFrame();
+            @* play() *@
+        }
+        else{
+            togglePlayButton.innerHTML = '<i class="fa fa-play"></i>'
+            @* stop() *@
+        }
+    }
+
+    function nextFrame(){
+        if(bPlaying){
+            if(parseInt(slider.value)<parseInt(slider.max)){
+                ++slider.value
+            } else {
+                slider.value = 0
+            }
+
+            image.onload=function(){
+                setTimeout(nextFrame, 50);
+            }
+            getImage(@(Model.device.Id), slider.value);
+        }
+    }
+
+    function getImage(deviceId, imageIndex) {
+        imageBlobUri = last24HoursImages[imageIndex].blobUri + '@(Model.SasToken)'.replace(/&amp;/g, '&')
+        image.src = imageBlobUri
+        var imageHeader = document.getElementById("imageHeader");
+        imageHeader.innerHTML = "Image for @(Model.device.Name) as at " + localizeDate(last24HoursImages[imageIndex].timestamp)
+    }
+
+    // Update the current slider value (each time you drag the slider handle)
+    slider.oninput = function() {
+        console.log(this.value)
+        getImage(@(Model.device.Id), this.value);
+    }
+</script>

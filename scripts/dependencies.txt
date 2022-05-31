@@ -1,0 +1,4 @@
+pijuice
+requests
+gpiozero
+picamera
