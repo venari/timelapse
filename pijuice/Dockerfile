@@ -11,6 +11,7 @@ FROM balenalib/%%BALENA_MACHINE_NAME%%-python:3-buster-build
 # RUN apt-get install pijuice-base jq curl -y
 
 RUN install_packages pijuice-base jq curl 
+RUN install_packages python3-smbus
 
 # RUN install_packages jq curl 
 # RUN balena-info
