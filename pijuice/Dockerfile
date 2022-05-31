@@ -3,9 +3,18 @@
 
 # Copied from https://github.com/balenalabs-incubator/balena-pijuice/blob/master/pijuice/Dockerfile.template
 
-FROM balenalib/aarch64-python:3-stretch-build
+# FROM balenalib/aarch64-python:3-stretch-build
+FROM balenalib/%%BALENA_MACHINE_NAME%%-python:3-buster-build
+
+# Didn't solve issue #25
+# RUN apt-get update
+# RUN apt-get install pijuice-base jq curl -y
 
 RUN install_packages pijuice-base jq curl 
+
+# RUN install_packages jq curl 
+# RUN balena-info
+# RUN install_packages pijuice-base
 
 # Set our working directory
 WORKDIR /usr/src/app

@@ -268,7 +268,7 @@ https://github.com/balena-os/wifi-connect/blob/master/README.md
 
 https://www.balena.io/blog/how-to-protect-your-device-with-pijuice-and-balenacloud/
 
-https://www.balena.io/docs/learn/develop/dockerfile/ - especially replacing `%%BALENA_MACHINE_NAME%%` with `aarch64`, etc.
+https://www.balena.io/docs/learn/develop/dockerfile/
 https://www.balena.io/docs/reference/base-images/base-images/
 https://www.balena.io/docs/reference/base-images/devicetypes/
 
