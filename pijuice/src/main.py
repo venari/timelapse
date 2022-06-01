@@ -1,14 +1,48 @@
+import shutil
 from time import sleep
 import datetime
 import sys, getopt, os
+import time
 sys.path.append('/usr/lib/python3.5/dist-packages') # temporary hack to import the piJuice module
 from pijuice import PiJuice
 from balena import Balena
 from twilio.rest import Client
+import requests
 
 # Start the SDK
 balena = Balena()
 balena.auth.login_with_token(os.environ['BALENA_API_KEY'])
+
+def getSerialNumber():
+    if (os.environ.get('BALENA') != None):
+        return os.environ['BALENA_DEVICE_UUID']
+
+    # Extract serial from cpuinfo file
+    cpuserial = "0000000000000000"
+    try:
+        f = open('/proc/cpuinfo','r')
+        for line in f:
+            if line[0:6]=='Serial':
+                    cpuserial = line[10:26]
+            f.close()
+    except:
+        cpuserial = "ERROR000000000"
+
+    return cpuserial
+
+serialNumber = getSerialNumber()
+print("serialNumber: " + serialNumber)
+
+print('API_URL')
+apiUrl = os.environ['API_URL']
+print(apiUrl)
+
+
+print('CAMERA_RESOLUTION_WIDTH')
+print(os.environ['CAMERA_RESOLUTION_WIDTH'])
+print('CAMERA_RESOLUTION_HEIGHT')
+print(os.environ['CAMERA_RESOLUTION_HEIGHT'])
+
 
 # Wait for device I2C device to start
 while not os.path.exists('/dev/i2c-1'):
@@ -23,12 +57,12 @@ def get_battery_paremeters(pijuice):
 
     juice = {}
 
-    charge = pijuice.status.GetChargeLevel()
-    juice['charge'] = charge['data'] if charge['error'] == 'NO_ERROR' else charge['error']
+    batteryPercent = pijuice.status.GetChargeLevel()
+    juice['batteryPercent'] = batteryPercent['data'] if batteryPercent['error'] == 'NO_ERROR' else -1 #batteryPercent['error']
 
     # Temperature [C]
-    temperature =  pijuice.status.GetBatteryTemperature()
-    juice['temperature'] = temperature['data'] if temperature['error'] == 'NO_ERROR' else temperature['error']
+    temperatureC =  pijuice.status.GetBatteryTemperature()
+    juice['temperatureC'] = temperatureC['data'] if temperatureC['error'] == 'NO_ERROR' else -1 #temperatureC['error']
 
     # Battery voltage  [V]
     vbat = pijuice.status.GetBatteryVoltage()
@@ -63,6 +97,47 @@ def update_tag(tag, variable):
 def send_sms(to_number, from_number, message, client):
     msg = client.messages.create(to=twilio_number, from_=twilio_from_number,body=message)
     print(msg.sid)
+
+
+def uploadTelemetry():
+    try:
+        # warningTemp = 50
+        api_data = {
+                    'batteryPercent': pijuice.status.GetChargeLevel()['data'],
+                    'temperatureC': pijuice.status.GetBatteryTemperature()['data'],
+                    'diskSpaceFree': shutil.disk_usage('/')[2] // (1024**3), # shutil.disk_usage returns tuple of (total, used, free), converted to int gb
+                    'uptimeSeconds': int(time.clock_gettime(time.CLOCK_BOOTTIME)),
+                    'status': str({ 'status': pijuice.status.GetStatus()['data'],
+                                'batteryVoltage': pijuice.status.GetBatteryVoltage()['data'],
+                                'batteryCurrent': pijuice.status.GetBatteryCurrent()['data'],
+                                'ioVoltage': pijuice.status.GetIoVoltage()['data'],
+                                'ioCurrent': pijuice.status.GetIoCurrent()['data']
+                            }),
+                    'SerialNumber': serialNumber
+                }
+
+        # if api_data['temperatureC'] > warningTemp:
+        #     print(f'WARNING: temperature is {api_data["temperatureC"]}C')
+        #     with open('tempWarning.log', 'a') as f:
+        #         f.write(f'{datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")}: {api_data["temperatureC"]}C\n')
+
+        #requests.post(config['apiUrl'] + '/Telemetry', json=api_data)
+        session = requests.Session()
+
+        print(api_data)
+
+        postResponse = session.post(apiUrl + 'Telemetry',data=api_data)
+        print(postResponse)
+        #assert postResponse.status_code == 200, "API returned error code"
+        #requests.post(config['apiUrl'] + '/Telemetry', json=api_data)
+
+        print(str(datetime.datetime.now()) + ' Logged to API.')
+
+    except Exception as e:
+        print(str(datetime.datetime.now()) + " uploadTelemetry() failed.")
+        print(e)
+
+
 
 # Change start tag
 start_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -103,9 +178,18 @@ while True:
 
     # Change tags every minute
     if(i%12==0):
+
+        update_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        update_tag("UPDATE_TIME", update_time)
+        update_tag("BALENA_DEVICE_NAME_AT_INIT", os.environ['BALENA_DEVICE_NAME_AT_INIT'])
+        update_tag("DISK_FREE", shutil.disk_usage('/')[2] // (1024**3)) # shutil.disk_usage returns tuple of (total, used, free), converted to int gb)
+        update_tag("UPTIME_SECONDS", int(time.clock_gettime(time.CLOCK_BOOTTIME)))
+
         # Update tags
         for key, value in battery_data.items():
             update_tag(key, value)
+
+        uploadTelemetry()
 
     i = i + 1
     sleep(5)
