@@ -1,0 +1,3 @@
+[submodule "balena-cam"]
+	path = balena-cam
+	url = https://github.com/balenalabs/balena-cam.git
