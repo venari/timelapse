@@ -99,8 +99,25 @@ def send_sms(to_number, from_number, message, client):
     print(msg.sid)
 
 
-def uploadTelemetry():
+def uploadTelemetry(pijuice):
     try:
+        print('uploadTelemetry')
+        print('------------------------------------------------------')
+
+        print(pijuice.status.GetChargeLevel()['error'])
+        print(pijuice.status.GetBatteryTemperature()['error'])
+        print(pijuice.status.GetChargeLevel()['data'])
+        print(pijuice.status.GetBatteryTemperature()['data'])
+        print(shutil.disk_usage('/')[2] // (1024**3))
+        print(int(time.clock_gettime(time.CLOCK_BOOTTIME)))
+        print(pijuice.status.GetStatus()['data'])
+        print(pijuice.status.GetBatteryVoltage()['data'])
+        print(pijuice.status.GetBatteryCurrent()['data'])
+        print(pijuice.status.GetIoVoltage()['data'])
+        print(pijuice.status.GetIoCurrent()['data'])
+        print(serialNumber)
+        print('------------------------------------------------------')
+
         # warningTemp = 50
         api_data = {
                     'batteryPercent': pijuice.status.GetChargeLevel()['data'],
@@ -122,19 +139,18 @@ def uploadTelemetry():
         #         f.write(f'{datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")}: {api_data["temperatureC"]}C\n')
 
         #requests.post(config['apiUrl'] + '/Telemetry', json=api_data)
-        session = requests.Session()
-
         print(api_data)
 
+        session = requests.Session()
         postResponse = session.post(apiUrl + 'Telemetry',data=api_data)
         print(postResponse)
         #assert postResponse.status_code == 200, "API returned error code"
         #requests.post(config['apiUrl'] + '/Telemetry', json=api_data)
 
-        print(str(datetime.datetime.now()) + ' Logged to API.')
+        print('Logged to API.')
 
     except Exception as e:
-        print(str(datetime.datetime.now()) + " uploadTelemetry() failed.")
+        print("uploadTelemetry() failed.")
         print(e)
 
 
@@ -167,29 +183,29 @@ while True:
     # Uncomment the line to display battery status on long
     # print(battery_data)
 
-    # Case power is disconnedted, send twilio text message if twilio alarm is set to true
-    if (os.environ.get('TWILIO_ALARM') != None):
-        if (os.environ['TWILIO_ALARM'].lower() == "true" and battery_data['power_input'] == "NOT_PRESENT" and battery_data['power_input_board'] == "NOT_PRESENT"):
-            # check if last message was over one hour from the last message
-            time_difference = (datetime.datetime.now() - twillio_last_message ).total_seconds() / 3600
-            if(time_difference >= 1):
-                send_sms(twilio_number, twilio_from_number,"Your device just lost power...", client)
-                twillio_last_message = datetime.datetime.now()
+    # # Case power is disconnedted, send twilio text message if twilio alarm is set to true
+    # if (os.environ.get('TWILIO_ALARM') != None):
+    #     if (os.environ['TWILIO_ALARM'].lower() == "true" and battery_data['power_input'] == "NOT_PRESENT" and battery_data['power_input_board'] == "NOT_PRESENT"):
+    #         # check if last message was over one hour from the last message
+    #         time_difference = (datetime.datetime.now() - twillio_last_message ).total_seconds() / 3600
+    #         if(time_difference >= 1):
+    #             send_sms(twilio_number, twilio_from_number,"Your device just lost power...", client)
+    #             twillio_last_message = datetime.datetime.now()
 
     # Change tags every minute
-    if(i%12==0):
+    # if(i%12==0):
 
-        update_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        update_tag("UPDATE_TIME", update_time)
-        update_tag("BALENA_DEVICE_NAME_AT_INIT", os.environ['BALENA_DEVICE_NAME_AT_INIT'])
-        update_tag("DISK_FREE", shutil.disk_usage('/')[2] // (1024**3)) # shutil.disk_usage returns tuple of (total, used, free), converted to int gb)
-        update_tag("UPTIME_SECONDS", int(time.clock_gettime(time.CLOCK_BOOTTIME)))
+    update_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    update_tag("UPDATE_TIME", update_time)
+    update_tag("BALENA_DEVICE_NAME_AT_INIT", os.environ['BALENA_DEVICE_NAME_AT_INIT'])
+    update_tag("DISK_FREE", shutil.disk_usage('/')[2] // (1024**3)) # shutil.disk_usage returns tuple of (total, used, free), converted to int gb)
+    update_tag("UPTIME_SECONDS", int(time.clock_gettime(time.CLOCK_BOOTTIME)))
 
-        # Update tags
-        for key, value in battery_data.items():
-            update_tag(key, value)
+    # Update tags
+    for key, value in battery_data.items():
+        update_tag(key, value)
 
-        uploadTelemetry()
+    uploadTelemetry(pijuice)
 
-    i = i + 1
-    sleep(5)
+    # i = i + 1
+    sleep(60)
