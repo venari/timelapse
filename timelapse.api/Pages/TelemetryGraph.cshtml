@@ -78,9 +78,15 @@
                                             @* display: false, *@
                                             type: 'time',
                                             time: {
-                                                max: new Date(),
                                                 unit: 'hour'
-                                            }
+                                            },
+                                            suggestedMin: new Date(@(new DateTimeOffset(Model.device.LatestTelemetry.Timestamp).AddDays(-2).ToUnixTimeMilliseconds())),
+                                            @* suggestedMax: new Date(), *@
+                                            suggestedMax: new Date(@(new DateTimeOffset(Model.device.LatestTelemetry.Timestamp).ToUnixTimeMilliseconds())),
+                                            @* ticks: {
+                                                max: new Date(),
+                                                min: new Date(@(new DateTimeOffset(Model.device.LatestTelemetry.Timestamp).AddDays(-2).ToUnixTimeMilliseconds())),
+                                            } *@
                                     },
                                     y: {
                                             @* display: false, *@

@@ -87,6 +87,8 @@
                             @(device.LatestTelemetry!=null?device.LatestTelemetry.BatteryPercent:"-")
                         </td>
                         <td>
+                        @if(device.LatestTelemetry!=null){
+
                             <a href="TelemetryGraph/@(device.Id)"><canvas id="myChart_@(device.Id)" width="100" height="50"></canvas></a>
 
                             <script>
@@ -106,7 +108,10 @@
                                                     type: 'time',
                                                     time: {
                                                         unit: 'hour'
-                                                    }
+                                                    },
+                                                    suggestedMin: new Date(@(new DateTimeOffset(device.LatestTelemetry.Timestamp).AddDays(-2).ToUnixTimeMilliseconds())),
+                                                    @* suggestedMax: new Date(), *@
+                                                    suggestedMax: new Date(@(new DateTimeOffset(device.LatestTelemetry.Timestamp).ToUnixTimeMilliseconds())),
                                             },
                                             y: {
                                                     display: false,
@@ -148,6 +153,7 @@
                                 getTelemetry(@(device.Id), myChart_@(device.Id));
 
                             </script>
+                        }
                         </td>
                         <td>
                             @(device.LatestTelemetry!=null?device.LatestTelemetry.TemperatureC:"-")
