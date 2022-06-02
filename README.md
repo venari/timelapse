@@ -54,6 +54,13 @@ git clone https://github.com/venari/timelapse.git
 cd timelapse
 ```
 
+# Camera settings
+Ensure gpu_mem is set to at least 144MB - sudo raspi-config, 4) Performance Options -> P2) GPU Memory -> 144
+```
+start_x=1
+gpu_mem=144
+```
+
 Add scheduled tasks:
 ```
 crontab -e
@@ -320,3 +327,48 @@ https://dashboard.balena-cloud.com/fleets/1887284
 			           <.'_.''
 			             <'
 ```
+
+## Belana-cam
+https://github.com/balenalabs/balena-cam
+
+Also https://forums.balena.io/t/camera-not-working-on-zero2-balena-cam/353569/12?u=leighghunt
+
+    | Key                                  | Value
+    |--------------------------------------|----------
+    |**`BALENA_HOST_CONFIG_gpu_mem`**      | **`64`**
+    |**`BALENA_HOST_CONFIG_start_x`**      | **`1`**
+
+
+Orginal docs - superceeded by the above
+
+- Set these variables in the `Configuration` side tab under "fleets".
+  - `BALENA_HOST_CONFIG_start_x` = `1`
+  - Set all the following `gpu_mem` variables so your Pi can autoselect how much memory to allocate for hardware accelerated graphics, based on how much RAM it has available
+
+    | Key                                  | Value
+    |--------------------------------------|----------
+    |**`BALENA_HOST_CONFIG_gpu_mem_256`**  | **`192`**
+    |**`BALENA_HOST_CONFIG_gpu_mem_512`**  | **`256`**
+    |**`BALENA_HOST_CONFIG_gpu_mem_1024`** | **`448`**
+- Using [Balena CLI](https://www.balena.io/docs/reference/cli/), push the code with `balena push <fleet-name>`.
+- See the magic happening, your device is getting updated 🌟Over-The-Air🌟!
+- In order for your device to be accessible over the internet, toggle the switch called `PUBLIC DEVICE URL`.
+- Once your device finishes updating, you can watch the live feed by visiting your device's public URL.
+
+### Password Protect your balenaCam device
+
+To protect your balenaCam devices using a username and a password set the following environment variables.
+
+| Key            | Value
+|----------------|---------------------------
+|**`username`**  | **`yourUserNameGoesHere`**
+|**`password`**  | **`yourPasswordGoesHere`**
+
+💡 **Tips:** 💡 
+* You can set them as [fleet environment variables](https://www.balena.io/docs/learn/manage/serv-vars/#fleet-environment-and-service-variables) and every new balenaCam device you add will be password protected.
+* You can set them as [device environment variables](https://www.balena.io/docs/learn/manage/serv-vars/#device-environment-and-service-variables) and the username and password will be different on each device.
+
+### Optional Settings
+
+- To rotate the camera feed by 180 degrees, add a **device variable**: `rotation` = `1` (More information about this on the [docs](https://www.balena.io/docs/learn/manage/serv-vars/)).
+- To suppress any warnings, add a **device variable**: `PYTHONWARNINGS` = `ignore`

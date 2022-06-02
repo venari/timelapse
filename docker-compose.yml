@@ -21,7 +21,7 @@ services:
     build: ./sample
 
   balena-cam:
-    build: ./balena-cam
+    build: ./balena-cam/balena-cam
     privileged: true
     restart: always
     network_mode: "host"
