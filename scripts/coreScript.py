@@ -41,6 +41,7 @@ serialNumber = getSerialNumber()
 def scheduleShutdown():
     alarmObj = {}
 
+    print(str(datetime.datetime.now()) + ' scheduleShutdown')
     setAlarm = False
 
     if config['shutdown']:
@@ -58,6 +59,7 @@ def scheduleShutdown():
 
         setAlarm = True
 
+    print(str(datetime.datetime.now()) + ' ' + datetime.datetime.now().hour)
     if datetime.datetime.now().hour >=19 or datetime.datetime.now().hour <= 7:
         print(str(datetime.datetime.now()) + " Night time so we're scheduling shutdown")
 
@@ -74,17 +76,17 @@ def scheduleShutdown():
 
         setAlarm = True
 
-    if setAlarm:
+    if setAlarm == True:
 
         alarmSet = False
-        while not alarmSet:
-            
+        while alarmSet == False:
             status = pj.rtcAlarm.SetAlarm(alarmObj)
 
             if status['error'] != 'NO_ERROR':
                 print('Cannot set alarm\n')
                 # sys.exit()
                 alarmSet = False
+                print('Sleeping and retrying...\n')
                 time.sleep(10)
             else:
                 print('Alarm set for ' + str(pj.rtcAlarm.GetAlarm()))
@@ -92,7 +94,7 @@ def scheduleShutdown():
 
         # Ensure Wake up alarm is actually enabled!
         wakeUpEnabled = False
-        while not wakeUpEnabled:
+        while wakeUpEnabled == False:
 
             status = pj.rtcAlarm.SetWakeupEnabled(True)
 
@@ -100,6 +102,7 @@ def scheduleShutdown():
                 print('Cannot enable wakeup\n')
                 # sys.exit()
                 wakeUpEnabled = False
+                print('Sleeping and retrying for wakeup...\n')
                 time.sleep(10)
             else:
                 print('Alarm set for ' + str(pj.rtcAlarm.GetAlarm()))
