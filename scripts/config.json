@@ -10,10 +10,12 @@
     "camera.vflip": true,
     "camera.hflip": true,
     "camera.rotation": 0,
-    "camera.resolution.width": 4056,
-    "camera.resolution.height": 3040,
+    "camera.resolution.width": 3280,
+    "camera.resolution.height": 2464,
 
 
+    "camera.resolution.width___": 4056,
+    "camera.resolution.height___": 3040,
     "camera.resolution.width__": 3280,
     "camera.resolution.height__": 2464,
     "camera.resolution.width_": 1024,
