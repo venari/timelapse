@@ -67,7 +67,7 @@ namespace timelapse.api{
         public ActionResult<IEnumerable<Telemetry>> GetLatest24HoursTelemetry([FromQuery] int deviceId){
             _logger.LogInformation("Get latest 24 hours' telemetry");
             Device? device = _appDbContext.Devices
-                .Include(d => d.Telemetries.Where(t =>t.Timestamp >= DateTime.UtcNow.AddDays(-2)))
+                .Include(d => d.Telemetries.Where(t =>t.Timestamp >= DateTime.UtcNow.AddDays(-4)))
                 .FirstOrDefault(d => d.Id == deviceId);
 
             List<Telemetry> telemetry = new List<Telemetry>();
