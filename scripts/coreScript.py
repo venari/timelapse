@@ -68,7 +68,7 @@ def scheduleShutdown():
             # 'hour': 20, # 8am
             # 'minute_period': DELTA_MIN,
             'hour': 'EVERY_HOUR',
-            'minute_period': 0,
+            'minute': 0,
             'second': 0,
         }
 
