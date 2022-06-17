@@ -1,5 +1,6 @@
 import subprocess
 import json
+from this import s
 import pijuice
 from picamera import PiCamera
 import os
@@ -38,22 +39,42 @@ def getSerialNumber():
 serialNumber = getSerialNumber()
 
 def scheduleShutdown():
-    if config['shutdown']:
-        print(str(datetime.datetime.now()) + ' scheduling shutdown')
-        DELTA_MIN=10
-        SHUTDOWN_TILL_MORNING=False
+    alarmObj = {}
 
-        if datetime.datetime.now().hour >=21 or datetime.datetime.now().hour <= 5:
-            SHUTDOWN_TILL_MORNING=True
+    setAlarm = False
+
+    if datetime.datetime.now().hour >=19 or datetime.datetime.now().hour <= 7:
+        print(str(datetime.datetime.now()) + " Night time so we're scheduling shutdown")
+
+        alarmObj = {
+            'year': 'EVERY_YEAR',
+            'month': 'EVERY_MONTH',
+            'day': 'EVERY_DAY',
+            # 'hour': 20, # 8am
+            # 'minute_period': DELTA_MIN,
+            'hour': 'EVERY_HOUR',
+            'minute_period': 0,
+            'second': 0,
+        }
+
+        setAlarm = True
+
+    if config['shutdown']:
+        print(str(datetime.datetime.now()) + ' scheduling regular shutdown')
+        DELTA_MIN=10
 
         alarmObj = {
                 'year': 'EVERY_YEAR',
                 'month': 'EVERY_MONTH',
                 'day': 'EVERY_DAY',
-                'hour': 18 if SHUTDOWN_TILL_MORNING else 'EVERY_HOUR',
+                'hour': 'EVERY_HOUR',
                 'minute_period': DELTA_MIN,
                 'second': 0,
             }
+
+        setAlarm = True
+
+    if setAlarm:
         status = pj.rtcAlarm.SetAlarm(alarmObj)
 
         if status['error'] != 'NO_ERROR':
@@ -70,8 +91,6 @@ def scheduleShutdown():
             # sys.exit()
         else:
             print('Alarm set for ' + str(pj.rtcAlarm.GetAlarm()))
-
-            
 
         print(str(datetime.datetime.now()) + ' Shutting down...')
         subprocess.call(['sudo', 'shutdown'])

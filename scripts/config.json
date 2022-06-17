@@ -4,7 +4,7 @@
 
     "apiUrl": "https://timelapse-dev.azurewebsites.net/api/",
 
-    "shutdown": true,
+    "shutdown": false,
     "tempWarning": 50,
 
     "camera.vflip": true,
@@ -12,6 +12,8 @@
     "camera.rotation": 0,
     "camera.resolution.width": 4056,
     "camera.resolution.height": 3040,
+
+
     "camera.resolution.width__": 3280,
     "camera.resolution.height__": 2464,
     "camera.resolution.width_": 1024,
