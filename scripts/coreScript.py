@@ -55,7 +55,7 @@ def scheduleShutdown():
                 'hour': 'EVERY_HOUR',
                 'minute_period': DELTA_MIN,
                 'second': 0,
-            }
+        }
 
         setAlarm = True
 
