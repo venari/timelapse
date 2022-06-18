@@ -59,8 +59,9 @@ def scheduleShutdown():
 
         setAlarm = True
 
-    print(str(datetime.datetime.now()) + ' ' + datetime.datetime.now().hour)
-    if datetime.datetime.now().hour >=19 or datetime.datetime.now().hour <= 7:
+    print(str(datetime.datetime.now()) + ' scheduleShutdown 3')
+    print(str(datetime.datetime.now()) + ' ' + str(datetime.datetime.now().hour))
+    if datetime.datetime.now().hour >=18 or datetime.datetime.now().hour <= 7:
         print(str(datetime.datetime.now()) + " Night time so we're scheduling shutdown")
 
         alarmObj = {
@@ -77,6 +78,7 @@ def scheduleShutdown():
         setAlarm = True
 
     if setAlarm == True:
+        print(str(datetime.datetime.now()) + " scheduleShutdown - we're setting the shutdown...")
 
         alarmSet = False
         while alarmSet == False:
