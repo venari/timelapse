@@ -1,6 +1,5 @@
 import subprocess
 import json
-from this import s
 import pijuice
 from picamera import PiCamera
 import os
