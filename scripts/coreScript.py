@@ -14,11 +14,16 @@ config = json.load(open('config.json'))
 logFilePath = config["logFilePath"]
 os.makedirs(os.path.dirname(logFilePath), exist_ok=True)
 
-logging.basicConfig(level = logging.DEBUG)
-logging.basicConfig(filename=logFilePath,level = 
-                    logging.DEBUG,format='%(asctime)s %(message)s',
-                    datefmt='%d/%m/%Y %I:%M:%S %p')
+print(logFilePath)
+
+logging.basicConfig(filename=logFilePath,
+                    level = logging.DEBUG,
+                    format='%(asctime)s %(message)s',
+                    # datefmt='%d/%m/%Y %I:%M:%S %p'
+                    encoding='utf-8'
+                    )
 # log = logging.getLogger()
+logging.info("Starting up...")
 
 # clock
 while not os.path.exists('/dev/i2c-1'):
