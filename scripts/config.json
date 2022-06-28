@@ -12,7 +12,7 @@
     "camera.rotation": 0,
     "camera.resolution.width": 3280,
     "camera.resolution.height": 2464,
-
+    "camera.interval": 60,
 
     "camera.resolution.width___": 4056,
     "camera.resolution.height___": 3040,
