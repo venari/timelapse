@@ -116,11 +116,13 @@ def deleteOldUploadedImages():
     try:
       now = time.time()
       os.makedirs(uploadedImageFolder, exist_ok = True)
+
       for uploadedImageFilename in os.listdir(uploadedImageFolder):
-        if os.stat(uploadedImageFilename).st_mtime < now - 7 * 86400:
+        uploadedImageFilename = os.path.join(uploadedImageFolder, uploadedImageFilename)
+        if os.stat(uploadedImageFilename).st_mtime < now - 1 * 86400:
           if os.path.isfile(uploadedImageFilename):
             print(str(datetime.datetime.now()) + ' deleting old uploaded file ' + uploadedImageFilename)
-            os.remove(os.path.join(uploadedImageFolder, uploadedImageFilename))
+            os.remove(uploadedImageFilename)
 
     except Exception as e:
         print(str(datetime.datetime.now()) + " deleteOldUploadedImages() failed.")
@@ -134,6 +136,6 @@ try:
       uploadPendingTelemetry()
       uploadPendingPhotos()
       time.sleep(10)
-      
+
 except Exception as e:
     print(e)
