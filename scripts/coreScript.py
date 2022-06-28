@@ -14,16 +14,14 @@ config = json.load(open('config.json'))
 logFilePath = config["logFilePath"]
 os.makedirs(os.path.dirname(logFilePath), exist_ok=True)
 
-print(logFilePath)
-
 logging.basicConfig(filename=logFilePath,
-                    format='%(asctime)s %(message)s',
+                    format='%(asctime)s %(levelname)s: %(message)s',
                     level = logging.DEBUG
                     # datefmt='%d/%m/%Y %I:%M:%S %p'
                     # encoding='utf-8'
                     )
 # log = logging.getLogger()
-logging.info("Starting up...")
+logging.info("Starting up coreScript.py...")
 
 # clock
 while not os.path.exists('/dev/i2c-1'):

@@ -7,8 +7,20 @@ import shutil
 import datetime
 import sys
 import requests
+import logging
 
 config = json.load(open('config.json'))
+logFilePath = config["logFilePath"]
+os.makedirs(os.path.dirname(logFilePath), exist_ok=True)
+
+logging.basicConfig(filename=logFilePath,
+                    format='%(asctime)s %(levelname)s: %(message)s',
+                    level = logging.DEBUG
+                    # datefmt='%d/%m/%Y %I:%M:%S %p'
+                    # encoding='utf-8'
+                    )
+# log = logging.getLogger()
+logging.info("Starting up uploadPending.py...")
 
 outputImageFolder = '../output/images/'
 pendingImageFolder = outputImageFolder + 'pending/'
@@ -39,11 +51,11 @@ def uploadPendingPhotos():
         os.makedirs(pendingImageFolder, exist_ok = True)
         os.makedirs(uploadedImageFolder, exist_ok = True)
         for IMAGEFILENAME in os.listdir(pendingImageFolder):
-            print(str(datetime.datetime.now()) + ' uploading ' + IMAGEFILENAME)
+            logging.info(' uploading ' + IMAGEFILENAME)
 
             imageTimestamp = datetime.datetime.strptime(IMAGEFILENAME, '%Y-%m-%d_%H%M%S.jpg')
-            print('imageTimestamp:')
-            print(imageTimestamp)
+            logging.debug('imageTimestamp:')
+            logging.debug(imageTimestamp)
 
             files = {
                 'File': open(pendingImageFolder + IMAGEFILENAME, 'rb'),
@@ -55,29 +67,29 @@ def uploadPendingPhotos():
                 'Timestamp': imageTimestamp.astimezone().isoformat()
             }
 
-            print('data:')
-            print(data)
+            logging.debug('data:')
+            logging.debug(data)
 
             session = requests.Session()
-            print('Posting image to API...')
+            logging.debug('Posting image to API...')
             response = session.post(config['apiUrl'] + 'Image', files=files, data=data)
 
-            print(f'Response code: {response.status_code}')
+            logging.debug(f'Response code: {response.status_code}')
             if response.status_code == 200:
-                print(f'Image uploaded successfully')
+                logging.debug(f'Image uploaded successfully')
                 shutil.move(pendingImageFolder + IMAGEFILENAME, uploadedImageFolder + IMAGEFILENAME)
 
             else:
-                print(f'Image upload failed')
+                logging.error(f'Image upload failed')
 
-            print(f'Response text:')
+            logging.debug(f'Response text:')
             try:
-                print(json.dumps(json.loads(response.text), indent = 4))
+                logging.debug(json.dumps(json.loads(response.text), indent = 4))
             except json.decoder.JSONDecodeError:
-                print(response.text)
+                logging.debug(response.text)
     except Exception as e:
-        print(str(datetime.datetime.now()) + " uploadPendingPhotos() failed.")
-        print(e)
+        logging.error(str(datetime.datetime.now()) + " uploadPendingPhotos() failed.")
+        logging.error(e)
 
 def uploadPendingTelemetry():
 
@@ -87,29 +99,29 @@ def uploadPendingTelemetry():
         #requests.post(config['apiUrl'] + '/Telemetry', json=api_data)
         session = requests.Session()
         for telemetryFilename in os.listdir(pendingTelemetryFolder):
-            print(str(datetime.datetime.now()) + ' uploading ' + telemetryFilename)
+            logging.info(' uploading ' + telemetryFilename)
 
             telemetryTimestamp = datetime.datetime.strptime(telemetryFilename, '%Y-%m-%d_%H%M%S.json')
-            print('telemetryTimestamp:')
-            print(telemetryTimestamp)
+            logging.debug('telemetryTimestamp:')
+            logging.debug(telemetryTimestamp)
 
             api_data = json.load(open(pendingTelemetryFolder + telemetryFilename, 'rb'))
 
-            print(api_data)
+            logging.debug(api_data)
 
             postResponse = session.post(config['apiUrl'] + 'Telemetry',data=api_data)
-            print(postResponse)
+            logging.debug(postResponse)
             assert postResponse.status_code == 200, "API returned error code"
             #requests.post(config['apiUrl'] + '/Telemetry', json=api_data)
 
             if postResponse.status_code == 200:
-                print(f'Telemetry uploaded successfully')
+                logging.debug(f'Telemetry uploaded successfully')
                 shutil.move(pendingTelemetryFolder + telemetryFilename, uploadedTelemetryFolder + telemetryFilename)
-                print(str(datetime.datetime.now()) + ' Logged to API.')
+                logging.debug('Logged to API.')
 
     except Exception as e:
-        print(str(datetime.datetime.now()) + " uploadPendingTelemetry() failed.")
-        print(e)
+        logging.error(str(datetime.datetime.now()) + " uploadPendingTelemetry() failed.")
+        logging.error(e)
 
 def deleteOldUploadedImages():
 
@@ -121,12 +133,12 @@ def deleteOldUploadedImages():
         uploadedImageFilename = os.path.join(uploadedImageFolder, uploadedImageFilename)
         if os.stat(uploadedImageFilename).st_mtime < now - 1 * 86400:
           if os.path.isfile(uploadedImageFilename):
-            print(str(datetime.datetime.now()) + ' deleting old uploaded file ' + uploadedImageFilename)
+            logging.info(' deleting old uploaded file ' + uploadedImageFilename)
             os.remove(uploadedImageFilename)
 
     except Exception as e:
-        print(str(datetime.datetime.now()) + " deleteOldUploadedImages() failed.")
-        print(e)
+        logging.error(str(datetime.datetime.now()) + " deleteOldUploadedImages() failed.")
+        logging.error(e)
 
 
 try:
@@ -138,4 +150,4 @@ try:
       time.sleep(10)
 
 except Exception as e:
-    print(e)
+    logging.error(e)
