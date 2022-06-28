@@ -130,6 +130,7 @@ def savePhotos():
     # txtTime = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
     try:
+        print(str(datetime.datetime.now()) + ' creating camera object...')
         with PiCamera() as camera:
 
             camera.vflip = config['camera.vflip']
@@ -201,6 +202,8 @@ try:
         print(str(datetime.datetime.now()) + ' Setting failsafe power off for 2 minutes 30 seconds from now.')
         pj.power.SetPowerOff(150)   # Fail safe turn the thing off
 
+    # Give things a chance to settle down
+    time.sleep(30)
     savePhotos()
 except Exception as e:
     print(str(datetime.datetime.now()) + " Catastrophic failure.")
