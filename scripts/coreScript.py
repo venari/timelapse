@@ -8,8 +8,18 @@ import shutil
 import datetime
 import sys
 import requests
+import logging
 
 config = json.load(open('config.json'))
+logFilePath = config["logFilePath"]
+os.makedirs(os.path.dirname(logFilePath), exist_ok=True)
+
+logging.basicConfig(level = logging.DEBUG)
+logging.basicConfig(filename=logFilePath,level = 
+                    logging.DEBUG,format='%(asctime)s %(message)s',
+                    datefmt='%d/%m/%Y %I:%M:%S %p')
+# log = logging.getLogger()
+
 # clock
 while not os.path.exists('/dev/i2c-1'):
     time.sleep(0.1)
@@ -44,11 +54,13 @@ serialNumber = getSerialNumber()
 def scheduleShutdown():
     alarmObj = {}
 
-    print(str(datetime.datetime.now()) + ' scheduleShutdown')
+    # print(str(datetime.datetime.now()) + ' scheduleShutdown')
+    logging.debug('scheduleShutdown')
     setAlarm = False
 
     if config['shutdown']:
-        print(str(datetime.datetime.now()) + ' scheduling regular shutdown')
+        # print(str(datetime.datetime.now()) + ' scheduling regular shutdown')
+        logging.info('scheduling regular shutdown')
         DELTA_MIN=10
 
         alarmObj = {
@@ -62,10 +74,8 @@ def scheduleShutdown():
 
         setAlarm = True
 
-    print(str(datetime.datetime.now()) + ' scheduleShutdown 3')
-    print(str(datetime.datetime.now()) + ' ' + str(datetime.datetime.now().hour))
     if datetime.datetime.now().hour >=18 or datetime.datetime.now().hour <= 7:
-        print(str(datetime.datetime.now()) + " Night time so we're scheduling shutdown")
+        logging.info("Night time so we're scheduling shutdown")
 
         alarmObj = {
             'year': 'EVERY_YEAR',
@@ -81,20 +91,20 @@ def scheduleShutdown():
         setAlarm = True
 
     if setAlarm == True:
-        print(str(datetime.datetime.now()) + " scheduleShutdown - we're setting the shutdown...")
+        logging.info("scheduleShutdown - we're setting the shutdown...")
 
         alarmSet = False
         while alarmSet == False:
             status = pj.rtcAlarm.SetAlarm(alarmObj)
 
             if status['error'] != 'NO_ERROR':
-                print('Cannot set alarm\n')
+                logging.error('Cannot set alarm\n')
                 # sys.exit()
                 alarmSet = False
-                print('Sleeping and retrying...\n')
+                logging.info('Sleeping and retrying...\n')
                 time.sleep(10)
             else:
-                print('Alarm set for ' + str(pj.rtcAlarm.GetAlarm()))
+                logging.debug('Alarm set for ' + str(pj.rtcAlarm.GetAlarm()))
                 alarmSet = True
 
         # Ensure Wake up alarm is actually enabled!
@@ -104,21 +114,21 @@ def scheduleShutdown():
             status = pj.rtcAlarm.SetWakeupEnabled(True)
 
             if status['error'] != 'NO_ERROR':
-                print('Cannot enable wakeup\n')
+                logging.error('Cannot enable wakeup\n')
                 # sys.exit()
                 wakeUpEnabled = False
-                print('Sleeping and retrying for wakeup...\n')
+                logging.info('Sleeping and retrying for wakeup...\n')
                 time.sleep(10)
             else:
-                print('Alarm set for ' + str(pj.rtcAlarm.GetAlarm()))
+                logging.debug('Alarm set for ' + str(pj.rtcAlarm.GetAlarm()))
                 wakeUpEnabled = True
 
-        print(str(datetime.datetime.now()) + ' Shutting down...')
+        logging.info('Shutting down...')
         subprocess.call(['sudo', 'shutdown'])
-        print(str(datetime.datetime.now()) + ' Power off scheduled for 30s from now')
+        logging.info('Power off scheduled for 30s from now')
         pj.power.SetPowerOff(30)
     else:
-        print(str(datetime.datetime.now()) + ' skipping shutdown scheduling because of config.json')
+        logging.debug('skipping shutdown scheduling because of config.json')
         # Ensure Wake up alarm is *not* enabled - or it will cause pi to reboot
         status = pj.rtcAlarm.SetWakeupEnabled(False)
 
@@ -129,7 +139,7 @@ def savePhotos():
     # txtTime = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
     try:
-        print(str(datetime.datetime.now()) + ' creating camera object...')
+        logging.debug('creating camera object...')
         with PiCamera() as camera:
 
             camera.vflip = config['camera.vflip']
@@ -138,16 +148,16 @@ def savePhotos():
             camera.rotation = config['camera.rotation']
 
             while True:
-                print(str(datetime.datetime.now()) + ' beginning capture')
+                logging.debug('beginning capture')
                 camera.start_preview()
                 # Camera warm-up time
-                print(str(datetime.datetime.now()) + ' warming up camera...')
+                logging.debug('warming up camera...')
                 time.sleep(5)
-                print(str(datetime.datetime.now()) + ' ready')
+                logging.debug('ready')
 
                 IMAGEFILENAME = pendingImageFolder + datetime.datetime.now().strftime('%Y-%m-%d_%H%M%S.jpg')
                 camera.capture(IMAGEFILENAME)
-                print(str(datetime.datetime.now()) + ' image saved')
+                logging.debug('image saved')
 
                 saveTelemetry()
                 scheduleShutdown()
@@ -157,8 +167,8 @@ def savePhotos():
                     time.sleep(config['camera.interval'])
 
     except Exception as e:
-        print(str(datetime.datetime.now()) + " SavePhoto() failed.")
-        print(e)
+        logging.error("SavePhoto() failed.")
+        logging.error(e)
 
 def saveTelemetry():
     try:
@@ -180,25 +190,26 @@ def saveTelemetry():
         telemetryFilename = pendingTelemetryFolder + datetime.datetime.now().strftime('%Y-%m-%d_%H%M%S.json')
         with open(telemetryFilename, 'w') as outfile:
             json.dump(api_data, outfile)
-            print(str(datetime.datetime.now()) + ' telemetry saved')
+            logging.debug('telemetry saved')
 
     except Exception as e:
-        print(str(datetime.datetime.now()) + " saveTelemetry() failed.")
-        print(e)
+        logging.error("saveTelemetry() failed.")
+        logging.error(e)
 
 
 try:
-    print(str(datetime.datetime.now()) + ' setting sys clock from RTC...')
+    logging.debug('setting sys clock from RTC...')
     subprocess.call(['sudo', 'hwclock', '--hctosys'])
-    print(str(datetime.datetime.now()) + " sudo hwclock --hctosys succeeded")
+    logging.debug("sudo hwclock --hctosys succeeded")
 except Exception as e:
-    print(str(datetime.datetime.now()) + " sudo hwclock --hctosys failed")
-    print(e)
+    logging.error("sudo hwclock --hctosys failed")
+    logging.error(e)
     
 
 try:
+    logging.info('In coreScript.py')
     if config['shutdown']:
-        print(str(datetime.datetime.now()) + ' Setting failsafe power off for 2 minutes 30 seconds from now.')
+        logging.info('Setting failsafe power off for 2 minutes 30 seconds from now.')
         pj.power.SetPowerOff(150)   # Fail safe turn the thing off
 
     # Give things a chance to settle down, and also restart savePhotos if it bails
@@ -206,6 +217,6 @@ try:
         time.sleep(30)
         savePhotos()
 except Exception as e:
-    print(str(datetime.datetime.now()) + " Catastrophic failure.")
+    logging.error("Catastrophic failure.")
     scheduleShutdown()
-    print(e)
+    logging.error(e)
