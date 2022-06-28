@@ -17,10 +17,10 @@ os.makedirs(os.path.dirname(logFilePath), exist_ok=True)
 print(logFilePath)
 
 logging.basicConfig(filename=logFilePath,
-                    level = logging.DEBUG,
                     format='%(asctime)s %(message)s',
+                    level = logging.DEBUG
                     # datefmt='%d/%m/%Y %I:%M:%S %p'
-                    encoding='utf-8'
+                    # encoding='utf-8'
                     )
 # log = logging.getLogger()
 logging.info("Starting up...")
