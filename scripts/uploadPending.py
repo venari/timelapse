@@ -107,7 +107,7 @@ def uploadPendingTelemetry():
 
             api_data = json.load(open(pendingTelemetryFolder + telemetryFilename, 'rb'))
 
-            api_data.Timestamp = telemetryTimestamp.astimezone().isoformat()
+            api_data['Timestamp'] = telemetryTimestamp.astimezone().isoformat()
 
             logging.debug(api_data)
 
