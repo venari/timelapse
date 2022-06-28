@@ -102,7 +102,10 @@ def uploadPendingTelemetry():
             assert postResponse.status_code == 200, "API returned error code"
             #requests.post(config['apiUrl'] + '/Telemetry', json=api_data)
 
-            print(str(datetime.datetime.now()) + ' Logged to API.')
+            if postResponse.status_code == 200:
+                print(f'Telemetry uploaded successfully')
+                shutil.move(pendingTelemetryFolder + telemetryFilename, uploadedTelemetryFolder + telemetryFilename)
+                print(str(datetime.datetime.now()) + ' Logged to API.')
 
     except Exception as e:
         print(str(datetime.datetime.now()) + " uploadPendingTelemetry() failed.")
