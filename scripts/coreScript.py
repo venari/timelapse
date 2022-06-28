@@ -202,9 +202,10 @@ try:
         print(str(datetime.datetime.now()) + ' Setting failsafe power off for 2 minutes 30 seconds from now.')
         pj.power.SetPowerOff(150)   # Fail safe turn the thing off
 
-    # Give things a chance to settle down
-    time.sleep(30)
-    savePhotos()
+    # Give things a chance to settle down, and also restart savePhotos if it bails
+    while True:
+        time.sleep(30)
+        savePhotos()
 except Exception as e:
     print(str(datetime.datetime.now()) + " Catastrophic failure.")
     scheduleShutdown()
