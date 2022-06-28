@@ -187,7 +187,7 @@ def saveTelemetry():
                                 'ioVoltage': pj.status.GetIoVoltage()['data'],
                                 'ioCurrent': pj.status.GetIoCurrent()['data']
                             }),
-                    'Timestamp': datetime.datetime.now().astimezone().isoformat(),
+                    # 'Timestamp': datetime.datetime.now().astimezone().isoformat(),
                     'SerialNumber': serialNumber
                 }
 
