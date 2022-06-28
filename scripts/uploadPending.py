@@ -15,8 +15,8 @@ pendingImageFolder = outputImageFolder + 'pending/'
 uploadedImageFolder = outputImageFolder + 'uploaded/'
 
 outputTelemetryFolder = '../output/telemetry/'
-pendingTelemetryFolder = outputImageFolder + 'pending/'
-uploadedTelemetryFolder = outputImageFolder + 'uploaded/'
+pendingTelemetryFolder = outputTelemetryFolder + 'pending/'
+uploadedTelemetryFolder = outputTelemetryFolder + 'uploaded/'
 
 def getSerialNumber():
   # Extract serial from cpuinfo file

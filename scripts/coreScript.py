@@ -20,8 +20,8 @@ pendingImageFolder = outputImageFolder + 'pending/'
 uploadedImageFolder = outputImageFolder + 'uploaded/'
 
 outputTelemetryFolder = '../output/telemetry/'
-pendingTelemetryFolder = outputImageFolder + 'pending/'
-uploadedTelemetryFolder = outputImageFolder + 'uploaded/'
+pendingTelemetryFolder = outputTelemetryFolder + 'pending/'
+uploadedTelemetryFolder = outputTelemetryFolder + 'uploaded/'
 
 # pijuice
 pj = pijuice.PiJuice(1, 0x14)
