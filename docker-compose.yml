@@ -30,6 +30,7 @@ services:
 
   timelapse-camera:
     build: ./timelapse-camera
+    restart: always
     privileged: true
     labels: 
       io.balena.features.balena-api: '1'
