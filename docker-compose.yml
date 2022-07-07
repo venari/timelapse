@@ -20,10 +20,17 @@ services:
   sample:
     build: ./sample
 
-  balena-cam:
-    build: ./balena-cam/balena-cam
+  # balena-cam:
+  #   build: ./balena-cam/balena-cam
+  #   privileged: true
+  #   restart: always
+  #   network_mode: "host"
+  #   labels:
+  #           io.balena.features.kernel-modules: '1'
+
+  timelapse-camera:
+    build: ./timelapse-camera
     privileged: true
-    restart: always
-    network_mode: "host"
-    labels:
-            io.balena.features.kernel-modules: '1'
+    labels: 
+      io.balena.features.balena-api: '1'
+      
