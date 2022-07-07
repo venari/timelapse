@@ -55,6 +55,8 @@
             <th scope="col">Description</th>
             <th scope="col">Latest Telemetry</th>
             <th scope="col">Battery %</th>
+            <th scope="col">Disk Space (GB)</th>
+            <th scope="col">Uptime</th>
             <th scope="col"></th>
             <th scope="col">Temperature (C)</th>
             <th scope="col">Status</th>
@@ -83,9 +85,17 @@
                             }
 
                         </td>
-                        <td>
-                            @(device.LatestTelemetry!=null?device.LatestTelemetry.BatteryPercent:"-")
-                        </td>
+                        @if(device.LatestTelemetry!=null){
+                            <td>@(device.LatestTelemetry.BatteryPercent)</td>
+                            <td>@(device.LatestTelemetry.DiskSpaceFree)</td>
+                            @* <td>@(ByteSize.FromGigabytes(device.LatestTelemetry.DiskSpaceFree))</td> *@
+                            <td>@(TimeSpan.FromSeconds(device.LatestTelemetry.UptimeSeconds.Value).Humanize())</td>
+
+                        } else {
+                            <td>-</td>
+                            <td>-</td>
+                            <td>-</td>
+                        }
                         <td>
                         @if(device.LatestTelemetry!=null){
 

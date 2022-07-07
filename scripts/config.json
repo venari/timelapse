@@ -3,8 +3,9 @@
     "logToAPI": true,
 
     "apiUrl": "https://timelapse-dev.azurewebsites.net/api/",
+    "logFilePath": "/home/pi/logs/timelapse.log",
 
-    "shutdown": true,
+    "shutdown": false,
     "tempWarning": 50,
 
     "camera.vflip": true,
@@ -12,6 +13,12 @@
     "camera.rotation": 0,
     "camera.resolution.width": 3280,
     "camera.resolution.height": 2464,
+    "camera.interval": 60,
+
+    "camera.resolution.width___": 4056,
+    "camera.resolution.height___": 3040,
+    "camera.resolution.width__": 3280,
+    "camera.resolution.height__": 2464,
     "camera.resolution.width_": 1024,
     "camera.resolution.height_": 768
 
