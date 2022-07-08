@@ -14,7 +14,7 @@
     "camera.resolution.width": 3280,
     "_camera.resolution.height": 2464,
     "camera.resolution.height": 1845,
-    "camera.interval": 30,
+    "camera.interval": 10,
 
     "camera.resolution.width___": 4056,
     "camera.resolution.height___": 3040,
