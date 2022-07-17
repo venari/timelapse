@@ -8,8 +8,21 @@ import shutil
 import datetime
 import sys
 import requests
+import logging
 
 config = json.load(open('config.json'))
+logFilePath = config["logFilePath"]
+os.makedirs(os.path.dirname(logFilePath), exist_ok=True)
+
+logging.basicConfig(filename=logFilePath,
+                    format='%(asctime)s %(levelname)s: %(message)s',
+                    level = logging.DEBUG
+                    # datefmt='%d/%m/%Y %I:%M:%S %p'
+                    # encoding='utf-8'
+                    )
+# log = logging.getLogger()
+logging.info("Starting up coreScript.py...")
+
 # clock
 while not os.path.exists('/dev/i2c-1'):
     time.sleep(0.1)
@@ -17,6 +30,10 @@ while not os.path.exists('/dev/i2c-1'):
 outputImageFolder = '../output/images/'
 pendingImageFolder = outputImageFolder + 'pending/'
 uploadedImageFolder = outputImageFolder + 'uploaded/'
+
+outputTelemetryFolder = '../output/telemetry/'
+pendingTelemetryFolder = outputTelemetryFolder + 'pending/'
+uploadedTelemetryFolder = outputTelemetryFolder + 'uploaded/'
 
 # pijuice
 pj = pijuice.PiJuice(1, 0x14)
@@ -38,128 +55,125 @@ def getSerialNumber():
 serialNumber = getSerialNumber()
 
 def scheduleShutdown():
-    if config['shutdown']:
-        print(str(datetime.datetime.now()) + ' scheduling shutdown')
-        DELTA_MIN=10
-        SHUTDOWN_TILL_MORNING=False
+    alarmObj = {}
 
-        if datetime.datetime.now().hour >=21 or datetime.datetime.now().hour <= 5:
-            SHUTDOWN_TILL_MORNING=True
+    # print(str(datetime.datetime.now()) + ' scheduleShutdown')
+    logging.debug('scheduleShutdown')
+    setAlarm = False
+
+    if config['shutdown']:
+        # print(str(datetime.datetime.now()) + ' scheduling regular shutdown')
+        logging.info('scheduling regular shutdown')
+        DELTA_MIN=10
 
         alarmObj = {
                 'year': 'EVERY_YEAR',
                 'month': 'EVERY_MONTH',
                 'day': 'EVERY_DAY',
-                'hour': 18 if SHUTDOWN_TILL_MORNING else 'EVERY_HOUR',
+                'hour': 'EVERY_HOUR',
                 'minute_period': DELTA_MIN,
                 'second': 0,
-            }
-        status = pj.rtcAlarm.SetAlarm(alarmObj)
+        }
 
-        if status['error'] != 'NO_ERROR':
-            print('Cannot set alarm\n')
-            # sys.exit()
-        else:
-            print('Alarm set for ' + str(pj.rtcAlarm.GetAlarm()))
+        setAlarm = True
+
+    if datetime.datetime.now().hour >=18 or datetime.datetime.now().hour <= 7:
+        logging.info("Night time so we're scheduling shutdown")
+
+        alarmObj = {
+            'year': 'EVERY_YEAR',
+            'month': 'EVERY_MONTH',
+            'day': 'EVERY_DAY',
+            # 'hour': 20, # 8am
+            # 'minute_period': DELTA_MIN,
+            'hour': 'EVERY_HOUR',
+            'minute': 0,
+            'second': 0,
+        }
+
+        setAlarm = True
+
+    if setAlarm == True:
+        logging.info("scheduleShutdown - we're setting the shutdown...")
+
+        alarmSet = False
+        while alarmSet == False:
+            status = pj.rtcAlarm.SetAlarm(alarmObj)
+
+            if status['error'] != 'NO_ERROR':
+                logging.error('Cannot set alarm\n')
+                # sys.exit()
+                alarmSet = False
+                logging.info('Sleeping and retrying...\n')
+                time.sleep(10)
+            else:
+                logging.debug('Alarm set for ' + str(pj.rtcAlarm.GetAlarm()))
+                alarmSet = True
 
         # Ensure Wake up alarm is actually enabled!
-        status = pj.rtcAlarm.SetWakeupEnabled(True)
+        wakeUpEnabled = False
+        while wakeUpEnabled == False:
 
-        if status['error'] != 'NO_ERROR':
-            print('Cannot enable wakeup\n')
-            # sys.exit()
-        else:
-            print('Alarm set for ' + str(pj.rtcAlarm.GetAlarm()))
+            status = pj.rtcAlarm.SetWakeupEnabled(True)
 
-            
+            if status['error'] != 'NO_ERROR':
+                logging.error('Cannot enable wakeup\n')
+                # sys.exit()
+                wakeUpEnabled = False
+                logging.info('Sleeping and retrying for wakeup...\n')
+                time.sleep(10)
+            else:
+                logging.debug('Alarm set for ' + str(pj.rtcAlarm.GetAlarm()))
+                wakeUpEnabled = True
 
-        print(str(datetime.datetime.now()) + ' Shutting down...')
+        logging.info('Shutting down...')
         subprocess.call(['sudo', 'shutdown'])
-        print(str(datetime.datetime.now()) + ' Power off scheduled for 30s from now')
+        logging.info('Power off scheduled for 30s from now')
         pj.power.SetPowerOff(30)
     else:
-        print(str(datetime.datetime.now()) + ' skipping shutdown scheduling because of config.json')
+        logging.debug('skipping shutdown scheduling because of config.json')
         # Ensure Wake up alarm is *not* enabled - or it will cause pi to reboot
         status = pj.rtcAlarm.SetWakeupEnabled(False)
 
 
-def savePhoto():
+def savePhotos():
     os.makedirs(outputImageFolder, exist_ok = True)
     os.makedirs(pendingImageFolder, exist_ok = True)
     # txtTime = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
     try:
+        logging.debug('creating camera object...')
         with PiCamera() as camera:
 
-            print(str(datetime.datetime.now()) + ' beginning capture')
             camera.vflip = config['camera.vflip']
             camera.hflip = config['camera.hflip']
             camera.resolution = (config['camera.resolution.width'], config['camera.resolution.height'])
             camera.rotation = config['camera.rotation']
 
-            #camera.resolution = (1024, 768)
-            #camera.resolution = (3280,2464) # Didn't work
-            camera.start_preview()
-            # Camera warm-up time
-            print(str(datetime.datetime.now()) + ' warming up camera...')
-            time.sleep(5)
-            print(str(datetime.datetime.now()) + ' ready')
+            while True:
+                logging.debug('beginning capture')
+                camera.start_preview()
+                # Camera warm-up time
+                logging.debug('warming up camera...')
+                time.sleep(5)
+                logging.debug('ready')
 
-            IMAGEFILENAME = pendingImageFolder + datetime.datetime.now().strftime('%Y-%m-%d_%H%M%S.jpg')
-            camera.capture(IMAGEFILENAME)
-            print(str(datetime.datetime.now()) + ' image saved')
+                IMAGEFILENAME = pendingImageFolder + datetime.datetime.now().strftime('%Y-%m-%d_%H%M%S.jpg')
+                camera.capture(IMAGEFILENAME)
+                logging.debug('image saved')
+
+                saveTelemetry()
+                scheduleShutdown()
+                if config['shutdown']:
+                    break
+                else:
+                    time.sleep(config['camera.interval'])
 
     except Exception as e:
-        print(str(datetime.datetime.now()) + " SavePhoto() failed.")
-        print(e)
+        logging.error("SavePhoto() failed.")
+        logging.error(e)
 
-def uploadPendingPhotos():
-    try:
-        os.makedirs(pendingImageFolder, exist_ok = True)
-        os.makedirs(uploadedImageFolder, exist_ok = True)
-        for IMAGEFILENAME in os.listdir(pendingImageFolder):
-            print(str(datetime.datetime.now()) + ' uploading ' + IMAGEFILENAME)
-
-            imageTimestamp = datetime.datetime.strptime(IMAGEFILENAME, '%Y-%m-%d_%H%M%S.jpg')
-            print('imageTimestamp:')
-            print(imageTimestamp)
-
-            files = {
-                'File': open(pendingImageFolder + IMAGEFILENAME, 'rb'),
-            }
-
-            data = {
-                'SerialNumber': serialNumber,
-                # 'Timestamp': (datetime.datetime.utcfromtimestamp(imageTimestamp.timestamp)).strftime('%Y-%m-%d %H:%M:%S')
-                'Timestamp': imageTimestamp.astimezone().isoformat()
-            }
-
-            print('data:')
-            print(data)
-
-            session = requests.Session()
-            print('Posting image to API...')
-            response = session.post(config['apiUrl'] + 'Image', files=files, data=data)
-
-            print(f'Response code: {response.status_code}')
-            if response.status_code == 200:
-                print(f'Image uploaded successfully')
-                shutil.move(pendingImageFolder + IMAGEFILENAME, uploadedImageFolder + IMAGEFILENAME)
-
-            else:
-                print(f'Image upload failed')
-
-            print(f'Response text:')
-            try:
-                print(json.dumps(json.loads(response.text), indent = 4))
-            except json.decoder.JSONDecodeError:
-                print(response.text)
-    except Exception as e:
-        print(str(datetime.datetime.now()) + " uploadPendingPhotos() failed.")
-        print(e)
-
-
-def uploadTelemetry():
+def saveTelemetry():
     try:
         warningTemp = 50
         api_data = {
@@ -173,58 +187,40 @@ def uploadTelemetry():
                                 'ioVoltage': pj.status.GetIoVoltage()['data'],
                                 'ioCurrent': pj.status.GetIoCurrent()['data']
                             }),
+                    # 'Timestamp': datetime.datetime.now().astimezone().isoformat(),
                     'SerialNumber': serialNumber
                 }
 
-        if api_data['temperatureC'] > warningTemp:
-            print(f'WARNING: temperature is {api_data["temperatureC"]}C')
-            with open('tempWarning.log', 'a') as f:
-                f.write(f'{datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")}: {api_data["temperatureC"]}C\n')
-
-        #requests.post(config['apiUrl'] + '/Telemetry', json=api_data)
-        session = requests.Session()
-
-        print(api_data)
-
-        postResponse = session.post(config['apiUrl'] + 'Telemetry',data=api_data)
-        print(postResponse)
-        #assert postResponse.status_code == 200, "API returned error code"
-        #requests.post(config['apiUrl'] + '/Telemetry', json=api_data)
-
-        print(str(datetime.datetime.now()) + ' Logged to API.')
+        telemetryFilename = pendingTelemetryFolder + datetime.datetime.now().strftime('%Y-%m-%d_%H%M%S.json')
+        with open(telemetryFilename, 'w') as outfile:
+            json.dump(api_data, outfile)
+            logging.debug('telemetry saved')
 
     except Exception as e:
-        print(str(datetime.datetime.now()) + " uploadTelemetry() failed.")
-        print(e)
+        logging.error("saveTelemetry() failed.")
+        logging.error(e)
 
 
 try:
-    print(str(datetime.datetime.now()) + ' setting sys clock from RTC...')
+    logging.debug('setting sys clock from RTC...')
     subprocess.call(['sudo', 'hwclock', '--hctosys'])
-    print(str(datetime.datetime.now()) + " sudo hwclock --hctosys succeeded")
+    logging.debug("sudo hwclock --hctosys succeeded")
 except Exception as e:
-    print(str(datetime.datetime.now()) + " sudo hwclock --hctosys failed")
-    print(e)
+    logging.error("sudo hwclock --hctosys failed")
+    logging.error(e)
     
 
 try:
+    logging.info('In coreScript.py')
     if config['shutdown']:
-        print(str(datetime.datetime.now()) + ' Setting failsafe power off for 2 minutes 30 seconds from now.')
+        logging.info('Setting failsafe power off for 2 minutes 30 seconds from now.')
         pj.power.SetPowerOff(150)   # Fail safe turn the thing off
 
-    uploadTelemetry()
-    print(str(datetime.datetime.now()) + ' warming up... waiting 30s')
-    # Give everything a chance to settle down.
-    time.sleep(30)
-
-    uploadTelemetry()
-    
-    #time.sleep(40) # Wait for the camera and network to warm up
-    savePhoto()
-    uploadPendingPhotos()
-    uploadTelemetry()
-    scheduleShutdown()
+    # Give things a chance to settle down, and also restart savePhotos if it bails
+    while True:
+        time.sleep(30)
+        savePhotos()
 except Exception as e:
-    print(str(datetime.datetime.now()) + " Catastrophic failure.")
+    logging.error("Catastrophic failure.")
     scheduleShutdown()
-    print(e)
+    logging.error(e)
