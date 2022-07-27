@@ -258,3 +258,30 @@ Charge from wall charger about 5 hours
 Discharge 95 -> 5% about 12 hours.
 Discharge 4 -> 1$ about 10 hours.
 
+# Arducam notes
+
+https://www.arducam.com/docs/cameras-for-raspberry-pi/64mp-camera-for-raspberry-pi/how-to-use-arducam-64mp-camera-on-rapberry-pi/#forpizero
+
+
+wget -O install_pivariety_pkgs.sh https://github.com/ArduCAM/Arducam-Pivariety-V4L2-Driver/releases/download/install_script/install_pivariety_pkgs.sh
+chmod +x install_pivariety_pkgs.sh
+./install_pivariety_pkgs.sh -p 64mp_pi_hawk_eye_kernel_driver
+./install_pivariety_pkgs.sh -p libcamera_dev
+./install_pivariety_pkgs.sh -p libcamera_apps
+
+
+For other Pi:
+sudo vi /boot/config.txt
+#find the line [all]
+#manually add dtoverlay=vc4-kms-v3d,cma-512 under it, like this:
+[all]
+# Run as fast as firmware / board allows
+arm_boost=1
+dtoverlay=vc4-kms-v3d,cma-512
+
+
+
+
+Cannot Allocate Memory
+Edit /boot/cmdline.txt and add cma=400M at the end.
+Edit /boot/cmdline.txt and add cma=200M at the end.
