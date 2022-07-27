@@ -42,6 +42,7 @@
         console.log(data)
         chart.config.data.datasets[0].data = data.map(d => ({x: new Date(d.timestamp), y: d.batteryPercent}));
         chart.config.data.datasets[1].data = data.map(d => ({x: new Date(d.timestamp), y: d.temperatureC}));
+        chart.config.data.datasets[2].data = data.map(d => ({x: new Date(d.timestamp), y: d.diskSpaceFree}));        
         chart.update();
     }
 </script>
@@ -150,6 +151,10 @@
                                     }, {
                                         backgroundColor: 'rgb(255, 99, 132)',
                                         borderColor: 'rgb(255, 99, 132)',
+                                    }, {
+                                        label: "Disk Space Free",
+                                        backgroundColor: 'rgb(50, 225, 50)',
+                                        borderColor: 'rgb(50, 225, 50)',
                                     }]
                                 };
 
