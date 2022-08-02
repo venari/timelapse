@@ -105,6 +105,10 @@ def uploadPendingTelemetry():
             logging.debug('telemetryTimestamp:')
             logging.debug(telemetryTimestamp)
 
+            if os.stat(pendingTelemetryFolder + telemetryFilename).st_size == 0:
+                # empty file, will throw JSONDecodeError
+                continue
+
             api_data = json.load(open(pendingTelemetryFolder + telemetryFilename, 'rb'))
 
             api_data['Timestamp'] = telemetryTimestamp.astimezone().isoformat()
