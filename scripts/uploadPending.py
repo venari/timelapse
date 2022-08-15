@@ -174,7 +174,7 @@ def deleteOldUploadedImagesAndTelemetry():
       os.makedirs(uploadedTelemetryFolder, exist_ok = True)
 
       for uploadedTelemetryFilename in os.listdir(uploadedTelemetryFolder):
-        uploadedImageFilename = os.path.join(uploadedTelemetryFolder, uploadedTelemetryFilename)
+        uploadedTelemetryFilename = os.path.join(uploadedTelemetryFolder, uploadedTelemetryFilename)
         if os.stat(uploadedTelemetryFilename).st_mtime < now - 1 * 86400:
           if os.path.isfile(uploadedTelemetryFilename):
             logging.info(' deleting old uploaded telemetry ' + uploadedTelemetryFilename)
