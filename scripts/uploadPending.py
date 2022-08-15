@@ -66,7 +66,7 @@ def uploadPendingPhotos():
 
             logging.info(' uploading ' + IMAGEFILENAME)
 
-            imageTimestamp = datetime.datetime.strptime(pathlib.stem(IMAGEFILENAME) , '%Y-%m-%d_%H%M%S')
+            imageTimestamp = datetime.datetime.strptime(pathlib.Path(IMAGEFILENAME).stem , '%Y-%m-%d_%H%M%S')
             logging.debug('imageTimestamp:')
             logging.debug(imageTimestamp)
 
@@ -129,7 +129,7 @@ def uploadPendingTelemetry():
 
             logging.info(' uploading ' + telemetryFilename)
 
-            telemetryTimestamp = datetime.datetime.strptime(pathlib.stem(telemetryFilename), '%Y-%m-%d_%H%M%S')
+            telemetryTimestamp = datetime.datetime.strptime(pathlib.Path(telemetryFilename).stem, '%Y-%m-%d_%H%M%S')
             logging.debug('telemetryTimestamp:')
             logging.debug(telemetryTimestamp)
 
