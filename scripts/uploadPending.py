@@ -9,6 +9,7 @@ import sys
 import requests
 import logging
 import glob
+import pathlib
 
 config = json.load(open('config.json'))
 logFilePath = config["logFilePath"]
@@ -65,7 +66,7 @@ def uploadPendingPhotos():
 
             logging.info(' uploading ' + IMAGEFILENAME)
 
-            imageTimestamp = datetime.datetime.strptime(IMAGEFILENAME, '%Y-%m-%d_%H%M%S.jpg')
+            imageTimestamp = datetime.datetime.strptime(pathlib.stem(IMAGEFILENAME) , '%Y-%m-%d_%H%M%S')
             logging.debug('imageTimestamp:')
             logging.debug(imageTimestamp)
 
@@ -128,7 +129,7 @@ def uploadPendingTelemetry():
 
             logging.info(' uploading ' + telemetryFilename)
 
-            telemetryTimestamp = datetime.datetime.strptime(telemetryFilename, '%Y-%m-%d_%H%M%S.json')
+            telemetryTimestamp = datetime.datetime.strptime(pathlib.stem(telemetryFilename), '%Y-%m-%d_%H%M%S')
             logging.debug('telemetryTimestamp:')
             logging.debug(telemetryTimestamp)
 
