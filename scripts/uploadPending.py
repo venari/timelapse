@@ -66,7 +66,7 @@ def uploadPendingPhotos():
 
             logging.info(' uploading ' + IMAGEFILENAME)
 
-            imageTimestamp = datetime.datetime.strptime(pathlib.Path(IMAGEFILENAME).stem , '%Y-%m-%d_%H%M%S')
+            imageTimestamp = datetime.datetime.strptime(pathlib.Path(IMAGEFILENAME).stem, '%Y-%m-%d_%H%M%S')
             logging.debug('imageTimestamp:')
             logging.debug(imageTimestamp)
 
@@ -95,7 +95,7 @@ def uploadPendingPhotos():
             logging.debug(f'Response code: {response.status_code}')
             if response.status_code == 200:
                 logging.debug(f'Image uploaded successfully')
-                shutil.move(pendingImageFolder + IMAGEFILENAME, uploadedImageFolder + IMAGEFILENAME)
+                shutil.move(IMAGEFILENAME, uploadedImageFolder + pathlib.Path(IMAGEFILENAME).name)
 
             else:
                 logging.error(f'Image upload failed')
@@ -151,7 +151,7 @@ def uploadPendingTelemetry():
 
             if postResponse.status_code == 200:
                 logging.debug(f'Telemetry uploaded successfully')
-                shutil.move(pendingTelemetryFolder + telemetryFilename, uploadedTelemetryFolder + telemetryFilename)
+                shutil.move(telemetryFilename, uploadedTelemetryFolder + pathlib.Path(telemetryFilename).name)
                 logging.debug('Logged to API.')
 
     except Exception as e:
