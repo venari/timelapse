@@ -70,13 +70,13 @@ def uploadPendingPhotos():
             logging.debug('imageTimestamp:')
             logging.debug(imageTimestamp)
 
-            if os.stat(pendingTelemetryFolder + imageTimestamp).st_size == 0:
+            if os.stat(IMAGEFILENAME).st_size == 0:
               logging.error('Empty file - deleting')
-              os.remove(pendingTelemetryFolder + imageTimestamp)
+              os.remove(IMAGEFILENAME)
               continue
 
             files = {
-                'File': open(pendingImageFolder + IMAGEFILENAME, 'rb'),
+                'File': open(IMAGEFILENAME, 'rb'),
             }
 
             data = {
@@ -133,12 +133,12 @@ def uploadPendingTelemetry():
             logging.debug('telemetryTimestamp:')
             logging.debug(telemetryTimestamp)
 
-            if os.stat(pendingTelemetryFolder + telemetryFilename).st_size == 0:
-                os.remove(pendingTelemetryFolder + telemetryFilename)
+            if os.stat(telemetryFilename).st_size == 0:
+                os.remove(telemetryFilename)
                 # empty file, will throw JSONDecodeError
                 continue
 
-            api_data = json.load(open(pendingTelemetryFolder + telemetryFilename, 'rb'))
+            api_data = json.load(open(telemetryFilename, 'rb'))
 
             api_data['Timestamp'] = telemetryTimestamp.astimezone().isoformat()
 
