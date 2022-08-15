@@ -168,16 +168,16 @@ def deleteOldUploadedImagesAndTelemetry():
         uploadedImageFilename = os.path.join(uploadedImageFolder, uploadedImageFilename)
         if os.stat(uploadedImageFilename).st_mtime < now - 1 * 86400:
           if os.path.isfile(uploadedImageFilename):
-            logging.info(' deleting old uploaded file ' + uploadedImageFilename)
+            logging.info(' deleting old uploaded image ' + uploadedImageFilename)
             os.remove(uploadedImageFilename)
 
       os.makedirs(uploadedTelemetryFolder, exist_ok = True)
 
-      for uploadedTelemetryFilename in os.listdir(uploadedImageFolder):
-        uploadedImageFilename = os.path.join(uploadedImageFolder, uploadedTelemetryFilename)
+      for uploadedTelemetryFilename in os.listdir(uploadedTelemetryFolder):
+        uploadedImageFilename = os.path.join(uploadedTelemetryFolder, uploadedTelemetryFilename)
         if os.stat(uploadedTelemetryFilename).st_mtime < now - 1 * 86400:
           if os.path.isfile(uploadedTelemetryFilename):
-            logging.info(' deleting old uploaded file ' + uploadedTelemetryFilename)
+            logging.info(' deleting old uploaded telemetry ' + uploadedTelemetryFilename)
             os.remove(uploadedTelemetryFilename)
 
     except Exception as e:
