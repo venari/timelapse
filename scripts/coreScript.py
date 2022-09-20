@@ -77,7 +77,7 @@ def scheduleShutdown():
 
         setAlarm = True
 
-    if datetime.datetime.now().hour >=18 or datetime.datetime.now().hour <= 7:
+    if datetime.datetime.now().hour >=20 or datetime.datetime.now().hour < 5:
         logging.info("Night time so we're scheduling shutdown")
 
         alarmObj = {
