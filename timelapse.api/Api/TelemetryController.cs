@@ -26,10 +26,9 @@ namespace timelapse.api{
         [HttpPost]
         public ActionResult<Telemetry> Post([FromForm] TelemetryPostModel model){
 
-            _logger.LogInformation("In Telemenrty Post");
-            // _logger.LogInformation("DeviceId: " + model.DeviceId);
-            _logger.LogInformation("SerialNumber: " + model.SerialNumber);
-            _logger.LogInformation("Timestamp: " + model.Timestamp);
+            // _logger.LogInformation("In Telemetry Post");
+            // _logger.LogInformation("SerialNumber: " + model.SerialNumber);
+            // _logger.LogInformation("Timestamp: " + model.Timestamp);
 
             Device device = _appDbContext.Devices.FirstOrDefault(d => d.SerialNumber == model.SerialNumber);
 
@@ -55,9 +54,12 @@ namespace timelapse.api{
                 BatteryPercent = model.BatteryPercent,
                 Status = model.Status,
                 DiskSpaceFree = model.DiskSpaceFree,
+                PendingImages = model.PendingImages,
+                UploadedImages = model.UploadedImages,
+                PendingTelemetry = model.PendingTelemetry,
+                UploadedTelemetry = model.UploadedTelemetry,
                 UptimeSeconds = model.UptimeSeconds
             };
-            _logger.LogInformation("Add Telemetry BLAH");
             _appDbContext.Telemetry.Add(telemetry);
             _appDbContext.SaveChanges();
             return telemetry;
