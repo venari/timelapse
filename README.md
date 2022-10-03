@@ -25,10 +25,14 @@ diskutil unmount /Volumes/boot
 ```
 
 Turn on and find the pi
+Pi Zero W 2:
 ```
 arp -a | grep e4:5f
 raspberrypi.lan (192.168.86.37) at e4:5f:1:5a:6e:b3 on en0 ifscope [ethernet]
+```
 
+Pi Zero W:
+```
 arp -a | grep b8:27
 raspberrypi.lan (192.168.86.32) at b8:27:eb:94:ac:b1 on en0 ifscope [ethernet]
 
@@ -86,6 +90,25 @@ Issues in Bullseye on Zero2? https://www.raspberrypi.com/news/bullseye-camera-sy
 
 ```
 ffmpeg -r 30 -f image2 -pattern_type glob -i "./<YYYY-MM-DD>*.jpg" -s 1014x760 -vcodec libx264 <YYYY-MM-DD>.mp4
+```
+
+# Video stabilization
+
+https://www.paulirish.com/2021/video-stabilization-with-ffmpeg-and-vidstab/
+
+```
+ffmpeg -i unstabilized.mp4 -vf vidstabdetect -f null -
+ffmpeg -i unstabilized.mp4 -vf vidstabdetect=shakiness=1:tripod=1 -f null -
+ffmpeg -i unstabilized.mp4 -vf vidstabtransform stabilized.mp4
+```
+
+Comparison video:
+```
+# vertically stacked
+ffmpeg -i unstabilized.mp4 -i stabilized.mp4  -filter_complex vstack compare-stacked.mp4
+
+# side-by-side
+ffmpeg -i unstabilized.mp4 -i stabilized.mp4  -filter_complex hstack compare-sxs.mp4
 ```
 
 # API Setup
@@ -258,3 +281,17 @@ Charge from wall charger about 5 hours
 Discharge 95 -> 5% about 12 hours.
 Discharge 4 -> 1$ about 10 hours.
 
+
+# Tailscale setup (optional)
+
+Using [tailscale](https://github.com/tailscale/tailscale) to manage updates to pi's:
+
+From https://tailscale.com/download/linux/rpi-bullseye:
+
+```
+curl -fsSL https://tailscale.com/install.sh | sh
+```
+
+```
+sudo tailscale up
+```
