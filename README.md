@@ -281,3 +281,17 @@ Charge from wall charger about 5 hours
 Discharge 95 -> 5% about 12 hours.
 Discharge 4 -> 1$ about 10 hours.
 
+
+# Tailscale setup (optional)
+
+Using [tailscale](https://github.com/tailscale/tailscale) to manage updates to pi's:
+
+From https://tailscale.com/download/linux/rpi-bullseye:
+
+```
+curl -fsSL https://tailscale.com/install.sh | sh
+```
+
+```
+sudo tailscale up
+```

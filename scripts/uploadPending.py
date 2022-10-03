@@ -8,6 +8,8 @@ import datetime
 import sys
 import requests
 import logging
+import glob
+import pathlib
 
 config = json.load(open('config.json'))
 logFilePath = config["logFilePath"]
@@ -50,15 +52,31 @@ def uploadPendingPhotos():
     try:
         os.makedirs(pendingImageFolder, exist_ok = True)
         os.makedirs(uploadedImageFolder, exist_ok = True)
-        for IMAGEFILENAME in os.listdir(pendingImageFolder):
+
+        mostRecentPendingFiles = sorted(glob.iglob(pendingImageFolder + "/*.*"), key=os.path.getctime, reverse=True)
+
+        pendingFilesProcessed=0
+        for IMAGEFILENAME in mostRecentPendingFiles:
+            
+            # Process in batches of 10:
+            pendingFilesProcessed+=1
+            if pendingFilesProcessed > 10:
+                break
+
+
             logging.info(' uploading ' + IMAGEFILENAME)
 
-            imageTimestamp = datetime.datetime.strptime(IMAGEFILENAME, '%Y-%m-%d_%H%M%S.jpg')
+            imageTimestamp = datetime.datetime.strptime(pathlib.Path(IMAGEFILENAME).stem, '%Y-%m-%d_%H%M%S')
             logging.debug('imageTimestamp:')
             logging.debug(imageTimestamp)
 
+            if os.stat(IMAGEFILENAME).st_size == 0:
+              logging.error('Empty file - deleting')
+              os.remove(IMAGEFILENAME)
+              continue
+
             files = {
-                'File': open(pendingImageFolder + IMAGEFILENAME, 'rb'),
+                'File': open(IMAGEFILENAME, 'rb'),
             }
 
             data = {
@@ -77,7 +95,7 @@ def uploadPendingPhotos():
             logging.debug(f'Response code: {response.status_code}')
             if response.status_code == 200:
                 logging.debug(f'Image uploaded successfully')
-                shutil.move(pendingImageFolder + IMAGEFILENAME, uploadedImageFolder + IMAGEFILENAME)
+                shutil.move(IMAGEFILENAME, uploadedImageFolder + pathlib.Path(IMAGEFILENAME).name)
 
             else:
                 logging.error(f'Image upload failed')
@@ -98,18 +116,29 @@ def uploadPendingTelemetry():
         os.makedirs(uploadedTelemetryFolder, exist_ok = True)
         #requests.post(config['apiUrl'] + '/Telemetry', json=api_data)
         session = requests.Session()
-        for telemetryFilename in os.listdir(pendingTelemetryFolder):
+
+        mostRecentTelemetryFiles = sorted(glob.iglob(pendingTelemetryFolder + "/*.json"), key=os.path.getctime, reverse=True)
+
+        pendingFilesProcessed=0
+        for telemetryFilename in mostRecentTelemetryFiles:
+            
+            # Process in batches of 100:
+            pendingFilesProcessed+=1
+            if pendingFilesProcessed > 100:
+                break
+
             logging.info(' uploading ' + telemetryFilename)
 
-            telemetryTimestamp = datetime.datetime.strptime(telemetryFilename, '%Y-%m-%d_%H%M%S.json')
+            telemetryTimestamp = datetime.datetime.strptime(pathlib.Path(telemetryFilename).stem, '%Y-%m-%d_%H%M%S')
             logging.debug('telemetryTimestamp:')
             logging.debug(telemetryTimestamp)
 
-            if os.stat(pendingTelemetryFolder + telemetryFilename).st_size == 0:
+            if os.stat(telemetryFilename).st_size == 0:
+                os.remove(telemetryFilename)
                 # empty file, will throw JSONDecodeError
                 continue
 
-            api_data = json.load(open(pendingTelemetryFolder + telemetryFilename, 'rb'))
+            api_data = json.load(open(telemetryFilename, 'rb'))
 
             api_data['Timestamp'] = telemetryTimestamp.astimezone().isoformat()
 
@@ -122,14 +151,14 @@ def uploadPendingTelemetry():
 
             if postResponse.status_code == 200:
                 logging.debug(f'Telemetry uploaded successfully')
-                shutil.move(pendingTelemetryFolder + telemetryFilename, uploadedTelemetryFolder + telemetryFilename)
+                shutil.move(telemetryFilename, uploadedTelemetryFolder + pathlib.Path(telemetryFilename).name)
                 logging.debug('Logged to API.')
 
     except Exception as e:
         logging.error(str(datetime.datetime.now()) + " uploadPendingTelemetry() failed.")
         logging.error(e)
 
-def deleteOldUploadedImages():
+def deleteOldUploadedImagesAndTelemetry():
 
     try:
       now = time.time()
@@ -139,18 +168,27 @@ def deleteOldUploadedImages():
         uploadedImageFilename = os.path.join(uploadedImageFolder, uploadedImageFilename)
         if os.stat(uploadedImageFilename).st_mtime < now - 1 * 86400:
           if os.path.isfile(uploadedImageFilename):
-            logging.info(' deleting old uploaded file ' + uploadedImageFilename)
+            logging.info(' deleting old uploaded image ' + uploadedImageFilename)
             os.remove(uploadedImageFilename)
 
+      os.makedirs(uploadedTelemetryFolder, exist_ok = True)
+
+      for uploadedTelemetryFilename in os.listdir(uploadedTelemetryFolder):
+        uploadedTelemetryFilename = os.path.join(uploadedTelemetryFolder, uploadedTelemetryFilename)
+        if os.stat(uploadedTelemetryFilename).st_mtime < now - 1 * 86400:
+          if os.path.isfile(uploadedTelemetryFilename):
+            logging.info(' deleting old uploaded telemetry ' + uploadedTelemetryFilename)
+            os.remove(uploadedTelemetryFilename)
+
     except Exception as e:
-        logging.error(str(datetime.datetime.now()) + " deleteOldUploadedImages() failed.")
+        logging.error(str(datetime.datetime.now()) + " deleteOldUploadedImagesAndTelemetry() failed.")
         logging.error(e)
 
 
 try:
     while True:
 
-      deleteOldUploadedImages()
+      deleteOldUploadedImagesAndTelemetry()
       uploadPendingTelemetry()
       uploadPendingPhotos()
       time.sleep(10)
