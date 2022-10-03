@@ -131,3 +131,6 @@ dmypy.json
 output/
 *.secret.*
 .DS_Store
+
+
+~$Timelapse_calc.xlsx
