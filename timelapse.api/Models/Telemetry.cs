@@ -15,5 +15,9 @@ namespace timelapse.api{
         public string? Status {get; set;}
         public int? DiskSpaceFree {get; set;}
         public int? UptimeSeconds {get; set;}
+        public int? PendingImages {get; set;}
+        public int? UploadedImages {get; set;}
+        public int? PendingTelemetry {get; set;}
+        public int? UploadedTelemetry {get; set;}
     }
 }
