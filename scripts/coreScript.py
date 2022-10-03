@@ -61,6 +61,8 @@ def scheduleShutdown():
     logging.debug('scheduleShutdown')
     setAlarm = False
 
+    config = json.load(open('config.json'))
+
     if config['shutdown']:
         # print(str(datetime.datetime.now()) + ' scheduling regular shutdown')
         logging.info('scheduling regular shutdown')
@@ -146,12 +148,13 @@ def savePhotos():
         logging.debug('creating camera object...')
         with PiCamera() as camera:
 
-            camera.vflip = config['camera.vflip']
-            camera.hflip = config['camera.hflip']
-            camera.resolution = (config['camera.resolution.width'], config['camera.resolution.height'])
-            camera.rotation = config['camera.rotation']
-
             while True:
+                config = json.load(open('config.json'))
+                camera.vflip = config['camera.vflip']
+                camera.hflip = config['camera.hflip']
+                camera.resolution = (config['camera.resolution.width'], config['camera.resolution.height'])
+                camera.rotation = config['camera.rotation']
+
                 logging.debug('beginning capture')
                 camera.start_preview()
                 # Camera warm-up time
@@ -181,6 +184,10 @@ def saveTelemetry():
                     'batteryPercent': pj.status.GetChargeLevel()['data'],
                     'temperatureC': pj.status.GetBatteryTemperature()['data'],
                     'diskSpaceFree': shutil.disk_usage('/')[2] // (1024**3), # shutil.disk_usage returns tuple of (total, used, free), converted to int gb
+                    'pendingImages': len(os.listdir(pendingImageFolder)),
+                    'uploadedImages': len(os.listdir(uploadedImageFolder)),
+                    'pendingTelemetry': len(os.listdir(pendingTelemetryFolder)),
+                    'uploadedTelemetry': len(os.listdir(uploadedTelemetryFolder)),
                     'uptimeSeconds': int(time.clock_gettime(time.CLOCK_BOOTTIME)),
                     'status': str({ 'status': pj.status.GetStatus()['data'],
                                 'batteryVoltage': pj.status.GetBatteryVoltage()['data'],
