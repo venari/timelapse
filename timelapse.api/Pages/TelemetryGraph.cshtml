@@ -1,4 +1,4 @@
-﻿@page "{id:int}"
+﻿@page "{id:int}/{numberOfHoursToDisplay:int?}"
 @using Humanizer
 @model TelemetryGraphModel
 @{
@@ -22,16 +22,19 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
 
-<div class="text-center">
-    <h1 class="display-4">Welcome</h1>
-    <p>Learn about <a href="https://docs.microsoft.com/aspnet/core">building Web apps with ASP.NET Core</a>.</p>
-</div>
+<h4>Displaying @(Model.NumberOfHoursToDisplay) hours data.</h4>
+@{
+    <a href="/TelemetryGraph/@(Model.device.Id)/1" type="button" class="btn btn-secondary">Last hour</a>
+    <a href="/TelemetryGraph/@(Model.device.Id)/24" type="button" class="btn btn-secondary">Last 24 hours</a>
+    <a href="/TelemetryGraph/@(Model.device.Id)/48" type="button" class="btn btn-secondary">Last 48 hours</a>
+}
+
 
 <script>
-    const latest24HoursTelemetryUri = '/api/Telemetry/GetLatest24HoursTelemetry'
+    const latest24HoursTelemetryUri = '/api/Telemetry/GetLatestTelemetry'
 
-    function getTelemetry(deviceId, chart) {
-        fetch(latest24HoursTelemetryUri + '?deviceId=' + deviceId)
+    function getTelemetry(deviceId, numberOfHoursToDisplay, chart) {
+        fetch(latest24HoursTelemetryUri + '?deviceId=' + deviceId + '&numberOfHoursToDisplay=' + numberOfHoursToDisplay)
             .then(response => response.json())
             .then(data => showTelemetry(chart, data))
             .catch(error => console.error('Unable to get telemetry.', error));
@@ -43,6 +46,8 @@
         chart.config.data.datasets[0].data = data.map(d => ({x: new Date(d.timestamp), y: d.batteryPercent}));
         chart.config.data.datasets[1].data = data.map(d => ({x: new Date(d.timestamp), y: d.temperatureC}));
         chart.config.data.datasets[2].data = data.map(d => ({x: new Date(d.timestamp), y: d.diskSpaceFree}));        
+        chart.config.data.datasets[3].data = data.map(d => ({x: new Date(d.timestamp), y: d.pendingImages}));        
+        chart.config.data.datasets[4].data = data.map(d => ({x: new Date(d.timestamp), y: d.pendingTelemetry}));        
         chart.update();
     }
 </script>
@@ -81,7 +86,7 @@
                                             time: {
                                                 unit: 'hour'
                                             },
-                                            suggestedMin: new Date(@(new DateTimeOffset(Model.device.LatestTelemetry.Timestamp).AddDays(-2).ToUnixTimeMilliseconds())),
+                                            suggestedMin: new Date(@(new DateTimeOffset(Model.device.LatestTelemetry.Timestamp).AddHours(-1 * Model.NumberOfHoursToDisplay).ToUnixTimeMilliseconds())),
                                             @* suggestedMax: new Date(), *@
                                             suggestedMax: new Date(@(new DateTimeOffset(Model.device.LatestTelemetry.Timestamp).ToUnixTimeMilliseconds())),
                                             @* ticks: {
@@ -122,6 +127,14 @@
                                 label: "Disk Space Free",
                                 backgroundColor: 'rgb(50, 225, 50)',
                                 borderColor: 'rgb(50, 225, 50)',
+                            }, {
+                                label: "Pending Images",
+                                backgroundColor: 'rgb(30, 185, 00)',
+                                borderColor: 'rgb(30, 185, 00)',
+                            }, {
+                                label: "Pending Telemetry",
+                                backgroundColor: 'rgb(00, 165, 20)',
+                                borderColor: 'rgb(00, 165, 20)',
                             }]
                         };
 
@@ -132,7 +145,7 @@
                             config
                         );
 
-                        getTelemetry(@(Model.device.Id), myChart_@(Model.device.Id));
+                        getTelemetry(@(Model.device.Id), @(Model.NumberOfHoursToDisplay), myChart_@(Model.device.Id));
 
                     </script>
                 </td>

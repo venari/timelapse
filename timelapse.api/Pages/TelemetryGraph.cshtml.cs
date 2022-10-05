@@ -15,15 +15,30 @@ public class TelemetryGraphModel : PageModel
     public Device device {get; private set;}
     public string SasToken {get; private set;}
 
+    // private int _numberOfHoursToDisplay;
+
+    //     get {
+    //         return _numberOfHoursToDisplay;
+    //     }
+    // }
+
     public TelemetryGraphModel(ILogger<TelemetryGraphModel> logger, AppDbContext appDbContext, IConfiguration configuration)
     {
         _logger = logger;
         _appDbContext = appDbContext;
+        NumberOfHoursToDisplay = 24;
     }
 
-    public IActionResult OnGet(int id)
+    [BindProperty]
+    public int NumberOfHoursToDisplay {get; set; }
+
+    public IActionResult OnGet(int id, int? numberOfHoursToDisplay = null)
     {
-        DateTime cutOff = DateTime.UtcNow.AddDays(-2);
+        if(numberOfHoursToDisplay!=null){
+            NumberOfHoursToDisplay = numberOfHoursToDisplay.Value;
+        }
+        
+        DateTime cutOff = DateTime.UtcNow.AddHours(-1 * NumberOfHoursToDisplay);
         
         var d = _appDbContext.Devices
             .Include(d => d.Telemetries.Where(t => t.Timestamp >= cutOff))
