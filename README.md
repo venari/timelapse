@@ -295,3 +295,9 @@ curl -fsSL https://tailscale.com/install.sh | sh
 ```
 sudo tailscale up
 ```
+
+# Copying log files
+
+```
+scp pi@100.101.235.119:~/logs/timelapse.log .
+```
