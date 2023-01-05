@@ -92,6 +92,45 @@ Issues in Bullseye on Zero2? https://www.raspberrypi.com/news/bullseye-camera-sy
 ffmpeg -r 30 -f image2 -pattern_type glob -i "./<YYYY-MM-DD>*.jpg" -s 1014x760 -vcodec libx264 <YYYY-MM-DD>.mp4
 ```
 
+# Other timelapse generation examples
+
+```
+ffmpeg -r 30 -f image2 -pattern_type glob -i  "*11_2023-01-03*.jpg" -s 3280x1844 -vcodec libx264 output.mp4
+```
+
+## Overlay lable and date/time in images:
+```
+mkdir -p mod
+
+for filename in *.jpg; do 
+    # Escape the colon so it doesn't confuse the text expansion for drawtext
+    date_time="$(echo ${filename:3:10} ${filename:14:2}\\:${filename:16:2})"
+    label="Forest Lodge Orchard"
+    ffmpeg -i $filename -y -vf "drawtext=fontfile=/System/Library/Fonts/Avenir.ttc:text='$label':fontcolor=white:fontsize=90:box=1:boxcolor=black@0.3:boxborderw=5:x=10:y=h-th-10,drawtext=fontfile=/System/Library/Fonts/Avenir.ttc:text='$date_time':fontcolor=white:fontsize=90:box=1:boxcolor=black@0.3:boxborderw=5:x=w-tw-10:y=h-th-10" -hide_banner -loglevel error mod/$filename
+done
+
+
+
+ffmpeg -r 60 -f image2 -pattern_type glob -i  "mod/*.jpg" -s 3280x1844 -vcodec libx264 text-test.mp4
+
+```
+
+ffmpeg -r 30 -f image2 -pattern_type glob -i  "*11_2023-01-03*.jpg" -s 3280x1844 -vcodec libx264 output.mp4 -vf "drawtext=fontfile=/System/Library/Fonts/Geneva.ttf:text='Stack Overflow':fontcolor=white:fontsize=24:box=1:boxcolor=black@0.5:boxborderw=5:x=(w-text_w)/2:y=(h-text_h)/2,drawtext=fontfile=/System/Library/Fonts/Avenir.ttc:text='%{split(split(filename, '_')[2], \\\\.)[0]} %{split(split(filename, '_')[2], \\\\.)[1]}':fontcolor=white:fontsize=90:box=1:boxcolor=black@0.2:boxborderw=5:x=w-tw-10:y=h-th-10" 
+
+ffmpeg -r 60 -f image2 -pattern_type glob -i  "*11_2023-01-03_120*.jpg" -s 3280x1844 -vcodec libx264 -vf "drawtext=fontfile=/System/Library/Fonts/Geneva.ttf:text='TEST':x=10:y=10:fontcolor=white:fontsize=24" text-test.mp4
+ffmpeg -r 60 -f image2 -pattern_type glob -i  "*11_2023-01-03_120*.jpg" -s 3280x1844 -vcodec libx264 -vf "drawtext=fontfile=/System/Library/Fonts/Geneva.ttf:text='Stack Overflow':fontcolor=white:fontsize=24:box=1:boxcolor=black@0.5:boxborderw=5:x=(w-text_w)/2:y=(h-text_h)/2,drawtext=fontfile=/System/Library/Fonts/Avenir.ttc:text='%{split(split(filename, '_')[2], \\\\.)[0]} %{split(split(filename, '_')[2], \\\\.)[1]}':fontcolor=white:fontsize=90:box=1:boxcolor=black@0.2:boxborderw=5:x=w-tw-10:y=h-th-10" text-test.mp4
+
+Avenir.ttc
+
+
+ffmpeg -i text-test.mp4 -vf "drawtext=fontfile=/System/Library/Fonts/Geneva.ttf:text='Stack Overflow':fontcolor=white:fontsize=24:box=1:boxcolor=black@0.5:boxborderw=5:x=(w-text_w)/2:y=(h-text_h)/2,drawtext=fontfile=/System/Library/Fonts/Avenir.ttc:text='Bottom right text':fontcolor=white:fontsize=60:x=w-tw-10:y=h-th-10" -codec:a copy output.mp4
+
+ffmpeg -i text-test.mp4 -vf "drawtext=fontfile=/System/Library/Fonts/Geneva.ttf:text='Stack Overflow':fontcolor=white:fontsize=24:box=1:boxcolor=black@0.5:boxborderw=5:x=(w-text_w)/2:y=(h-text_h)/2,drawtext=fontfile=/System/Library/Fonts/Avenir.ttc:text='Bottom right text':fontcolor=white:fontsize=90:box=1:boxcolor=black@0.5:boxborderw=5:x=w-tw-10:y=h-th-10" -codec:a copy output.mp4
+
+
+
+```
+
 # Video stabilization
 
 https://www.paulirish.com/2021/video-stabilization-with-ffmpeg-and-vidstab/
