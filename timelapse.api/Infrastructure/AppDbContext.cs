@@ -5,10 +5,13 @@ using timelapse.core.models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 // using Microsoft.Extensions.Logging;
+using timelapse.api.Areas.Identity.Data;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 
 namespace timelapse.infrastructure
 {
-    public class AppDbContext : DbContext
+    public class AppDbContext : IdentityDbContext<AppUser>
     {
         private IConfiguration _configuration;
         public AppDbContext(DbContextOptions<AppDbContext> options, IConfiguration configuration, ILogger<AppDbContext> logger)
