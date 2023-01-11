@@ -27,6 +27,10 @@ namespace timelapse.infrastructure
         public DbSet<UnregisteredDevice> UnregisteredDevices { get; set; }
         public DbSet<Telemetry> Telemetry { get; set; }
         public DbSet<Image> Images { get; set; }
+        public DbSet<Project> Projects { get; set; }
+        public DbSet<DeviceProjectContract> DeviceProjectContracts { get; set; }
+        public DbSet<Organisation> Organisations { get; set; }
+        public DbSet<OrganisationUserJoinEntry> OrganisationUserJoinEntry { get; set; }
 
         protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
         {

@@ -98,5 +98,8 @@ public class Device
     //         return "Missing";
     //     }
     // }
+    
+    [System.Text.Json.Serialization.JsonIgnore]
+    public List<DeviceProjectContract> DeviceProjectContracts { get; } = new List<DeviceProjectContract>();
 }
 
