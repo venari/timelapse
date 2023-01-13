@@ -24,14 +24,14 @@
     </table>
     @if (Model.Organisations.Count > 0)
     {
-        <a asp-page="./Index">Back to List</a>
+        <a asp-page="./Index">Back to Home</a>
     }
     else
     {
         <div>
-            No Organisations found
-            <a asp-page="./Create">Create New</a>
+            No Organisations found <br>
+            <a asp-page="./CreateOrganisation">Create New Organisation</a>
         </div>
-        <a asp-page="./Index">Back to List</a>
+        <a asp-page="./Index">Back to Home</a>
     }
 </div>
