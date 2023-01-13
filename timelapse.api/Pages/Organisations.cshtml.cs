@@ -10,18 +10,18 @@ using Microsoft.EntityFrameworkCore;
 
 namespace timelapse.api.Pages
 {
-    public class ManageOrganisationModel : PageModel
+    public class OrganisationsModel : PageModel
     {
         private readonly UserManager<AppUser> _userManager;
         private readonly SignInManager<AppUser> _signInManager;
-        private readonly ILogger<ManageOrganisationModel> _logger;
+        private readonly ILogger<OrganisationsModel> _logger;
         public List<Organisation> Organisations;
         private AppDbContext _appDbContext;
 
-        public ManageOrganisationModel(
+        public OrganisationsModel(
             UserManager<AppUser> userManager,
             SignInManager<AppUser> signInManager,
-            ILogger<ManageOrganisationModel> logger,
+            ILogger<OrganisationsModel> logger,
             AppDbContext appDbContext)
         {
             _userManager = userManager;

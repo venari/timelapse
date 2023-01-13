@@ -1,7 +1,7 @@
 ﻿@page
-@model timelapse.api.Pages.ManageOrganisationModel
+@model timelapse.api.Pages.OrganisationsModel
 @{
-    ViewData["Title"] = "Manage Organisation";
+    ViewData["Title"] = "Organisations";
 }
 
 <div>
@@ -18,20 +18,21 @@
                     <td>
                         @Html.DisplayFor(modelItem => item.Name)
                     </td>
+                    <td>
+
+                    </td>
                 </tr>
             }
         </tbody>
     </table>
     @if (Model.Organisations.Count > 0)
     {
-        <a asp-page="./Index">Back to Home</a>
+        <a asp-page="./Index">Back to Home</a> <br>
+        <a asp-page="./CreateOrganisation">Create New Organisation</a>
     }
     else
     {
-        <div>
-            No Organisations found <br>
-            <a asp-page="./CreateOrganisation">Create New Organisation</a>
-        </div>
+        <p> No Organisations found </p>
         <a asp-page="./Index">Back to Home</a>
     }
 </div>
