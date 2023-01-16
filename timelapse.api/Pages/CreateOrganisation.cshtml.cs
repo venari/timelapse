@@ -26,6 +26,7 @@ namespace timelapse.api.Pages
             _signInManager = signInManager;
             _logger = logger;
             _appDbContext = appDbContext;
+
             organisation = new Organisation();
         }
         
@@ -41,16 +42,22 @@ namespace timelapse.api.Pages
         {
             if (ModelState.IsValid)
             {
-                var user = await _userManager.GetUserAsync(User);
-                if (user == null)
+                var UserId = _userManager.GetUserId(User);
+                if (UserId == null) // Might not need this
                 {
                     return NotFound($"Unable to load user with ID '{_userManager.GetUserId(User)}'.");
                 }
 
                 _logger.LogInformation($"Organisation created by user {_userManager.GetUserName(User)}");
                 _appDbContext.Organisations.Add(organisation);
+                
+                await _appDbContext.SaveChangesAsync(); // Looks like organisation.Id is only updated after saving changes
+
+                var OwnerUserEntry = new OrganisationUserJoinEntry{UserId=UserId, OrganisationId=organisation.Id, OrganisationAdmin=true, OrganisationOwner=true};
+                _appDbContext.OrganisationUserJoinEntry.Add(OwnerUserEntry);
+
                 await _appDbContext.SaveChangesAsync();
-                return Page();
+                return RedirectToPage("./Organisations");
             }
             return Page();
         }
