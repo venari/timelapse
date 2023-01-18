@@ -26,7 +26,7 @@ namespace timelapse.api.Helpers
             _logger = logger;
             _memoryCache = memoryCache;
 
-            azureStorageConnectionString = config["STORAGE_CONNECTION_STRING"];
+            azureStorageConnectionString = config["STORAGE_CONNECTION_STRING"]; // Spent a while trying to figure out why this wasn't working, turns out that dotnet cli has weird behaviour with dotnet watch run running from the parent directory, solutions involve passing `--foo bar` as an argument or `--configuration appsettings.json`
             azureBlobContainerName = config["STORAGE_CONTAINER_NAME"];
 
             blobContainerClient = new Azure.Storage.Blobs.BlobContainerClient(azureStorageConnectionString, azureBlobContainerName);
