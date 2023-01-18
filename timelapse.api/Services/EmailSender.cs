@@ -33,7 +33,7 @@ public class EmailSender : IEmailSender
         var client = new SendGridClient(apiKey);
         var msg = new SendGridMessage()
         {
-            From = new EmailAddress("passwd@venari.co.nz", "Password Recovery"),
+            From = new EmailAddress("accounts@venari.co.nz", "Account Manager"),
             Subject = subject,
             PlainTextContent = message,
             HtmlContent = message
