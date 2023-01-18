@@ -53,7 +53,7 @@ namespace timelapse.api.Pages
                 
                 await _appDbContext.SaveChangesAsync(); // Looks like organisation.Id is only updated after saving changes
 
-                var OwnerUserEntry = new OrganisationUserJoinEntry{UserId=UserId, OrganisationId=organisation.Id, OrganisationAdmin=true, OrganisationOwner=true};
+                var OwnerUserEntry = new OrganisationUserJoinEntry{UserId=UserId, OrganisationId=organisation.Id, OrganisationAdmin=true, OrganisationOwner=true, CreationDate=DateTime.UtcNow};
                 _appDbContext.OrganisationUserJoinEntry.Add(OwnerUserEntry);
 
                 await _appDbContext.SaveChangesAsync();
