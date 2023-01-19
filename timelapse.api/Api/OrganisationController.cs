@@ -23,30 +23,19 @@ namespace timelapse.api
         [HttpPost("AddUserToOrganisation")]
         public async Task<ActionResult<String>> AddUserToOrganisation(String UserEmail, int OrganisationId)
         {
-            // DEVDO refactor these validation checks to conform to validation checks in other functions
-            if (! _appDbContext.Organisations.Any(o => o.Id == OrganisationId))
-            {
-                _logger.LogWarning($"User attempted to add user to non-existent organisation with id {OrganisationId}");
-                return "FAIL: Non-existant Organisation";
-            }
-
             if (! await CurrentUserHasAdminPermissions(Request, OrganisationId))
             {
-                _logger.LogWarning($"User attempted to add a user to Organisation with id {OrganisationId} (\"{_appDbContext.Organisations.First(o => o.Id == OrganisationId).Name}\")");
+                _logger.LogWarning($"User attempted to add user {UserEmail} to Organisation with id {OrganisationId} (\"{_appDbContext.Organisations.First(o => o.Id == OrganisationId).Name}\" without admin permissions");
                 return "FAIL: Authentication Error";
-                // This shouldn't be reachable from within the page, may be that someone is sending malicious requests, or that the add user form was exposed to users without perms (shouldn't happen, fix it)
             }
             
-            String userId;
-            try {
-                userId = _appDbContext.Users.Single(x => x.UserName == UserEmail).Id;
-            }
-            catch (System.InvalidOperationException) {
-                // No user exists in the database with that email
+            if (! _appDbContext.Users.Any(u => u.UserName == UserEmail))
+            {
                 return "FAIL: Database User Error, email may have been mistyped, or user may not have an account on this server";
             }
+            var userId = _appDbContext.Users.First(u => u.UserName == UserEmail).Id;
             
-            if (_appDbContext.OrganisationUserJoinEntry.Any(x => x.OrganisationId == OrganisationId && x.UserId == userId))
+            if (_appDbContext.OrganisationUserJoinEntry.Any(e => e.OrganisationId == OrganisationId && e.UserId == userId))
             {
                 return "FAIL: User Already In Organisation";
             }
