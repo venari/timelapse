@@ -1,0 +1,194 @@
+﻿@page 
+@model timelapse.api.Pages.ManageOrganisationModel
+@using timelapse.core.models
+@using timelapse.api.Areas.Identity.Data
+@{
+    ViewData["Title"] = "Manage Organisation";
+}
+
+<div>
+    <div>
+        <h1> Members </h1>
+        <table class="table">
+            <thead>
+                <th scope="col"> Email </th>
+                <th scope="col"> Is Admin </th>
+                <th scope="col"> Is Owner </th>
+                @if (Model.UserIsAdmin) {
+                    <th scope="col"> Remove </th>
+                }
+            </thead>
+            <tbody>
+                @{
+                    var MemberEntries = Model.Org.OrganisationUserJoinEntries.ToList();
+                    MemberEntries.OrderBy(o => o.Id); // DEVDO find out why this seems to change randomly
+                }
+                @foreach (var item in MemberEntries)
+                {
+                    AppUser? Member = Model.Users.Where(u => (item.UserId == u.Id)).First();
+                    if (Member != null)
+                    {
+                        <tr>
+                            <td>
+                                @Html.DisplayFor(ModelItem => Member.Email)
+                            </td>
+                            <td>
+                                @if (! Model.UserIsOwner) {
+                                    @Html.DisplayFor(ModelItem => item.OrganisationAdmin)
+
+                                } else {
+                                    if (item.OrganisationAdmin) {
+                                        <input type="checkbox" class="AdminCheckbox" id="AdminCheckbox@(Member.Id)" checked onclick="togglePerms('@(Member.Id)', 'Admin')">
+                                    } else {
+                                        <input type="checkbox" class="AdminCheckbox" id="AdminCheckbox@(Member.Id)" onclick="togglePerms('@(Member.Id)', 'Admin')">
+                                    }
+
+                                    <label class="text-danger" id="AdminCheckboxError@(Member.Id)"></label>
+                                }
+                            </td>
+                            <td>
+                                @if (! Model.UserIsOwner) {
+                                    @Html.DisplayFor(ModelItem => item.OrganisationOwner)
+
+                                } else if (Model.UserId == Member.Id) {
+                                    <input type="checkbox" title="You cannot remove your own owner permissions" checked disabled>
+
+                                } else {
+                                    if (item.OrganisationOwner) {
+                                        <input type="checkbox" class="OwnerCheckbox" id="OwnerCheckbox@(Member.Id)" checked onclick="togglePerms('@(Member.Id)', 'Owner')">
+                                    } else {
+                                        <input type="checkbox" class="OwnerCheckbox" id="OwnerCheckbox@(Member.Id)" onclick="togglePerms('@(Member.Id)', 'Owner')">
+                                    }
+                                    
+                                    <label class="text-danger" id="OwnerCheckboxError@(Member.Id)"></label>
+                                }
+                            </td>
+                            @if (Model.UserIsAdmin) {
+                                <td>
+                                    <button class="btn btn-danger" onclick="removeUser('@(item.UserId)')">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-trash" viewBox="0 0 16 16">
+                                          <path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/>
+                                          <path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/>
+                                        </svg>
+                                    </button>
+                                    <label class="text-danger" id="RemoveButtonError@(Member.Id)"></label>
+                                </td>
+                            }
+                        </tr>
+                    } else {
+                        <tr>
+                            <td>
+                                Stuff is burning
+                            </td>
+                            <td>
+                                Stuff is burning
+                            </td>
+                            <td>
+                                Stuff is burning
+                            </td>
+                        </tr>
+                    }
+                }
+            </tbody>
+        </table>
+        <script>
+            function makeReq(Url, ErrorObject, Reload=true) {
+                fetch(Url, {
+                    method: 'POST'
+                })
+                .then((response) => response.body)
+                .then((body) => {
+                    const reader = body.getReader()
+                    reader.read().then(({done, value}) => {
+                        valueString = ''
+                        for (i=0; i<value.length; i++) {
+                            valueString = valueString + String.fromCharCode(value[i])
+                        }
+                        if (valueString.startsWith('FAIL:'))
+                        {
+                            ErrorObject.innerText = valueString
+                        } else if (valueString.startsWith('SUCCEED:'))
+                        {
+                            if (Reload) {
+                                location.reload()
+                            }
+                        } else {
+                            console.error('Server sent an invalid response:', valueString)
+                        }
+                    })
+                })
+                .catch(error => console.log('Unable to add user to organisation', error))
+            }
+        </script>
+        @if (Model.UserIsAdmin)
+        {
+            <form class="form" onclick="addUser()" onsubmit="return false" autocomplete="off">
+                <label> Email </label> <br>
+                <input type="email" id="addUserEmail">
+                <input type="submit" Value="Add User" class="btn btn-primary"><br>
+                <label class="text-danger" id="UserEmailErrorMessage"></label>
+            </form>
+            
+            <script>
+                function addUser() {
+                    var email = document.getElementById("addUserEmail").value
+                    if ( email == "") { return }
+                    var url = "/api/Organisation/AddUserToOrganisation?UserEmail=" + encodeURIComponent(email) + "&OrganisationId=@(Model.Org.Id)"
+                    makeReq(url, document.getElementById("UserEmailErrorMessage"))
+                }
+                
+                function removeUser(UserId) {
+                    var url = "/api/Organisation/RemoveUserFromOrganisation?UserId=" + encodeURIComponent(UserId) + "&OrganisationId=@(Model.Org.Id)"
+                    makeReq(url, document.getElementById('RemoveButtonError' + UserId))
+                }
+            </script>
+
+        }
+        @if (Model.UserIsOwner) {
+            <script>
+                
+                function togglePerms(UserId, Permission) {
+                    checkbox = document.getElementById('AdminCheckbox'+UserId)
+
+                    var url = "/api/Organisation/ChangeUserPermission?UserId=" + encodeURIComponent(UserId) + "&OrganisationId=@(Model.Org.Id)" + "&Value=" + checkbox.checked + "&PermissionName=" + Permission
+                    makeReq(url, document.getElementById('AdminCheckboxError' + UserId))
+                }
+            </script>
+        }
+    </div>
+
+    <div>
+        @* placeholder *@
+        <h1> Contact Information </h1>
+        <p>
+            Nothing is here yet
+        </p>
+    </div>
+
+    <div>
+        @* placeholder *@
+        <h1> Projects </h1>
+        <table>
+            <thead>
+                <th scope="col"> Name </th>
+            </thead>
+            <tbody>
+                @foreach (var item in Model.Org.Projects)
+                {
+                    <tr>
+                    </tr>
+                }
+            </tbody>
+        </table>
+        @if (Model.Org.Projects.Count() == 0)
+        {
+            <p>
+                No projects found
+            </p>
+        }
+        <p>
+            Make project link goes here
+        </p>
+    </div>
+
+</div>

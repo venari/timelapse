@@ -12,5 +12,11 @@ public class OrganisationUserJoinEntry
     public Organisation Organisation { get; set; }    
     public DateTime CreationDate { get; set; }
     public bool OrganisationAdmin { get; set; }
+    // Admins can:
+    //  - Add users to the organisation with no admin or owner perms
+    //  - Remove users without admin or owner perms
     public bool OrganisationOwner { get; set; }
+    // Owners can:
+    //  - Change organisation member perms
+    //  - Remove users regardless of permissions DEVDO stop owners from removing themselves
 }
