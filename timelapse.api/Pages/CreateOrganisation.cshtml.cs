@@ -43,10 +43,6 @@ namespace timelapse.api.Pages
             if (ModelState.IsValid)
             {
                 var UserId = _userManager.GetUserId(User);
-                if (UserId == null) // Might not need this
-                {
-                    return NotFound($"Unable to load user with ID '{_userManager.GetUserId(User)}'.");
-                }
 
                 _logger.LogInformation($"Organisation created by user {_userManager.GetUserName(User)}");
                 _appDbContext.Organisations.Add(organisation);
