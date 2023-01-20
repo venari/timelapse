@@ -53,8 +53,8 @@ namespace timelapse.api.Pages
             var userOrgRelation = Org.OrganisationUserJoinEntries.Where(e => e.UserId == UserId);
             if (userOrgRelation.Count() == 0)
             {
-                _logger.LogWarning($"Unauthorised access attempt to organisation with ID {Id} (\"{Org.Name}\") by user {UserId}");
-                return NotFound($"Not authorised to access organisation with ID {Id}");
+                _logger.LogWarning($"Unauthorised access attempt to organisation with Id {Id} (\"{Org.Name}\") by user {UserId}");
+                return NotFound($"Not authorised to access organisation with Id {Id}");
             }
             
             UserIsAdmin = userOrgRelation.First().OrganisationAdmin;

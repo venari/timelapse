@@ -25,7 +25,7 @@ namespace timelapse.api
         {
             if (! await CurrentUserHasAdminPermissions(Request, OrganisationId))
             {
-                _logger.LogWarning($"User attempted to add user {UserEmail} to Organisation with id {OrganisationId} (\"{_appDbContext.Organisations.First(o => o.Id == OrganisationId).Name}\" without admin permissions");
+                _logger.LogWarning($"User attempted to add user \"{UserEmail}\" to Organisation with id {OrganisationId} (\"{_appDbContext.Organisations.First(o => o.Id == OrganisationId).Name}\" without admin permissions");
                 return "FAIL: Authentication Error";
             }
             
