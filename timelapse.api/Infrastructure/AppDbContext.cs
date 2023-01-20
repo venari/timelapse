@@ -30,7 +30,7 @@ namespace timelapse.infrastructure
         public DbSet<Project> Projects { get; set; }
         public DbSet<DeviceProjectContract> DeviceProjectContracts { get; set; }
         public DbSet<Organisation> Organisations { get; set; }
-        public DbSet<OrganisationUserJoinEntry> OrganisationUserJoinEntry { get; set; }
+        public DbSet<OrganisationUserJoinEntry> OrganisationUserJoinEntry { get; set; } // DEVDO refactor code to change ORganisationUserJoinEntry to OrganisationUserJoinEntries
 
         protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
         {
