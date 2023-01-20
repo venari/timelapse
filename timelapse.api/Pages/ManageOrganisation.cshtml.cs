@@ -62,20 +62,5 @@ namespace timelapse.api.Pages
 
             return Page();
         }
-
-        [BindProperty]
-        [Display(Name = "Email")]
-        public String AddUserEmail { get; set; }
-
-        public IActionResult OnPost()
-        {
-            if (!ModelState.IsValid)
-            {
-                _logger.LogInformation("ModelState is invalid");
-                return Page();
-            }
-            
-            return Page();
-        }
     }
 }
