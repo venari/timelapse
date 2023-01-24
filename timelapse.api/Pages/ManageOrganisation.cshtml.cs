@@ -18,6 +18,7 @@ namespace timelapse.api.Pages
         public List<Organisation> Organisations;
         public List<OrganisationUserJoinEntry> OrgUserJoins;
         public List<AppUser> Users;
+        public List<Project> Projects;
         public Organisation? Org;
         public Boolean UserIsAdmin;
         public Boolean UserIsOwner;
@@ -38,6 +39,7 @@ namespace timelapse.api.Pages
             Organisations = _appDbContext.Organisations.ToList();
             OrgUserJoins = _appDbContext.OrganisationUserJoinEntry.ToList();
             Users = _appDbContext.Users.ToList();
+            Projects = _appDbContext.Projects.ToList();
         }
 
         public IActionResult OnGet(int Id)

@@ -171,17 +171,19 @@
         <table class="table">
             <thead>
                 <th scope="col"> Name </th>
-                <th scope="col"> Manage </th>
+                <th scope="col" class="text-end"> Manage </th>
             </thead>
             <tbody>
-                @foreach (var item in Model.Org.Projects)
+                @foreach (var item in Model.Projects.Where(p => p.OrganisationId == Model.Org.Id))
                 {
                     <tr>
                         <td>
                             @(item.Name)
                         </td>
-                        <td>
-                            <a href="/ManageProject?Id=@(item.Id)"></a>
+                        <td class="text-end">
+                            <a href="/ManageProject?Id=@(item.Id)">
+                                <button class="btn btn-primary" >Manage Project</button>
+                            </a>
                         </td>
                     </tr>
                 }
@@ -193,11 +195,14 @@
                 No projects found
             </p>
         }
-        <p>
-            <a href="/CreateProject?OrganisationId=@(Model.Org.Id)">
-                <button id="CreateProjectButton" class="btn btn-primary"> Create new project </button>
-            </a>
-        </p>
+        @if (Model.UserIsAdmin)
+        {
+            <p>
+                <a href="/CreateProject?OrganisationId=@(Model.Org.Id)">
+                    <button id="CreateProjectButton" class="btn btn-primary"> Create new project </button>
+                </a>
+            </p>
+        }
     </div>
 
     @if (Model.UserIsOwner) {

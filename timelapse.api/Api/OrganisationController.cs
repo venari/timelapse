@@ -17,7 +17,7 @@ namespace timelapse.api
         private static AppDbContext _appDbContext;
         private static ILogger _logger;
         
-        public List<Organisation> Organisations;
+        public List<Organisation> Organisations; // DEVDO delete these
         public List<OrganisationUserJoinEntry> OrganisationUserJoinEntries;
         
         [HttpPost("AddUserToOrganisation")]

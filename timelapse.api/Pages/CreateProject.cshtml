@@ -1,0 +1,22 @@
+﻿@page
+@model timlapse.api.Pages.CreateProjectModel
+@{
+}
+
+<div class="row">
+    <form method="post">
+        <div asp-validation-summary="All" class="text-danger"></div>
+        <div class="form-group">
+            <label asp-for="ProjectName"></label>
+            <input asp-for="ProjectName" class="form-control" />
+            <span asp-validation-for="ProjectName" class="text-danger"></span>
+        </div>
+        <div class="form-group">
+            <input type="submit" value="Create" class="btn btn-primary">
+        </div>
+    </form>
+
+    <div>
+        <a asp-page="./ManageOrganisation?Id=@(Model.RetOrganisationId)">Back to Organisation</a>
+    </div>
+</div>
