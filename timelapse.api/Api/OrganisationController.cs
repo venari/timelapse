@@ -113,6 +113,11 @@ namespace timelapse.api
                 return "FAIL: Permission Error, Users with Admin permissions can only be removed by users with Owner permissions";
             }
             
+            if (removee.Id == currentUser.Id)
+            {
+                return "FAIL: you cannot remove yourself from the organisation";
+            }
+            
             _logger.LogInformation($"User {currentUser.Id} (\"{currentUser.UserName}\") removed user {removee.Id} (\"{removee.UserName}\") from organisation {organisation.Id} (\"{organisation.Name}\")");
             _appDbContext.OrganisationUserJoinEntry.Remove(removeeJoinEntry);
             _appDbContext.SaveChanges();
@@ -120,16 +125,54 @@ namespace timelapse.api
             return "SUCCEED: User Removed";
         }
         
+        [HttpPost("DeleteOrganisation")]
+        public async Task<ActionResult<String>> DeleteOrganisation(int OrganisationId)
+        {
+            if (! await CurrentUserHasOwnerPermissions(Request, OrganisationId))
+            {
+                return "FAIL: Authentication Error";
+            }
+
+            var organisation = _appDbContext.Organisations.First(o => o.Id == OrganisationId);
+            
+            if (organisation.softDeleteFlag)
+            {
+                return "FAIL: organisation already soft-deleted";
+            }
+
+            organisation.softDeleteFlag = true;
+            _appDbContext.SaveChanges();
+            return "SUCCEED: organisation soft-deleted";
+        }
+        
         public static async Task<bool> CurrentUserHasAdminPermissions(HttpRequest Request, int OrganisationId)
         {
+            validateUserOrganisationJoinEntries();
             var currentUserId = (await GetCurrentUserFromRequest(Request)).Id;
             return _appDbContext.OrganisationUserJoinEntry.Any(e => e.OrganisationId == OrganisationId && e.UserId == currentUserId && e.OrganisationAdmin);
         }
         
         public static async Task<bool> CurrentUserHasOwnerPermissions(HttpRequest Request, int OrganisationId)
         {
+            validateUserOrganisationJoinEntries();
             var currentUserId = (await GetCurrentUserFromRequest(Request)).Id;
             return _appDbContext.OrganisationUserJoinEntry.Any(e => e.OrganisationId == OrganisationId && e.UserId == currentUserId && e.OrganisationOwner);
+        }
+        
+        public static async void validateUserOrganisationJoinEntries()
+        {
+            foreach (var entry in _appDbContext.OrganisationUserJoinEntry.ToList())
+            {
+                if (! _appDbContext.Organisations.Any(o => o.Id == entry.OrganisationId))
+                {
+                    _logger.LogError($"Organisation {entry.OrganisationId} does not exist, but OrganisationUserJoinEntry {entry.Id} refers to it");
+                }
+                
+                if (! _appDbContext.Users.Any(u => u.Id == entry.UserId))
+                {
+                    _logger.LogError($"User {entry.UserId} does not exist, but OrganisationUserJoinEntry {entry.Id} refers to it");
+                }
+            }
         }
 
         public static async Task<AppUser> GetCurrentUserFromRequest(HttpRequest Request){
