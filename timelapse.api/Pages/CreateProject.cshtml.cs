@@ -52,7 +52,7 @@ namespace timlapse.api.Pages
             
             if (! _appDbContext.OrganisationUserJoinEntry.Any(e => e.OrganisationId == OrganisationId && e.UserId == _userManager.GetUserId(User) && e.OrganisationAdmin))
             {
-                _logger.LogWarning($"Unauthorised project creation attempt for organisation {OrganisationId} by user {_userManager.GetUserId(User)} (\"{_userManager.GetUserName(User)}\")")
+                _logger.LogWarning($"Unauthorised project creation attempt for organisation {OrganisationId} by user {_userManager.GetUserId(User)} (\"{_userManager.GetUserName(User)}\")");
                 return NotFound($"Not authorised to create projects for organisation {OrganisationId}");
             }
 
