@@ -15,8 +15,9 @@ public class OrganisationUserJoinEntry
     // Admins can:
     //  - Add users to the organisation with no admin or owner perms
     //  - Remove users without admin or owner perms
+    //  - Add and manage projects
     public bool OrganisationOwner { get; set; }
     // Owners can:
     //  - Change organisation member perms
-    //  - Remove users regardless of permissions DEVDO stop owners from removing themselves
+    //  - Remove users regardless of permissions
 }
