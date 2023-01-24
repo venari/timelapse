@@ -14,10 +14,11 @@
             <th scope="col"> Manage </th>
         </thead>
         <tbody>
-            @foreach (var item in Model.Organisations)
+            @foreach (var item in Model.Organisations.Where(o => !o.softDeleteFlag))
             {
                 var Owner = "Unknown";
                 var OwnerJoin = Model.OrgUserJoins.Where(e => (e.OrganisationId == item.Id) && (e.OrganisationOwner));
+                @* DEVDO clean up redundant logic *@
                 if (OwnerJoin != null && OwnerJoin.Count() > 0) {
                     Owner = Model.Users.First(u => u.Id == OwnerJoin.First().UserId).Email ?? "Unknown";
                 } else {
