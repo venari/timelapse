@@ -133,12 +133,12 @@
                 function addUser() {
                     var email = document.getElementById("addUserEmail").value
                     if ( email == "") { return }
-                    var url = "/api/Organisation/AddUserToOrganisation?UserEmail=" + encodeURIComponent(email) + "&OrganisationId=@(Model.Org.Id)"
+                    url = "/api/Organisation/AddUserToOrganisation?UserEmail=" + encodeURIComponent(email) + "&OrganisationId=@(Model.Org.Id)"
                     makeReq(url, document.getElementById("UserEmailErrorMessage"))
                 }
                 
                 function removeUser(UserId) {
-                    var url = "/api/Organisation/RemoveUserFromOrganisation?UserId=" + encodeURIComponent(UserId) + "&OrganisationId=@(Model.Org.Id)"
+                    url = "/api/Organisation/RemoveUserFromOrganisation?UserId=" + encodeURIComponent(UserId) + "&OrganisationId=@(Model.Org.Id)"
                     makeReq(url, document.getElementById('RemoveButtonError' + UserId))
                 }
             </script>
@@ -150,7 +150,7 @@
                 function togglePerms(UserId, Permission) {
                     checkbox = document.getElementById('AdminCheckbox'+UserId)
 
-                    var url = "/api/Organisation/ChangeUserPermission?UserId=" + encodeURIComponent(UserId) + "&OrganisationId=@(Model.Org.Id)" + "&Value=" + checkbox.checked + "&PermissionName=" + Permission
+                    url = "/api/Organisation/ChangeUserPermission?UserId=" + encodeURIComponent(UserId) + "&OrganisationId=@(Model.Org.Id)" + "&Value=" + checkbox.checked + "&PermissionName=" + Permission
                     makeReq(url, document.getElementById('AdminCheckboxError' + UserId))
                 }
             </script>
@@ -168,14 +168,21 @@
     <div>
         @* placeholder *@
         <h1> Projects </h1>
-        <table>
+        <table class="table">
             <thead>
                 <th scope="col"> Name </th>
+                <th scope="col"> Manage </th>
             </thead>
             <tbody>
                 @foreach (var item in Model.Org.Projects)
                 {
                     <tr>
+                        <td>
+                            @(item.Name)
+                        </td>
+                        <td>
+                            <a href="/ManageProject?Id=@(item.Id)"></a>
+                        </td>
                     </tr>
                 }
             </tbody>
@@ -187,8 +194,43 @@
             </p>
         }
         <p>
-            Make project link goes here
+            <a href="/CreateProject?OrganisationId=@(Model.Org.Id)">
+                <button id="CreateProjectButton" class="btn btn-primary"> Create new project </button>
+            </a>
         </p>
     </div>
 
+    @if (Model.UserIsOwner) {
+        <div>
+            <h1> Delete Organisation </h1>
+            <button class="btn btn-danger" id="DeleteOrganisationButton" data-bs-toggle="modal" data-bs-target="#deleteOrganisationModal">Delete Organisation</button> <br>
+        </div>
+        <div class="modal fade" id="deleteOrganisationModal" @* tabindex="-1" *@ arie-labelledby="deleteOrganisationModalLabel" aria-hidden="true">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="exampleModalLabel">Delete Organisation?</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        @* DEVDO fill in placeholder values *@
+                        Organisation will be soft-deleted. <br>
+                        Contact [site admin] to recover organisation. <br>
+                        Soft deleted Organisations are deleted in [placeholder] days.
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                        <button id="DeleteOrganisationButton" type="button" class="btn btn-danger" onclick="deleteOrganisation()">Delete Organisation</button>
+                        <label class="text-danger" id="DeleteOrganisationError"></label>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <script>
+            function deleteOrganisation() {
+                url = "/api/Organisation/DeleteOrganisation?OrganisationId=@(Model.Org.Id)";
+                makeReq(url, document.getElementById("DeleteOrganisationError"));
+            }
+        </script>
+    }
 </div>
