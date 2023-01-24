@@ -56,6 +56,10 @@
         </tbody>
     </table>
     <div>
+        @if (Model.DeviceProjectContracts.Count() == 0)
+        {
+            <p> No devices found </p>
+        }
         <a href="/requestDevicePage"> Request a camera </a> @* DEVDO actually make this page *@
     </div>
     <div>
