@@ -45,20 +45,27 @@ namespace timlapse.api.Pages
         public async Task<IActionResult> OnPostAsync(int OrganisationId)
         {
             RetOrganisationId = OrganisationId;
-            if (ModelState.IsValid)
+            if (! ModelState.IsValid)
             {
-                _logger.LogInformation($"Project created by user {_userManager.GetUserId(User)} (\"{_userManager.GetUserName(User)}\")");
-
-                project = new Project();
-                project.Organisation = _appDbContext.Organisations.First(o => o.Id == OrganisationId);
-                project.Name = ProjectName;
-                _appDbContext.Projects.Add(project);
-                
-                await _appDbContext.SaveChangesAsync();
-
-                return Redirect($"ManageProject?Id={project.Id}");
+                return Page();
             }
-            return Page();
+            
+            if (! _appDbContext.OrganisationUserJoinEntry.Any(e => e.OrganisationId == OrganisationId && e.UserId == _userManager.GetUserId(User) && e.OrganisationAdmin))
+            {
+                _logger.LogWarning($"Unauthorised project creation attempt for organisation {OrganisationId} by user {_userManager.GetUserId(User)} (\"{_userManager.GetUserName(User)}\")")
+                return NotFound($"Not authorised to create projects for organisation {OrganisationId}");
+            }
+
+            _logger.LogInformation($"Project created by user {_userManager.GetUserId(User)} (\"{_userManager.GetUserName(User)}\")");
+
+            project = new Project();
+            project.Organisation = _appDbContext.Organisations.First(o => o.Id == OrganisationId);
+            project.Name = ProjectName;
+            _appDbContext.Projects.Add(project);
+            
+            await _appDbContext.SaveChangesAsync();
+
+            return Redirect($"ManageProject?Id={project.Id}");
         }
     }
 }

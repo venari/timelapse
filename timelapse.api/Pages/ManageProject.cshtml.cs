@@ -45,7 +45,8 @@ namespace timelapse.api.Pages
             var userId = _userManager.GetUserId(User);
             if (! _appDbContext.OrganisationUserJoinEntry.Any(e => e.OrganisationId == Project.OrganisationId && e.UserId == userId))
             {
-                return NotFound($"Not authorised to access projects in organisation with Id {Id}");
+                _logger.LogWarning($"Unauthorised access attempt on project {Project.Id} by user {_userManager.GetUserId(User)} (\"{_userManager.GetUserName(User)}\")");
+                return NotFound($"Not authorised to access project with id {Project.Id}");
             }
 
             return Page();
