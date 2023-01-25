@@ -3,4 +3,126 @@
 @{
 }
 
-Idk, stuff?
+<script>
+    function makeReq(Url, ErrorObject, Reload=true) {
+        fetch(Url, {
+            method: 'POST'
+        })
+        .then((response) => response.body)
+        .then((body) => {
+            const reader = body.getReader()
+            reader.read().then(({done, value}) => {
+                valueString = ''
+                for (i=0; i<value.length; i++) {
+                    valueString = valueString + String.fromCharCode(value[i])
+                }
+                if (valueString.startsWith('FAIL:'))
+                {
+                    console.logError
+                    ErrorObject.innerText = valueString
+                } else if (valueString.startsWith('SUCCEED:'))
+                {
+                    if (Reload) {
+                        location.reload()
+                    }
+                } else {
+                    console.error('Server sent an invalid response:', valueString)
+                }
+            })
+        })
+        .catch(error => console.log('Unable to make request', error))
+    }
+</script>
+
+<div>
+    <h2> Users </h2>
+    <table class="table">
+        <thead>
+            <th scope="col"> Email </th>
+            <th scope="col"> User Id </th>
+            <th scope="col"> Manage </th>
+        </thead>
+        <tbody>
+            @foreach (var user in Model.Users)
+            {
+                <tr>
+                    <td> @Html.DisplayFor(m => user.Email) </td>
+                    <td> @Html.DisplayFor(m => user.Id) </td>
+                    <td> A link goes here </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>
+
+<div>
+    <h2> Organisations </h2>
+    <table class="table">
+        <thead>
+            <th scope="col"> Name </th>
+            <th scope="col"> Id </th>
+            <th scope="col"> Soft Deleted </th>
+            <th scope="col"> Manage </th>
+        </thead>
+        <tbody>
+            @foreach (var org in Model.Organisations)
+            {
+                <tr>
+                    <td> @Html.DisplayFor(m => org.Name) </td>
+                    <td> @Html.DisplayFor(m => org.Id) </td>
+                    <td>
+                        @if (org.SoftDeleteFlag)
+                        {
+                            <input type="checkbox" id="DeleteCheckbox@(org.Id)" onclick="makeReq('/api/Debug/changeOrganisationSoftDeleteFlag?OrganisationId=@(org.Id)&Value=' + document.getElementById('DeleteCheckbox@(org.Id)').checked, document.getElementById('DeleteError@(org.Id)'))" checked/>
+                        } else {
+                            <input type="checkbox" id="DeleteCheckbox@(org.Id)" onclick="makeReq('/api/Debug/changeOrganisationSoftDeleteFlag?OrganisationId=@(org.Id)&Value=' + document.getElementById('DeleteCheckbox@(org.Id)').checked, document.getElementById('DeleteError@(org.Id)'))">
+                        }
+                        <label class="text-danger" id="DeleteError@(org.Id)"></label>
+                    </td>
+                    <td> A link goes here </td>
+                </tr>
+            }
+        </tbody>    
+    </table>
+</div>
+
+<div>
+    <h2> Organisation User Join Entries </h2>
+    <table class="table">
+        <thead>
+            <th scope="col">Email</th>
+            <th scope="col">User Id</th>
+            <th scope="col">Organisation Id</th>
+            <th scope="col">Is Admin</th>
+            <th scope="col">Is Owner</th>
+        </thead>
+        <tbody>
+            @foreach (var entry in Model.OrganisationUserJoinEntries)
+            {
+                <tr>
+                    <td>@(Model.Users.First(x => x.Id == entry.UserId)?.Email)</td>
+                    <td>@entry.UserId</td>
+                    <td>@entry.OrganisationId</td>
+                    <td>
+                        @if (entry.OrganisationAdmin)
+                        {
+                            <input type="checkbox" id="PermissionCheckboxAdmin@(entry.Id)" onclick="makeReq('/api/Debug/changePermission?EntryId=@(entry.Id)&Permission=Admin&Value=' + document.getElementById('PermissionCheckboxAdmin@(entry.Id)').checked, document.getElementById('PermissionErrorAdmin@(entry.Id)'))" checked/>
+                        } else {
+                            <input type="checkbox" id="PermissionCheckboxAdmin@(entry.Id)" onclick="makeReq('/api/Debug/changePermission?EntryId=@(entry.Id)&Permission=Admin&Value=' + document.getElementById('PermissionCheckboxAdmin@(entry.Id)').checked, document.getElementById('PermissionErrorAdmin@(entry.Id)'))"/>
+                        }
+                        <label class="text-danger" id="PermissionErrorAdmin@(entry.Id)"></label>
+                    </td>
+                    <td>
+                        @if (entry.OrganisationOwner)
+                        {
+                            <input type="checkbox" id="PermissionCheckboxOwner@(entry.Id)" onclick="makeReq('/api/Debug/changePermission?EntryId=@(entry.Id)&Permission=Owner&Value=' + document.getElementById('PermissionCheckboxOwner@(entry.Id)').checked, document.getElementById('PermissionErrorOwner@(entry.Id)'))" checked/>
+                        } else {
+                            <input type="checkbox" id="PermissionCheckboxOwner@(entry.Id)" onclick="makeReq('/api/Debug/changePermission?EntryId=@(entry.Id)&Permission=Owner&Value=' + document.getElementById('PermissionCheckboxOwner@(entry.Id)').checked, document.getElementById('PermissionErrorOwner@(entry.Id)'))"/>
+                        }
+                        <label class="text-danger" id="PermissionErrorOwner@(entry.Id)"></label>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>
