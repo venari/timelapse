@@ -9,13 +9,13 @@ using Microsoft.AspNetCore.Authorization;
 
 namespace timelapse.api.Pages;
 
+[Authorize]
 public class IndexModel : PageModel
 {
     private readonly ILogger<IndexModel> _logger;
     private AppDbContext _appDbContext;
     private StorageHelper _storageHelper;
 
-    [Authorize]
     public List<Device> devices {get;}
     public string SasToken {get; private set;}
 
