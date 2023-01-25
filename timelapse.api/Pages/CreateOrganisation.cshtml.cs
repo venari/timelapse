@@ -8,7 +8,7 @@ using Microsoft.AspNetCore.Authorization;
 
 namespace timelapse.api.Pages
 {
-    [Authorize]
+    [Authorize(Roles = "Admin")]
     public class CreateOrganisationModel : PageModel
     {
         private readonly UserManager<AppUser> _userManager;

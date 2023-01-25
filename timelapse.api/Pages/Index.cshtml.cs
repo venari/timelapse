@@ -5,6 +5,7 @@ using timelapse.infrastructure;
 using Microsoft.EntityFrameworkCore;
 using timelapse.api.Helpers;
 using Microsoft.Extensions.Caching.Memory;
+using Microsoft.AspNetCore.Authorization;
 
 namespace timelapse.api.Pages;
 
@@ -14,6 +15,7 @@ public class IndexModel : PageModel
     private AppDbContext _appDbContext;
     private StorageHelper _storageHelper;
 
+    [Authorize]
     public List<Device> devices {get;}
     public string SasToken {get; private set;}
 

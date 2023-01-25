@@ -7,9 +7,11 @@ using timelapse.core.models;
 using System.ComponentModel.DataAnnotations;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Authorization;
 
 namespace timelapse.api.Pages
 {
+    [Authorize]
     public class OrganisationsModel : PageModel
     {
         private readonly UserManager<AppUser> _userManager;
@@ -18,6 +20,7 @@ namespace timelapse.api.Pages
         public List<Organisation> Organisations;
         public List<OrganisationUserJoinEntry> OrgUserJoins;
         public List<AppUser> Users;
+        public String CurrentUserId { get; set; }
         private AppDbContext _appDbContext;
 
         public OrganisationsModel(
@@ -38,6 +41,7 @@ namespace timelapse.api.Pages
 
         public IActionResult OnGet()
         {
+            CurrentUserId = _userManager.GetUserId(User);
             return Page();
         }
     }
