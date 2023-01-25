@@ -14,7 +14,7 @@
             <th scope="col"> Manage </th>
         </thead>
         <tbody>
-            @foreach (var item in Model.Organisations.Where(o => !o.softDeleteFlag))
+            @foreach (var item in Model.Organisations.Where(o => !o.SoftDeleteFlag))
             {
                 var Owner = "Unknown";
                 var OwnerJoin = Model.OrgUserJoins.Where(e => (e.OrganisationId == item.Id) && (e.OrganisationOwner));

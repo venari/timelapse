@@ -135,12 +135,12 @@ namespace timelapse.api
 
             var organisation = _appDbContext.Organisations.First(o => o.Id == OrganisationId);
             
-            if (organisation.softDeleteFlag)
+            if (organisation.SoftDeleteFlag)
             {
                 return "FAIL: organisation already soft-deleted";
             }
 
-            organisation.softDeleteFlag = true;
+            organisation.SoftDeleteFlag = true;
             _appDbContext.SaveChanges();
             return "SUCCEED: organisation soft-deleted";
         }

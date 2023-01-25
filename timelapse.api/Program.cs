@@ -14,7 +14,10 @@ builder.Services.AddRazorPages();
 builder.Services.AddDefaultIdentity<AppUser>(options => 
 {
     options.SignIn.RequireConfirmedAccount = true;
-}).AddEntityFrameworkStores<AppDbContext>();
+})
+    .AddRoles<IdentityRole>()
+    .AddEntityFrameworkStores<AppDbContext>();
+
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
