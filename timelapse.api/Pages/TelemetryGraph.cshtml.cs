@@ -4,9 +4,11 @@ using timelapse.core.models;
 using timelapse.infrastructure;
 using Microsoft.EntityFrameworkCore;
 using timelapse.api.Helpers;
+using Microsoft.AspNetCore.Authorization;
 
 namespace timelapse.api.Pages;
 
+[Authorize]
 public class TelemetryGraphModel : PageModel
 {
     private readonly ILogger<TelemetryGraphModel> _logger;

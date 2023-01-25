@@ -181,6 +181,7 @@ docker exec -it dev-postgres bash
 
 User Secrets:
 ```
+dotnet tool install dotnet-user-secrets
 dotnet user-secrets --project timelapse.api init
 dotnet user-secrets --project timelapse.api set "ConnectionStrings:DefaultConnection" "Host=localhost;Port=5432;User ID=postgres;Password=Pass2020!;Database=timelapse"
 ```

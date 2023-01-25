@@ -1,0 +1,55 @@
+﻿@page
+@model timelapse.api.Pages.OrganisationsModel
+@using timelapse.core.models;
+@using timelapse.infrastructure;
+@{
+    ViewData["Title"] = "Organisations";
+}
+
+<div>
+    <table class="table">
+        <thead>
+            <th scope="col"> Name </th>
+            <th scope="col"> Owner </th>
+            <th scope="col"> Manage </th>
+        </thead>
+        <tbody>
+            @foreach (var item in Model.Organisations.Where(o => !o.SoftDeleteFlag && (Model.OrgUserJoins.Any(u => u.OrganisationId == o.Id && u.UserId == Model.CurrentUserId))))
+            {
+                var Owner = "Unknown";
+                var OwnerJoin = Model.OrgUserJoins.Where(e => (e.OrganisationId == item.Id) && (e.OrganisationOwner));
+                @* DEVDO clean up redundant logic *@
+                if (OwnerJoin != null && OwnerJoin.Count() > 0) {
+                    Owner = Model.Users.First(u => u.Id == OwnerJoin.First().UserId).Email ?? "Unknown";
+                } else {
+                    Owner = "Empty";
+                }
+                    <tr>
+                        <td>
+                            @Html.DisplayFor(modelItem => item.Name)
+                        </td>
+                        <td>
+                            @Owner
+                        </td>
+                        <td>
+                            <a asp-page="./ManageOrganisation" asp-route-id="@item.Id">Manage Organisation</a>
+                        </td>
+                    </tr>
+            }
+        </tbody>
+    </table>
+    @if (Model.Organisations.Count() == 0)
+    {
+        <p>No organisations found.</p>
+    }
+    @if (User.Identity.IsAuthenticated)
+    {
+        <a asp-page="./Index">Back to Home</a> <br>
+        <a asp-page="./CreateOrganisation">Create New Organisation</a>
+    }
+    else
+    {
+        <a asp-page="./Index"> Back to Home </a>
+        <p> Log in to create an organisation </p>
+    }
+</div>

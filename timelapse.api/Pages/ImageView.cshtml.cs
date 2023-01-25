@@ -5,9 +5,11 @@ using timelapse.infrastructure;
 using Microsoft.EntityFrameworkCore;
 using timelapse.api.Helpers;
 using Microsoft.Extensions.Caching.Memory;
+using Microsoft.AspNetCore.Authorization;
 
 namespace timelapse.api.Pages;
 
+[Authorize]
 public class ImageViewModel : PageModel
 {
     private readonly ILogger<ImageViewModel> _logger;
