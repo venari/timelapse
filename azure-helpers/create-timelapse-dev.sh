@@ -158,7 +158,7 @@ fi
 
 # STORAGE_KEY1=$(az storage account keys list --account-name $STORAGE_ACCOUNT_NAME --resource-group $AZURE_RESOURCE_GROUP --query "[?keyName=='key1'].{value:value}[0].value")
 # STORAGE_KEY2=$(az storage account keys list --account-name $STORAGE_ACCOUNT_NAME --resource-group $AZURE_RESOURCE_GROUP --query "[?keyName=='key2'].{value:value}[0].value")
-STORAGE_CONNECTION_STRING=$(az storage account show-connection-string --name $STORAGE_ACCOUNT_NAME --key primary --query "connectionString" -o tsv)
+STORAGE_CONNECTION_STRING=$(az storage account show-connection-string --name $STORAGE_ACCOUNT_NAME --resource-group $AZURE_RESOURCE_GROUP --key primary --query "connectionString" -o tsv)
 
 
 echo "Checking if Storage Container $STORAGE_CONTAINER_NAME already exists...."
@@ -174,7 +174,9 @@ fi
 
 az webapp config appsettings set --name $AZURE_APP_NAME --resource-group $AZURE_RESOURCE_GROUP --settings STORAGE_CONNECTION_STRING=$STORAGE_CONNECTION_STRING --output none
 az webapp config appsettings set --name $AZURE_APP_NAME --resource-group $AZURE_RESOURCE_GROUP --settings STORAGE_CONTAINER_NAME=$STORAGE_CONTAINER_NAME --output none
+az webapp config appsettings set --name $AZURE_APP_NAME --resource-group $AZURE_RESOURCE_GROUP --settings SendgridAPIKey=$SendgridAPIKey --output none
 dotnet user-secrets --project timelapse.api set "STORAGE_CONNECTION_STRING" $STORAGE_CONNECTION_STRING
+dotnet user-secrets --project timelapse.api set "SendgridAPIKey" "$SendgridAPIKey"
 # az webapp config appsettings set --name $AZURE_APP_NAME --resource-group $AZURE_RESOURCE_GROUP --settings STORAGE_ACCOUNT_NAME=$STORAGE_ACCOUNT_NAME
 # az webapp config appsettings set --name $AZURE_APP_NAME --resource-group $AZURE_RESOURCE_GROUP --settings STORAGE_CONTAINER_NAME=$STORAGE_CONTAINER_NAME
 # az webapp config appsettings set --name $AZURE_APP_NAME --resource-group $AZURE_RESOURCE_GROUP --settings STORAGE_KEY1=$STORAGE_KEY1
