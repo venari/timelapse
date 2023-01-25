@@ -21,7 +21,6 @@
             <tbody>
                 @{
                     var MemberEntries = Model.Org.OrganisationUserJoinEntries.ToList();
-                    MemberEntries.OrderBy(o => o.Id); // DEVDO find out why this seems to change randomly
                 }
                 @foreach (var item in MemberEntries)
                 {
@@ -117,7 +116,7 @@
                         }
                     })
                 })
-                .catch(error => console.log('Unable to add user to organisation', error))
+                .catch(error => console.log('Unable to make request', error))
             }
         </script>
         @if (Model.UserIsAdmin)

@@ -37,8 +37,8 @@ namespace timelapse.api.Pages
             _appDbContext = appDbContext;
             
             Organisations = _appDbContext.Organisations.ToList();
-            OrgUserJoins = _appDbContext.OrganisationUserJoinEntry.ToList();
-            Users = _appDbContext.Users.ToList();
+            OrgUserJoins = _appDbContext.OrganisationUserJoinEntry.OrderBy(e => e.UserId).ToList();
+            Users = _appDbContext.Users.OrderBy(u => u.Id).ToList();
             Projects = _appDbContext.Projects.ToList();
         }
 
