@@ -3,7 +3,7 @@
     "logToAPI": true,
 
     "apiUrl": "https://timelapse-dev.azurewebsites.net/api/",
-    "logFilePath": "/home/leigh/logs/timelapse.log",
+    "logFilePath": "/home/pi/logs/timelapse.log",
 
     "shutdown": false,
     "tempWarning": 50,
