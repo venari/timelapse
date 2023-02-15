@@ -10,19 +10,14 @@ Debian version 10 - https://downloads.raspberrypi.org/raspios_oldstable_lite_arm
 
 
 Raspberry Pi OS Lite (32 bit - Pi Zero W)
-Debian version 11 - https://downloads.raspberrypi.org/raspios_oldstable_lite_armhf/images/raspios_oldstable_lite_armhf-2022-01-28/2022-01-28-raspios-buster-armhf-lite.zip
+Debian version 11 (bullseye) - https://downloads.raspberrypi.org/raspios_lite_armhf/images/raspios_lite_armhf-2022-09-26/2022-09-22-raspios-bullseye-armhf-lite.img.xz
 
 Raspberry Pi OS Lite (64 bit - Pi Zero 2 W
 Debian version 11 - https://downloads.raspberrypi.org/raspios_lite_arm64/images/raspios_lite_arm64-2022-01-28/2022-01-28-raspios-bullseye-arm64-lite.zip
 
-Burn using Etcher.
+Burn using Pi Imager.
 
-Mount SD card
-```
-cp ~/wpa_supplicant.conf /Volumes/boot
-touch /Volumes/boot/ssh
-diskutil unmount /Volumes/boot
-```
+Set username and password, and authentication methods as desired.
 
 Turn on and find the pi
 Pi Zero W 2:
@@ -41,15 +36,18 @@ raspberrypi.lan (192.168.86.32) at b8:27:eb:94:ac:b1 on en0 ifscope [ethernet]
 ```
 sudo apt-get update
 sudo apt-get upgrade
+# Note - Camera module v3 won't work until you've done this update, and it will take 5-10 mins
 
-# Enable camera interface
-sudo raspi-config nonint do_camera 0
+sudo apt-get install git pijuice-base python3-pip -y
+sudo apt install -y python3-picamera2 --no-install-recommends
 
-sudo apt-get install git pijuice-base gphoto2 python3-pip -y
+#S Set hostname
+<!-- sudo hostname timelapse-pi-zero-w-v1-A -->
+sudo hostnamectl set-hostname timelapse-pi-zero-w-v1-A.local
+sudo shutdown -r now
 
-pip3 install picamera
 
-# Set timezone
+# Set timezone (if necessary)
 sudo timedatectl set-timezone Pacific/Auckland
 
 mkdir -p dev
@@ -67,6 +65,16 @@ crontab -e
 @reboot /usr/bin/bash /home/pi/dev/timelapse/scripts/uploadPending.sh 
 ```
 
+# Raspberry Pi Camera Module v3
+
+- 12MP sensor using IMX708
+https://www.raspberrypi.com/documentation/computers/camera_software.html
+Camera Module 3 (IMX708)
+Ensure software is upgraded (above)
+<!-- Add following to /boot/config.txt
+```
+dtoverlay=imx708
+``` -->
 # preview image over VNC
 https://www.youtube.com/watch?v=dbBWyeHbGs0&ab_channel=WillyKjellstrom
 
