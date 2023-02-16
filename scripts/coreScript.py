@@ -1,7 +1,8 @@
 import subprocess
 import json
 import pijuice
-from picamera import PiCamera
+from picamera2 import Picamera2, Preview
+from libcamera import Transform, controls
 import os
 import time
 import shutil
@@ -9,6 +10,7 @@ import datetime
 import sys
 import requests
 import logging
+import pathlib
 
 config = json.load(open('config.json'))
 logFilePath = config["logFilePath"]
@@ -28,6 +30,7 @@ while not os.path.exists('/dev/i2c-1'):
     time.sleep(0.1)
 
 outputImageFolder = '../output/images/'
+workingImageFolder = outputImageFolder + 'working/'
 pendingImageFolder = outputImageFolder + 'pending/'
 uploadedImageFolder = outputImageFolder + 'uploaded/'
 
@@ -142,36 +145,51 @@ def scheduleShutdown():
 def savePhotos():
     os.makedirs(outputImageFolder, exist_ok = True)
     os.makedirs(pendingImageFolder, exist_ok = True)
+    os.makedirs(workingImageFolder, exist_ok = True)
     # txtTime = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
     try:
-        logging.debug('creating camera object...')
-        with PiCamera() as camera:
+        #with Picamera2() as camera:
 
-            while True:
+        #    while True:
+        while True:
+            logging.debug('creating camera object...')
+            with Picamera2() as camera:
+
                 config = json.load(open('config.json'))
-                camera.vflip = config['camera.vflip']
-                camera.hflip = config['camera.hflip']
-                camera.resolution = (config['camera.resolution.width'], config['camera.resolution.height'])
-                camera.rotation = config['camera.rotation']
+                #camera_config = camera.create_preview_configuration()
+                camera_config = camera.create_still_configuration()
+                camera_config["transform"] = Transform(vflip = config['camera.vflip'], hflip = config['camera.hflip'])
+                camera_config["size"] = (config['camera.resolution.width'], config['camera.resolution.height'])
+                logging.debug(camera_config["size"])
+                camera.set_controls({"AfMode": controls.AfModeEnum.Manual, "LensPosition": config['camera.lensposition']})
+                # camera.rotation = config['camera.rotation']
+                camera.configure(camera_config)
 
                 logging.debug('beginning capture')
-                camera.start_preview()
+                #camera.start_preview(Preview.DRM)
+                camera.start()
                 # Camera warm-up time
                 logging.debug('warming up camera...')
                 time.sleep(5)
                 logging.debug('ready')
 
-                IMAGEFILENAME = pendingImageFolder + datetime.datetime.now().strftime('%Y-%m-%d_%H%M%S.jpg')
-                camera.capture(IMAGEFILENAME)
-                logging.debug('image saved')
+                IMAGEFILENAME = workingImageFolder + datetime.datetime.now().strftime('%Y-%m-%d_%H%M%S.jpg')
+                camera.capture_file(IMAGEFILENAME)
+                logging.debug('image saved to working folder')
+                shutil.move(IMAGEFILENAME, pendingImageFolder + pathlib.Path(IMAGEFILENAME).name)
+                logging.debug('image moved to pending folder')
 
-                saveTelemetry()
-                scheduleShutdown()
-                if config['shutdown']:
-                    break
-                else:
-                    time.sleep(config['camera.interval'])
+            logging.debug('destroying camera object')
+
+            saveTelemetry()
+            scheduleShutdown()
+            
+
+            if config['shutdown']:
+                break
+            else:
+                time.sleep(config['camera.interval'])
 
     except Exception as e:
         logging.error("SavePhoto() failed.")
@@ -226,7 +244,7 @@ try:
 
     # Give things a chance to settle down, and also restart savePhotos if it bails
     while True:
-        time.sleep(30)
+        #time.sleep(30)
         savePhotos()
 except Exception as e:
     logging.error("Catastrophic failure.")
