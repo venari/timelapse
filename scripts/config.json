@@ -8,22 +8,15 @@
     "shutdown": false,
     "tempWarning": 50,
 
+    "daytime_starts_at_h": 6,
+    "daytime_ends_at_h": 22,
+
     "camera.vflip": false,
     "camera.hflip": false,
     "camera.rotation": 0,
-    "__camera.resolution.width": 3280,
     "camera.resolution.width": 4608,
-    "_camera.resolution.height": 2464,
-    "_camera.resolution.height": 1845,
     "camera.resolution.height": 2592,
     "camera.interval": 30,
-    "camera.lensposition": 0,
-
-    "camera.resolution.width___": 4056,
-    "camera.resolution.height___": 3040,
-    "camera.resolution.width__": 3280,
-    "camera.resolution.height__": 2464,
-    "camera.resolution.width_": 1024,
-    "camera.resolution.height_": 768
+    "camera.lensposition": 0
 
 }
