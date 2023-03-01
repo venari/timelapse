@@ -19,6 +19,14 @@ Burn using Pi Imager.
 
 Set username and password, and authentication methods as desired.
 
+Mount SD card
+```
+cp ~/wpa_supplicant.conf /Volumes/boot
+touch /Volumes/boot/ssh
+diskutil unmount /Volumes/boot
+```
+
+
 Turn on and find the pi
 Pi Zero W 2:
 ```
@@ -71,6 +79,15 @@ crontab -e
 https://www.raspberrypi.com/documentation/computers/camera_software.html
 Camera Module 3 (IMX708)
 Ensure software is upgraded (above)
+
+<!-- `camera.lensposition` - 1/distance in metres
+- '0' - infinity
+- '1': 1m
+- `5`: 20cm
+- `10`: 10cm -->
+
+`camera.focus_m`: focus in metres
+
 <!-- Add following to /boot/config.txt
 ```
 dtoverlay=imx708

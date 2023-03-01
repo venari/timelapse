@@ -8,6 +8,7 @@
     "shutdown": false,
     "tempWarning": 50,
 
+    "sleep_during_night": true,
     "daytime_starts_at_h": 6,
     "daytime_ends_at_h": 22,
 
@@ -17,6 +18,6 @@
     "camera.resolution.width": 4608,
     "camera.resolution.height": 2592,
     "camera.interval": 30,
-    "camera.lensposition": 0
+    "camera.focus_m": 100
 
 }

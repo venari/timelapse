@@ -82,7 +82,7 @@ def scheduleShutdown():
 
         setAlarm = True
 
-    if datetime.datetime.now().hour >= config['daytime_ends_at_h'] or datetime.datetime.now().hour < config['daytime_starts_at_h']:
+    if config['sleep_during_night'] == True and (datetime.datetime.now().hour >= config['daytime_ends_at_h'] or datetime.datetime.now().hour < config['daytime_starts_at_h']):
         logging.info("Night time so we're scheduling shutdown")
 
         alarmObj = {
@@ -161,7 +161,22 @@ def savePhotos():
                 camera_config["transform"] = Transform(vflip = config['camera.vflip'], hflip = config['camera.hflip'])
                 camera_config["size"] = (config['camera.resolution.width'], config['camera.resolution.height'])
                 logging.debug(camera_config["size"])
-                camera.set_controls({"AfMode": controls.AfModeEnum.Manual, "LensPosition": config['camera.lensposition']})
+
+                focus_m = config['camera.focus_m']
+
+                logging.debug('focus_m is ' + str(focus_m))
+                
+                if(focus_m < 0.1):
+                    focus_m = 0.1
+                
+                if(focus_m > 100):
+                    focus_m == 100
+
+                lensposition = 1/focus_m
+
+                logging.debug('setting lens position to ' + str(lensposition))
+
+                camera.set_controls({"AfMode": controls.AfModeEnum.Manual, "LensPosition": lensposition})
                 # camera.rotation = config['camera.rotation']
                 camera.configure(camera_config)
 
@@ -244,6 +259,7 @@ try:
     # Give things a chance to settle down, and also restart savePhotos if it bails
     while True:
         #time.sleep(30)
+        saveTelemetry()
         savePhotos()
 except Exception as e:
     logging.error("Catastrophic failure.")
