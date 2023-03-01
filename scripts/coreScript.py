@@ -259,6 +259,8 @@ try:
     while True:
         saveTelemetry()
         savePhotos()
+        saveTelemetry()
+        logging.warn("Bailed out of savePhotos() - let's pause to catch our breath...")
         # If we get here something went wrong. Let's pause for a bit and try again.
         time.sleep(30)
 except Exception as e:
