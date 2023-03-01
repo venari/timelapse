@@ -165,7 +165,7 @@ def savePhotos():
                 focus_m = config['camera.focus_m']
 
                 logging.debug('focus_m is ' + str(focus_m))
-                
+
                 if(focus_m < 0.1):
                     focus_m = 0.1
                 
@@ -256,11 +256,11 @@ try:
         logging.info('Setting failsafe power off for 2 minutes 30 seconds from now.')
         pj.power.SetPowerOff(150)   # Fail safe turn the thing off
 
-    # Give things a chance to settle down, and also restart savePhotos if it bails
     while True:
-        #time.sleep(30)
         saveTelemetry()
         savePhotos()
+        # If we get here something went wrong. Let's pause for a bit and try again.
+        time.sleep(30)
 except Exception as e:
     logging.error("Catastrophic failure.")
     scheduleShutdown()
