@@ -61,6 +61,7 @@ sudo timedatectl set-timezone Pacific/Auckland
 mkdir -p dev
 cd dev
 git clone https://github.com/venari/timelapse.git
+git config pull.rebase false
 cd timelapse
 ```
 
@@ -398,3 +399,8 @@ sudo tailscale up
 
 
 
+# Credits
+
+3D models
+
+- Raspberry Pi Camera Module v3 STL files: https://www.printables.com/model/368779-raspberry-pi-camera-module-3-v3/
