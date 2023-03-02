@@ -12,9 +12,8 @@
     "daytime_starts_at_h": 6,
     "daytime_ends_at_h": 22,
 
-    "camera.vflip": false,
-    "camera.hflip": false,
-    "camera.rotation": 0,
+    "camera.vflip": true,
+    "camera.hflip": true,
     "camera.resolution.width": 4608,
     "camera.resolution.height": 2592,
     "camera.interval": 30,
