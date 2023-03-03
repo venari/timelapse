@@ -1,11 +1,5 @@
 #!/bin/bash
 
-# Query user for hostname, provide a default value
-read -p "Enter hostname: " -i timelapse-pi- -e hostname
-echo Setting hostname to $hostname
-sudo hostnamectl set-hostname $hostname
-
-
 echo Updating....
 sudo apt-get update
 
@@ -46,3 +40,13 @@ sudo chown pijuice:pijuice /var/lib/pijuice/pijuice_config.JSON
 echo Installing Tailscale...
 curl -fsSL https://tailscale.com/install.sh | sh
 sudo tailscale up
+
+# Query user for hostname, provide a default value
+read -p "Enter hostname: " -i timelapse-pi- -e hostname
+echo Setting hostname to $hostname
+sudo hostnamectl set-hostname $hostname
+
+echo We need to reboot
+echo "Press any key to reboot"
+read -n 1 -s
+sudo reboot
