@@ -12,6 +12,12 @@ sudo apt-get install vim byobu -y
 echo Setting timezone...
 sudo timedatectl set-timezone Pacific/Auckland
 
+# Query user for hostname, provide a default value
+read -p "Enter hostname: " -i timelapse-pi- -e hostname
+echo Setting hostname to $hostname
+sudo hostnamectl set-hostname $hostname
+
+
 echo Cloning repo...
 # Check if dev folder exists
 if [ ! -d "/home/pi/dev/timelapse" ]; then
