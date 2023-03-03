@@ -43,7 +43,7 @@ raspberrypi.lan (192.168.86.32) at b8:27:eb:94:ac:b1 on en0 ifscope [ethernet]
 
 ```
 <!-- curl -fsSL https://raw.githubusercontent.com/venari/timelapse/main/install.sh | sh -->
-curl -fsSL https://raw.githubusercontent.com/venari/timelapse/raspberry-pi-camera-v3/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/venari/timelapse/feature/raspberry-pi-camera-v3/install.sh | sh
 
 ```
 
