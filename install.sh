@@ -41,7 +41,7 @@ curl -fsSL https://tailscale.com/install.sh | sh
 sudo tailscale up
 
 # Query user for hostname, provide a default value
-read -p "Enter hostname: " -i timelapse-pi- -e hostname
+read -p "Enter hostname: " -i sediment-pi- -e hostname
 echo Setting hostname to $hostname
 sudo hostnamectl set-hostname $hostname
 
