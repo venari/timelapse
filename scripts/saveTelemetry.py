@@ -24,6 +24,7 @@ logging.info("Starting up saveTelemetry.py...")
 
 # clock
 while not os.path.exists('/dev/i2c-1'):
+    logging.info("dev i2c-1 doesn't exist")
     time.sleep(0.1)
 
 outputImageFolder = '../output/images/'
@@ -36,7 +37,9 @@ pendingTelemetryFolder = outputTelemetryFolder + 'pending/'
 uploadedTelemetryFolder = outputTelemetryFolder + 'uploaded/'
 
 # pijuice
+time.sleep(10)
 pj = pijuice.PiJuice(1, 0x14)
+logging.info("Starting up saveTelemetry.py 3b...")
 
 def getSerialNumber():
   # Extract serial from cpuinfo file
@@ -167,7 +170,6 @@ def saveTelemetry():
     except Exception as e:
         logging.error("saveTelemetry() failed.")
         logging.error(e)
-
 
 try:
     logging.debug('setting sys clock from RTC...')
