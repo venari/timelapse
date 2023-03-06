@@ -125,7 +125,7 @@ def scheduleShutdown():
                 logging.info('Sleeping and retrying for wakeup...\n')
                 time.sleep(10)
             else:
-                logging.debug('Alarm set for ' + str(pj.rtcAlarm.GetAlarm()))
+                logging.debug('Wakeup set for ' + str(pj.rtcAlarm.GetAlarm()))
                 wakeUpEnabled = True
 
         logging.info('Shutting down...')
@@ -188,10 +188,6 @@ try:
         saveTelemetry()
         scheduleShutdown()
         time.sleep(60)
-
-        logging.warn("Bailed out of savePhotos() - let's pause to catch our breath...")
-        # If we get here something went wrong. Let's pause for a bit and try again.
-        time.sleep(30)
 except Exception as e:
     logging.error("Catastrophic failure.")
     scheduleShutdown()
