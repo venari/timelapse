@@ -11,7 +11,7 @@
     },
     "min_charge": {
       "enabled": true,
-      "threshold": 10
+      "threshold": 2
     },
     "min_bat_voltage": {
       "enabled": false,
