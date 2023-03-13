@@ -15,15 +15,14 @@ Debian version 11 (bullseye) - https://downloads.raspberrypi.org/raspios_lite_ar
 Raspberry Pi OS Lite (64 bit - Pi Zero 2 W
 Debian version 11 - https://downloads.raspberrypi.org/raspios_lite_arm64/images/raspios_lite_arm64-2022-01-28/2022-01-28-raspios-bullseye-arm64-lite.zip
 
-Burn using Pi Imager.
+Burn using Pi Imager. Give a default name, but you can change this inthe install script below.
 
 Set username and password, and authentication methods as desired.
 
 Mount SD card
 ```
-cp ~/wpa_supplicant.conf /Volumes/boot
-touch /Volumes/boot/ssh
-diskutil unmount /Volumes/boot
+cp ~/wpa_supplicant.conf /Volumes/bootfs
+diskutil unmount /Volumes/bootfs
 ```
 
 
@@ -334,6 +333,51 @@ Note - Wake up should be automatically enabled in `saveTelemetry.py`.
 ```
 
 # Battery Profiles
+
+[Headway 38120s 10ah lifepo4 cell](https://evshop.eu/en/batteries/213-headway-lifepo4-38120s-32v-10ah.html)
+
+```
+
+░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+░░░░░┌───────────────────────── PiJuice CLI ────────────────────────┐░░░░░
+░░░░░│  Battery settings                                            │░░░░░
+░░░░░│                                                              │░░░░░
+░░░░░│  Status: Custom profile by: HOST                             │░░░░░
+░░░░░│  < Profile: CUSTOM       >                                   │░░░░░
+░░░░░│                                                              │░░░░░
+░░░░░│  [X] Custom                                                  │░░░░░  <-- Set to Custom
+░░░░░│  Chemistry:                LIFEPO4                           │░░░░░  <-- Set to LIFEPO4
+░░░░░│  Capacity [mAh]:           10000                             │░░░░░  <-- Set to 10000
+░░░░░│  Charge current [mA]:      2500                              │░░░░░  <-- Set to 2500
+░░░░░│  Termination current [mA]: 50                                │░░░░░
+░░░░░│  Regulation voltage [mV]:  3600                              │░░░░░  <-- Set to 3600
+░░░░░│  Cutoff voltage [mV]:      2000                              │░░░░░  <-- Set to 2000
+░░░░░│  Cold temperature [C]:     0                                 │░░░░░
+░░░░░│  Cool temperature [C]:     2                                 │░░░░░
+░░░░░│  Warm temperature [C]:     49                                │░░░░░
+░░░░░│  Hot temperature [C]:      65                                │░░░░░
+░░░░░│  NTC B constant [1k]:      3450                              │░░░░░
+░░░░░│  NTC resistance [ohm]:     10000                             │░░░░░
+░░░░░│  OCV10 [mV]:               3111                              │░░░░░  <-- Set to 3111
+░░░░░│  OCV50 [mV]:               3243                              │░░░░░  <-- Set to 3243
+░░░░░│  OCV90 [mV]:               3283                              │░░░░░  <-- Set to 3283
+░░░░░│  R10 [mOhm]:               91.0                              │░░░░░  <-- Set to 91
+░░░░░│  R50 [mOhm]:               83.0                              │░░░░░  <-- Set to 83
+░░░░░│  R90 [mOhm]:               76.0                              │░░░░░  <-- Set to 76
+░░░░░│                                                              │░░░░░
+░░░░░│  < Temperature sense: ON_BOARD    >                          │░░░░░
+░░░░░│                                                              │░░░░░
+░░░░░│  < Rsoc estimation: DIRECT_BY_MCU >                          │░░░░░
+░░░░░│                                                              │░░░░░
+░░░░░│  < Refresh        >                                          │░░░░░
+░░░░░│  < Apply settings >                                          │░░░░░
+░░░░░│  < Back           >                                          │░░░░░
+░░░░░└──────────────────────────────────────────────────────────────┘░░░░░
+░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+
+```
+
 
 Ali Express, likely-not-really 10,000mAh battery...
 
