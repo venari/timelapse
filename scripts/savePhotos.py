@@ -79,7 +79,7 @@ def savePhotos():
                     focus_m = 0.1
                 
                 if(focus_m > 100):
-                    focus_m == 100
+                    focus_m = 100
 
                 lensposition = 1/focus_m
 
