@@ -48,6 +48,11 @@ def getSerialNumber():
 
 serialNumber = getSerialNumber()
 
+time.sleep(10)
+pj = pijuice.PiJuice(1, 0x14)
+logging.info("Starting up uploadPending.py 2...")
+
+
 def uploadPendingPhotos():
     try:
         os.makedirs(pendingImageFolder, exist_ok = True)
@@ -105,6 +110,22 @@ def uploadPendingPhotos():
                 logging.debug(json.dumps(json.loads(response.text), indent = 4))
             except json.decoder.JSONDecodeError:
                 logging.debug(response.text)
+
+        if pendingFilesProcessed < 10:
+            logging.info('No more pending images to upload.')
+            power_interval = config['modem.power_interval']
+            if power_interval > 0:
+                logging.info('Current Power Switch:')
+                logging.info(pj.power.GetPowerSwitch())
+                logging.info('Setting Power Switch to Off:')
+                pj.power.SetPowerSwitch(0)
+                logging.info('Sleeping for ' + str(power_interval) + ' seconds...')
+                time.sleep(power_interval)
+                logging.info('Setting Power Switch to 500:')
+                pj.power.SetPowerSwitch(500)
+                logging.info('Power Switch set to 500.')
+                # Delay for 5 seconds to allow modem to power down
+
     except Exception as e:
         logging.error(str(datetime.datetime.now()) + " uploadPendingPhotos() failed.")
         logging.error(e)
