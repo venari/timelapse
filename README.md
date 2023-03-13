@@ -15,15 +15,14 @@ Debian version 11 (bullseye) - https://downloads.raspberrypi.org/raspios_lite_ar
 Raspberry Pi OS Lite (64 bit - Pi Zero 2 W
 Debian version 11 - https://downloads.raspberrypi.org/raspios_lite_arm64/images/raspios_lite_arm64-2022-01-28/2022-01-28-raspios-bullseye-arm64-lite.zip
 
-Burn using Pi Imager.
+Burn using Pi Imager. Give a default name, but you can change this inthe install script below.
 
 Set username and password, and authentication methods as desired.
 
 Mount SD card
 ```
-cp ~/wpa_supplicant.conf /Volumes/boot
-touch /Volumes/boot/ssh
-diskutil unmount /Volumes/boot
+cp ~/wpa_supplicant.conf /Volumes/bootfs
+diskutil unmount /Volumes/bootfs
 ```
 
 
