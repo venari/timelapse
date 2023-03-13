@@ -49,13 +49,13 @@ case $yn in
     [Yy]* ) echo "Changing hostname";
         read -p "Enter new hostname if desired: " -i sediment-pi- -e hostname
         echo Setting hostname to $hostname
-        sudo hostnamectl set-hostname $hostname
+        sudo hostnamectl set-hostname $hostname;;
 
     [Nn]* ) echo "Skipping hostname change"; exit;;
     * ) echo "Please answer yes or no.";;
 esac
 
-echo We need to reboot
+echo We need to reboot to kick off cron jobs
 echo "Press any key to reboot"
 read -n 1 -s
 sudo reboot;;
