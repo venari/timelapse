@@ -49,10 +49,11 @@ case $yn in
         echo Setting hostname to $hostname
         sudo hostnamectl set-hostname $hostname
 
-        echo We need to reboot
-        echo "Press any key to reboot"
-        read -n 1 -s
-        sudo reboot;;
     [Nn]* ) echo "Skipping hostname change"; exit;;
     * ) echo "Please answer yes or no.";;
 esac
+
+echo We need to reboot
+echo "Press any key to reboot"
+read -n 1 -s
+sudo reboot;;
