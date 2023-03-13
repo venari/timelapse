@@ -209,6 +209,7 @@ def deleteOldUploadedImagesAndTelemetry():
 try:
     while True:
 
+      config = json.load(open('config.json'))
       deleteOldUploadedImagesAndTelemetry()
       uploadPendingTelemetry()
       uploadPendingPhotos()
