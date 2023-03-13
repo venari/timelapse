@@ -11,6 +11,8 @@ sudo apt-get install git pijuice-base python3-pip -y
 sudo apt install -y python3-picamera2 --no-install-recommends
 sudo apt-get install vim byobu -y
 
+byobu-enable
+
 echo Setting timezone...
 sudo timedatectl set-timezone Pacific/Auckland
 
