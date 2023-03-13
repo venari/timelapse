@@ -58,4 +58,4 @@ esac
 echo We need to reboot to kick off cron jobs
 echo "Press any key to reboot"
 read -n 1 -s
-sudo reboot;;
+sudo reboot
