@@ -51,7 +51,7 @@ case $yn in
         echo Setting hostname to $hostname
         sudo hostnamectl set-hostname $hostname;;
 
-    [Nn]* ) echo "Skipping hostname change"; exit;;
+    [Nn]* ) echo "Skipping hostname change";;
     * ) echo "Please answer yes or no.";;
 esac
 
