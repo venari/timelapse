@@ -233,7 +233,7 @@ dotnet ef --project timelapse.api database update
 
 # Enable Wake Up and set RTC Time
 
-Note - Wake up should be automatically enabled in `saveTelemetry.py`.
+Note - Wake up should be automatically enabled in `saveTelemetry.py`, but you will need to set the RTC time during installation.
 ```
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
