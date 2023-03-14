@@ -85,9 +85,9 @@ def savePhotos():
 
                 logging.debug('setting lens position to ' + str(lensposition))
 
-                camera.set_controls({"AfMode": controls.AfModeEnum.Manual, "LensPosition": lensposition})
                 # camera.rotation = config['camera.rotation']
                 camera.configure(camera_config)
+                camera.set_controls({"AfMode": controls.AfModeEnum.Manual, "LensPosition": lensposition})
 
                 logging.debug('beginning capture')
                 #camera.start_preview(Preview.DRM)
