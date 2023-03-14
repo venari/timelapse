@@ -1,14 +1,13 @@
 import subprocess
 import json
 import pijuice
-from picamera import PiCamera
 import os
 import time
 import shutil
 import datetime
 import sys
-import requests
 import logging
+import pathlib
 
 config = json.load(open('config.json'))
 logFilePath = config["logFilePath"]
@@ -21,13 +20,15 @@ logging.basicConfig(filename=logFilePath,
                     # encoding='utf-8'
                     )
 # log = logging.getLogger()
-logging.info("Starting up coreScript.py...")
+logging.info("Starting up saveTelemetry.py...")
 
 # clock
 while not os.path.exists('/dev/i2c-1'):
+    logging.info("dev i2c-1 doesn't exist")
     time.sleep(0.1)
 
 outputImageFolder = '../output/images/'
+workingImageFolder = outputImageFolder + 'working/'
 pendingImageFolder = outputImageFolder + 'pending/'
 uploadedImageFolder = outputImageFolder + 'uploaded/'
 
@@ -36,7 +37,9 @@ pendingTelemetryFolder = outputTelemetryFolder + 'pending/'
 uploadedTelemetryFolder = outputTelemetryFolder + 'uploaded/'
 
 # pijuice
+time.sleep(10)
 pj = pijuice.PiJuice(1, 0x14)
+logging.info("Starting up saveTelemetry.py 3b...")
 
 def getSerialNumber():
   # Extract serial from cpuinfo file
@@ -79,8 +82,7 @@ def scheduleShutdown():
 
         setAlarm = True
 
-    # if datetime.datetime.now().hour >=18 or datetime.datetime.now().hour <= 7:
-    if datetime.datetime.now().hour >=20 or datetime.datetime.now().hour <= 6:
+    if config['sleep_during_night'] == True and (datetime.datetime.now().hour >= config['daytime_ends_at_h'] or datetime.datetime.now().hour < config['daytime_starts_at_h']):
         logging.info("Night time so we're scheduling shutdown")
 
         alarmObj = {
@@ -126,7 +128,7 @@ def scheduleShutdown():
                 logging.info('Sleeping and retrying for wakeup...\n')
                 time.sleep(10)
             else:
-                logging.debug('Alarm set for ' + str(pj.rtcAlarm.GetAlarm()))
+                logging.debug('Wakeup set for ' + str(pj.rtcAlarm.GetAlarm()))
                 wakeUpEnabled = True
 
         logging.info('Shutting down...')
@@ -137,45 +139,6 @@ def scheduleShutdown():
         logging.debug('skipping shutdown scheduling because of config.json')
         # Ensure Wake up alarm is *not* enabled - or it will cause pi to reboot
         status = pj.rtcAlarm.SetWakeupEnabled(False)
-
-
-def savePhotos():
-    os.makedirs(outputImageFolder, exist_ok = True)
-    os.makedirs(pendingImageFolder, exist_ok = True)
-    # txtTime = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-
-    try:
-        logging.debug('creating camera object...')
-        with PiCamera() as camera:
-
-            while True:
-                config = json.load(open('config.json'))
-                camera.vflip = config['camera.vflip']
-                camera.hflip = config['camera.hflip']
-                camera.resolution = (config['camera.resolution.width'], config['camera.resolution.height'])
-                camera.rotation = config['camera.rotation']
-
-                logging.debug('beginning capture')
-                camera.start_preview()
-                # Camera warm-up time
-                logging.debug('warming up camera...')
-                time.sleep(5)
-                logging.debug('ready')
-
-                IMAGEFILENAME = pendingImageFolder + datetime.datetime.now().strftime('%Y-%m-%d_%H%M%S.jpg')
-                camera.capture(IMAGEFILENAME)
-                logging.debug('image saved')
-
-                saveTelemetry()
-                scheduleShutdown()
-                if config['shutdown']:
-                    break
-                else:
-                    time.sleep(config['camera.interval'])
-
-    except Exception as e:
-        logging.error("SavePhoto() failed.")
-        logging.error(e)
 
 def saveTelemetry():
     try:
@@ -208,7 +171,6 @@ def saveTelemetry():
         logging.error("saveTelemetry() failed.")
         logging.error(e)
 
-
 try:
     logging.debug('setting sys clock from RTC...')
     subprocess.call(['sudo', 'hwclock', '--hctosys'])
@@ -219,15 +181,15 @@ except Exception as e:
     
 
 try:
-    logging.info('In coreScript.py')
+    logging.info('In saveTelemetry.py')
     if config['shutdown']:
         logging.info('Setting failsafe power off for 2 minutes 30 seconds from now.')
         pj.power.SetPowerOff(150)   # Fail safe turn the thing off
 
-    # Give things a chance to settle down, and also restart savePhotos if it bails
     while True:
-        time.sleep(30)
-        savePhotos()
+        saveTelemetry()
+        scheduleShutdown()
+        time.sleep(60)
 except Exception as e:
     logging.error("Catastrophic failure.")
     scheduleShutdown()

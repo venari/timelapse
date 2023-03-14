@@ -1,0 +1,67 @@
+{
+  "system_task": {
+    "enabled": true,
+    "watchdog": {
+      "enabled": false,
+      "period": 4
+    },
+    "wakeup_on_charge": {
+      "enabled": true,
+      "trigger_level": 20
+    },
+    "min_charge": {
+      "enabled": true,
+      "threshold": 2
+    },
+    "min_bat_voltage": {
+      "enabled": false,
+      "threshold": 3.3
+    },
+    "ext_halt_power_off": {
+      "enabled": true,
+      "period": 20
+    }
+  },
+  "system_events": {
+    "low_charge": {
+      "enabled": true,
+      "function": "SYS_FUNC_HALT_POW_OFF"
+    },
+    "low_battery_voltage": {
+      "enabled": false,
+      "function": "NO_FUNC"
+    },
+    "no_power": {
+      "enabled": false,
+      "function": "NO_FUNC"
+    },
+    "power": {
+      "enabled": false,
+      "function": "NO_FUNC"
+    },
+    "watchdog_reset": {
+      "enabled": false,
+      "function": "NO_FUNC"
+    },
+    "button_power_off": {
+      "enabled": false,
+      "function": "NO_FUNC"
+    },
+    "forced_power_off": {
+      "enabled": false,
+      "function": "NO_FUNC"
+    },
+    "forced_sys_power_off": {
+      "enabled": false,
+      "function": "NO_FUNC"
+    },
+    "sys_start": {
+      "enabled": false,
+      "function": "NO_FUNC"
+    },
+    "sys_stop": {
+      "enabled": false,
+      "function": "NO_FUNC"
+    }
+  }
+}

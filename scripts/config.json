@@ -8,19 +8,17 @@
     "shutdown": false,
     "tempWarning": 50,
 
+    "sleep_during_night": true,
+    "daytime_starts_at_h": 6,
+    "daytime_ends_at_h": 22,
+
+    "modem.power_interval": 600,
+
     "camera.vflip": true,
     "camera.hflip": true,
-    "camera.rotation": 0,
-    "camera.resolution.width": 3280,
-    "_camera.resolution.height": 2464,
-    "camera.resolution.height": 1845,
-    "camera.interval": 10,
-
-    "camera.resolution.width___": 4056,
-    "camera.resolution.height___": 3040,
-    "camera.resolution.width__": 3280,
-    "camera.resolution.height__": 2464,
-    "camera.resolution.width_": 1024,
-    "camera.resolution.height_": 768
+    "camera.resolution.width": 4608,
+    "camera.resolution.height": 2592,
+    "camera.interval": 300,
+    "camera.focus_m": 100
 
 }

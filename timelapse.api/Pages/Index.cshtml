@@ -56,11 +56,12 @@
             <th scope="col">Description</th>
             <th scope="col">Latest Telemetry</th>
             <th scope="col">Battery %</th>
+            <th scope="col"></th>
+            <th scope="col">Power</th>
             <th scope="col">Disk Space (GB)</th>
             <th scope="col">Uptime</th>
             <th scope="col"></th>
             <th scope="col">Temperature (C)</th>
-            <th scope="col">Status</th>
             <th scope="col">Latest Image</th>
             <th scope="col"></th>
             @* <th scope="col"></th> *@
@@ -70,7 +71,7 @@
                 @foreach (var device in Model.devices){
                     <tr>
                         <td>
-                            @Html.DisplayFor(modelItem => device.Id)
+                            <a href="DeviceEdit/@(device.Id)">@(device.Id)</a>
                         </td>
                         <td>
                             @Html.DisplayFor(modelItem => device.Name)
@@ -80,19 +81,27 @@
                         </td>
                         <td>
                             @* @(device.LatestTelemetry!=null?device.LatestTelemetry.Timestamp:"---") *@
-                            <script type="text/javascript">localize('@(device.LatestTelemetryTimestamp.HasValue?device.LatestTelemetryTimestamp.Value.ToString("s"):"---")')</script>
+                            @* <script type="text/javascript">localize('@(device.LatestTelemetryTimestamp.HasValue?device.LatestTelemetryTimestamp.Value.ToString("s"):"---")')</script> *@
                             @if (device.LatestTelemetry!=null && DateTime.UtcNow - device.LatestTelemetry.Timestamp > TimeSpan.FromMinutes(15)){
                                 <span class="badge bg-warning text-dark">Warning - @((DateTime.UtcNow - device.LatestTelemetry.Timestamp).Humanize()) old</span>
+                            } else {
+                                <span>@(device.LatestTelemetryTimestamp.HasValue?device.LatestTelemetryTimestamp.Humanize():"---")</span>
+                                @* <span>@((DateTime.UtcNow - device.LatestTelemetry.Timestamp).Humanize()) ago</span> *@
                             }
 
                         </td>
                         @if(device.LatestTelemetry!=null){
                             <td>@(device.LatestTelemetry.BatteryPercent)</td>
+                            <td>@(device.LatestTelemetry.Status_Battery)</td>
+                            <td>@(device.LatestTelemetry.Status_PowerInput)</td>
+
                             <td>@(device.LatestTelemetry.DiskSpaceFree)</td>
                             @* <td>@(ByteSize.FromGigabytes(device.LatestTelemetry.DiskSpaceFree))</td> *@
                             <td>@(TimeSpan.FromSeconds(device.LatestTelemetry.UptimeSeconds.Value).Humanize())</td>
 
                         } else {
+                            <td>-</td>
+                            <td>-</td>
                             <td>-</td>
                             <td>-</td>
                             <td>-</td>
@@ -174,11 +183,10 @@
                             @(device.LatestTelemetry!=null?device.LatestTelemetry.TemperatureC:"-")
                         </td>
                         <td>
-                            @(device.LatestTelemetry!=null?device.LatestTelemetry.Status:"-")
-                        </td>
-                        <td>
                             @* @(device.LatestImage!=null?device.LatestImage.Timestamp:"---") *@
-                            <script type="text/javascript">localize('@(device.LatestImageTimestamp.HasValue?device.LatestImageTimestamp.Value.ToString("s"):"---")')</script>
+                            @* <script type="text/javascript">localize('@(device.LatestImageTimestamp.HasValue?device.LatestImageTimestamp.Value.ToString("s"):"---")')</script> *@
+                            <span>@(device.LatestImageTimestamp.HasValue?device.LatestImageTimestamp.Humanize():"---")</span>
+
                         </td>
                         <td>
                             @if(device.LatestImage!=null){

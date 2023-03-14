@@ -10,19 +10,21 @@ Debian version 10 - https://downloads.raspberrypi.org/raspios_oldstable_lite_arm
 
 
 Raspberry Pi OS Lite (32 bit - Pi Zero W)
-Debian version 11 - https://downloads.raspberrypi.org/raspios_oldstable_lite_armhf/images/raspios_oldstable_lite_armhf-2022-01-28/2022-01-28-raspios-buster-armhf-lite.zip
+Debian version 11 (bullseye) - https://downloads.raspberrypi.org/raspios_lite_armhf/images/raspios_lite_armhf-2022-09-26/2022-09-22-raspios-bullseye-armhf-lite.img.xz
 
 Raspberry Pi OS Lite (64 bit - Pi Zero 2 W
 Debian version 11 - https://downloads.raspberrypi.org/raspios_lite_arm64/images/raspios_lite_arm64-2022-01-28/2022-01-28-raspios-bullseye-arm64-lite.zip
 
-Burn using Etcher.
+Burn using Pi Imager. Give a default name, but you can change this inthe install script below.
+
+Set username and password, and authentication methods as desired.
 
 Mount SD card
 ```
-cp ~/wpa_supplicant.conf /Volumes/boot
-touch /Volumes/boot/ssh
-diskutil unmount /Volumes/boot
+cp ~/wpa_supplicant.conf /Volumes/bootfs
+diskutil unmount /Volumes/bootfs
 ```
+
 
 Turn on and find the pi
 Pi Zero W 2:
@@ -39,22 +41,33 @@ raspberrypi.lan (192.168.86.32) at b8:27:eb:94:ac:b1 on en0 ifscope [ethernet]
 ```
 
 ```
+<!-- curl -fsSL https://raw.githubusercontent.com/venari/timelapse/main/install.sh | sh -->
+<!-- curl -fsSL "https://raw.githubusercontent.com/venari/timelapse/feature/raspberry-pi-camera-v3/install.sh?$RANDOM" | sh -->
+bash <(curl -fsSL "https://raw.githubusercontent.com/venari/timelapse/feature/raspberry-pi-camera-v3/install.sh?$RANDOM")
+
+```
+
+```
 sudo apt-get update
 sudo apt-get upgrade
+# Note - Camera module v3 won't work until you've done this update, and it will take 5-10 mins
 
-# Enable camera interface
-sudo raspi-config nonint do_camera 0
+sudo apt-get install git pijuice-base python3-pip -y
+sudo apt install -y python3-picamera2 --no-install-recommends
 
-sudo apt-get install git pijuice-base gphoto2 python3-pip -y
+#S Set hostname
+<!-- sudo hostname timelapse-pi-zero-w-v1-A -->
+sudo hostnamectl set-hostname timelapse-pi-zero-w-v1-A.local
+sudo shutdown -r now
 
-pip3 install picamera
 
-# Set timezone
+# Set timezone (if necessary)
 sudo timedatectl set-timezone Pacific/Auckland
 
 mkdir -p dev
 cd dev
 git clone https://github.com/venari/timelapse.git
+git config pull.rebase false
 cd timelapse
 ```
 
@@ -67,6 +80,25 @@ crontab -e
 @reboot /usr/bin/bash /home/pi/dev/timelapse/scripts/uploadPending.sh 
 ```
 
+# Raspberry Pi Camera Module v3
+
+- 12MP sensor using IMX708
+https://www.raspberrypi.com/documentation/computers/camera_software.html
+Camera Module 3 (IMX708)
+Ensure software is upgraded (above)
+
+<!-- `camera.lensposition` - 1/distance in metres
+- '0' - infinity
+- '1': 1m
+- `5`: 20cm
+- `10`: 10cm -->
+
+`camera.focus_m`: focus in metres
+
+<!-- Add following to /boot/config.txt
+```
+dtoverlay=imx708
+``` -->
 # preview image over VNC
 https://www.youtube.com/watch?v=dbBWyeHbGs0&ab_channel=WillyKjellstrom
 
@@ -201,7 +233,7 @@ dotnet ef --project timelapse.api database update
 
 # Enable Wake Up and set RTC Time
 
-Note - Wake up should be automatically enabled in `coreScript.py`.
+Note - Wake up should be automatically enabled in `saveTelemetry.py`, but you will need to set the RTC time during installation.
 ```
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
@@ -264,9 +296,88 @@ Note - Wake up should be automatically enabled in `coreScript.py`.
 
 ```
 
+# Battery min sleep/wake up levels:
 
+```
+░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+░░░░░░░░░░┌───────────────────────── PiJuice CLI ────────────────────────┐░░░░░░░░░░░
+░░░░░░░░░░│  System Task                                                 │░░░░░░░░░░░
+░░░░░░░░░░│                                                              │░░░░░░░░░░░
+░░░░░░░░░░│  [X] System task enabled                                     │░░░░░░░░░░░
+░░░░░░░░░░│                                                              │░░░░░░░░░░░
+░░░░░░░░░░│  [ ] Watchdog            Expire period          [ ] Restore  │░░░░░░░░░░░
+░░░░░░░░░░│                          [minutes]: 4                        │░░░░░░░░░░░
+░░░░░░░░░░│                                                              │░░░░░░░░░░░
+░░░░░░░░░░│  [X] Wakeup on charge    Trigger level [%]: 20  [X] Restore  │░░░░░░░░░░░
+░░░░░░░░░░│                                                              │░░░░░░░░░░░
+░░░░░░░░░░│  [X] Min charge          Threshold [%]: 10                   │░░░░░░░░░░░
+░░░░░░░░░░│                                                              │░░░░░░░░░░░
+░░░░░░░░░░│  [ ] Min battery voltage 3.3                                 │░░░░░░░░░░░
+░░░░░░░░░░│                                                              │░░░░░░░░░░░
+░░░░░░░░░░│  [X] Software Halt Power Delay period [seconds]: 20          │░░░░░░░░░░░
+░░░░░░░░░░│      Off                                                     │░░░░░░░░░░░
+░░░░░░░░░░│                                                              │░░░░░░░░░░░
+░░░░░░░░░░│  < Refresh        >                                          │░░░░░░░░░░░
+░░░░░░░░░░│  < Apply settings >                                          │░░░░░░░░░░░
+░░░░░░░░░░└──────────────────────────────────────────────────────────────┘░░░░░░░░░░░
+░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+```
+
+# System Events
+
+```
+[X] Low Charge : <SYS_FUNC_HALT_POW_OFF>
+
+```
 
 # Battery Profiles
+
+[Headway 38120s 10ah lifepo4 cell](https://evshop.eu/en/batteries/213-headway-lifepo4-38120s-32v-10ah.html)
+
+```
+
+░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+░░░░░┌───────────────────────── PiJuice CLI ────────────────────────┐░░░░░
+░░░░░│  Battery settings                                            │░░░░░
+░░░░░│                                                              │░░░░░
+░░░░░│  Status: Custom profile by: HOST                             │░░░░░
+░░░░░│  < Profile: CUSTOM       >                                   │░░░░░
+░░░░░│                                                              │░░░░░
+░░░░░│  [X] Custom                                                  │░░░░░  <-- Set to Custom
+░░░░░│  Chemistry:                LIFEPO4                           │░░░░░  <-- Set to LIFEPO4
+░░░░░│  Capacity [mAh]:           10000                             │░░░░░  <-- Set to 10000
+░░░░░│  Charge current [mA]:      2500                              │░░░░░  <-- Set to 2500
+░░░░░│  Termination current [mA]: 50                                │░░░░░
+░░░░░│  Regulation voltage [mV]:  3600                              │░░░░░  <-- Set to 3600
+░░░░░│  Cutoff voltage [mV]:      2000                              │░░░░░  <-- Set to 2000
+░░░░░│  Cold temperature [C]:     0                                 │░░░░░
+░░░░░│  Cool temperature [C]:     2                                 │░░░░░
+░░░░░│  Warm temperature [C]:     49                                │░░░░░
+░░░░░│  Hot temperature [C]:      65                                │░░░░░
+░░░░░│  NTC B constant [1k]:      3450                              │░░░░░
+░░░░░│  NTC resistance [ohm]:     10000                             │░░░░░
+░░░░░│  OCV10 [mV]:               3111                              │░░░░░  <-- Set to 3111
+░░░░░│  OCV50 [mV]:               3243                              │░░░░░  <-- Set to 3243
+░░░░░│  OCV90 [mV]:               3283                              │░░░░░  <-- Set to 3283
+░░░░░│  R10 [mOhm]:               91.0                              │░░░░░  <-- Set to 91
+░░░░░│  R50 [mOhm]:               83.0                              │░░░░░  <-- Set to 83
+░░░░░│  R90 [mOhm]:               76.0                              │░░░░░  <-- Set to 76
+░░░░░│                                                              │░░░░░
+░░░░░│  < Temperature sense: ON_BOARD    >                          │░░░░░
+░░░░░│                                                              │░░░░░
+░░░░░│  < Rsoc estimation: DIRECT_BY_MCU >                          │░░░░░
+░░░░░│                                                              │░░░░░
+░░░░░│  < Refresh        >                                          │░░░░░
+░░░░░│  < Apply settings >                                          │░░░░░
+░░░░░│  < Back           >                                          │░░░░░
+░░░░░└──────────────────────────────────────────────────────────────┘░░░░░
+░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+
+```
+
 
 Ali Express, likely-not-really 10,000mAh battery...
 
@@ -335,3 +446,12 @@ curl -fsSL https://tailscale.com/install.sh | sh
 ```
 sudo tailscale up
 ```
+
+
+
+
+# Credits
+
+3D models
+
+- Raspberry Pi Camera Module v3 STL files: https://www.printables.com/model/368779-raspberry-pi-camera-module-3-v3/
