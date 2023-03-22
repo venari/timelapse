@@ -172,6 +172,11 @@ def saveTelemetry():
         logging.error(e)
 
 try:
+    waitForRTCAttempts = 0
+    while not os.path.exists('/dev/rtc') and waitForRTCAttempts <= 60:
+        logging.info("dev rtc doesn't exist - waiting... " + str(waitForRTCAttempts))
+        time.sleep(1)
+
     logging.debug('setting sys clock from RTC...')
     subprocess.call(['sudo', 'hwclock', '--hctosys'])
     logging.debug("sudo hwclock --hctosys succeeded")

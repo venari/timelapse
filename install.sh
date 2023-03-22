@@ -25,8 +25,11 @@ if [ ! -d "/home/pi/dev/timelapse" ]; then
     git clone https://github.com/venari/timelapse.git
     cd timelapse
     git config pull.rebase false
-    git checkout feature/raspberry-pi-camera-v3
+    git checkout feature/development
 fi
+
+echo Checking RTC module is enabled in boot/config.txt
+grep -qxF 'dtoverlay=i2c-rtc,ds1307=1' /boot/config.txt || echo 'dtoverlay=i2c-rtc,ds1307=1' | sudo tee -a /boot/config.txt
 
 echo Installing crontab entries...
 # (crontab -l 2>/dev/null; echo "@reboot /usr/bin/bash /home/pi/dev/timelapse/scripts/startup.sh")| crontab -
@@ -36,7 +39,7 @@ echo Installing crontab entries...
 
 echo Overwriting pijuice config...
 sudo mv /var/lib/pijuice/pijuice_config.JSON /var/lib/pijuice/pijuice_config.JSON.bak
-sudo curl -fsSL -o /var/lib/pijuice/pijuice_config.JSON https://raw.githubusercontent.com/venari/timelapse/feature/raspberry-pi-camera-v3/pijuice_config.JSON
+sudo curl -fsSL -o /var/lib/pijuice/pijuice_config.JSON https://raw.githubusercontent.com/venari/timelapse/feature/development/pijuice_config.JSON
 sudo chown pijuice:pijuice /var/lib/pijuice/pijuice_config.JSON
 
 echo Installing Tailscale...

@@ -19,7 +19,8 @@ Burn using Pi Imager. Give a default name, but you can change this inthe install
 
 Set username and password, and authentication methods as desired.
 
-Mount SD card
+Mount (reinsert) SD card
+<!-- diskutil mount /dev/disk4s1 -->
 ```
 cp ~/wpa_supplicant.conf /Volumes/bootfs
 diskutil unmount /Volumes/bootfs
@@ -41,9 +42,7 @@ raspberrypi.lan (192.168.86.32) at b8:27:eb:94:ac:b1 on en0 ifscope [ethernet]
 ```
 
 ```
-<!-- curl -fsSL https://raw.githubusercontent.com/venari/timelapse/main/install.sh | sh -->
-<!-- curl -fsSL "https://raw.githubusercontent.com/venari/timelapse/feature/raspberry-pi-camera-v3/install.sh?$RANDOM" | sh -->
-bash <(curl -fsSL "https://raw.githubusercontent.com/venari/timelapse/feature/raspberry-pi-camera-v3/install.sh?$RANDOM")
+bash <(curl -fsSL "https://raw.githubusercontent.com/venari/timelapse/feature/development/install.sh?$RANDOM")
 
 ```
 
