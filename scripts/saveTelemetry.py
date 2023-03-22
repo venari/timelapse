@@ -177,7 +177,8 @@ try:
         logging.info("dev rtc doesn't exist - waiting... " + str(waitForRTCAttempts))
         time.sleep(1)
         waitForRTCAttempts = waitForRTCAttempts + 1
-        subprocess.call(['sudo', 'modprobe', 'rts_ds1307'])
+        subprocess.call(['sudo', 'modprobe', '-r rtc_ds1307'])
+        subprocess.call(['sudo', 'modprobe', 'rtc_ds1307'])
 
     logging.debug('setting sys clock from RTC...')
     subprocess.call(['sudo', 'hwclock', '--hctosys'])
