@@ -21,7 +21,7 @@ handler = TimedRotatingFileHandler(logFilePath, when='midnight', backupCount=10)
 handler.setFormatter(formatter)
 logger = logging.getLogger("savePhotos")
 logger.addHandler(handler)
-logger.setLevel(logger.debug)
+logger.setLevel(logging.DEBUG)
 
 logger.info("Starting up savePhotos.py...")
 

@@ -21,7 +21,7 @@ handler = TimedRotatingFileHandler(logFilePath,
 handler.setFormatter(formatter)
 logger = logging.getLogger("saveTelemetry")
 logger.addHandler(handler)
-logger.setLevel(logger.debug)
+logger.setLevel(logging.DEBUG
 
 logger.info("Starting up saveTelemetry.py...")
 

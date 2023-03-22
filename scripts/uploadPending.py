@@ -23,7 +23,7 @@ handler = TimedRotatingFileHandler(logFilePath,
 handler.setFormatter(formatter)
 logger = logging.getLogger("uploadPending")
 logger.addHandler(handler)
-logger.setLevel(logger.debug)
+logger.setLevel(logging.DEBUG)
 
 logger.info("Starting up uploadPending.py...")
 
