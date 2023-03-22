@@ -9,19 +9,22 @@ import datetime
 import sys
 import requests
 import logging
+from logging.handlers import TimedRotatingFileHandler
 import pathlib
 
 config = json.load(open('config.json'))
 logFilePath = config["logFilePath"]
 os.makedirs(os.path.dirname(logFilePath), exist_ok=True)
 
-logging.basicConfig(filename=logFilePath,
-                    format='%(asctime)s %(levelname)s: %(message)s',
-                    level = logging.DEBUG
-                    # datefmt='%d/%m/%Y %I:%M:%S %p'
-                    # encoding='utf-8'
-                    )
-# log = logging.getLogger()
+formatter = logging.Formatter('%(asctime)s %(name)s %(levelname)s %(message)s')
+handler = TimedRotatingFileHandler(logFilePath, 
+                                   when='midnight',
+                                   backupCount=10)
+handler.setFormatter(formatter)
+logger = logging.getLogger(__name__)
+logger.addHandler(handler)
+logger.setLevel(logging.DEBUG)
+
 logging.info("Starting up savePhotos.py...")
 
 # clock
