@@ -21,7 +21,7 @@ handler = TimedRotatingFileHandler(logFilePath,
                                    when='midnight',
                                    backupCount=10)
 handler.setFormatter(formatter)
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("savePhotos")
 logger.addHandler(handler)
 logger.setLevel(logging.DEBUG)
 
