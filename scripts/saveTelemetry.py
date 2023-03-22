@@ -21,13 +21,13 @@ handler = TimedRotatingFileHandler(logFilePath,
 handler.setFormatter(formatter)
 logger = logging.getLogger("saveTelemetry")
 logger.addHandler(handler)
-logger.setLevel(logging.DEBUG)
+logger.setLevel(logger.debug)
 
-logging.info("Starting up saveTelemetry.py...")
+logger.info("Starting up saveTelemetry.py...")
 
 # clock
 while not os.path.exists('/dev/i2c-1'):
-    logging.info("dev i2c-1 doesn't exist")
+    logger.info("dev i2c-1 doesn't exist")
     time.sleep(0.1)
 
 outputImageFolder = '../output/images/'
@@ -42,7 +42,7 @@ uploadedTelemetryFolder = outputTelemetryFolder + 'uploaded/'
 # pijuice
 time.sleep(10)
 pj = pijuice.PiJuice(1, 0x14)
-logging.info("Starting up saveTelemetry.py 3b...")
+logger.info("Starting up saveTelemetry.py 3b...")
 
 def getSerialNumber():
   # Extract serial from cpuinfo file
@@ -64,14 +64,14 @@ def scheduleShutdown():
     alarmObj = {}
 
     # print(str(datetime.datetime.now()) + ' scheduleShutdown')
-    logging.debug('scheduleShutdown')
+    logger.debug('scheduleShutdown')
     setAlarm = False
 
     config = json.load(open('config.json'))
 
     if config['shutdown']:
         # print(str(datetime.datetime.now()) + ' scheduling regular shutdown')
-        logging.info('scheduling regular shutdown')
+        logger.info('scheduling regular shutdown')
         DELTA_MIN=10
 
         alarmObj = {
@@ -86,7 +86,7 @@ def scheduleShutdown():
         setAlarm = True
 
     if config['sleep_during_night'] == True and (datetime.datetime.now().hour >= config['daytime_ends_at_h'] or datetime.datetime.now().hour < config['daytime_starts_at_h']):
-        logging.info("Night time so we're scheduling shutdown")
+        logger.info("Night time so we're scheduling shutdown")
 
         alarmObj = {
             'year': 'EVERY_YEAR',
@@ -102,20 +102,20 @@ def scheduleShutdown():
         setAlarm = True
 
     if setAlarm == True:
-        logging.info("scheduleShutdown - we're setting the shutdown...")
+        logger.info("scheduleShutdown - we're setting the shutdown...")
 
         alarmSet = False
         while alarmSet == False:
             status = pj.rtcAlarm.SetAlarm(alarmObj)
 
             if status['error'] != 'NO_ERROR':
-                logging.error('Cannot set alarm\n')
+                logger.error('Cannot set alarm\n')
                 # sys.exit()
                 alarmSet = False
-                logging.info('Sleeping and retrying...\n')
+                logger.info('Sleeping and retrying...\n')
                 time.sleep(10)
             else:
-                logging.debug('Alarm set for ' + str(pj.rtcAlarm.GetAlarm()))
+                logger.debug('Alarm set for ' + str(pj.rtcAlarm.GetAlarm()))
                 alarmSet = True
 
         # Ensure Wake up alarm is actually enabled!
@@ -125,21 +125,21 @@ def scheduleShutdown():
             status = pj.rtcAlarm.SetWakeupEnabled(True)
 
             if status['error'] != 'NO_ERROR':
-                logging.error('Cannot enable wakeup\n')
+                logger.error('Cannot enable wakeup\n')
                 # sys.exit()
                 wakeUpEnabled = False
-                logging.info('Sleeping and retrying for wakeup...\n')
+                logger.info('Sleeping and retrying for wakeup...\n')
                 time.sleep(10)
             else:
-                logging.debug('Wakeup set for ' + str(pj.rtcAlarm.GetAlarm()))
+                logger.debug('Wakeup set for ' + str(pj.rtcAlarm.GetAlarm()))
                 wakeUpEnabled = True
 
-        logging.info('Shutting down...')
+        logger.info('Shutting down...')
         subprocess.call(['sudo', 'shutdown'])
-        logging.info('Power off scheduled for 30s from now')
+        logger.info('Power off scheduled for 30s from now')
         pj.power.SetPowerOff(30)
     else:
-        logging.debug('skipping shutdown scheduling because of config.json')
+        logger.debug('skipping shutdown scheduling because of config.json')
         # Ensure Wake up alarm is *not* enabled - or it will cause pi to reboot
         status = pj.rtcAlarm.SetWakeupEnabled(False)
 
@@ -168,33 +168,33 @@ def saveTelemetry():
         telemetryFilename = pendingTelemetryFolder + datetime.datetime.now().strftime('%Y-%m-%d_%H%M%S.json')
         with open(telemetryFilename, 'w') as outfile:
             json.dump(api_data, outfile)
-            logging.debug('telemetry saved')
+            logger.debug('telemetry saved')
 
     except Exception as e:
-        logging.error("saveTelemetry() failed.")
-        logging.error(e)
+        logger.error("saveTelemetry() failed.")
+        logger.error(e)
 
 try:
     waitForRTCAttempts = 0
     while not os.path.exists('/dev/rtc') and waitForRTCAttempts <= 60:
-        logging.info("dev rtc doesn't exist - waiting... " + str(waitForRTCAttempts))
+        logger.info("dev rtc doesn't exist - waiting... " + str(waitForRTCAttempts))
         time.sleep(1)
         waitForRTCAttempts = waitForRTCAttempts + 1
         subprocess.call(['sudo', 'modprobe', '-r', 'rtc_ds1307'])
         subprocess.call(['sudo', 'modprobe', 'rtc_ds1307'])
 
-    logging.debug('setting sys clock from RTC...')
+    logger.debug('setting sys clock from RTC...')
     subprocess.call(['sudo', 'hwclock', '--hctosys'])
-    logging.debug("sudo hwclock --hctosys succeeded")
+    logger.debug("sudo hwclock --hctosys succeeded")
 except Exception as e:
-    logging.error("sudo hwclock --hctosys failed")
-    logging.error(e)
+    logger.error("sudo hwclock --hctosys failed")
+    logger.error(e)
     
 
 try:
-    logging.info('In saveTelemetry.py')
+    logger.info('In saveTelemetry.py')
     if config['shutdown']:
-        logging.info('Setting failsafe power off for 2 minutes 30 seconds from now.')
+        logger.info('Setting failsafe power off for 2 minutes 30 seconds from now.')
         pj.power.SetPowerOff(150)   # Fail safe turn the thing off
 
     while True:
@@ -202,6 +202,6 @@ try:
         scheduleShutdown()
         time.sleep(60)
 except Exception as e:
-    logging.error("Catastrophic failure.")
+    logger.error("Catastrophic failure.")
     scheduleShutdown()
-    logging.error(e)
+    logger.error(e)

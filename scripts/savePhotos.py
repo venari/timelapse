@@ -17,15 +17,13 @@ logFilePath = config["logFilePath"]
 os.makedirs(os.path.dirname(logFilePath), exist_ok=True)
 
 formatter = logging.Formatter('%(asctime)s %(name)s %(levelname)s %(message)s')
-handler = TimedRotatingFileHandler(logFilePath, 
-                                   when='midnight',
-                                   backupCount=10)
+handler = TimedRotatingFileHandler(logFilePath, when='midnight', backupCount=10)
 handler.setFormatter(formatter)
 logger = logging.getLogger("savePhotos")
 logger.addHandler(handler)
-logger.setLevel(logging.DEBUG)
+logger.setLevel(logger.debug)
 
-logging.info("Starting up savePhotos.py...")
+logger.info("Starting up savePhotos.py...")
 
 # clock
 while not os.path.exists('/dev/i2c-1'):
@@ -64,7 +62,7 @@ def savePhotos():
 
         #    while True:
         while True:
-            logging.debug('creating camera object...')
+            logger.debug('creating camera object...')
             with Picamera2() as camera:
 
                 config = json.load(open('config.json'))
@@ -72,11 +70,11 @@ def savePhotos():
                 camera_config = camera.create_still_configuration()
                 camera_config["transform"] = Transform(vflip = config['camera.vflip'], hflip = config['camera.hflip'])
                 camera_config["size"] = (config['camera.resolution.width'], config['camera.resolution.height'])
-                logging.debug(camera_config["size"])
+                logger.debug(camera_config["size"])
 
                 focus_m = config['camera.focus_m']
 
-                logging.debug('focus_m is ' + str(focus_m))
+                logger.debug('focus_m is ' + str(focus_m))
 
                 if(focus_m < 0.1):
                     focus_m = 0.1
@@ -86,27 +84,27 @@ def savePhotos():
 
                 lensposition = 1/focus_m
 
-                logging.debug('setting lens position to ' + str(lensposition))
+                logger.debug('setting lens position to ' + str(lensposition))
 
                 # camera.rotation = config['camera.rotation']
                 camera.configure(camera_config)
                 camera.set_controls({"AfMode": controls.AfModeEnum.Manual, "LensPosition": lensposition})
 
-                logging.debug('beginning capture')
+                logger.debug('beginning capture')
                 #camera.start_preview(Preview.DRM)
                 camera.start()
                 # Camera warm-up time
-                logging.debug('warming up camera...')
+                logger.debug('warming up camera...')
                 time.sleep(5)
-                logging.debug('ready')
+                logger.debug('ready')
 
                 IMAGEFILENAME = workingImageFolder + datetime.datetime.now().strftime('%Y-%m-%d_%H%M%S.jpg')
                 camera.capture_file(IMAGEFILENAME)
-                logging.debug('image saved to working folder')
+                logger.debug('image saved to working folder')
                 shutil.move(IMAGEFILENAME, pendingImageFolder + pathlib.Path(IMAGEFILENAME).name)
-                logging.debug('image moved to pending folder')
+                logger.debug('image moved to pending folder')
 
-            logging.debug('destroying camera object')
+            logger.debug('destroying camera object')
             
 
             if config['shutdown']:
@@ -115,21 +113,21 @@ def savePhotos():
                 time.sleep(config['camera.interval'])
 
     except Exception as e:
-        logging.error("SavePhoto() failed.")
-        logging.error(e)
+        logger.error("SavePhoto() failed.")
+        logger.error(e)
 
 
 try:
-    logging.info('In savePhotos.py')
+    logger.info('In savePhotos.py')
     if config['shutdown']:
-        logging.info('Setting failsafe power off for 2 minutes 30 seconds from now.')
+        logger.info('Setting failsafe power off for 2 minutes 30 seconds from now.')
         pj.power.SetPowerOff(150)   # Fail safe turn the thing off
 
     while True:
         savePhotos()
-        logging.warning("Bailed out of savePhotos() - let's pause to catch our breath...")
+        logger.warning("Bailed out of savePhotos() - let's pause to catch our breath...")
         # If we get here something went wrong. Let's pause for a bit and try again.
         time.sleep(30)
 except Exception as e:
-    logging.error("Catastrophic failure.")
-    logging.error(e)
+    logger.error("Catastrophic failure.")
+    logger.error(e)

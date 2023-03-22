@@ -23,9 +23,9 @@ handler = TimedRotatingFileHandler(logFilePath,
 handler.setFormatter(formatter)
 logger = logging.getLogger("uploadPending")
 logger.addHandler(handler)
-logger.setLevel(logging.DEBUG)
+logger.setLevel(logger.debug)
 
-logging.info("Starting up uploadPending.py...")
+logger.info("Starting up uploadPending.py...")
 
 outputImageFolder = '../output/images/'
 pendingImageFolder = outputImageFolder + 'pending/'
@@ -53,7 +53,7 @@ serialNumber = getSerialNumber()
 
 time.sleep(10)
 pj = pijuice.PiJuice(1, 0x14)
-logging.info("Starting up uploadPending.py 2...")
+logger.info("Starting up uploadPending.py 2...")
 
 
 def uploadPendingPhotos():
@@ -72,14 +72,14 @@ def uploadPendingPhotos():
                 break
 
 
-            logging.info(' uploading ' + IMAGEFILENAME)
+            logger.info(' uploading ' + IMAGEFILENAME)
 
             imageTimestamp = datetime.datetime.strptime(pathlib.Path(IMAGEFILENAME).stem, '%Y-%m-%d_%H%M%S')
-            logging.debug('imageTimestamp:')
-            logging.debug(imageTimestamp)
+            logger.debug('imageTimestamp:')
+            logger.debug(imageTimestamp)
 
             if os.stat(IMAGEFILENAME).st_size == 0:
-              logging.error('Empty file - deleting')
+              logger.error('Empty file - deleting')
               os.remove(IMAGEFILENAME)
               continue
 
@@ -93,45 +93,45 @@ def uploadPendingPhotos():
                 'Timestamp': imageTimestamp.astimezone().isoformat()
             }
 
-            logging.debug('data:')
-            logging.debug(data)
+            logger.debug('data:')
+            logger.debug(data)
 
             session = requests.Session()
-            logging.debug('Posting image to API...')
+            logger.debug('Posting image to API...')
             response = session.post(config['apiUrl'] + 'Image', files=files, data=data)
 
-            logging.debug(f'Response code: {response.status_code}')
+            logger.debug(f'Response code: {response.status_code}')
             if response.status_code == 200:
-                logging.debug(f'Image uploaded successfully')
+                logger.debug(f'Image uploaded successfully')
                 shutil.move(IMAGEFILENAME, uploadedImageFolder + pathlib.Path(IMAGEFILENAME).name)
 
             else:
-                logging.error(f'Image upload failed')
+                logger.error(f'Image upload failed')
 
-            logging.debug(f'Response text:')
+            logger.debug(f'Response text:')
             try:
-                logging.debug(json.dumps(json.loads(response.text), indent = 4))
+                logger.debug(json.dumps(json.loads(response.text), indent = 4))
             except json.decoder.JSONDecodeError:
-                logging.debug(response.text)
+                logger.debug(response.text)
 
         if pendingFilesProcessed < 10:
-            logging.info('No more pending images to upload.')
+            logger.info('No more pending images to upload.')
             power_interval = config['modem.power_interval']
             if power_interval > 0:
-                logging.info('Current System Power Switch:')
-                logging.info(pj.power.GetSystemPowerSwitch())
-                logging.info('Setting System Power Switch to Off:')
+                logger.info('Current System Power Switch:')
+                logger.info(pj.power.GetSystemPowerSwitch())
+                logger.info('Setting System Power Switch to Off:')
                 pj.power.SetSystemPowerSwitch(0)
-                logging.info('Sleeping for ' + str(power_interval) + ' seconds...')
+                logger.info('Sleeping for ' + str(power_interval) + ' seconds...')
                 time.sleep(power_interval)
-                logging.info('Setting System Power Switch to 500:')
+                logger.info('Setting System Power Switch to 500:')
                 pj.power.SetSystemPowerSwitch(500)
-                logging.info('System Power Switch set to 500.')
+                logger.info('System Power Switch set to 500.')
                 # Delay for 5 seconds to allow modem to power down
 
     except Exception as e:
-        logging.error(str(datetime.datetime.now()) + " uploadPendingPhotos() failed.")
-        logging.error(e)
+        logger.error(str(datetime.datetime.now()) + " uploadPendingPhotos() failed.")
+        logger.error(e)
 
 def uploadPendingTelemetry():
 
@@ -151,11 +151,11 @@ def uploadPendingTelemetry():
             if pendingFilesProcessed > 100:
                 break
 
-            logging.info(' uploading ' + telemetryFilename)
+            logger.info(' uploading ' + telemetryFilename)
 
             telemetryTimestamp = datetime.datetime.strptime(pathlib.Path(telemetryFilename).stem, '%Y-%m-%d_%H%M%S')
-            logging.debug('telemetryTimestamp:')
-            logging.debug(telemetryTimestamp)
+            logger.debug('telemetryTimestamp:')
+            logger.debug(telemetryTimestamp)
 
             if os.stat(telemetryFilename).st_size == 0:
                 os.remove(telemetryFilename)
@@ -166,21 +166,21 @@ def uploadPendingTelemetry():
 
             api_data['Timestamp'] = telemetryTimestamp.astimezone().isoformat()
 
-            logging.debug(api_data)
+            logger.debug(api_data)
 
             postResponse = session.post(config['apiUrl'] + 'Telemetry',data=api_data)
-            logging.debug(postResponse)
+            logger.debug(postResponse)
             assert postResponse.status_code == 200, "API returned error code"
             #requests.post(config['apiUrl'] + '/Telemetry', json=api_data)
 
             if postResponse.status_code == 200:
-                logging.debug(f'Telemetry uploaded successfully')
+                logger.debug(f'Telemetry uploaded successfully')
                 shutil.move(telemetryFilename, uploadedTelemetryFolder + pathlib.Path(telemetryFilename).name)
-                logging.debug('Logged to API.')
+                logger.debug('Logged to API.')
 
     except Exception as e:
-        logging.error(str(datetime.datetime.now()) + " uploadPendingTelemetry() failed.")
-        logging.error(e)
+        logger.error(str(datetime.datetime.now()) + " uploadPendingTelemetry() failed.")
+        logger.error(e)
 
 def deleteOldUploadedImagesAndTelemetry():
 
@@ -192,7 +192,7 @@ def deleteOldUploadedImagesAndTelemetry():
         uploadedImageFilename = os.path.join(uploadedImageFolder, uploadedImageFilename)
         if os.stat(uploadedImageFilename).st_mtime < now - 1 * 86400:
           if os.path.isfile(uploadedImageFilename):
-            logging.info(' deleting old uploaded image ' + uploadedImageFilename)
+            logger.info(' deleting old uploaded image ' + uploadedImageFilename)
             os.remove(uploadedImageFilename)
 
       os.makedirs(uploadedTelemetryFolder, exist_ok = True)
@@ -201,12 +201,12 @@ def deleteOldUploadedImagesAndTelemetry():
         uploadedTelemetryFilename = os.path.join(uploadedTelemetryFolder, uploadedTelemetryFilename)
         if os.stat(uploadedTelemetryFilename).st_mtime < now - 1 * 86400:
           if os.path.isfile(uploadedTelemetryFilename):
-            logging.info(' deleting old uploaded telemetry ' + uploadedTelemetryFilename)
+            logger.info(' deleting old uploaded telemetry ' + uploadedTelemetryFilename)
             os.remove(uploadedTelemetryFilename)
 
     except Exception as e:
-        logging.error(str(datetime.datetime.now()) + " deleteOldUploadedImagesAndTelemetry() failed.")
-        logging.error(e)
+        logger.error(str(datetime.datetime.now()) + " deleteOldUploadedImagesAndTelemetry() failed.")
+        logger.error(e)
 
 
 try:
@@ -219,4 +219,4 @@ try:
       time.sleep(10)
 
 except Exception as e:
-    logging.error(e)
+    logger.error(e)
