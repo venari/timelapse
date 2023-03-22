@@ -25,7 +25,7 @@ if [ ! -d "/home/pi/dev/timelapse" ]; then
     git clone https://github.com/venari/timelapse.git
     cd timelapse
     git config pull.rebase false
-    git checkout feature/development
+    git checkout development
 fi
 
 echo Checking RTC module is enabled in boot/config.txt
@@ -35,11 +35,11 @@ echo Installing crontab entries...
 # (crontab -l 2>/dev/null; echo "@reboot /usr/bin/bash /home/pi/dev/timelapse/scripts/startup.sh")| crontab -
 (echo "@reboot /usr/bin/bash /home/pi/dev/timelapse/scripts/saveTelemetry.sh")| crontab -
 (crontab -l 2>/dev/null; echo "@reboot /usr/bin/bash /home/pi/dev/timelapse/scripts/savePhotos.sh")| crontab -
-(crontab -l 2>/dev/null; echo "@reboot /usr/bin/bash /home/pi/dev/timelapse/scripts/uploadPending.sh")| crontab -
+(crontab -l 2>/dev/null; echo "@reboot sleep 60 /usr/bin/bash /home/pi/dev/timelapse/scripts/uploadPending.sh")| crontab -
 
 echo Overwriting pijuice config...
 sudo mv /var/lib/pijuice/pijuice_config.JSON /var/lib/pijuice/pijuice_config.JSON.bak
-sudo curl -fsSL -o /var/lib/pijuice/pijuice_config.JSON https://raw.githubusercontent.com/venari/timelapse/feature/development/pijuice_config.JSON
+sudo curl -fsSL -o /var/lib/pijuice/pijuice_config.JSON https://raw.githubusercontent.com/venari/timelapse/development/pijuice_config.JSON
 sudo chown pijuice:pijuice /var/lib/pijuice/pijuice_config.JSON
 
 echo Installing Tailscale...
