@@ -19,6 +19,7 @@
     "camera.resolution.width": 4608,
     "camera.resolution.height": 2592,
     "camera.interval": 300,
+    "camera.quality": 30,
     "camera.focus_m": 100
 
 }
