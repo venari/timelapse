@@ -26,6 +26,10 @@ if [ ! -d "/home/pi/dev/timelapse" ]; then
     cd timelapse
     git config pull.rebase false
     git checkout development
+else
+    cd dev/timelapse
+    git checkout development
+    git pull
 fi
 
 echo Checking RTC module is enabled in boot/config.txt
