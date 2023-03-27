@@ -85,6 +85,21 @@ def scheduleShutdown():
 
         setAlarm = True
 
+    if config['sleep_at_battery_percent'] > 0 and pj.status.GetChargeLevel()['data'] <= config['sleep_at_battery_percent']:
+        logger.info('scheduling 10 minute sleep due to low battery')
+        DELTA_MIN=10
+
+        alarmObj = {
+                'year': 'EVERY_YEAR',
+                'month': 'EVERY_MONTH',
+                'day': 'EVERY_DAY',
+                'hour': 'EVERY_HOUR',
+                'minute_period': DELTA_MIN,
+                'second': 0,
+        }
+
+        setAlarm = True
+
     if config['sleep_during_night'] == True and (datetime.datetime.now().hour >= config['daytime_ends_at_h'] or datetime.datetime.now().hour < config['daytime_starts_at_h']):
         logger.info("Night time so we're scheduling shutdown")
 
