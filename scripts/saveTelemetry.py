@@ -89,6 +89,8 @@ def scheduleShutdown():
         logger.info('scheduling 10 minute sleep due to low battery')
         DELTA_MIN=10
 
+        time.sleep(30)
+
         alarmObj = {
                 'year': 'EVERY_YEAR',
                 'month': 'EVERY_MONTH',
@@ -214,8 +216,8 @@ try:
 
     while True:
         saveTelemetry()
-        scheduleShutdown()
         time.sleep(60)
+        scheduleShutdown()
 except Exception as e:
     logger.error("Catastrophic failure.")
     scheduleShutdown()
