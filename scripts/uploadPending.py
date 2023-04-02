@@ -124,9 +124,14 @@ def uploadPendingPhotos():
                 pj.power.SetSystemPowerSwitch(0)
                 logger.info('Sleeping for ' + str(power_interval) + ' seconds...')
                 time.sleep(power_interval)
-                logger.info('Setting System Power Switch to 500:')
+                sysVoltage = pj.status.GetBatteryVoltage()['data']
+                if sysVoltage < 3.2:  # 3.2V is the minimum voltage for the XL6009
+                    logger.info('Battery voltage too low for XL6009 - not powering up modem.')
+                    return
+                logger.info('System Voltage looks good at ' + str(sysVoltage) + 'V')
+                logger.info('Setting System Power Switch to 500mA:')
                 pj.power.SetSystemPowerSwitch(500)
-                logger.info('System Power Switch set to 500.')
+                logger.info('System Power Switch set to 500mA.')
                 # Delay for 5 seconds to allow modem to power down
 
     except Exception as e:

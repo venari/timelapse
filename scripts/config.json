@@ -10,6 +10,7 @@
 
     "sleep_during_night": true,
     "sleep_at_battery_percent": 25,
+    "hibernate_at_battery_percent": 2,
     "daytime_starts_at_h": 6,
     "daytime_ends_at_h": 22,
 
