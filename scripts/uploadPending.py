@@ -55,6 +55,15 @@ time.sleep(10)
 pj = pijuice.PiJuice(1, 0x14)
 logger.info("Starting up uploadPending.py 2...")
 
+power_interval = config['modem.power_interval']
+if power_interval > 0:
+    logger.info('Current System Power Switch:')
+    logger.info(pj.power.GetSystemPowerSwitch())
+    logger.info('Setting System Power Switch to 2100:')
+    pj.power.SetSystemPowerSwitch(2100)
+
+logger.info("Starting up uploadPending.py 3...")
+
 
 def uploadPendingPhotos():
     try:
@@ -125,8 +134,11 @@ def uploadPendingPhotos():
                 logger.info('Sleeping for ' + str(power_interval) + ' seconds...')
                 time.sleep(power_interval)
                 sysVoltage = pj.status.GetBatteryVoltage()['data']
-                if sysVoltage < 3.2:  # 3.2V is the minimum voltage for the XL6009
-                    logger.info('Battery voltage too low for XL6009 - not powering up modem.')
+                # if sysVoltage < 3.2:  # 3.2V is the minimum voltage for the XL6009
+                #     logger.info('Battery voltage too low for XL6009 - not powering up modem.')
+                #     return
+                if sysVoltage < 3.0:  # 3.0V is a bit on the low side
+                    logger.info('Battery voltage too low - not powering up modem.')
                     return
                 logger.info('System Voltage looks good at ' + str(sysVoltage) + 'V')
                 logger.info('Setting System Power Switch to 2100mA:')
