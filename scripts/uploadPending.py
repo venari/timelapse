@@ -55,15 +55,6 @@ time.sleep(10)
 pj = pijuice.PiJuice(1, 0x14)
 logger.info("Starting up uploadPending.py 2...")
 
-power_interval = config['modem.power_interval']
-if power_interval > 0:
-    logger.info('Current System Power Switch:')
-    logger.info(pj.power.GetSystemPowerSwitch())
-    logger.info('Setting System Power Switch to 2100:')
-    pj.power.SetSystemPowerSwitch(2100)
-
-logger.info("Starting up uploadPending.py 3...")
-
 
 def uploadPendingPhotos():
     try:
@@ -133,21 +124,40 @@ def uploadPendingPhotos():
                 pj.power.SetSystemPowerSwitch(0)
                 logger.info('Sleeping for ' + str(power_interval) + ' seconds...')
                 time.sleep(power_interval)
-                sysVoltage = pj.status.GetBatteryVoltage()['data']
-                # if sysVoltage < 3.2:  # 3.2V is the minimum voltage for the XL6009
-                #     logger.info('Battery voltage too low for XL6009 - not powering up modem.')
-                #     return
-                if sysVoltage < 3.0:  # 3.0V is a bit on the low side
-                    logger.info('Battery voltage too low - not powering up modem.')
-                    return
-                logger.info('System Voltage looks good at ' + str(sysVoltage) + 'V')
-                logger.info('Setting System Power Switch to 2100mA:')
-                pj.power.SetSystemPowerSwitch(2100)
-                logger.info('System Power Switch set to 2100mA.')
-                # Delay for 30 seconds to allow modem to power up and connect to network
+                turnOnSystemPowerSwitch()
 
     except Exception as e:
         logger.error(str(datetime.datetime.now()) + " uploadPendingPhotos() failed.")
+        logger.error(e)
+
+
+def turnOnSystemPowerSwitch():
+    try:
+        sysVoltage = pj.status.GetBatteryVoltage()['data']
+        # if sysVoltage < 3.2:  # 3.2V is the minimum voltage for the XL6009
+        #     logger.info('Battery voltage too low for XL6009 - not powering up modem.')
+        #     return
+        if sysVoltage < 3.0:  # 3.0V is a bit on the low side
+            logger.info('Battery voltage too low - not powering up modem.')
+            return
+        logger.info('System Voltage looks good at ' + str(sysVoltage) + 'V')
+
+        modemPower = config['modem.power']
+        if modemPower <= 0:
+            logger.info('Modem power is disabled in config.')
+            return
+        
+        logger.info('Current System Power Switch:')
+        logger.info(pj.power.GetSystemPowerSwitch())
+        logger.info('Setting System Power Switch to ' + str(modemPower) + ':')
+        pj.power.SetSystemPowerSwitch(modemPower)
+
+        logger.info('Delaying for 30 seconds to allow modem to power up and connect to network')
+        time.sleep(30)
+        logger.info('Hopefully network connection established by now.')
+
+    except Exception as e:
+        logger.error(str(datetime.datetime.now()) + " turnOnSystemPowerSwitch() failed.")
         logger.error(e)
 
 def uploadPendingTelemetry():
@@ -227,6 +237,9 @@ def deleteOldUploadedImagesAndTelemetry():
 
 
 try:
+    
+    turnOnSystemPowerSwitch()
+
     while True:
 
       config = json.load(open('config.json'))

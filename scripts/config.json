@@ -14,6 +14,7 @@
     "daytime_starts_at_h": 6,
     "daytime_ends_at_h": 22,
 
+    "modem.power": 2100,
     "modem.power_interval": 600,
 
     "camera.vflip": true,
