@@ -164,6 +164,8 @@ def scheduleShutdown():
         subprocess.call(['sudo', 'shutdown'])
         logger.info('Power off scheduled for 30s from now')
         pj.power.SetPowerOff(30)
+        logger.info('Setting System Power Switch to Off:')
+        pj.power.SetSystemPowerSwitch(0)
     else:
         logger.debug('skipping shutdown scheduling because of config.json')
         # Ensure Wake up alarm is *not* enabled - or it will cause pi to reboot

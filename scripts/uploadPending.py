@@ -129,10 +129,10 @@ def uploadPendingPhotos():
                     logger.info('Battery voltage too low for XL6009 - not powering up modem.')
                     return
                 logger.info('System Voltage looks good at ' + str(sysVoltage) + 'V')
-                logger.info('Setting System Power Switch to 500mA:')
-                pj.power.SetSystemPowerSwitch(500)
-                logger.info('System Power Switch set to 500mA.')
-                # Delay for 5 seconds to allow modem to power down
+                logger.info('Setting System Power Switch to 2100mA:')
+                pj.power.SetSystemPowerSwitch(2100)
+                logger.info('System Power Switch set to 2100mA.')
+                # Delay for 30 seconds to allow modem to power up and connect to network
 
     except Exception as e:
         logger.error(str(datetime.datetime.now()) + " uploadPendingPhotos() failed.")
