@@ -34,6 +34,7 @@ uploadedImageFolder = outputImageFolder + 'uploaded/'
 outputTelemetryFolder = '../output/telemetry/'
 pendingTelemetryFolder = outputTelemetryFolder + 'pending/'
 uploadedTelemetryFolder = outputTelemetryFolder + 'uploaded/'
+holdTelemetryFolder = outputTelemetryFolder + 'hold/'
 
 def getSerialNumber():
   # Extract serial from cpuinfo file
@@ -165,14 +166,17 @@ def uploadPendingTelemetry():
     try:
         os.makedirs(pendingTelemetryFolder, exist_ok = True)
         os.makedirs(uploadedTelemetryFolder, exist_ok = True)
+        os.makedirs(holdTelemetryFolder, exist_ok = True)
         #requests.post(config['apiUrl'] + '/Telemetry', json=api_data)
         session = requests.Session()
 
         mostRecentTelemetryFiles = sorted(glob.iglob(pendingTelemetryFolder + "/*.json"), key=os.path.getctime, reverse=True)
 
         pendingFilesProcessed=0
+        lastAttemptedFilename = ''
         for telemetryFilename in mostRecentTelemetryFiles:
             
+            lastAttemptedFilename = telemetryFilename
             # Process in batches of 100:
             pendingFilesProcessed+=1
             if pendingFilesProcessed > 100:
@@ -208,6 +212,11 @@ def uploadPendingTelemetry():
     except Exception as e:
         logger.error(str(datetime.datetime.now()) + " uploadPendingTelemetry() failed.")
         logger.error(e)
+        if lastAttemptedFilename!="":          
+          logger.error("lastAttemptedFilename: " + lastAttemptedFilename)
+          # os.remove(telemetryFilename)
+          shutil.move(lastAttemptedFilename, holdTelemetryFolder + pathlib.Path(lastAttemptedFilename).name)
+          logger.info("Moved " + lastAttemptedFilename + " to " + holdTelemetryFolder)
 
 def deleteOldUploadedImagesAndTelemetry():
 
