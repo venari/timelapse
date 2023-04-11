@@ -209,6 +209,9 @@ def uploadPendingTelemetry():
                 shutil.move(telemetryFilename, uploadedTelemetryFolder + pathlib.Path(telemetryFilename).name)
                 logger.debug('Logged to API.')
 
+    except requests.exceptions.ConnectionError:
+        logger.error(str(datetime.datetime.now()) + " uploadPendingTelemetry() failed - connection error. Leave in place.")
+        logger.error(e)
     except Exception as e:
         logger.error(str(datetime.datetime.now()) + " uploadPendingTelemetry() failed.")
         logger.error(e)
