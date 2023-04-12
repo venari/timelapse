@@ -346,20 +346,20 @@ Note - Wake up should be automatically enabled in `saveTelemetry.py`, but you wi
 ░░░░░│                                                              │░░░░░
 ░░░░░│  [X] Custom                                                  │░░░░░  <-- Set to Custom
 ░░░░░│  Chemistry:                LIFEPO4                           │░░░░░  <-- Set to LIFEPO4
-░░░░░│  Capacity [mAh]:           10000                             │░░░░░  <-- Set to 10000
+░░░░░│  Capacity [mAh]:           15000                             │░░░░░  <-- Set to 15000
 ░░░░░│  Charge current [mA]:      2500                              │░░░░░  <-- Set to 2500
 ░░░░░│  Termination current [mA]: 50                                │░░░░░
 ░░░░░│  Regulation voltage [mV]:  3600                              │░░░░░  <-- Set to 3600
-░░░░░│  Cutoff voltage [mV]:      2000                              │░░░░░  <-- Set to 2000
+░░░░░│  Cutoff voltage [mV]:      2500                              │░░░░░  <-- Set to 2500
 ░░░░░│  Cold temperature [C]:     0                                 │░░░░░
 ░░░░░│  Cool temperature [C]:     2                                 │░░░░░
 ░░░░░│  Warm temperature [C]:     49                                │░░░░░
 ░░░░░│  Hot temperature [C]:      65                                │░░░░░
 ░░░░░│  NTC B constant [1k]:      3450                              │░░░░░
 ░░░░░│  NTC resistance [ohm]:     10000                             │░░░░░
-░░░░░│  OCV10 [mV]:               3111                              │░░░░░  <-- Set to 3111
-░░░░░│  OCV50 [mV]:               3243                              │░░░░░  <-- Set to 3243
-░░░░░│  OCV90 [mV]:               3283                              │░░░░░  <-- Set to 3283
+░░░░░│  OCV10 [mV]:               3131                              │░░░░░  <-- Set to 3131
+░░░░░│  OCV50 [mV]:               3263                              │░░░░░  <-- Set to 3263
+░░░░░│  OCV90 [mV]:               3303                              │░░░░░  <-- Set to 3303
 ░░░░░│  R10 [mOhm]:               91.0                              │░░░░░  <-- Set to 91
 ░░░░░│  R50 [mOhm]:               83.0                              │░░░░░  <-- Set to 83
 ░░░░░│  R90 [mOhm]:               76.0                              │░░░░░  <-- Set to 76
@@ -377,50 +377,6 @@ Note - Wake up should be automatically enabled in `saveTelemetry.py`, but you wi
 
 ```
 
-
-Ali Express, likely-not-really 10,000mAh battery...
-
-```
-
-░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
-░░░░░┌───────────────────────── PiJuice CLI ────────────────────────┐░░░░░
-░░░░░│  Battery settings                                            │░░░░░
-░░░░░│                                                              │░░░░░
-░░░░░│  Status: Custom profile by: HOST                             │░░░░░
-░░░░░│  < Profile: CUSTOM       >                                   │░░░░░
-░░░░░│                                                              │░░░░░
-░░░░░│  [X] Custom                                                  │░░░░░  <-- Set to Custom
-░░░░░│  Chemistry:                LIPO                              │░░░░░  
-░░░░░│  Capacity [mAh]:           10000                             │░░░░░  <-- Set to 10000
-░░░░░│  Charge current [mA]:      1225                              │░░░░░  <-- Set to 1250 or 1000
-░░░░░│  Termination current [mA]: 50                                │░░░░░
-░░░░░│  Regulation voltage [mV]:  4180                              │░░░░░
-░░░░░│  Cutoff voltage [mV]:      3000                              │░░░░░
-░░░░░│  Cold temperature [C]:     0                                 │░░░░░
-░░░░░│  Cool temperature [C]:     2                                 │░░░░░
-░░░░░│  Warm temperature [C]:     49                                │░░░░░
-░░░░░│  Hot temperature [C]:      65                                │░░░░░
-░░░░░│  NTC B constant [1k]:      3450                              │░░░░░
-░░░░░│  NTC resistance [ohm]:     10000                             │░░░░░
-░░░░░│  OCV10 [mV]:               3743                              │░░░░░
-░░░░░│  OCV50 [mV]:               3933                              │░░░░░
-░░░░░│  OCV90 [mV]:               4057                              │░░░░░
-░░░░░│  R10 [mOhm]:               135.0                             │░░░░░
-░░░░░│  R50 [mOhm]:               133.0                             │░░░░░
-░░░░░│  R90 [mOhm]:               133.0                             │░░░░░
-░░░░░│                                                              │░░░░░
-░░░░░│  < Temperature sense: ON_BOARD    >                          │░░░░░
-░░░░░│                                                              │░░░░░
-░░░░░│  < Rsoc estimation: AUTO_DETECT   >                          │░░░░░
-░░░░░│                                                              │░░░░░
-░░░░░│  < Refresh        >                                          │░░░░░
-░░░░░│  < Apply settings >                                          │░░░░░
-░░░░░│  < Back           >                                          │░░░░░
-░░░░░└──────────────────────────────────────────────────────────────┘░░░░░
-░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
-░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
-
-```
 
 
 # Battery notes
