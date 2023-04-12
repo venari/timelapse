@@ -36,12 +36,36 @@ public class Telemetry
         return null;
     }}
 
-    public string? Status_Battery {
+    private dynamic PiJuiceJSONStatus {
         get{
             if(Status!=null){
                 dynamic status = System.Text.Json.JsonSerializer.Deserialize<dynamic>(FixUpInvalidPiJuiceJSONStatus);
                 dynamic status2 = System.Text.Json.JsonSerializer.Deserialize<dynamic>(status.GetProperty("status"));
-                return status2.GetProperty("battery").ToString()
+                return status2;
+            }
+
+            return null;
+        }
+    }
+
+
+    public int? BatteryVoltage {
+        get{
+            if(Status!=null){
+                dynamic status = System.Text.Json.JsonSerializer.Deserialize<dynamic>(FixUpInvalidPiJuiceJSONStatus);
+                int batteryVoltage = System.Text.Json.JsonSerializer.Deserialize<int>(status.GetProperty("batteryVoltage"));
+                return batteryVoltage;
+            }
+
+            return null;
+        }
+    }
+
+    public string? Status_Battery {
+        get{
+            if(Status!=null){
+                dynamic status = PiJuiceJSONStatus;
+                return status.GetProperty("battery").ToString()
                     .Replace("CHARGING_FROM_IN", "Charging")
                     .Replace("CHARGING_FROM_5V_IO", "Charging")
                     .Replace("NOT_PRESENT", "Not Present")
@@ -52,12 +76,21 @@ public class Telemetry
         }
     }
 
+    public bool? Charging {
+        get{
+            if(Status_Battery == "Charging"){
+                return true;
+            } else {
+                return null;
+            }
+        }
+    }
+
     public string? Status_PowerInput {
         get{
             if(Status!=null){
-                dynamic status = System.Text.Json.JsonSerializer.Deserialize<dynamic>(FixUpInvalidPiJuiceJSONStatus);
-                dynamic status2 = System.Text.Json.JsonSerializer.Deserialize<dynamic>(status.GetProperty("status"));
-                return status2.GetProperty("powerInput").ToString()
+                dynamic status = PiJuiceJSONStatus;
+                return status.GetProperty("powerInput").ToString()
                     .Replace("WEAK", "Weak")
                     .Replace("BAD", "Bad")
                     .Replace("NOT_PRESENT", "Not Present")

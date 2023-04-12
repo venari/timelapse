@@ -17,6 +17,9 @@ public class TelemetryGraphModel : PageModel
     public Device device {get; private set;}
     public string SasToken {get; private set;}
 
+    public DateTime? LatestTelemetryDateTime {get; private set;}
+    public DateTime? EarliestTelemetryDateTime {get; private set;}
+
     // private int _numberOfHoursToDisplay;
 
     //     get {
@@ -39,8 +42,18 @@ public class TelemetryGraphModel : PageModel
         if(numberOfHoursToDisplay!=null){
             NumberOfHoursToDisplay = numberOfHoursToDisplay.Value;
         }
-        
-        DateTime cutOff = DateTime.UtcNow.AddHours(-1 * NumberOfHoursToDisplay);
+
+        LatestTelemetryDateTime = _appDbContext.Telemetry
+            .Where(t => t.DeviceId == id)
+            .OrderByDescending(t => t.Timestamp)
+            .Select(t => t.Timestamp)
+            .FirstOrDefault();
+
+        if(LatestTelemetryDateTime==null || !LatestTelemetryDateTime.HasValue || LatestTelemetryDateTime.Value == DateTime.MinValue){
+            return RedirectToPage("/NotFound");
+        }
+
+        DateTime cutOff = LatestTelemetryDateTime.Value.AddHours(-1 * NumberOfHoursToDisplay);
         
         var d = _appDbContext.Devices
             .Include(d => d.Telemetries.Where(t => t.Timestamp >= cutOff))
@@ -55,6 +68,11 @@ public class TelemetryGraphModel : PageModel
         if(d.Telemetries.Count()==0){
             return RedirectToPage("/NotFound");
         }
+
+        EarliestTelemetryDateTime = d.Telemetries
+            .OrderBy(t => t.Timestamp)
+            .Select(t => t.Timestamp)
+            .FirstOrDefault();
 
         return Page();
 
