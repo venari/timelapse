@@ -47,6 +47,27 @@
 
         console.log("showTelemtery");
         console.log(data)
+
+        var lastIndex = 0;
+
+        var lastBatteryPercent = data[0].batteryPercent;
+        var lastTimestamp =  new Date(data[0].timestamp);
+        data.forEach(function(d, i) {
+            if(i==0){
+                return;
+            }
+            var timeDifference = new Date(d.timestamp) - lastTimestamp;
+            var hoursDifference = timeDifference / 1000 / 60 / 60;
+            var batteryPercentDifference = d.batteryPercent - lastBatteryPercent;
+            d.batteryPercentPerHour = batteryPercentDifference / hoursDifference;
+
+            if(hoursDifference >= 0.25){
+                ++lastIndex;
+                lastBatteryPercent = data[lastIndex].batteryPercent;
+                lastTimestamp = new Date(data[lastIndex].timestamp);
+            }
+        });
+
         chart.config.data.datasets[0].data = data.map(d => ({x: new Date(d.timestamp), y: d.batteryPercent}));
         chart.config.data.datasets[1].data = data.map(d => ({x: new Date(d.timestamp), y: d.temperatureC}));
         chart.config.data.datasets[2].data = data.map(d => ({x: new Date(d.timestamp), y: d.diskSpaceFree}));        
@@ -55,6 +76,7 @@
         @* chart.config.data.datasets[5].data = data.map(d => ({x: new Date(d.timestamp), y: Math.max(0, (d.batteryVoltage - minVoltage)/(maxVoltage - minVoltage) * 100)})); *@
         chart.config.data.datasets[5].data = data.map(d => ({x: new Date(d.timestamp), y: d.batteryVoltage}));
         chart.config.data.datasets[6].data = data.map(d => ({x: new Date(d.timestamp), y: d.charging}));        
+        chart.config.data.datasets[7].data = data.map(d => ({x: new Date(d.timestamp), y: d.batteryPercentPerHour}));
         chart.update();
     }
 </script>
@@ -160,12 +182,18 @@
                                 label: "Battery Voltage",
                                 backgroundColor: 'rgb(99, 99, 255)',
                                 borderColor: 'rgb(99, 99, 255)',
-                                hidden: false,
+                                hidden: true,
                                 yAxisID: 'y1',
                             }, {
                                 label: "Charging",
                                 backgroundColor: 'rgb(00, 165, 20)',
                                 borderColor: 'rgb(00, 165, 20)',
+                                yAxisID: 'y',
+                            }, {
+                                label: "Battery %/hr",
+                                backgroundColor: 'rgb(00, 165, 20)',
+                                borderColor: 'rgb(00, 165, 20)',
+                                hidden: true,
                                 yAxisID: 'y',
                             }]
                         };
