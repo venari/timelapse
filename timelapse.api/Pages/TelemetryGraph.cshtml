@@ -60,11 +60,21 @@
             var hoursDifference = timeDifference / 1000 / 60 / 60;
             var batteryPercentDifference = d.batteryPercent - lastBatteryPercent;
             // Work out battery percent, but cap to remove unreal bounces.
-            d.batteryPercentPerHour = Math.min(60, Math.max(-50, batteryPercentDifference / hoursDifference));
+            if(hoursDifference>=0.5){
+                d.batteryPercentPerHour = Math.min(60, Math.max(-50, batteryPercentDifference / hoursDifference));
+            }
 
-            // Make sure there's an over 2% difference between readings to help smooth things out, and no more than 6 hours between readings
+            while(hoursDifference>1){
+                ++lastIndex;
+                lastBatteryPercent = data[lastIndex].batteryPercent;
+                lastTimestamp = new Date(data[lastIndex].timestamp);
+                timeDifference = new Date(d.timestamp) - lastTimestamp;
+                hoursDifference = timeDifference / 1000 / 60 / 60;
+            }
 
-            if(hoursDifference <= 6 && Math.abs(batteryPercentDifference) > 2){
+            @* // Make sure there's an over 2% difference between readings to help smooth things out, and at least 1 hourand no more than 6 hours between readings
+
+            if(hoursDifference > 1 && Math.abs(batteryPercentDifference) > 2){
                 ++lastIndex;
                 lastBatteryPercent = data[lastIndex].batteryPercent;
                 lastTimestamp = new Date(data[lastIndex].timestamp);
@@ -77,7 +87,7 @@
                     hoursDifference = hoursDifference / 1000 / 60 / 60;
                 }
 
-            }
+            } *@
         });
 
         chart.config.data.datasets[0].data = data.map(d => ({x: new Date(d.timestamp), y: d.batteryPercent}));
