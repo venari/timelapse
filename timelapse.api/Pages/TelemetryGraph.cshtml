@@ -59,12 +59,24 @@
             var timeDifference = new Date(d.timestamp) - lastTimestamp;
             var hoursDifference = timeDifference / 1000 / 60 / 60;
             var batteryPercentDifference = d.batteryPercent - lastBatteryPercent;
-            d.batteryPercentPerHour = batteryPercentDifference / hoursDifference;
+            // Work out battery percent, but cap to remove unreal bounces.
+            d.batteryPercentPerHour = Math.min(60, Math.max(-50, batteryPercentDifference / hoursDifference));
 
-            if(hoursDifference >= 0.25){
+            // Make sure there's an over 2% difference between readings to help smooth things out, and no more than 6 hours between readings
+
+            if(hoursDifference <= 6 && Math.abs(batteryPercentDifference) > 2){
                 ++lastIndex;
                 lastBatteryPercent = data[lastIndex].batteryPercent;
                 lastTimestamp = new Date(data[lastIndex].timestamp);
+            } else {
+                while(hoursDifference>6){
+                    ++lastIndex;
+                    lastBatteryPercent = data[lastIndex].batteryPercent;
+                    lastTimestamp = new Date(data[lastIndex].timestamp);
+                    hoursDifference = new Date(d.timestamp) - lastTimestamp;
+                    hoursDifference = hoursDifference / 1000 / 60 / 60;
+                }
+
             }
         });
 
