@@ -11,3 +11,10 @@ Printer
   - Disable Raft
 
 Not bad, but a bit of stringing on internal walls
+
+PETG Attempt 2
+
+As above, plus:
+- General
+ - Speed
+  - Base Print Speed 50mm/s -> 30mm/s
