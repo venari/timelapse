@@ -121,11 +121,20 @@ def uploadPendingPhotos():
             if power_interval > 0:
                 logger.info('Current System Power Switch:')
                 logger.info(pj.power.GetSystemPowerSwitch())
-                logger.info('Setting System Power Switch to Off:')
-                pj.power.SetSystemPowerSwitch(0)
-                logger.info('Sleeping for ' + str(power_interval) + ' seconds...')
-                time.sleep(power_interval)
-                turnOnSystemPowerSwitch()
+
+                # Give the telemetry an opportunity to upload before powering off modem
+                uploadPendingTelemetry()
+
+                # If it's 9am or 12pm or 5pm, don't turn the modem off for 15 minutes.
+                if (datetime.datetime.now().hour == 9 or datetime.datetime.now().hour == 12 or datetime.datetime.now().hour == 17) and datetime.datetime.now().minute < 15:
+                    logger.info('Openning 15 minute support window...')
+
+                else:
+                    logger.info('Setting System Power Switch to Off:')
+                    pj.power.SetSystemPowerSwitch(0)
+                    logger.info('Sleeping for ' + str(power_interval) + ' seconds...')
+                    time.sleep(power_interval)
+                    turnOnSystemPowerSwitch()
 
     except Exception as e:
         logger.error(str(datetime.datetime.now()) + " uploadPendingPhotos() failed.")
