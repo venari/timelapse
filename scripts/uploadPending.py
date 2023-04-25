@@ -162,8 +162,8 @@ def turnOnSystemPowerSwitch():
         logger.info('Setting System Power Switch to ' + str(modemPower) + ':')
         pj.power.SetSystemPowerSwitch(modemPower)
 
-        logger.info('Delaying for 30 seconds to allow modem to power up and connect to network')
-        time.sleep(30)
+        logger.info('Delaying for 60 seconds to allow modem to power up and connect to network')
+        time.sleep(60)
         logger.info('Hopefully network connection established by now.')
 
     except Exception as e:
