@@ -11,6 +11,7 @@ import logging
 from logging.handlers import TimedRotatingFileHandler
 import glob
 import pathlib
+import socket
 
 config = json.load(open('config.json'))
 logFilePath = config["logFilePath"]
@@ -35,6 +36,8 @@ outputTelemetryFolder = '../output/telemetry/'
 pendingTelemetryFolder = outputTelemetryFolder + 'pending/'
 uploadedTelemetryFolder = outputTelemetryFolder + 'uploaded/'
 holdTelemetryFolder = outputTelemetryFolder + 'hold/'
+
+bInSupportWindow = False
 
 def getSerialNumber():
   # Extract serial from cpuinfo file
@@ -119,17 +122,22 @@ def uploadPendingPhotos():
             logger.info('No more pending images to upload.')
             power_interval = config['modem.power_interval']
             if power_interval > 0:
-                logger.info('Current System Power Switch:')
-                logger.info(pj.power.GetSystemPowerSwitch())
 
                 # Give the telemetry an opportunity to upload before powering off modem
                 uploadPendingTelemetry()
 
                 # If it's 9am or 12pm or 5pm, don't turn the modem off for 15 minutes.
                 if (datetime.datetime.now().hour == 9 or datetime.datetime.now().hour == 12 or datetime.datetime.now().hour == 17) and datetime.datetime.now().minute < 15:
-                    logger.info('Openning 15 minute support window...')
+                    if not bInSupportWindow:
+                        logger.info('Opening 15 minute support window...')
+                        bInSupportWindow = True
 
                 else:
+                    if bInSupportWindow:
+                        logger.info('Closing support window...')
+                        bInSupportWindow = False
+                    logger.info('Current System Power Switch:')
+                    logger.info(pj.power.GetSystemPowerSwitch())
                     logger.info('Setting System Power Switch to Off:')
                     pj.power.SetSystemPowerSwitch(0)
                     logger.info('Sleeping for ' + str(power_interval) + ' seconds...')
@@ -140,6 +148,20 @@ def uploadPendingPhotos():
         logger.error(str(datetime.datetime.now()) + " uploadPendingPhotos() failed.")
         logger.error(e)
 
+# https://stackoverflow.com/questions/3764291/how-can-i-see-if-theres-an-available-and-active-network-connection-in-python
+def internet(host="8.8.8.8", port=53, timeout=3):
+    """
+    Host: 8.8.8.8 (google-public-dns-a.google.com)
+    OpenPort: 53/tcp
+    Service: domain (DNS/TCP)
+    """
+    try:
+        socket.setdefaulttimeout(timeout)
+        socket.socket(socket.AF_INET, socket.SOCK_STREAM).connect((host, port))
+        return True
+    except socket.error as ex:
+        logger.warning(e)
+        return False
 
 def turnOnSystemPowerSwitch():
     try:
@@ -162,10 +184,20 @@ def turnOnSystemPowerSwitch():
         logger.info('Setting System Power Switch to ' + str(modemPower) + ':')
         pj.power.SetSystemPowerSwitch(modemPower)
 
-        logger.info('Delaying for 60 seconds to allow modem to power up and connect to network')
-        time.sleep(60)
-        logger.info('Hopefully network connection established by now.')
-
+        logger.infi('Waiting for network....')
+        # Call Internet function to wait for network, for a max of 2 minutes
+        waitCounter = 0
+        while not internet() and waitCounter < 120:
+            time.sleep(10)
+            logger.info('Still waiting for network....')
+            waitCounter=waitCounter+1
+        
+        if waitCounter < 120:
+            logger.info('Network connection established.')
+       
+        else:
+            logger.warning('Could not establish network connection after 2 minutes.')
+    
     except Exception as e:
         logger.error(str(datetime.datetime.now()) + " turnOnSystemPowerSwitch() failed.")
         logger.error(e)
@@ -267,7 +299,7 @@ try:
       deleteOldUploadedImagesAndTelemetry()
       uploadPendingTelemetry()
       uploadPendingPhotos()
-      time.sleep(10)
+      time.sleep(30)
 
 except Exception as e:
     logger.error(e)
