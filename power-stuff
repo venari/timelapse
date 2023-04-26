@@ -1,0 +1,9 @@
+
+https://www.instructables.com/Raspberry-Pi-GPIO-Circuits-Controlling-High-Powere/
+
+
+echo 0 | sudo tee /sys/devices/platform/soc/20980000.usb/buspower >/dev/null
+
+vcgencmd display_power 0
+
+

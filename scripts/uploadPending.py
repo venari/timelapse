@@ -62,6 +62,7 @@ logger.info("Starting up uploadPending.py 2...")
 
 def uploadPendingPhotos():
     try:
+        global bInSupportWindow
         os.makedirs(pendingImageFolder, exist_ok = True)
         os.makedirs(uploadedImageFolder, exist_ok = True)
 
