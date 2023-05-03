@@ -204,6 +204,11 @@ def turnOnSystemPowerSwitch(retries = 3):
             if retries > 0:
                 logger.info('Retrying to establish network connection...')
                 turnOnSystemPowerSwitch(retries-1)
+            else:
+                logger.warning('Retries exhausted - giving up.')
+                logger.info('Setting System Power Switch to Off')
+                pj.power.SetSystemPowerSwitch(0)
+                return
     
     except Exception as e:
         logger.error(str(datetime.datetime.now()) + " turnOnSystemPowerSwitch() failed.")
