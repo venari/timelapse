@@ -185,8 +185,8 @@ def turnOnSystemPowerSwitch():
         logger.info('Setting System Power Switch to ' + str(modemPower) + ':')
         pj.power.SetSystemPowerSwitch(modemPower)
 
-        logger.infi('Waiting for network....')
-        # Call Internet function to wait for network, for a max of 2 minutes
+        logger.info('Waiting for network....')
+        # Call Internet function to wait for network, for a max of 1 minute
         waitCounter = 0
         while not internet() and waitCounter < 120:
             time.sleep(10)
