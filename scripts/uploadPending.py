@@ -164,7 +164,7 @@ def internet(host="8.8.8.8", port=53, timeout=3):
         logger.warning(e)
         return False
 
-def turnOnSystemPowerSwitch():
+def turnOnSystemPowerSwitch(retries = 3):
     try:
         sysVoltage = pj.status.GetBatteryVoltage()['data']
         # if sysVoltage < 3.2:  # 3.2V is the minimum voltage for the XL6009
@@ -173,7 +173,7 @@ def turnOnSystemPowerSwitch():
         if sysVoltage < 3.0:  # 3.0V is a bit on the low side
             logger.info('Battery voltage too low - not powering up modem.')
             return
-        logger.info('System Voltage looks good at ' + str(sysVoltage) + 'V')
+        logger.info('System Voltage looks good at ' + str(sysVoltage) + 'mV')
 
         modemPower = config['modem.power']
         if modemPower <= 0:
@@ -185,10 +185,13 @@ def turnOnSystemPowerSwitch():
         logger.info('Setting System Power Switch to ' + str(modemPower) + ':')
         pj.power.SetSystemPowerSwitch(modemPower)
 
+        logger.info('Waiting 50s for modem to warm up...')
+        time.sleep(50)
+
         logger.info('Waiting for network....')
         # Call Internet function to wait for network, for a max of 1 minute
         waitCounter = 0
-        while not internet() and waitCounter < 120:
+        while not internet() and waitCounter < 60:
             time.sleep(10)
             logger.info('Still waiting for network....')
             waitCounter=waitCounter+1
@@ -198,6 +201,9 @@ def turnOnSystemPowerSwitch():
        
         else:
             logger.warning('Could not establish network connection after 2 minutes.')
+            if retries > 0:
+                logger.info('Retrying to establish network connection...')
+                turnOnSystemPowerSwitch(retries-1)
     
     except Exception as e:
         logger.error(str(datetime.datetime.now()) + " turnOnSystemPowerSwitch() failed.")
