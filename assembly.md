@@ -22,8 +22,34 @@ Parts:
 1. Connect positive wire terminated in Jumper socket to Positive OUT of LM2596. This goes to [Positive Pin of J4](https://github.com/PiSupply/PiJuice/tree/master/Hardware#connectors) on PiJuice Zero.
 1. Connect negative wire terminated in Jumper socket to Negative OUT of LM2596. This goes to Negative Pin of J4 on PiJuice Zero.
 
+## Pi mounting
+
+4 x M2.5 x 6 screw
+1 x Plastic mount
+4 x M2.5 x 6 Pozi Pan (DIN7985)
+4 x M2.5 nut (DIN934)
+1 x Pi Zero
+4 x Pi Juice Zero spacer
+1 x Pi Juice Zero
+4 x Pi Juice Zero M2.5 screw
+
 ## Camera mounting and connecting
 
-## Pi mounting
+4 x M2 x 6 screw 
+1 x Camera
+1 x Plastic mount
+
+## Mount camera mount to enclosure
+<Outside>
+4 x M2 x 6 screw 
+<enclosure>
+1 x Plastic mount
+<Inside>
+
+## Mount window to enclosure
+Drill out 4 holes in acrylic to 2.5mm so that M2.5 screws can pass through.
+<Outside>
+4 x M2.5 x 6 Pozi Pan (DIN7985)
+<enclosure>
 
 ## Cellular 3.3V -> 5V power.
