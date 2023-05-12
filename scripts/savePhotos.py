@@ -120,9 +120,6 @@ def savePhotos():
 
 try:
     logger.info('In savePhotos.py')
-    if config['shutdown']:
-        logger.info('Setting failsafe power off for 2 minutes 30 seconds from now.')
-        pj.power.SetPowerOff(150)   # Fail safe turn the thing off
 
     while True:
         savePhotos()
