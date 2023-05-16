@@ -12,7 +12,7 @@
     "sleep_at_battery_percent": 25,
     "hibernate_at_battery_percent": 2,
     "daytime_starts_at_h": 6,
-    "daytime_ends_at_h": 22,
+    "daytime_ends_at_h": 18,
 
     "modem.power": 500,
     "modem.power_interval": 900,
@@ -21,7 +21,7 @@
     "camera.hflip": true,
     "camera.resolution.width": 4608,
     "camera.resolution.height": 2592,
-    "camera.interval": 300,
+    "camera.interval": 60,
     "camera.quality": 30,
     "camera.focus_m": 100
 
