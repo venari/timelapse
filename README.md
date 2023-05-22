@@ -26,6 +26,15 @@ cp ~/wpa_supplicant.conf /Volumes/bootfs
 diskutil unmount /Volumes/bootfs
 ```
 
+If updating the wpa_supplicant file, and you have network access:
+```
+scp ~/wpa_supplicant.conf pi@[pi name]:~
+```
+And then on the pi:
+```
+sudo cp ~/wpa_supplicant.conf /etc/wpa_supplicant/wpa_supplicant.conf
+sudo reboot
+```
 
 Turn on and find the pi
 Pi Zero W 2:
@@ -364,9 +373,9 @@ Note - Wake up should be automatically enabled in `saveTelemetry.py`, but you wi
 ░░░░░│  R50 [mOhm]:               83.0                              │░░░░░  <-- Set to 83
 ░░░░░│  R90 [mOhm]:               76.0                              │░░░░░  <-- Set to 76
 ░░░░░│                                                              │░░░░░
-░░░░░│  < Temperature sense: ON_BOARD    >                          │░░░░░
+░░░░░│  < Temperature sense: ON_BOARD    >                          │░░░░░  <-- Set to ON_BOARD
 ░░░░░│                                                              │░░░░░
-░░░░░│  < Rsoc estimation: DIRECT_BY_MCU >                          │░░░░░
+░░░░░│  < Rsoc estimation: DIRECT_BY_MCU >                          │░░░░░  <-- Set to DIRECT_BY_MCU
 ░░░░░│                                                              │░░░░░
 ░░░░░│  < Refresh        >                                          │░░░░░
 ░░░░░│  < Apply settings >                                          │░░░░░

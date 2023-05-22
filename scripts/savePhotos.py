@@ -123,9 +123,12 @@ try:
 
     while True:
         savePhotos()
-        logger.warning("Bailed out of savePhotos() - let's pause to catch our breath...")
-        # If we get here something went wrong. Let's pause for a bit and try again.
-        time.sleep(30)
+
+        if not config['shutdown']:
+            logger.warning("Bailed out of savePhotos() - let's pause to catch our breath...")
+            # If we get here something went wrong. Let's pause for a bit and try again.
+            time.sleep(30)
+            
 except Exception as e:
     logger.error("Catastrophic failure.")
     logger.error(e)
