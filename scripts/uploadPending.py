@@ -103,7 +103,7 @@ def uploadPendingPhotos():
 
             session = requests.Session()
             logger.debug('Posting image to API...')
-            response = session.post(config['apiUrl'] + 'Image', files=files, data=data)
+            response = session.post(config['apiUrl'] + 'Image', files=files, data=data, timeout=30)
 
             logger.debug(f'Response code: {response.status_code}')
             if response.status_code == 200:
@@ -252,7 +252,7 @@ def uploadPendingTelemetry():
 
             logger.debug(api_data)
 
-            postResponse = session.post(config['apiUrl'] + 'Telemetry',data=api_data)
+            postResponse = session.post(config['apiUrl'] + 'Telemetry',data=api_data, timeout=5)
             logger.debug(postResponse)
             assert postResponse.status_code == 200, "API returned error code"
             #requests.post(config['apiUrl'] + '/Telemetry', json=api_data)
