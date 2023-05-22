@@ -5,6 +5,7 @@ using timelapse.infrastructure;
 using Microsoft.EntityFrameworkCore;
 using timelapse.api.Helpers;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.Extensions.Caching.Memory;
 
 namespace timelapse.api.Pages;
 
@@ -27,11 +28,14 @@ public class TelemetryGraphModel : PageModel
     //     }
     // }
 
-    public TelemetryGraphModel(ILogger<TelemetryGraphModel> logger, AppDbContext appDbContext, IConfiguration configuration)
+    public TelemetryGraphModel(ILogger<TelemetryGraphModel> logger, AppDbContext appDbContext, IConfiguration configuration, IMemoryCache memoryCache)
     {
         _logger = logger;
         _appDbContext = appDbContext;
         NumberOfHoursToDisplay = 24;
+        StorageHelper storageHelper;
+        storageHelper = new StorageHelper(configuration, logger, memoryCache);
+        SasToken = storageHelper.SasToken;
     }
 
     [BindProperty]
@@ -57,6 +61,8 @@ public class TelemetryGraphModel : PageModel
         
         var d = _appDbContext.Devices
             .Include(d => d.Telemetries.Where(t => t.Timestamp >= cutOff))
+            .Include(d => d.Images.OrderByDescending(i => i.Timestamp).Take(1))
+            .AsSplitQuery()
             .FirstOrDefault(d => d.Id == id);
 
         if(d==null){

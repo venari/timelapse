@@ -14,7 +14,6 @@ public class ImageViewModel : PageModel
 {
     private readonly ILogger<ImageViewModel> _logger;
     private AppDbContext _appDbContext;
-    private StorageHelper _storageHelper;
 
     public Device device {get; private set;}
     public string SasToken {get; private set;}
@@ -27,15 +26,35 @@ public class ImageViewModel : PageModel
     {
         _logger = logger;
         _appDbContext = appDbContext;
-        _storageHelper = new StorageHelper(configuration, logger, memoryCache);
-        SasToken = _storageHelper.SasToken;
+        NumberOfHoursToDisplay = 24;
+        StorageHelper storageHelper;
+        storageHelper = new StorageHelper(configuration, logger, memoryCache);
+        SasToken = storageHelper.SasToken;
     }
 
-    public IActionResult OnGet(int id)
+    [BindProperty]
+    public int NumberOfHoursToDisplay {get; set; }
+
+    public IActionResult OnGet(int id, int? numberOfHoursToDisplay = null)
     {
-        DateTime cutOff = DateTime.UtcNow.AddDays(-1).Date;
+        if(numberOfHoursToDisplay!=null){
+            NumberOfHoursToDisplay = numberOfHoursToDisplay.Value;
+        }
+
+        DateTime latestImageDateTime = _appDbContext.Images
+            .Where(t => t.DeviceId == id)
+            .OrderByDescending(t => t.Timestamp)
+            .Select(t => t.Timestamp)
+            .FirstOrDefault();
+
+        if(latestImageDateTime==null || latestImageDateTime == DateTime.MinValue){
+            return RedirectToPage("/NotFound");
+        }
+
+        DateTime cutOff = latestImageDateTime.AddHours(-1 * NumberOfHoursToDisplay);
+
         var d = _appDbContext.Devices
-            .Include(d => d.Images.Where(i =>i.Timestamp.Date >= cutOff))
+            .Include(d => d.Images.Where(i =>i.Timestamp >= cutOff))
             .FirstOrDefault(d => d.Id == id);
 
         if(d==null){

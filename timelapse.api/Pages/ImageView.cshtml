@@ -1,39 +1,47 @@
-﻿@page "{id:int}"
+﻿@page "{id:int}/{numberOfHoursToDisplay:int?}"
 @using Humanizer
 @model ImageViewModel
 @{
     ViewData["Title"] = "Image View";
 }
 
-<script>
-    function localize(t)
-    {
-        var d=new Date(t+"Z");
-        document.write(d.toLocaleString());
-    }
-
-    function localizeDate(t)
-    {
-        var d=new Date(t);
-        return d.toLocaleString();
-    }
-</script>
-
 <div class="text-center">
-    <h1 class="display-4">Welcome</h1>
-    <p>Learn about <a href="https://docs.microsoft.com/aspnet/core">building Web apps with ASP.NET Core</a>.</p>
+    <h1 class="display-4">@(Model.device.Description)</h1>
+    <p id="imageHeader" scope="col">Image for @(Model.device.Name) as at <script type="text/javascript">localizeDateTime('@(Model.device.LatestImageTimestamp.Value.ToString("s"))');</script>
+    @if (DateTime.UtcNow - Model.device.LatestImage.Timestamp > TimeSpan.FromMinutes(60)){
+        <span class="badge bg-warning text-dark">Warning - @((DateTime.UtcNow - Model.device.LatestImage.Timestamp).Humanize()) old</span>
+    }
+    </p>
 </div>
+
+<div class="container">
+  <div class="row">
+    <div class="col">
+        <h4>Displaying @(Model.NumberOfHoursToDisplay) hours imagery.</h4>
+        @{
+            <a href="/ImageView/@(Model.device.Id)/1" type="button" class="btn btn-secondary">Last hour</a>
+            <a href="/ImageView/@(Model.device.Id)/24" type="button" class="btn btn-secondary">Last 24 hours</a>
+            <a href="/ImageView/@(Model.device.Id)/48" type="button" class="btn btn-secondary">Last 48 hours</a>
+            <a href="/ImageView/@(Model.device.Id)/168" type="button" class="btn btn-secondary">Last week</a>
+        }
+    </div>
+    @* <div class="col">
+        <div class="float-end">
+            @if(Model.device.LatestImage!=null){
+                <a href="/ImageView/@(Model.device.Id)"><img class="img-thumbnail" src="@(Model.device.LatestImage.BlobUri + Model.SasToken)" width=100></img></a>
+            }
+            @if (Model.device.LatestImage!=null && DateTime.UtcNow - Model.device.LatestImage.Timestamp > TimeSpan.FromMinutes(60)){
+                <span class="badge bg-warning text-dark">Warning - @((DateTime.UtcNow - Model.device.LatestImage.Timestamp).Humanize()) old</span>
+            }
+        </div>
+    </div> *@
+  </div>
+</div>
+
 
 <div>
     <table class="table">
         <thead>
-            <tr>
-            <th id="imageHeader" scope="col">Image for @(Model.device.Name) as at <script type="text/javascript">localize('@(Model.device.LatestImageTimestamp.Value.ToString("s"))');</script>
-            @if (DateTime.UtcNow - Model.device.LatestImage.Timestamp > TimeSpan.FromMinutes(15)){
-                <span class="badge bg-warning text-dark">Warning - @((DateTime.UtcNow - Model.device.LatestImage.Timestamp).Humanize()) old</span>
-            }
-            </th>
-            </tr>
         </thead>
         <tbody>
             <tr>
@@ -97,7 +105,7 @@
         imageBlobUri = last24HoursImages[imageIndex].blobUri + '@(Model.SasToken)'.replace(/&amp;/g, '&')
         image.src = imageBlobUri
         var imageHeader = document.getElementById("imageHeader");
-        imageHeader.innerHTML = "Image for @(Model.device.Name) as at " + localizeDate(last24HoursImages[imageIndex].timestamp)
+        imageHeader.innerHTML = "Image for @(Model.device.Name) as at " + localizeDateTimeAsString(last24HoursImages[imageIndex].timestamp)
     }
 
     // Update the current slider value (each time you drag the slider handle)
