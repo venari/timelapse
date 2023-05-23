@@ -1,6 +1,8 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
+using timelapse.api.Filters;
 using timelapse.api.Helpers;
 using timelapse.core.models;
 using timelapse.infrastructure;
@@ -9,6 +11,8 @@ namespace timelapse.api{
 
     [Route("api/[controller]")]
     [ApiController]
+    [ThirdPartyApiKeyAuth]
+    [AllowAnonymous]
     public class ImageController{
 
         public ImageController(AppDbContext appDbContext, ILogger<ImageController> logger, IConfiguration configuration, IMemoryCache memoryCache){
@@ -60,5 +64,26 @@ namespace timelapse.api{
             _appDbContext.SaveChanges();
             return image;
         }
+
+        // Return latest image for device as a JPEG
+        [HttpGet("Latest")]
+        public ActionResult GetLatest([FromQuery] int deviceId){
+            Device device = _appDbContext.Devices.FirstOrDefault(d => d.Id == deviceId);
+
+            if(device==null){
+                return new NotFoundResult();
+            }
+
+            Image image = _appDbContext.Images
+                .Where(i => i.DeviceId == device.Id)
+                .OrderByDescending(i => i.Timestamp)
+                .FirstOrDefault();
+
+            if(image==null){
+                return new NotFoundResult();
+            }
+
+            return new RedirectResult(image.BlobUri.ToString() + _storageHelper.SasToken);
+        }        
     }
 }

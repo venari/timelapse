@@ -13,16 +13,18 @@
     }
     </p>
 </div>
+@* 
+                        <img class="img-fluid" id="image2" src="/api/Image/Latest?deviceId=@(Model.device.Id)"></img> *@
 
 <div class="container">
   <div class="row">
     <div class="col">
         <h4>Displaying @(Model.NumberOfHoursToDisplay) hours imagery.</h4>
         @{
-            <a href="/ImageView/@(Model.device.Id)/1" type="button" class="btn btn-secondary">Last hour</a>
-            <a href="/ImageView/@(Model.device.Id)/24" type="button" class="btn btn-secondary">Last 24 hours</a>
-            <a href="/ImageView/@(Model.device.Id)/48" type="button" class="btn btn-secondary">Last 48 hours</a>
-            <a href="/ImageView/@(Model.device.Id)/168" type="button" class="btn btn-secondary">Last week</a>
+            <a href="/ImageView/@(Model.device.Id)/1@(HttpContext.Request.QueryString)" type="button" class="btn btn-secondary">Last hour</a>
+            <a href="/ImageView/@(Model.device.Id)/24@(HttpContext.Request.QueryString)" type="button" class="btn btn-secondary">Last 24 hours</a>
+            <a href="/ImageView/@(Model.device.Id)/48@(HttpContext.Request.QueryString)" type="button" class="btn btn-secondary">Last 48 hours</a>
+            <a href="/ImageView/@(Model.device.Id)/168@(HttpContext.Request.QueryString)" type="button" class="btn btn-secondary">Last week</a>
         }
     </div>
     @* <div class="col">
@@ -61,8 +63,6 @@
 </div>
 
 <script>
-
-    const getImageUri = '/api/Image/GetImage'
 
     var last24HoursImages = @(Json.Serialize(Model.imagesLast24Hours));
     var slider = document.getElementById("imageDateSlider")

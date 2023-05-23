@@ -6,10 +6,12 @@ using Microsoft.EntityFrameworkCore;
 using timelapse.api.Helpers;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.AspNetCore.Authorization;
+using timelapse.api.Filters;
 
 namespace timelapse.api.Pages;
 
 [Authorize]
+[AllowAnonymous]
 public class ImageViewModel : PageModel
 {
     private readonly ILogger<ImageViewModel> _logger;
@@ -37,6 +39,37 @@ public class ImageViewModel : PageModel
 
     public IActionResult OnGet(int id, int? numberOfHoursToDisplay = null)
     {
+        // Unusual authentication here - want to accept logged in users, and the Third Party key
+        // Duplication of logic in ThirdPartyApiKeyAuthAttribute
+
+        const string ApiKeyHeaderName = "api-key";
+        if(HttpContext.User==null || HttpContext.User.Identity == null || !HttpContext.User.Identity.IsAuthenticated)
+        {
+            if (!HttpContext.Request.Headers.TryGetValue(ApiKeyHeaderName, out var potentialApiKey))
+            {
+                // Not in headers? Let's try in query string?
+                if(!HttpContext.Request.Query.TryGetValue(ApiKeyHeaderName, out potentialApiKey))
+                {
+                    return Redirect("/Identity/Account/Login");
+                    // return Unauthorized();
+                    // return new UnauthorizedResult();
+                }
+            }
+
+            var configuration = HttpContext.RequestServices.GetRequiredService<IConfiguration>();
+            var apiKey = configuration.GetValue<string>("ThirdParty_ApiKey");
+
+            if(apiKey==null){
+                return Redirect("/Identity/Account/Login");
+            }
+
+            if(!apiKey.Equals(potentialApiKey))
+            {
+                return Redirect("/Identity/Account/Login");
+            }
+        }
+
+
         if(numberOfHoursToDisplay!=null){
             NumberOfHoursToDisplay = numberOfHoursToDisplay.Value;
         }
