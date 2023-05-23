@@ -26,6 +26,7 @@ namespace timelapse.api{
         private StorageHelper _storageHelper;
         
         [HttpPost]
+        [AllowAnonymous]
         public ActionResult<Image> Post([FromForm] ImagePostModel model){
 
             // _logger.LogInformation("In Image Post");
