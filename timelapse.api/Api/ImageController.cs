@@ -11,7 +11,6 @@ namespace timelapse.api{
 
     [Route("api/[controller]")]
     [ApiController]
-    [ThirdPartyApiKeyAuth]
     [AllowAnonymous]
     public class ImageController{
 
@@ -26,7 +25,6 @@ namespace timelapse.api{
         private StorageHelper _storageHelper;
         
         [HttpPost]
-        [AllowAnonymous]
         public ActionResult<Image> Post([FromForm] ImagePostModel model){
 
             // _logger.LogInformation("In Image Post");
@@ -68,6 +66,7 @@ namespace timelapse.api{
 
         // Return latest image for device as a JPEG
         [HttpGet("Latest")]
+        [ThirdPartyApiKeyAuth]
         public ActionResult GetLatest([FromQuery] int deviceId){
             Device device = _appDbContext.Devices.FirstOrDefault(d => d.Id == deviceId);
 
