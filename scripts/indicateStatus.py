@@ -69,7 +69,7 @@ def flashLED(led='D2', R=0, G=0, B=255, flashCount=3, flashDelay=0.5):
         time.sleep(flashDelay)
 
 
-def indcateStatus():
+def indicateStatus():
     flashLED('D2', 0, 0, 255, 3, 0.5)
 
 
