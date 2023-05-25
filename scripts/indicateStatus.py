@@ -75,19 +75,19 @@ def indicateStatus():
     cycleLEDs()
     flashLED('D2', 0, 0, 255, 3, 0.1)
 
-    logger.log('Indicating status...')
+    logger.info('Indicating status...')
 
     # Green - internet OK, red no internet
     time.sleep(3)
     if internet():
-        logger.log('Internet OK')
+        logger.info('Internet OK')
         flashLED('D2', 0, 255, 0, 1, 2)
     else:
-        logger.log('No Internet')
+        logger.info('No Internet')
         flashLED('D2', 255, 0, 0, 1, 2)
     
 
-    logger.log('Status indicated.')
+    logger.info('Status indicated.')
 
     # Flash to indicate end of status
     flashLED('D2', 0, 0, 255, 3, 0.5)
