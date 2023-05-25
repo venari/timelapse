@@ -61,17 +61,19 @@ pj = pijuice.PiJuice(1, 0x14)
 
 def flashLED(led='D2', R=0, G=0, B=255, flashCount=3, flashDelay=0.5):
     for i in range(0, flashCount):
-        logger.info(led + ' - ' + str(R) + ',' + str(G) + ',' + str(B)) 
         pj.status.SetLedState(led, [R, G, B])
         time.sleep(flashDelay)
-        logger.info(led + ' - ' + str(R) + ',' + str(G) + ',' + str(B)) 
         pj.status.SetLedState(led, [0, 0, 0])
         time.sleep(flashDelay)
 
+def cycleLEDs():
+    flashLED('D2', 255, 0, 0, 1, 0.2)
+    flashLED('D2', 0, 255, 0, 1, 0.2)
+    flashLED('D2', 0, 0, 255, 1, 0.2)
 
 def indicateStatus():
-    flashLED('D2', 0, 0, 255, 3, 0.5)
-
+    cycleLEDs()
+    flashLED('D2', 0, 0, 255, 3, 0.1)
 
     # Green - internet OK, red no internet
     time.sleep(3)
