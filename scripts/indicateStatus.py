@@ -28,7 +28,8 @@ def indicateStatus():
         flashLED('D2', 255, 0, 0, 1, 2)
     
     # Flash to indicate end of status
-    flashLED('D2', 0, 0, 255, 3, 0.5)
+    cycleLEDs()
+    flashLED('D2', 0, 0, 255, 3, 0.1)
 
 
 # https://stackoverflow.com/questions/3764291/how-can-i-see-if-theres-an-available-and-active-network-connection-in-python
