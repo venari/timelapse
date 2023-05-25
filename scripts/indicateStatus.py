@@ -62,10 +62,10 @@ pj = pijuice.PiJuice(1, 0x14)
 def flashLED(led='D2', R=0, G=0, B=255, flashCount=3, flashDelay=0.5):
     for i in range(0, flashCount):
         logger.info(led + ' - ' + str(R) + ',' + str(G) + ',' + str(B)) 
-        pijuice.status.SetLedState(led, [R, G, B])
+        pj.status.SetLedState(led, [R, G, B])
         time.sleep(flashDelay)
         logger.info(led + ' - ' + str(R) + ',' + str(G) + ',' + str(B)) 
-        pijuice.status.SetLedState(led, [0, 0, 0])
+        pj.status.SetLedState(led, [0, 0, 0])
         time.sleep(flashDelay)
 
 
