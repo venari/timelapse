@@ -6,15 +6,16 @@ using Microsoft.EntityFrameworkCore;
 using timelapse.api.Helpers;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.AspNetCore.Authorization;
+using timelapse.api.Filters;
 
 namespace timelapse.api.Pages;
 
 [Authorize]
+[AllowAnonymous]
 public class ImageViewModel : PageModel
 {
     private readonly ILogger<ImageViewModel> _logger;
     private AppDbContext _appDbContext;
-    private StorageHelper _storageHelper;
 
     public Device device {get; private set;}
     public string SasToken {get; private set;}
@@ -27,15 +28,66 @@ public class ImageViewModel : PageModel
     {
         _logger = logger;
         _appDbContext = appDbContext;
-        _storageHelper = new StorageHelper(configuration, logger, memoryCache);
-        SasToken = _storageHelper.SasToken;
+        NumberOfHoursToDisplay = 24;
+        StorageHelper storageHelper;
+        storageHelper = new StorageHelper(configuration, logger, memoryCache);
+        SasToken = storageHelper.SasToken;
     }
 
-    public IActionResult OnGet(int id)
+    [BindProperty]
+    public int NumberOfHoursToDisplay {get; set; }
+
+    public IActionResult OnGet(int id, int? numberOfHoursToDisplay = null)
     {
-        DateTime cutOff = DateTime.UtcNow.AddDays(-1).Date;
+        // Unusual authentication here - want to accept logged in users, and the Third Party key
+        // Duplication of logic in ThirdPartyApiKeyAuthAttribute
+
+        const string ApiKeyHeaderName = "api-key";
+        if(HttpContext.User==null || HttpContext.User.Identity == null || !HttpContext.User.Identity.IsAuthenticated)
+        {
+            if (!HttpContext.Request.Headers.TryGetValue(ApiKeyHeaderName, out var potentialApiKey))
+            {
+                // Not in headers? Let's try in query string?
+                if(!HttpContext.Request.Query.TryGetValue(ApiKeyHeaderName, out potentialApiKey))
+                {
+                    return Redirect("/Identity/Account/Login");
+                    // return Unauthorized();
+                    // return new UnauthorizedResult();
+                }
+            }
+
+            var configuration = HttpContext.RequestServices.GetRequiredService<IConfiguration>();
+            var apiKey = configuration.GetValue<string>("ThirdParty_ApiKey");
+
+            if(apiKey==null){
+                return Redirect("/Identity/Account/Login");
+            }
+
+            if(!apiKey.Equals(potentialApiKey))
+            {
+                return Redirect("/Identity/Account/Login");
+            }
+        }
+
+
+        if(numberOfHoursToDisplay!=null){
+            NumberOfHoursToDisplay = numberOfHoursToDisplay.Value;
+        }
+
+        DateTime latestImageDateTime = _appDbContext.Images
+            .Where(t => t.DeviceId == id)
+            .OrderByDescending(t => t.Timestamp)
+            .Select(t => t.Timestamp)
+            .FirstOrDefault();
+
+        if(latestImageDateTime==null || latestImageDateTime == DateTime.MinValue){
+            return RedirectToPage("/NotFound");
+        }
+
+        DateTime cutOff = latestImageDateTime.AddHours(-1 * NumberOfHoursToDisplay);
+
         var d = _appDbContext.Devices
-            .Include(d => d.Images.Where(i =>i.Timestamp.Date >= cutOff))
+            .Include(d => d.Images.Where(i =>i.Timestamp >= cutOff))
             .FirstOrDefault(d => d.Id == id);
 
         if(d==null){

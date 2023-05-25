@@ -5,26 +5,11 @@
     ViewData["Title"] = "Home page";
 }
 
-<script>
-    function localize(t)
-    {
-        var d=new Date(t+"Z");
-        document.write(d.toLocaleString());
-    }
-
-    function localizeDate(t)
-    {
-        var d=new Date(t);
-        return d.toLocaleString();
-    }
-</script>
-
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
 
 <div class="text-center">
     <h1 class="display-4">Welcome</h1>
-    <p>Learn about <a href="https://docs.microsoft.com/aspnet/core">building Web apps with ASP.NET Core</a>.</p>
 </div>
 
 <script>
@@ -82,7 +67,7 @@
                         <td>
                             @* @(device.LatestTelemetry!=null?device.LatestTelemetry.Timestamp:"---") *@
                             @* <script type="text/javascript">localize('@(device.LatestTelemetryTimestamp.HasValue?device.LatestTelemetryTimestamp.Value.ToString("s"):"---")')</script> *@
-                            @if (device.LatestTelemetry!=null && DateTime.UtcNow - device.LatestTelemetry.Timestamp > TimeSpan.FromMinutes(15)){
+                            @if (device.LatestTelemetry!=null && DateTime.UtcNow - device.LatestTelemetry.Timestamp > TimeSpan.FromMinutes(60)){
                                 <span class="badge bg-warning text-dark">Warning - @((DateTime.UtcNow - device.LatestTelemetry.Timestamp).Humanize()) old</span>
                             } else {
                                 <span>@(device.LatestTelemetryTimestamp.HasValue?device.LatestTelemetryTimestamp.Humanize():"---")</span>
@@ -191,7 +176,7 @@
                         <td>
                             @if(device.LatestImage!=null){
                                 <a href="ImageView/@(device.Id)"><img class="img-thumbnail" src="@(device.LatestImage.BlobUri + Model.SasToken)" width=100></img></a>
-                                @if (device.LatestImage!=null && DateTime.UtcNow - device.LatestImage.Timestamp > TimeSpan.FromMinutes(15)){
+                                @if (device.LatestImage!=null && DateTime.UtcNow - device.LatestImage.Timestamp > TimeSpan.FromMinutes(60)){
                                     <span class="badge bg-warning text-dark">Warning - @((DateTime.UtcNow - device.LatestImage.Timestamp).Humanize()) old</span>
                                 }
                             }
