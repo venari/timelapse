@@ -32,6 +32,33 @@ def indicateStatus():
     flashLED('D2', 0, 0, 255, 3, 0.1)
 
 
+def turnOnSystemPowerSwitch(retries = 3):
+
+    pj.power.SetSystemPowerSwitch(500)
+
+    waitCounter = 0
+    while not internet() and waitCounter < 12:
+        time.sleep(10)
+        waitCounter=waitCounter+1
+
+        # Flash yellow
+        flashLED('D2', 255, 255, 0, 1, 1)
+    
+    if waitCounter < 12:
+        # Solid blue
+        flashLED('D2', 0, 0, 255, 1, 5)
+    
+    else:
+        # Flash red
+        flashLED('D2', 255, 0, 0, 10, 0.2)
+        if retries > 0:
+            turnOnSystemPowerSwitch(retries-1)
+        else:
+            pj.power.SetSystemPowerSwitch(0)
+            flashLED('D2', 255, 0, 0, 3, 1)
+            return
+    
+
 # https://stackoverflow.com/questions/3764291/how-can-i-see-if-theres-an-available-and-active-network-connection-in-python
 def internet(host="8.8.8.8", port=53, timeout=3):
     """
@@ -47,3 +74,4 @@ def internet(host="8.8.8.8", port=53, timeout=3):
         return False
 
 indicateStatus()
+turnOnSystemPowerSwitch()
