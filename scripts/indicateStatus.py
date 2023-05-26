@@ -17,8 +17,6 @@ def cycleLEDs():
     flashLED('D2', 0, 0, 255, 1, 0.2)
 
 def indicateStatus():
-    cycleLEDs()
-    flashLED('D2', 0, 0, 255, 3, 0.1)
 
     # Green - internet OK, red no internet
     time.sleep(3)
@@ -27,10 +25,6 @@ def indicateStatus():
     else:
         flashLED('D2', 255, 0, 0, 1, 2)
     
-    # Flash to indicate end of status
-    cycleLEDs()
-    flashLED('D2', 0, 0, 255, 3, 0.1)
-
 
 def turnOnSystemPowerSwitch(retries = 3):
 
@@ -73,5 +67,13 @@ def internet(host="8.8.8.8", port=53, timeout=3):
     except socket.error as ex:
         return False
 
+
+cycleLEDs()
+flashLED('D2', 0, 0, 255, 3, 0.1)
+
 indicateStatus()
 turnOnSystemPowerSwitch()
+
+# Flash to indicate end of status
+cycleLEDs()
+flashLED('D2', 0, 0, 255, 3, 0.1)
