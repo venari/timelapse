@@ -191,7 +191,7 @@ def turnOnSystemPowerSwitch(retries = 3):
         logger.info('Waiting for network....')
         # Call Internet function to wait for network, for a max of 1 minute
         waitCounter = 0
-        while not internet() and waitCounter < 60:
+        while not internet() and waitCounter < 6:
             time.sleep(10)
             logger.info('Still waiting for network....')
             waitCounter=waitCounter+1
