@@ -1,6 +1,22 @@
 import pijuice
 import time
 import socket
+import logging
+from logging.handlers import TimedRotatingFileHandler
+import pathlib
+import json
+
+config = json.load(open('config.json'))
+logFilePath = config["logFilePath"]
+
+formatter = logging.Formatter('%(asctime)s %(name)s %(levelname)s %(message)s')
+handler = TimedRotatingFileHandler(logFilePath, when='midnight', backupCount=10)
+handler.setFormatter(formatter)
+logger = logging.getLogger("indicateStatus")
+logger.addHandler(handler)
+logger.setLevel(logging.DEBUG)
+
+logger.info("Starting up indicateStatus.py...")
 
 pj = pijuice.PiJuice(1, 0x14)
 
@@ -21,8 +37,10 @@ def indicateStatus():
     # Green - internet OK, red no internet
     time.sleep(3)
     if internet():
+        logger.info("We've got internet")
         flashLED('D2', 0, 255, 0, 1, 2)
     else:
+        logger.info("No internet")
         flashLED('D2', 255, 0, 0, 1, 2)
     
 
@@ -70,8 +88,10 @@ def internet(host="8.8.8.8", port=53, timeout=3):
 def togglePowerSwitch():
 
     if pj.power.GetSystemPowerSwitch()['data'] == 0:
+        logger.info("Toggling power switch ON")
         turnOnSystemPowerSwitch()
     else:
+        logger.info("Toglgling power switch OFF")
         pj.power.SetSystemPowerSwitch(0)
         flashLED('D2', 255, 0, 0, 1, 10)
 
@@ -85,3 +105,6 @@ togglePowerSwitch()
 # Flash to indicate end of status
 cycleLEDs()
 # flashLED('D2', 0, 0, 255, 3, 0.1)
+
+logger.info("Completed indicateStatus.py")
+
