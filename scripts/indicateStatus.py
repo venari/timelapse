@@ -69,7 +69,7 @@ def internet(host="8.8.8.8", port=53, timeout=3):
 
 def togglePowerSwitch():
 
-    if pj.power.GetSystemPowerSwitch() == 0:
+    if pj.power.GetSystemPowerSwitch().data == 0:
         turnOnSystemPowerSwitch()
     else:
         pj.power.SetSystemPowerSwitch(0)
