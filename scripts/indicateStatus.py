@@ -93,7 +93,7 @@ def togglePowerSwitch():
     else:
         logger.info("Toglgling power switch OFF")
         pj.power.SetSystemPowerSwitch(0)
-        flashLED('D2', 255, 0, 0, 1, 10)
+        flashLED('D2', 255, 0, 0, 1, 5)
 
 
 cycleLEDs()
