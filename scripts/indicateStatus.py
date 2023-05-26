@@ -67,13 +67,21 @@ def internet(host="8.8.8.8", port=53, timeout=3):
     except socket.error as ex:
         return False
 
+def togglePowerSwitch():
+
+    if pj.power.GetSystemPowerSwitch() == 0:
+        turnOnSystemPowerSwitch()
+    else:
+        pj.power.SetSystemPowerSwitch(0)
+        flashLED('D2', 255, 0, 0, 1, 10)
+
 
 cycleLEDs()
-flashLED('D2', 0, 0, 255, 3, 0.1)
+# flashLED('D2', 0, 0, 255, 3, 0.1)
 
 indicateStatus()
-turnOnSystemPowerSwitch()
+togglePowerSwitch()
 
 # Flash to indicate end of status
 cycleLEDs()
-flashLED('D2', 0, 0, 255, 3, 0.1)
+# flashLED('D2', 0, 0, 255, 3, 0.1)
