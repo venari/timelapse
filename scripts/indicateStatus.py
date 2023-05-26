@@ -36,7 +36,7 @@ def turnOnSystemPowerSwitch(retries = 3):
         waitCounter=waitCounter+1
 
         # Flash yellow
-        flashLED('D2', 255, 255, 0, 1, 1)
+        flashLED('D2', 150, 200, 0, 1, 1)
     
     if waitCounter < 12:
         # Solid blue
