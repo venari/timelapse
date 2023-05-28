@@ -51,7 +51,6 @@ raspberrypi.lan (192.168.86.32) at b8:27:eb:94:ac:b1 on en0 ifscope [ethernet]
 ```
 
 ```
-bash <(curl -fsSL "https://raw.githubusercontent.com/venari/timelapse/development/install.sh?$RANDOM")
 
 ```
 
@@ -442,7 +441,10 @@ Note - Wake up should be automatically enabled in `saveTelemetry.py`, but you wi
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 ```
 
-
+## Troubleshooting indicateStatus script:
+```
+sudo -u pijuice /home/pi/dev/timelapse/scripts/indicateStatus.sh
+```
 
 # Battery notes
 

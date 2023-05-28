@@ -14,7 +14,6 @@ config = json.load(open('config.json'))
 logFilePath = config["logFilePath"]
 os.makedirs(os.path.dirname(logFilePath), exist_ok=True)
 # os.chmod(os.path.dirname(logFilePath), 0o777) # Make sure pijuice user scrip can write to log file.
-os.chmod(logFilePath, 0o777) # Make sure pijuice user scrip can write to log file.
 
 
 formatter = logging.Formatter('%(asctime)s %(name)s %(levelname)s %(message)s')
@@ -27,6 +26,7 @@ logger.addHandler(handler)
 logger.setLevel(logging.DEBUG)
 
 logger.info("Starting up saveTelemetry.py...")
+os.chmod(logFilePath, 0o777) # Make sure pijuice user script can write to log file.
 
 # clock
 while not os.path.exists('/dev/i2c-1'):
