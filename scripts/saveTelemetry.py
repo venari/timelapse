@@ -176,7 +176,7 @@ def scheduleShutdown():
 
         minsToWakeAfter = 10
 
-        logger.debug('skipping shutdown - scheduling safety wakeup in ' + minsToWakeAfter + ' minutes incase we crash...')
+        logger.debug('skipping shutdown - scheduling safety wakeup in ' + str(minsToWakeAfter) + ' minutes incase we crash...')
         # Set wake up for near period in future in case we crash.
 
         minToWakeAt = datetime.datetime.now().minute + minsToWakeAfter
