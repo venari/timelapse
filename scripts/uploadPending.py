@@ -16,6 +16,7 @@ import socket
 config = json.load(open('config.json'))
 logFilePath = config["logFilePath"]
 os.makedirs(os.path.dirname(logFilePath), exist_ok=True)
+# os.chmod(os.path.dirname(logFilePath), 0o777) # Make sure pijuice user scrip can write to log file.
 
 formatter = logging.Formatter('%(asctime)s %(name)s %(levelname)s %(message)s')
 handler = TimedRotatingFileHandler(logFilePath, 
@@ -27,6 +28,7 @@ logger.addHandler(handler)
 logger.setLevel(logging.DEBUG)
 
 logger.info("Starting up uploadPending.py...")
+os.chmod(logFilePath, 0o777) # Make sure pijuice user script can write to log file.
 
 outputImageFolder = '../output/images/'
 pendingImageFolder = outputImageFolder + 'pending/'
@@ -191,7 +193,7 @@ def turnOnSystemPowerSwitch(retries = 3):
         logger.info('Waiting for network....')
         # Call Internet function to wait for network, for a max of 1 minute
         waitCounter = 0
-        while not internet() and waitCounter < 60:
+        while not internet() and waitCounter < 6:
             time.sleep(10)
             logger.info('Still waiting for network....')
             waitCounter=waitCounter+1

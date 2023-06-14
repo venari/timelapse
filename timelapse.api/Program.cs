@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Identity.UI.Services;
 using timelapse.api.Areas.Identity.Data;
 using timelapse.Services;
 using Microsoft.OpenApi.Models;
+using timelapse.api.Data;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -89,5 +90,22 @@ app.UseEndpoints(endpoints =>
     endpoints.MapControllers();
     // endpoints.MapRazorPages();
 });
+
+try
+{
+    using (var scope = app.Services.CreateScope())
+    {
+        var services = scope.ServiceProvider;
+        var context = services.GetRequiredService<AppDbContext>();    
+        // var userManager = services.GetRequiredService<UserManager<ApplicationUser>>();
+        DbInitializer.Initialize(context); //, userManager);
+    }
+}
+catch (Exception ex)
+{
+    var logger = app.Services.GetRequiredService<ILogger<Program>>();
+    logger.LogError(ex, "An error occurred while seeding the database.");
+}
+
 
 app.Run();
