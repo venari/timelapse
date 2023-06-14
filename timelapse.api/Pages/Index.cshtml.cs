@@ -31,7 +31,8 @@ public class IndexModel : PageModel
             .Include(d => d.Telemetries.Where(t => t.Timestamp >= cutOff))
             .Include(d => d.Images.OrderByDescending(i => i.Timestamp).Take(1))
             .AsSplitQuery()
-            .OrderBy(d => d.Name)
+            // .OrderBy(d => d.Name)
+            .OrderBy(d => d.Description)
             .ToList();
         _storageHelper = new StorageHelper(configuration, logger, memoryCache);
 

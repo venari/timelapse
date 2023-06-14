@@ -56,7 +56,7 @@
         const maxVoltage = 3600
 
         console.log("showTelemtery");
-        console.log(data)
+        @* console.log(data) *@
 
         var lastIndex = 0;
 
@@ -109,6 +109,7 @@
         chart.config.data.datasets[5].data = data.map(d => ({x: new Date(d.timestamp), y: d.batteryVoltage}));
         chart.config.data.datasets[6].data = data.map(d => ({x: new Date(d.timestamp), y: d.charging}));        
         chart.config.data.datasets[7].data = data.map(d => ({x: new Date(d.timestamp), y: d.batteryPercentPerHour}));
+        chart.config.data.datasets[8].data = data.map(d => ({x: new Date(d.timestamp), y: d.uptimeSeconds/60}));
         chart.update();
     }
 </script>
@@ -225,6 +226,12 @@
                                 label: "Battery %/hr",
                                 backgroundColor: 'rgb(00, 165, 20)',
                                 borderColor: 'rgb(00, 165, 20)',
+                                hidden: true,
+                                yAxisID: 'y',
+                            }, {
+                                label: "Uptime (minutes)",
+                                backgroundColor: 'rgb(00, 00, 00)',
+                                borderColor: 'rgb(00, 00, 00)',
                                 hidden: true,
                                 yAxisID: 'y',
                             }]

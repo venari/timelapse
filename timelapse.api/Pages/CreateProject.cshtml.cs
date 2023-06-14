@@ -6,7 +6,7 @@ using timelapse.api.Areas.Identity.Data;
 using timelapse.infrastructure;
 using timelapse.core.models;
 
-namespace timlapse.api.Pages
+namespace timelapse.api.Pages
 {
     [Authorize]
     public class CreateProjectModel : PageModel
