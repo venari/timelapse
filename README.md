@@ -26,6 +26,15 @@ cp ~/wpa_supplicant.conf /Volumes/bootfs
 diskutil unmount /Volumes/bootfs
 ```
 
+If updating the wpa_supplicant file, and you have network access:
+```
+scp ~/wpa_supplicant.conf pi@[pi name]:~
+```
+And then on the pi:
+```
+sudo cp ~/wpa_supplicant.conf /etc/wpa_supplicant/wpa_supplicant.conf
+sudo reboot
+```
 
 Turn on and find the pi
 Pi Zero W 2:
@@ -42,7 +51,6 @@ raspberrypi.lan (192.168.86.32) at b8:27:eb:94:ac:b1 on en0 ifscope [ethernet]
 ```
 
 ```
-bash <(curl -fsSL "https://raw.githubusercontent.com/venari/timelapse/development/install.sh?$RANDOM")
 
 ```
 
@@ -364,9 +372,9 @@ Note - Wake up should be automatically enabled in `saveTelemetry.py`, but you wi
 ░░░░░│  R50 [mOhm]:               83.0                              │░░░░░  <-- Set to 83
 ░░░░░│  R90 [mOhm]:               76.0                              │░░░░░  <-- Set to 76
 ░░░░░│                                                              │░░░░░
-░░░░░│  < Temperature sense: ON_BOARD    >                          │░░░░░
+░░░░░│  < Temperature sense: ON_BOARD    >                          │░░░░░  <-- Set to ON_BOARD
 ░░░░░│                                                              │░░░░░
-░░░░░│  < Rsoc estimation: DIRECT_BY_MCU >                          │░░░░░
+░░░░░│  < Rsoc estimation: DIRECT_BY_MCU >                          │░░░░░  <-- Set to DIRECT_BY_MCU
 ░░░░░│                                                              │░░░░░
 ░░░░░│  < Refresh        >                                          │░░░░░
 ░░░░░│  < Apply settings >                                          │░░░░░
@@ -377,7 +385,66 @@ Note - Wake up should be automatically enabled in `saveTelemetry.py`, but you wi
 
 ```
 
+# Status Indication script
 
+```
+░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+░░░░░┌───────────────────────── PiJuice CLI ────────────────────────┐░░░░
+░░░░░│  User Scripts                                                │░░░░
+░░░░░│                                                              │░░░░
+░░░░░│  USER FUNC1:                                                 │░░░░
+░░░░░│  /home/pi/dev/timelapse/scripts/indicateStatus.sh            │░░░░
+░░░░░│  USER FUNC2:                                                 │░░░░
+░░░░░│  USER FUNC3:                                                 │░░░░
+░░░░░│  USER FUNC4:                                                 │░░░░
+░░░░░│  USER FUNC5:                                                 │░░░░
+░░░░░│  USER FUNC6:                                                 │░░░░
+░░░░░│  USER FUNC7:                                                 │░░░░
+░░░░░│  USER FUNC8:                                                 │░░░░
+░░░░░│  USER FUNC9:                                                 │░░░░
+░░░░░│  USER FUNC10:                                                │░░░░
+░░░░░│  USER FUNC11:                                                │░░░░
+░░░░░│  USER FUNC12:                                                │░░░░
+░░░░░│  USER FUNC13:                                                │░░░░
+░░░░░│  USER FUNC14:                                                │░░░░
+░░░░░│  USER FUNC15:                                                │░░░░
+░░░░░└──────────────────────────────────────────────────────────────┘░░░░
+░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+
+
+
+░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+░░░░░┌───────────────────────── PiJuice CLI ────────────────────────┐░░░░
+░░░░░│  Settings for SW1                                            │░░░░
+░░░░░│                                                              │░░░░
+░░░░░│  < PRESS: USER_FUNC1, 0                       >              │░░░░
+░░░░░│  < RELEASE: NO_FUNC, 0                        >              │░░░░
+░░░░░│  < SINGLE_PRESS: HARD_FUNC_POWER_ON, 800      >              │░░░░
+░░░░░│  < DOUBLE_PRESS: NO_FUNC, 0                   >              │░░░░
+░░░░░│  < LONG_PRESS1: SYS_FUNC_HALT, 10000          >              │░░░░
+░░░░░│  < LONG_PRESS2: HARD_FUNC_POWER_OFF, 20000    >              │░░░░
+░░░░░│                                                              │░░░░
+░░░░░│  < Back >                                                    │░░░░
+░░░░░│                                                              │░░░░
+░░░░░│                                                              │░░░░
+░░░░░│                                                              │░░░░
+░░░░░│                                                              │░░░░
+░░░░░│                                                              │░░░░
+░░░░░│                                                              │░░░░
+░░░░░│                                                              │░░░░
+░░░░░│                                                              │░░░░
+░░░░░└──────────────────────────────────────────────────────────────┘░░░░
+░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+```
+
+## Troubleshooting indicateStatus script:
+```
+sudo -u pijuice /home/pi/dev/timelapse/scripts/indicateStatus.sh
+```
 
 # Battery notes
 

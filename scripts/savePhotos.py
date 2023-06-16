@@ -15,6 +15,7 @@ import pathlib
 config = json.load(open('config.json'))
 logFilePath = config["logFilePath"]
 os.makedirs(os.path.dirname(logFilePath), exist_ok=True)
+# os.chmod(os.path.dirname(logFilePath), 0o777) # Make sure pijuice user scrip can write to log file.
 
 formatter = logging.Formatter('%(asctime)s %(name)s %(levelname)s %(message)s')
 handler = TimedRotatingFileHandler(logFilePath, when='midnight', backupCount=10)
@@ -24,6 +25,7 @@ logger.addHandler(handler)
 logger.setLevel(logging.DEBUG)
 
 logger.info("Starting up savePhotos.py...")
+os.chmod(logFilePath, 0o777) # Make sure pijuice user script can write to log file.
 
 # clock
 while not os.path.exists('/dev/i2c-1'):
@@ -120,15 +122,15 @@ def savePhotos():
 
 try:
     logger.info('In savePhotos.py')
-    if config['shutdown']:
-        logger.info('Setting failsafe power off for 2 minutes 30 seconds from now.')
-        pj.power.SetPowerOff(150)   # Fail safe turn the thing off
 
     while True:
         savePhotos()
-        logger.warning("Bailed out of savePhotos() - let's pause to catch our breath...")
-        # If we get here something went wrong. Let's pause for a bit and try again.
-        time.sleep(30)
+
+        if not config['shutdown']:
+            logger.warning("Bailed out of savePhotos() - let's pause to catch our breath...")
+            # If we get here something went wrong. Let's pause for a bit and try again.
+            time.sleep(30)
+            
 except Exception as e:
     logger.error("Catastrophic failure.")
     logger.error(e)

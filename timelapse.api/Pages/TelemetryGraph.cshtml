@@ -5,29 +5,39 @@
     ViewData["Title"] = "Telemetry Graph";
 }
 
-<script>
-    function localize(t)
-    {
-        var d=new Date(t+" UTC");
-        document.write(d.toLocaleString());
-    }
-
-    function localizeDate(t)
-    {
-        var d=new Date(t);
-        return d.toLocaleString();
-    }
-</script>
-
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
 
-<h4>Displaying @(Model.NumberOfHoursToDisplay) hours data.</h4>
-@{
-    <a href="/TelemetryGraph/@(Model.device.Id)/1" type="button" class="btn btn-secondary">Last hour</a>
-    <a href="/TelemetryGraph/@(Model.device.Id)/24" type="button" class="btn btn-secondary">Last 24 hours</a>
-    <a href="/TelemetryGraph/@(Model.device.Id)/48" type="button" class="btn btn-secondary">Last 48 hours</a>
-}
+<div class="text-center">
+    <h1 class="display-4">
+        @(Model.device.Description)
+    </h1>
+</div>
+
+<div class="container">
+  <div class="row">
+    <div class="col">
+        <h4>Displaying @(Model.NumberOfHoursToDisplay) hours data.</h4>
+        @{
+            <a href="/TelemetryGraph/@(Model.device.Id)/1" type="button" class="btn btn-secondary">Last hour</a>
+            <a href="/TelemetryGraph/@(Model.device.Id)/24" type="button" class="btn btn-secondary">Last 24 hours</a>
+            <a href="/TelemetryGraph/@(Model.device.Id)/48" type="button" class="btn btn-secondary">Last 48 hours</a>
+            <a href="/TelemetryGraph/@(Model.device.Id)/168" type="button" class="btn btn-secondary">Last week</a>
+        }
+    </div>
+    <div class="col">
+        <div class="float-end">
+            @if(Model.device.LatestImage!=null){
+                <a href="/ImageView/@(Model.device.Id)"><img class="img-thumbnail" src="@(Model.device.LatestImage.BlobUri + Model.SasToken)" width=100></img></a>
+            }
+            @if (Model.device.LatestImage!=null && DateTime.UtcNow - Model.device.LatestImage.Timestamp > TimeSpan.FromMinutes(60)){
+                <span class="badge bg-warning text-dark">Warning - @((DateTime.UtcNow - Model.device.LatestImage.Timestamp).Humanize()) old</span>
+            }
+        </div>
+    </div>
+  </div>
+</div>
+
 
 
 <script>
@@ -46,7 +56,7 @@
         const maxVoltage = 3600
 
         console.log("showTelemtery");
-        console.log(data)
+        @* console.log(data) *@
 
         var lastIndex = 0;
 
@@ -99,6 +109,7 @@
         chart.config.data.datasets[5].data = data.map(d => ({x: new Date(d.timestamp), y: d.batteryVoltage}));
         chart.config.data.datasets[6].data = data.map(d => ({x: new Date(d.timestamp), y: d.charging}));        
         chart.config.data.datasets[7].data = data.map(d => ({x: new Date(d.timestamp), y: d.batteryPercentPerHour}));
+        chart.config.data.datasets[8].data = data.map(d => ({x: new Date(d.timestamp), y: d.uptimeSeconds/60}));
         chart.update();
     }
 </script>
@@ -107,8 +118,8 @@
     <table class="table">
         <thead>
             <tr>
-            <th scope="col">Latest Telemetry for @(Model.device.Name) as at <script type="text/javascript">localize('@(Model.device.LatestTelemetryTimestamp)');</script>
-            @if (Model.device.LatestTelemetry!=null && DateTime.UtcNow - Model.device.LatestTelemetry.Timestamp > TimeSpan.FromMinutes(15)){
+            <th scope="col">Latest Telemetry for @(Model.device.Name) as at <script type="text/javascript">localizeDateTime('@(Model.device.LatestTelemetryTimestamp.Value.ToString("s"))');</script>
+            @if (Model.device.LatestTelemetry!=null && DateTime.UtcNow - Model.device.LatestTelemetry.Timestamp > TimeSpan.FromMinutes(60)){
                 <span class="badge bg-warning text-dark">Warning - @((DateTime.UtcNow - Model.device.LatestTelemetry.Timestamp).Humanize()) old</span>
             }
             </th>
@@ -215,6 +226,12 @@
                                 label: "Battery %/hr",
                                 backgroundColor: 'rgb(00, 165, 20)',
                                 borderColor: 'rgb(00, 165, 20)',
+                                hidden: true,
+                                yAxisID: 'y',
+                            }, {
+                                label: "Uptime (minutes)",
+                                backgroundColor: 'rgb(00, 00, 00)',
+                                borderColor: 'rgb(00, 00, 00)',
                                 hidden: true,
                                 yAxisID: 'y',
                             }]

@@ -1,6 +1,8 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
+using timelapse.api.Filters;
 using timelapse.api.Helpers;
 using timelapse.core.models;
 using timelapse.infrastructure;
@@ -9,6 +11,7 @@ namespace timelapse.api{
 
     [Route("api/[controller]")]
     [ApiController]
+    [AllowAnonymous]
     public class ImageController{
 
         public ImageController(AppDbContext appDbContext, ILogger<ImageController> logger, IConfiguration configuration, IMemoryCache memoryCache){
@@ -20,33 +23,6 @@ namespace timelapse.api{
         private AppDbContext _appDbContext;
         private ILogger _logger;
         private StorageHelper _storageHelper;
-
-        [HttpGet]
-        public ActionResult<IEnumerable<Image>> Get(){
-            _logger.LogInformation("Get all TelemetryController");
-            return _appDbContext.Images.ToList();
-        }
-
-        [HttpGet("GetImage")]
-        public ActionResult<Image> GetImage([FromQuery] int deviceId, int imageIndex){
-            _logger.LogInformation("Get Image");
-            // var device = _appDbContext.Devices.Find(deviceId);
-            var device = _appDbContext.Devices
-                .Include(d => d.Images)
-                .FirstOrDefault(d => d.Id == deviceId);
-
-            if(device==null){
-                return new NotFoundResult();
-            }
-            var images = device.Images.OrderBy(i => i.Timestamp).ToList();
-            if(imageIndex<0 || imageIndex>=images.Count){
-                return new NotFoundResult();
-            }
-            var image = images[imageIndex];
-            return image;
-            // var imageUrl = image.BlobUri + _storageHelper.SasToken;
-            // return sasUri.ToString();
-        }
         
         [HttpPost]
         public ActionResult<Image> Post([FromForm] ImagePostModel model){
@@ -87,5 +63,27 @@ namespace timelapse.api{
             _appDbContext.SaveChanges();
             return image;
         }
+
+        // Return latest image for device as a JPEG
+        [HttpGet("Latest")]
+        [ThirdPartyApiKeyAuth]
+        public ActionResult GetLatest([FromQuery] int deviceId){
+            Device device = _appDbContext.Devices.FirstOrDefault(d => d.Id == deviceId);
+
+            if(device==null){
+                return new NotFoundResult();
+            }
+
+            Image image = _appDbContext.Images
+                .Where(i => i.DeviceId == device.Id)
+                .OrderByDescending(i => i.Timestamp)
+                .FirstOrDefault();
+
+            if(image==null){
+                return new NotFoundResult();
+            }
+
+            return new RedirectResult(image.BlobUri.ToString() + _storageHelper.SasToken);
+        }        
     }
 }

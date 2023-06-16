@@ -16,6 +16,7 @@ import socket
 config = json.load(open('config.json'))
 logFilePath = config["logFilePath"]
 os.makedirs(os.path.dirname(logFilePath), exist_ok=True)
+# os.chmod(os.path.dirname(logFilePath), 0o777) # Make sure pijuice user scrip can write to log file.
 
 formatter = logging.Formatter('%(asctime)s %(name)s %(levelname)s %(message)s')
 handler = TimedRotatingFileHandler(logFilePath, 
@@ -27,6 +28,7 @@ logger.addHandler(handler)
 logger.setLevel(logging.DEBUG)
 
 logger.info("Starting up uploadPending.py...")
+os.chmod(logFilePath, 0o777) # Make sure pijuice user script can write to log file.
 
 outputImageFolder = '../output/images/'
 pendingImageFolder = outputImageFolder + 'pending/'
@@ -103,7 +105,7 @@ def uploadPendingPhotos():
 
             session = requests.Session()
             logger.debug('Posting image to API...')
-            response = session.post(config['apiUrl'] + 'Image', files=files, data=data)
+            response = session.post(config['apiUrl'] + 'Image', files=files, data=data, timeout=30)
 
             logger.debug(f'Response code: {response.status_code}')
             if response.status_code == 200:
@@ -191,7 +193,7 @@ def turnOnSystemPowerSwitch(retries = 3):
         logger.info('Waiting for network....')
         # Call Internet function to wait for network, for a max of 1 minute
         waitCounter = 0
-        while not internet() and waitCounter < 60:
+        while not internet() and waitCounter < 6:
             time.sleep(10)
             logger.info('Still waiting for network....')
             waitCounter=waitCounter+1
@@ -252,7 +254,7 @@ def uploadPendingTelemetry():
 
             logger.debug(api_data)
 
-            postResponse = session.post(config['apiUrl'] + 'Telemetry',data=api_data)
+            postResponse = session.post(config['apiUrl'] + 'Telemetry',data=api_data, timeout=5)
             logger.debug(postResponse)
             assert postResponse.status_code == 200, "API returned error code"
             #requests.post(config['apiUrl'] + '/Telemetry', json=api_data)

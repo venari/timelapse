@@ -5,6 +5,8 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.UI.Services;
 using timelapse.api.Areas.Identity.Data;
 using timelapse.Services;
+using Microsoft.OpenApi.Models;
+using timelapse.api.Data;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -20,7 +22,33 @@ builder.Services.AddDefaultIdentity<AppUser>(options =>
 
 
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+builder.Services.AddSwaggerGen(c =>
+{
+    c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+    {
+        Description = "JWT Authorization header using the Bearer scheme. Example: \"Authorization: Bearer {token}\"",
+        Name = "api-key",
+        In = ParameterLocation.Header,
+        Type = SecuritySchemeType.ApiKey
+    });
+
+    c.AddSecurityRequirement(new OpenApiSecurityRequirement()
+    {
+        {
+            new OpenApiSecurityScheme
+            {
+                Reference = new OpenApiReference
+                {
+                    Type = ReferenceType.SecurityScheme,
+                    Id = "Bearer"
+                }
+            },
+            new string[] {}
+        }
+    });
+
+});
+
 builder.Services.AddControllers()
     .AddJsonOptions(options =>{
     options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
@@ -62,5 +90,22 @@ app.UseEndpoints(endpoints =>
     endpoints.MapControllers();
     // endpoints.MapRazorPages();
 });
+
+try
+{
+    using (var scope = app.Services.CreateScope())
+    {
+        var services = scope.ServiceProvider;
+        var context = services.GetRequiredService<AppDbContext>();    
+        // var userManager = services.GetRequiredService<UserManager<ApplicationUser>>();
+        DbInitializer.Initialize(context); //, userManager);
+    }
+}
+catch (Exception ex)
+{
+    var logger = app.Services.GetRequiredService<ILogger<Program>>();
+    logger.LogError(ex, "An error occurred while seeding the database.");
+}
+
 
 app.Run();
