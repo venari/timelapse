@@ -91,7 +91,7 @@ def togglePowerSwitch():
         logger.info("Toggling power switch ON")
         turnOnSystemPowerSwitch()
     else:
-        logger.info("Toglgling power switch OFF")
+        logger.info("Toggling power switch OFF")
         pj.power.SetSystemPowerSwitch(0)
         flashLED('D2', 255, 0, 0, 1, 5)
 
