@@ -9,6 +9,7 @@ import sys
 import logging
 from logging.handlers import TimedRotatingFileHandler
 import pathlib
+import glob
 
 config = json.load(open('config.json'))
 logFilePath = config["logFilePath"]
@@ -129,6 +130,40 @@ def scheduleShutdown():
         }
 
         setAlarm = True
+
+
+    # If we've been up for more than 2 modem cycles or 30 minutes, and the most recently uploaded image is older than 10 minutes, 
+    # either network is out, or we can't get a cellular signal, DNS is messing around, or camera isn't capturing.
+    # Let's shutdown, power down, and wake up again in 3 mins to see if that fixes it.
+    uptimeSeconds = int(time.clock_gettime(time.CLOCK_BOOTTIME))
+    power_interval = config['modem.power_interval']
+    if uptimeSeconds > power_interval * 2 and uptimeSeconds > 1800:
+        mostRecentUploadedFiles = sorted(glob.iglob(pendingImageFolder + "/*.*"), key=os.path.getctime, reverse=True)
+        latestUploadedFileCreationTime = max(mostRecentUploadedFiles, key=os.path.getctime)
+        logger.debug("latestUploadedFileCreationTime: " + str(latestUploadedFileCreationTime))
+
+        secondsSinceLastUpload = (datetime.datetime.now() - datetime.datetime.fromtimestamp(os.path.getctime(latestUploadedFileCreationTime))).total_seconds()
+        logger.debug("secondsSinceLastUpload: " + str(secondsSinceLastUpload))
+
+        if secondsSinceLastUpload > 600:
+            logger.warning('Most recent uploaded image is ' + str(secondsSinceLastUpload) + ' seconds old - restarting...')
+            minsToWakeAfter = 3
+            minToWakeAt = datetime.datetime.now().minute + minsToWakeAfter
+            if minToWakeAt >= 60:
+                minToWakeAt = minToWakeAt - 60
+
+            alarmObj = {
+                    'year': 'EVERY_YEAR',
+                    'month': 'EVERY_MONTH',
+                    'day': 'EVERY_DAY',
+                    'hour': 'EVERY_HOUR',
+                    # 'minute_period': DELTA_MIN,
+                    'minute': minToWakeAt,
+                    'second': 0,
+            }
+
+            setAlarm = True
+
 
     if setAlarm == True:
         logger.info("scheduleShutdown - we're setting the shutdown...")

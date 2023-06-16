@@ -27,7 +27,11 @@ logger = logging.getLogger("uploadPending")
 logger.addHandler(handler)
 logger.setLevel(logging.DEBUG)
 
+logger.info("******************************************************************************")
+logger.info("")
 logger.info("Starting up uploadPending.py...")
+logger.info("")
+logger.info("******************************************************************************")
 os.chmod(logFilePath, 0o777) # Make sure pijuice user script can write to log file.
 
 outputImageFolder = '../output/images/'
