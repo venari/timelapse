@@ -143,7 +143,7 @@ def scheduleShutdown():
         secondsSinceLastUpload = -1
         triggerRestart = False
 
-        if mostRecentUploadedFiles.count > 0:
+        if len(mostRecentUploadedFiles.count) > 0:
 
             latestUploadedFileCreationTime = max(mostRecentUploadedFiles, key=os.path.getctime)
             logger.debug("latestUploadedFileCreationTime: " + str(latestUploadedFileCreationTime))
@@ -173,7 +173,8 @@ def scheduleShutdown():
                     'second': 0,
             }
 
-            setAlarm = True
+            # setAlarm = True
+            logger.warning('We would set alarm to ' + str(alarmObj) + '...')
 
 
     if setAlarm == True:
