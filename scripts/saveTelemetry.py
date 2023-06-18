@@ -143,7 +143,7 @@ def scheduleShutdown():
         secondsSinceLastUpload = -1
         triggerRestart = False
 
-        if len(mostRecentUploadedFiles.count) > 0:
+        if len(mostRecentUploadedFiles) > 0:
 
             latestUploadedFileCreationTime = max(mostRecentUploadedFiles, key=os.path.getctime)
             logger.debug("latestUploadedFileCreationTime: " + str(latestUploadedFileCreationTime))
