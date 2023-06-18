@@ -138,15 +138,26 @@ def scheduleShutdown():
     uptimeSeconds = int(time.clock_gettime(time.CLOCK_BOOTTIME))
     power_interval = config['modem.power_interval']
     if uptimeSeconds > power_interval * 2 and uptimeSeconds > 1800:
-        mostRecentUploadedFiles = sorted(glob.iglob(pendingImageFolder + "/*.*"), key=os.path.getctime, reverse=True)
-        latestUploadedFileCreationTime = max(mostRecentUploadedFiles, key=os.path.getctime)
-        logger.debug("latestUploadedFileCreationTime: " + str(latestUploadedFileCreationTime))
+        mostRecentUploadedFiles = sorted(glob.iglob(uploadedImageFolder + "/*.*"), key=os.path.getctime, reverse=True)
 
-        secondsSinceLastUpload = (datetime.datetime.now() - datetime.datetime.fromtimestamp(os.path.getctime(latestUploadedFileCreationTime))).total_seconds()
-        logger.debug("secondsSinceLastUpload: " + str(secondsSinceLastUpload))
+        secondsSinceLastUpload = -1
+        triggerRestart = False
 
-        if secondsSinceLastUpload > 600:
-            logger.warning('Most recent uploaded image is ' + str(secondsSinceLastUpload) + ' seconds old - restarting...')
+        if mostRecentUploadedFiles.count > 0:
+
+            latestUploadedFileCreationTime = max(mostRecentUploadedFiles, key=os.path.getctime)
+            logger.debug("latestUploadedFileCreationTime: " + str(latestUploadedFileCreationTime))
+
+            secondsSinceLastUpload = (datetime.datetime.now() - datetime.datetime.fromtimestamp(os.path.getctime(latestUploadedFileCreationTime))).total_seconds()
+            logger.debug("secondsSinceLastUpload: " + str(secondsSinceLastUpload))
+            if secondsSinceLastUpload > 600:
+                logger.warning('Most recent uploaded image is ' + str(secondsSinceLastUpload) + ' seconds old - restarting...')
+                triggerRestart = True
+        else:
+            logger.debug("No uploaded files found - restarting...")
+            triggerRestart = True
+
+        if triggerRestart:
             minsToWakeAfter = 3
             minToWakeAt = datetime.datetime.now().minute + minsToWakeAfter
             if minToWakeAt >= 60:
