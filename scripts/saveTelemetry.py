@@ -173,9 +173,7 @@ def scheduleShutdown():
                     'second': 0,
             }
 
-            # setAlarm = True
-            logger.warning('We would set alarm to ' + str(alarmObj) + '...')
-
+            setAlarm = True
 
     if setAlarm == True:
         logger.info("scheduleShutdown - we're setting the shutdown...")
