@@ -19,6 +19,6 @@
     "camera.interval": 60,
     "camera.quality": 30,
     "camera.focus_m": 100,
-    "supportMode": true,
+    "supportMode": false,
     "monitoringMode": false
 }
