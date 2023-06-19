@@ -1,7 +1,6 @@
 {
     "logToFile": true,
     "logToAPI": true,
-
     "apiUrl": "https://timelapse-dev.azurewebsites.net/api/",
     "logFilePath": "/home/pi/logs/timelapse.log",
     "shutdown": false,
