@@ -147,7 +147,7 @@ def uploadPendingPhotos():
 
                 # If it's 9am or 12pm or 5pm, don't turn the modem off for 15 minutes, 
                 # or config['supportMode'] == True
-                if ((datetime.datetime.now().hour == 9 or datetime.datetime.now().hour == 12 or datetime.datetime.now().hour == 17) and datetime.datetime.now().minute < 15) or config['supportMode'==True]:
+                if ((datetime.datetime.now().hour == 9 or datetime.datetime.now().hour == 12 or datetime.datetime.now().hour == 17) and datetime.datetime.now().minute < 15) or config['supportMode']==True:
                     if not bInSupportWindow:
                         logger.info('Opening minute support window...')
                         bInSupportWindow = True
