@@ -39,6 +39,8 @@
             <th scope="col">Id</th>
             <th scope="col">Name</th>
             <th scope="col">Description</th>
+            <th scope="col">Support</th>
+            <th scope="col">Monitoring</th>
             <th scope="col">Latest Telemetry</th>
             <th scope="col">Battery %</th>
             <th scope="col"></th>
@@ -63,6 +65,12 @@
                         </td>
                         <td>
                             @Html.DisplayFor(modelItem => device.Description)
+                        </td>
+                        <td>
+                            @Html.DisplayFor(modelItem => device.SupportMode)
+                        </td>
+                        <td>
+                            @Html.DisplayFor(modelItem => device.MonitoringMode)
                         </td>
                         <td>
                             @* @(device.LatestTelemetry!=null?device.LatestTelemetry.Timestamp:"---") *@

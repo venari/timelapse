@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using timelapse.infrastructure;
@@ -11,9 +12,10 @@ using timelapse.infrastructure;
 namespace timelapse.api.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20230619020918_DeviceSupportAndMonitoringModes")]
+    partial class DeviceSupportAndMonitoringModes
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -292,10 +294,6 @@ namespace timelapse.api.Migrations
                         .IsRequired()
                         .HasColumnType("text")
                         .HasColumnName("name");
-
-                    b.Property<bool>("Retired")
-                        .HasColumnType("boolean")
-                        .HasColumnName("retired");
 
                     b.Property<string>("SerialNumber")
                         .IsRequired()

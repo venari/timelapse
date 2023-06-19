@@ -9,6 +9,7 @@ import sys
 import logging
 from logging.handlers import TimedRotatingFileHandler
 import pathlib
+import glob
 
 config = json.load(open('config.json'))
 logFilePath = config["logFilePath"]
@@ -129,6 +130,67 @@ def scheduleShutdown():
         }
 
         setAlarm = True
+
+
+    # If we've been up for more than 2 modem cycles or 30 minutes, and the most recently captured image is older than 10 minutes, or the most recently uploaded image is older than 30 minutes, 
+    # either network is out, or we can't get a cellular signal, DNS is messing around, or camera isn't capturing.
+    # Let's shutdown, power down, and wake up again in 3 mins to see if that fixes it.
+    uptimeSeconds = int(time.clock_gettime(time.CLOCK_BOOTTIME))
+    power_interval = config['modem.power_interval']
+    
+    if uptimeSeconds > power_interval * 2 and uptimeSeconds > 1800:
+        mostRecentUploadedFiles = sorted(glob.iglob(uploadedImageFolder + "/*.*"), key=os.path.getctime, reverse=True)
+        mostRecentPendingFiles = sorted(glob.iglob(pendingImageFolder + "/*.*"), key=os.path.getctime, reverse=True)
+
+        secondsSinceLastUpload = -1
+        secondsSinceLastImageCapture = -1
+
+        triggerRestart = False
+
+        if len(mostRecentUploadedFiles) > 0:
+            latestImageCapturedFilename = max(mostRecentPendingFiles, key=os.path.getctime)
+            secondsSinceLastImageCapture = (datetime.datetime.now() - datetime.datetime.fromtimestamp(os.path.getctime(latestImageCapturedFilename))).total_seconds()
+            logger.debug("secondsSinceLastImageCapture: " + str(secondsSinceLastImageCapture))
+
+        if len(mostRecentUploadedFiles) > 0:
+
+            latestUploadedFilename = max(mostRecentUploadedFiles, key=os.path.getctime)
+            # logger.debug("latestUploadedFilename: " + str(latestUploadedFilename))
+
+            secondsSinceLastUpload = (datetime.datetime.now() - datetime.datetime.fromtimestamp(os.path.getctime(latestUploadedFilename))).total_seconds()
+            logger.debug("secondsSinceLastUpload: " + str(secondsSinceLastUpload))
+
+
+        # Most recent image captured (may also be in uploaded folder) is older than 10 minutes
+        if secondsSinceLastImageCapture > 600 and secondsSinceLastUpload > 600:
+            logger.warning('Most recent captured image is ' + str(secondsSinceLastImageCapture) + 'seconds old, and uploaded image is ' + str(secondsSinceLastUpload) + ' seconds old - restarting...')
+            triggerRestart = True
+
+        if secondsSinceLastUpload > 1800:
+            logger.warning('Most recent uploaded image is ' + str(secondsSinceLastUpload) + ' seconds old - restarting...')
+            triggerRestart = True
+
+        if len(mostRecentPendingFiles) == 0 and len(mostRecentUploadedFiles) == 0:
+            logger.debug("No uploaded or captured images found - restarting...")
+            triggerRestart = True
+
+        if triggerRestart:
+            minsToWakeAfter = 3
+            minToWakeAt = datetime.datetime.now().minute + minsToWakeAfter
+            if minToWakeAt >= 60:
+                minToWakeAt = minToWakeAt - 60
+
+            alarmObj = {
+                    'year': 'EVERY_YEAR',
+                    'month': 'EVERY_MONTH',
+                    'day': 'EVERY_DAY',
+                    'hour': 'EVERY_HOUR',
+                    # 'minute_period': DELTA_MIN,
+                    'minute': minToWakeAt,
+                    'second': 0,
+            }
+
+            setAlarm = True
 
     if setAlarm == True:
         logger.info("scheduleShutdown - we're setting the shutdown...")
