@@ -33,6 +33,7 @@ public class IndexModel : PageModel
             .AsSplitQuery()
             // .OrderBy(d => d.Name)
             .OrderBy(d => d.Description)
+            .Where(d => d.Retired == false)
             .ToList();
         _storageHelper = new StorageHelper(configuration, logger, memoryCache);
 

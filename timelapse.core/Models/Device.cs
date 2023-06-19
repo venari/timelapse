@@ -11,6 +11,10 @@ public class Device
     public string Name {get; set;}
     public string Description {get; set;}
 
+    public bool SupportMode {get; set;} = false;
+    public bool MonitoringMode {get; set;} = false;
+    public bool Retired {get; set;} = false;
+
     [System.Text.Json.Serialization.JsonIgnore]
     public List<Telemetry> Telemetries {get;} = new List<Telemetry>();
 
