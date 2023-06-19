@@ -113,7 +113,10 @@ def savePhotos():
             if config['shutdown']:
                 break
             else:
-                time.sleep(config['camera.interval'])
+                if config['monitoringMode']:
+                    logger.debug('monitoring mode is true, so no capture delay....')
+                else:
+                    time.sleep(config['camera.interval'])
 
     except Exception as e:
         logger.error("SavePhoto() failed.")
