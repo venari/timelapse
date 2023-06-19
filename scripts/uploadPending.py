@@ -124,12 +124,12 @@ def uploadPendingPhotos():
                 logger.debug(json.dumps(json.loads(response.text), indent = 4))
 
                 if json.loads(response.text)['device']['supportMode'] != config['supportMode']:
-                    logger.info('Support mode changed to ' + json.loads(response.text)['device']['supportMode'])
+                    logger.info('Support mode changed to ' + str(json.loads(response.text)['device']['supportMode']))
                     config['supportMode'] = json.loads(response.text)['device']['supportMode']
                     json.dump(config, open('config.json', 'w'), indent=4)
 
                 if json.loads(response.text)['device']['monitoringMode'] != config['monitoringMode']:
-                    logger.info('Monitoring mode changed to ' + json.loads(response.text)['device']['monitoringMode'])
+                    logger.info('Monitoring mode changed to ' + str(json.loads(response.text)['device']['monitoringMode']))
                     config['monitoringMode'] = json.loads(response.text)['device']['monitoringMode']
                     json.dump(config, open('config.json', 'w'), indent=4)
 
