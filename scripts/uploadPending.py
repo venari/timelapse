@@ -122,6 +122,18 @@ def uploadPendingPhotos():
             logger.debug(f'Response text:')
             try:
                 logger.debug(json.dumps(json.loads(response.text), indent = 4))
+
+                if json.loads(response.text)['device']['supportMode'] != config['supportMode']:
+                    logger.info('Support mode changed to ' + json.loads(response.text)['device']['supportMode'])
+                    config['supportMode'] = json.loads(response.text)['device']['supportMode']
+                    json.dump(config, open('config.json', 'w'), indent=4)
+
+                if json.loads(response.text)['device']['monitoringMode'] != config['monitoringMode']:
+                    logger.info('Monitoring mode changed to ' + json.loads(response.text)['device']['monitoringMode'])
+                    config['monitoringMode'] = json.loads(response.text)['device']['monitoringMode']
+                    json.dump(config, open('config.json', 'w'), indent=4)
+
+                   
             except json.decoder.JSONDecodeError:
                 logger.debug(response.text)
 
@@ -133,10 +145,11 @@ def uploadPendingPhotos():
                 # Give the telemetry an opportunity to upload before powering off modem
                 uploadPendingTelemetry()
 
-                # If it's 9am or 12pm or 5pm, don't turn the modem off for 15 minutes.
-                if (datetime.datetime.now().hour == 9 or datetime.datetime.now().hour == 12 or datetime.datetime.now().hour == 17) and datetime.datetime.now().minute < 15:
+                # If it's 9am or 12pm or 5pm, don't turn the modem off for 15 minutes, 
+                # or config['supportMode'] == True
+                if ((datetime.datetime.now().hour == 9 or datetime.datetime.now().hour == 12 or datetime.datetime.now().hour == 17) and datetime.datetime.now().minute < 15) or config['supportMode'==True]:
                     if not bInSupportWindow:
-                        logger.info('Opening 15 minute support window...')
+                        logger.info('Opening minute support window...')
                         bInSupportWindow = True
 
                 else:
