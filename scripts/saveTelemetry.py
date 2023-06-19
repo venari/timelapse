@@ -147,7 +147,7 @@ def scheduleShutdown():
 
         triggerRestart = False
 
-        if len(mostRecentUploadedFiles) > 0:
+        if len(mostRecentPendingFiles) > 0:
             latestImageCapturedFilename = max(mostRecentPendingFiles, key=os.path.getctime)
             secondsSinceLastImageCapture = (datetime.datetime.now() - datetime.datetime.fromtimestamp(os.path.getctime(latestImageCapturedFilename))).total_seconds()
             logger.debug("secondsSinceLastImageCapture: " + str(secondsSinceLastImageCapture))
