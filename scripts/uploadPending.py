@@ -189,7 +189,7 @@ def turnOnSystemPowerSwitch(retries = 3):
         # if sysVoltage < 3.2:  # 3.2V is the minimum voltage for the XL6009
         #     logger.info('Battery voltage too low for XL6009 - not powering up modem.')
         #     return
-        if sysVoltage < 3.0:  # 3.0V is a bit on the low side
+        if sysVoltage < 3.2:  # 3.0V is a bit on the low side
             logger.info('Battery voltage too low - not powering up modem.')
             return
         logger.info('System Voltage looks good at ' + str(sysVoltage) + 'mV')
