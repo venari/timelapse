@@ -125,17 +125,7 @@ namespace timelapse.api{
         public ActionResult<IEnumerable<Telemetry>> GetTelemetryBetweenDates([FromQuery] int deviceId, DateTime startDate, DateTime endDate){
             _logger.LogInformation($"Get latest telemetry between {startDate} and {endDate}");
 
-            // DateTime ?latestTelemetryDateTime = _appDbContext.Telemetry
-            //     .Where(t => t.DeviceId == deviceId)
-            //     .OrderByDescending(t => t.Timestamp)
-            //     .Select(t => t.Timestamp)
-            //     .FirstOrDefault();
-
             List<Telemetry> telemetry = new List<Telemetry>();
-
-            // if(latestTelemetryDateTime==null || !latestTelemetryDateTime.HasValue || latestTelemetryDateTime.Value == DateTime.MinValue){
-            //     return new NotFoundObjectResult(telemetry);
-            // }
 
             Device? device = _appDbContext.Devices
                 .Include(d => d.Telemetries.Where(t =>t.Timestamp.ToUniversalTime() >= startDate.ToUniversalTime() && t.Timestamp.ToUniversalTime() <= endDate.ToUniversalTime()))
@@ -143,7 +133,6 @@ namespace timelapse.api{
 
             if(device != null){
                 telemetry =  device.Telemetries.OrderBy(t => t.Timestamp).ToList();
-                // telemetry =  device.Telemetries.OrderBy(t => t.Timestamp).ToList();
             }
 
             if(telemetry.Count==0){

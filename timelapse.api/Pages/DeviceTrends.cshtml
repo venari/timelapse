@@ -42,32 +42,6 @@
         console.log("showTelemtery");
         console.log("deviceLabel:")
         console.log(deviceLabel)
-        @* console.log(data) *@
-
-        @* var lastIndex = 0;
-
-        var lastBatteryPercent = data[0].batteryPercent;
-        var lastTimestamp =  new Date(data[0].timestamp);
-        data.forEach(function(d, i) {
-            if(i==0){
-                return;
-            }
-            var timeDifference = new Date(d.timestamp) - lastTimestamp;
-            var hoursDifference = timeDifference / 1000 / 60 / 60;
-            var batteryPercentDifference = d.batteryPercent - lastBatteryPercent;
-            // Work out battery percent, but cap to remove unreal bounces.
-            if(hoursDifference>=0.5){
-                d.batteryPercentPerHour = Math.min(60, Math.max(-50, batteryPercentDifference / hoursDifference));
-            }
-
-            while(hoursDifference>1){
-                ++lastIndex;
-                lastBatteryPercent = data[lastIndex].batteryPercent;
-                lastTimestamp = new Date(data[lastIndex].timestamp);
-                timeDifference = new Date(d.timestamp) - lastTimestamp;
-                hoursDifference = timeDifference / 1000 / 60 / 60;
-            }
-        }); *@
 
         data = {
             @* labels: labels, *@
@@ -108,13 +82,6 @@
 <div>
     <table class="table">
         <thead>
-            @* <tr>
-            <th scope="col">Latest Telemetry for @(Model.device.Name) as at <script type="text/javascript">localizeDateTime('@(Model.device.LatestTelemetryTimestamp.Value.ToString("s"))');</script>
-            @if (Model.device.LatestTelemetry!=null && DateTime.UtcNow - Model.device.LatestTelemetry.Timestamp > TimeSpan.FromMinutes(60)){
-                <span class="badge bg-warning text-dark">Warning - @((DateTime.UtcNow - Model.device.LatestTelemetry.Timestamp).Humanize()) old</span>
-            }
-            </th>
-            </tr> *@
         </thead>
         <tbody>
             <tr>
@@ -141,12 +108,7 @@
                                                 unit: 'hour'
                                             },
                                             suggestedMin: new Date(@(new DateTimeOffset(Model.StartDate).ToUnixTimeMilliseconds())),
-                                            @* suggestedMax: new Date(), *@
                                             suggestedMax: new Date(@(new DateTimeOffset(Model.EndDate).ToUnixTimeMilliseconds())),
-                                            @* ticks: {
-                                                max: new Date(),
-                                                min: new Date(@(new DateTimeOffset(Model.device.LatestTelemetry.Timestamp).AddDays(-2).ToUnixTimeMilliseconds())),
-                                            } *@
                                     },
                                     y: {
                                             @* display: false, *@
