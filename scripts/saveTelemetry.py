@@ -13,7 +13,7 @@ import glob
 
 config = json.load(open('config.json'))
 logFilePath = config["logFilePath"]
-logFilePath = logFilePath.Replace(".log", "saveTelemetry.log")
+logFilePath = logFilePath.replace(".log", "saveTelemetry.log")
 os.makedirs(os.path.dirname(logFilePath), exist_ok=True)
 # os.chmod(os.path.dirname(logFilePath), 0o777) # Make sure pijuice user scrip can write to log file.
 
