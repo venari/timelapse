@@ -15,6 +15,7 @@ import socket
 
 config = json.load(open('config.json'))
 logFilePath = config["logFilePath"]
+logFilePath = logFilePath.Replace(".log", "uploadTelemetry.log")
 os.makedirs(os.path.dirname(logFilePath), exist_ok=True)
 # os.chmod(os.path.dirname(logFilePath), 0o777) # Make sure pijuice user scrip can write to log file.
 
@@ -204,13 +205,13 @@ def turnOnSystemPowerSwitch(retries = 3):
         logger.info('Setting System Power Switch to ' + str(modemPower) + ':')
         pj.power.SetSystemPowerSwitch(modemPower)
 
-        logger.info('Waiting 50s for modem to warm up...')
-        time.sleep(50)
+        # logger.info('Waiting 50s for modem to warm up...')
+        # time.sleep(50)
 
         logger.info('Waiting for network....')
-        # Call Internet function to wait for network, for a max of 1 minute
+        # Call Internet function to wait for network, for a max of 2 minutes
         waitCounter = 0
-        while not internet() and waitCounter < 6:
+        while not internet() and waitCounter < 12:
             time.sleep(10)
             logger.info('Still waiting for network....')
             waitCounter=waitCounter+1

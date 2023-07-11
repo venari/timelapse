@@ -13,6 +13,7 @@ import glob
 
 config = json.load(open('config.json'))
 logFilePath = config["logFilePath"]
+logFilePath = logFilePath.Replace(".log", "saveTelemetry.log")
 os.makedirs(os.path.dirname(logFilePath), exist_ok=True)
 # os.chmod(os.path.dirname(logFilePath), 0o777) # Make sure pijuice user scrip can write to log file.
 
@@ -226,12 +227,15 @@ def scheduleShutdown():
                     logger.debug('Wakeup enabled')
                     wakeUpEnabled = True
 
-            logger.info('Shutting down...')
-            subprocess.call(['sudo', 'shutdown'])
+            logger.debug('rtcAlarm.GetControlStatus(): ' + str(pj.rtcAlarm.GetControlStatus()))
+            logger.debug('rtcAlarm.GetTime(): ' + str(pj.rtcAlarm.GetTime()))
+
             logger.info('Power off scheduled for 30s from now')
             pj.power.SetPowerOff(30)
             logger.info('Setting System Power Switch to Off:')
             pj.power.SetSystemPowerSwitch(0)
+            logger.info('Shutting down now...')
+            subprocess.call(['sudo', 'shutdown', '-h', 'now'])
         else:
             # logger.debug('skipping shutdown scheduling because of config.json')
             # # Ensure Wake up alarm is *not* enabled - or it will cause pi to reboot
