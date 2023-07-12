@@ -272,15 +272,33 @@ def uploadPendingTelemetry():
 
             logger.debug(api_data)
 
-            postResponse = session.post(config['apiUrl'] + 'Telemetry',data=api_data, timeout=5)
-            logger.debug(postResponse)
-            assert postResponse.status_code == 200, "API returned error code"
+            response = session.post(config['apiUrl'] + 'Telemetry',data=api_data, timeout=5)
+            logger.debug(response)
+            assert response.status_code == 200, "API returned error code"
             #requests.post(config['apiUrl'] + '/Telemetry', json=api_data)
 
-            if postResponse.status_code == 200:
+            if response.status_code == 200:
                 logger.debug(f'Telemetry uploaded successfully')
                 shutil.move(telemetryFilename, uploadedTelemetryFolder + pathlib.Path(telemetryFilename).name)
                 logger.debug('Logged to API.')
+
+            try:
+                logger.debug(json.dumps(json.loads(response.text), indent = 4))
+
+                if json.loads(response.text)['device']['supportMode'] != config['supportMode']:
+                    logger.info('Support mode changed to ' + str(json.loads(response.text)['device']['supportMode']))
+                    config['supportMode'] = json.loads(response.text)['device']['supportMode']
+                    json.dump(config, open('config.json', 'w'), indent=4)
+
+                if json.loads(response.text)['device']['monitoringMode'] != config['monitoringMode']:
+                    logger.info('Monitoring mode changed to ' + str(json.loads(response.text)['device']['monitoringMode']))
+                    config['monitoringMode'] = json.loads(response.text)['device']['monitoringMode']
+                    json.dump(config, open('config.json', 'w'), indent=4)
+
+                   
+            except json.decoder.JSONDecodeError:
+                logger.debug(response.text)
+
 
     except requests.exceptions.ConnectionError as e:
         logger.error(str(datetime.datetime.now()) + " uploadPendingTelemetry() failed - connection error. Leave in place.")
