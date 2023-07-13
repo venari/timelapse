@@ -71,7 +71,11 @@ def scheduleShutdown():
 
         # print(str(datetime.datetime.now()) + ' scheduleShutdown')
         logger.debug('scheduleShutdown')
+        logger.debug('rtcAlarm.GetControlStatus(): ' + str(pj.rtcAlarm.GetControlStatus()))
+        logger.debug('rtcAlarm.GetTime(): ' + str(pj.rtcAlarm.GetTime()))
+
         setAlarm = False
+
 
         config = json.load(open('config.json'))
 
@@ -139,6 +143,7 @@ def scheduleShutdown():
         # Let's shutdown, power down, and wake up again in 3 mins to see if that fixes it.
         uptimeSeconds = int(time.clock_gettime(time.CLOCK_BOOTTIME))
         power_interval = config['modem.power_interval']
+        triggerRestart = False
         
         if uptimeSeconds > power_interval * 2 and uptimeSeconds > 1800:
             mostRecentUploadedFiles = sorted(glob.iglob(uploadedImageFolder + "/*.*"), key=os.path.getctime, reverse=True)
@@ -146,8 +151,6 @@ def scheduleShutdown():
 
             secondsSinceLastUpload = -1
             secondsSinceLastImageCapture = -1
-
-            triggerRestart = False
 
             if len(mostRecentPendingFiles) > 0:
                 latestImageCapturedFilename = max(mostRecentPendingFiles, key=os.path.getctime)
@@ -230,8 +233,18 @@ def scheduleShutdown():
             logger.debug('rtcAlarm.GetControlStatus(): ' + str(pj.rtcAlarm.GetControlStatus()))
             logger.debug('rtcAlarm.GetTime(): ' + str(pj.rtcAlarm.GetTime()))
 
-            logger.info('Power off scheduled for 30s from now')
-            pj.power.SetPowerOff(30)
+            logger.debug('Clearing Alarm Flag...')
+            pj.rtcAlarm.ClearAlarmFlag()
+            logger.debug('rtcAlarm.GetControlStatus(): ' + str(pj.rtcAlarm.GetControlStatus()))
+            logger.debug('rtcAlarm.GetTime(): ' + str(pj.rtcAlarm.GetTime()))
+
+            if triggerRestart:
+                logger.info('Restart scheduled for ' + str(minsToWakeAfter) + ' minutes from now')
+                logger.info("So we'll skip the power off.")
+            else:
+                logger.info('Power off scheduled for 30s from now')
+                pj.power.SetPowerOff(30)
+        
             logger.info('Setting System Power Switch to Off:')
             pj.power.SetSystemPowerSwitch(0)
             logger.info('Shutting down now...')
