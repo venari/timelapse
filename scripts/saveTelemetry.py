@@ -75,7 +75,7 @@ def scheduleShutdown():
         logger.debug('rtcAlarm.GetTime(): ' + str(pj.rtcAlarm.GetTime()))
 
         setAlarm = False
-
+        triggerRestart = False
 
         config = json.load(open('config.json'))
 
@@ -146,7 +146,6 @@ def scheduleShutdown():
                 # Let's shutdown, power down, and wake up again in 3 mins to see if that fixes it.
                 uptimeSeconds = int(time.clock_gettime(time.CLOCK_BOOTTIME))
                 power_interval = config['modem.power_interval']
-                triggerRestart = False
                 
                 if uptimeSeconds > power_interval * 2 and uptimeSeconds > 1800:
                     mostRecentUploadedFiles = sorted(glob.iglob(uploadedImageFolder + "/*.*"), key=os.path.getctime, reverse=True)
