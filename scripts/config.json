@@ -15,7 +15,7 @@
     "camera.vflip": true,
     "camera.hflip": true,
     "camera.long_exposure_mode": false,
-    "camera.long_exposure_time_s": 10,
+    "camera.long_exposure_time": 500000,
     "camera.resolution.width": 4608,
     "camera.resolution.height": 2592,
     "camera.interval": 60,

@@ -93,7 +93,7 @@ def savePhotos():
                 camera.configure(camera_config)
 
                 if(config['camera.long_exposure_mode']):
-                    camera.set_controls({"AfMode": controls.AfModeEnum.Manual, "LensPosition": lensposition, "ExposureTime": config['camera.long_exposure_time_s'] * 1000000, "AnalogueGain": 8, "ColourGains": (2, 1.81)})
+                    camera.set_controls({"AfMode": controls.AfModeEnum.Manual, "LensPosition": lensposition, "ExposureTime": config['camera.long_exposure_time'], "AnalogueGain": 8, "ColourGains": (2, 1.81)})
                 else:
                     camera.set_controls({"AfMode": controls.AfModeEnum.Manual, "LensPosition": lensposition})
                     
