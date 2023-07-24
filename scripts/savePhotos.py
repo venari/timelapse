@@ -1,7 +1,7 @@
 import subprocess
 import json
 from picamera2 import Picamera2, Preview
-from libcamera import Transform, controls
+# from libcamera import Transform, controls
 import os
 import time
 import shutil
@@ -91,7 +91,12 @@ def savePhotos():
 
                 # camera.rotation = config['camera.rotation']
                 camera.configure(camera_config)
-                camera.set_controls({"AfMode": controls.AfModeEnum.Manual, "LensPosition": lensposition})
+
+                if(config['camera.long_exposure_mode']):
+                    camera.set_controls({"AfMode": controls.AfModeEnum.Manual, "LensPosition": lensposition, "ExposureTime": config['camera.long_exposure_time_s'] * 1000000, "AnalogueGain": 8, "ColourGains": (2, 1.81)})
+                else:
+                    camera.set_controls({"AfMode": controls.AfModeEnum.Manual, "LensPosition": lensposition})
+                    
                 camera.options["quality"] = config['camera.quality']
 
                 logger.debug('beginning capture')
