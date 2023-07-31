@@ -97,7 +97,7 @@ def scheduleShutdown():
 
         if config['sleep_during_night'] == True and (datetime.datetime.now().hour >= config['daytime_ends_at_h'] or datetime.datetime.now().hour < config['daytime_starts_at_h']):
 
-            if config['support_mode'] == True:
+            if config['supportMode'] == True:
                 logger.warning("Night time - we would have scheduled shutdown, but we're in support mode.")
             else:
                 logger.info("Night time so we're scheduling shutdown")
