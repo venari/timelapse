@@ -61,6 +61,43 @@ public class Telemetry
         }
     }
 
+    public int? BatteryCurrent {
+        get{
+            if(Status!=null){
+                dynamic status = System.Text.Json.JsonSerializer.Deserialize<dynamic>(FixUpInvalidPiJuiceJSONStatus);
+                int batteryCurrent = System.Text.Json.JsonSerializer.Deserialize<int>(status.GetProperty("batteryCurrent"));
+                return batteryCurrent;
+            }
+
+            return null;
+        }
+    }
+
+    public int? IOVoltage {
+        get{
+            if(Status!=null){
+                dynamic status = System.Text.Json.JsonSerializer.Deserialize<dynamic>(FixUpInvalidPiJuiceJSONStatus);
+                int ioVoltage = System.Text.Json.JsonSerializer.Deserialize<int>(status.GetProperty("ioVoltage"));
+                return ioVoltage;
+            }
+
+            return null;
+        }
+    }
+
+    public int? IOCurrent {
+        get{
+            if(Status!=null){
+                dynamic status = System.Text.Json.JsonSerializer.Deserialize<dynamic>(FixUpInvalidPiJuiceJSONStatus);
+                int ioCurrent = System.Text.Json.JsonSerializer.Deserialize<int>(status.GetProperty("ioCurrent"));
+                return ioCurrent;
+            }
+
+            return null;
+        }
+    }
+
+
     public string? Status_Battery {
         get{
             if(Status!=null){

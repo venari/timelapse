@@ -96,20 +96,24 @@ def scheduleShutdown():
             setAlarm = True
 
         if config['sleep_during_night'] == True and (datetime.datetime.now().hour >= config['daytime_ends_at_h'] or datetime.datetime.now().hour < config['daytime_starts_at_h']):
-            logger.info("Night time so we're scheduling shutdown")
 
-            alarmObj = {
-                'year': 'EVERY_YEAR',
-                'month': 'EVERY_MONTH',
-                'day': 'EVERY_DAY',
-                # 'hour': 20, # 8am
-                # 'minute_period': DELTA_MIN,
-                'hour': 'EVERY_HOUR',
-                'minute': 0,
-                'second': 0,
-            }
+            if config['support_mode'] == True:
+                logger.warning("Night time - we would have scheduled shutdown, but we're in support mode.")
+            else:
+                logger.info("Night time so we're scheduling shutdown")
 
-            setAlarm = True
+                alarmObj = {
+                    'year': 'EVERY_YEAR',
+                    'month': 'EVERY_MONTH',
+                    'day': 'EVERY_DAY',
+                    # 'hour': 20, # 8am
+                    # 'minute_period': DELTA_MIN,
+                    'hour': 'EVERY_HOUR',
+                    'minute': 0,
+                    'second': 0,
+                }
+
+                setAlarm = True
 
         else:
 
