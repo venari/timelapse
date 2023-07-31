@@ -71,6 +71,10 @@ def savePhotos():
                 config = json.load(open('config.json'))
                 #camera_config = camera.create_preview_configuration()
                 camera_config = camera.create_still_configuration()
+
+                # # Use sensor mode 2 to give greater max exposure time.
+                # camera_config = camera.create_still_configuration(raw = picam2.sensor_modes[2])
+
                 camera_config["transform"] = Transform(vflip = config['camera.vflip'], hflip = config['camera.hflip'])
                 camera_config["size"] = (config['camera.resolution.width'], config['camera.resolution.height'])
                 logger.debug(camera_config["size"])
@@ -94,7 +98,8 @@ def savePhotos():
 
                 if(config['camera.long_exposure_mode']):
                     # camera.set_controls({"AfMode": controls.AfModeEnum.Manual, "LensPosition": lensposition, "AeEnable": False, "ExposureTime": config['camera.long_exposure_time'], "AnalogueGain": config['camera.analogue_gain']}) #, "ColourGains": (2, 1.81)})
-                    camera.set_controls({"AfMode": controls.AfModeEnum.Manual, "LensPosition": lensposition, "AnalogueGain": config['camera.analogue_gain']}) #, "ColourGains": (2, 1.81)})
+                    # camera.set_controls({"AfMode": controls.AfModeEnum.Manual, "LensPosition": lensposition, "AnalogueGain": config['camera.analogue_gain']})
+                    camera.set_controls({"AfMode": controls.AfModeEnum.Manual, "LensPosition": lensposition, "AeExposureMode": "Long"}) 
                 else:
                     camera.set_controls({"AfMode": controls.AfModeEnum.Manual, "LensPosition": lensposition})
                     
