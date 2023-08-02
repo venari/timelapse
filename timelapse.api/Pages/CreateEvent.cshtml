@@ -1,0 +1,120 @@
+﻿@* @page "{deviceId:int}/{initialDateTime:datetime}" *@
+@* @page "{deviceId:int}/{initialDateTime:int}" *@
+@page "{imageId:int}"
+@using Humanizer
+@model CreateEventModel
+@{
+    ViewData["Title"] = "Create Event";
+}
+
+<div class="text-center">
+    <h1 class="display-4">@(Model.device.Description)</h1>
+    @* <p id="imageHeader" scope="col">Image for @(Model.device.Name) as at <script type="text/javascript">localizeDateTime('@(Model.device.LatestImageTimestamp.Value.ToString("s"))');</script> *@
+    </p>
+</div>
+
+<div class="container">
+  <div class="row">
+    <div class="col">
+        @* <h4>Displaying @(Model.NumberOfHoursToDisplay) hours imagery.</h4> *@
+        @{
+            <a href="/ImageView/@(Model.device.Id)/1@(HttpContext.Request.QueryString)" type="button" class="btn btn-secondary">Last hour</a>
+            <a href="/ImageView/@(Model.device.Id)/24@(HttpContext.Request.QueryString)" type="button" class="btn btn-secondary">Last 24 hours</a>
+            <a href="/ImageView/@(Model.device.Id)/48@(HttpContext.Request.QueryString)" type="button" class="btn btn-secondary">Last 48 hours</a>
+            <a href="/ImageView/@(Model.device.Id)/168@(HttpContext.Request.QueryString)" type="button" class="btn btn-secondary">Last week</a>
+        }
+    </div>
+    @* <div class="col">
+        <div class="float-end">
+            @if(Model.device.LatestImage!=null){
+                <a href="/ImageView/@(Model.device.Id)"><img class="img-thumbnail" src="@(Model.device.LatestImage.BlobUri + Model.SasToken)" width=100></img></a>
+            }
+            @if (Model.device.LatestImage!=null && DateTime.UtcNow - Model.device.LatestImage.Timestamp > TimeSpan.FromMinutes(60)){
+                <span class="badge bg-warning text-dark">Warning - @((DateTime.UtcNow - Model.device.LatestImage.Timestamp).Humanize()) old</span>
+            }
+        </div>
+    </div> *@
+  </div>
+</div>
+
+
+<div>
+    <table class="table">
+        <thead>
+        </thead>
+        <tbody>
+            <tr>
+                <td>
+                    @if(Model.device.LatestImage!=null){
+                        <img class="img-fluid" id="image" src="@(Model.device.LatestImage.BlobUri + Model.SasToken)"></img>
+                    }
+                </td>
+            </tr>
+            <tr>
+                @* <label id="imageDateSliderValue"></label> *@
+                @* <input type="range" class="form-range" min="0" max="@(Model.imagesLast24Hours.Count() - 1)" value="@(Model.imagesLast24Hours.Count() - 1)" id="imageDateSlider"> *@
+                @* <button id="togglePlay" onclick="togglePlay()" type="button" class="btn btn-primary"><i class="fa fa-play"></i></button> *@
+                <button onclick="navigate(-99)" type="button" class="btn btn-primary"><i class="fa fa-fast-backward"></i></button>
+                <button onclick="navigate(-60)" type="button" class="btn btn-primary"><i class="fa fa-backward"></i></button>
+                <button onclick="navigate(-1)" type="button" class="btn btn-primary"><i class="fa fa-step-backward"></i></button>
+                <button id="togglePlay" onclick="togglePlay()" type="button" class="btn btn-primary"><i class="fa fa-play"></i></button>
+                <button onclick="navigate(1)" type="button" class="btn btn-primary"><i class="fa fa-step-forward"></i></button>
+                <button onclick="navigate(60)" type="button" class="btn btn-primary"><i class="fa fa-forward"></i></button>
+                <button onclick="navigate(99)" type="button" class="btn btn-primary"><i class="fa fa-fast-forward"></i></button>
+            </tr>
+        </tbody>
+    </table>
+</div>
+
+<script>
+
+    var last24HoursImages = @(Json.Serialize(Model.imagesLast24Hours));
+    @* var slider = document.getElementById("imageDateSlider") *@
+    var image = document.getElementById("image")
+
+    var bPlaying=false
+
+    var togglePlayButton = document.getElementById("togglePlay")
+
+    function togglePlay(){
+        bPlaying=!bPlaying;
+        if(bPlaying){
+            togglePlayButton.innerHTML = '<i class="fa fa-pause"></i>'
+
+            nextFrame();
+            @* play() *@
+        }
+        else{
+            togglePlayButton.innerHTML = '<i class="fa fa-play"></i>'
+            @* stop() *@
+        }
+    }
+
+    @* function nextFrame(){
+        if(bPlaying){
+            if(parseInt(slider.value)<parseInt(slider.max)){
+                ++slider.value
+            } else {
+                slider.value = 0
+            }
+
+            image.onload=function(){
+                setTimeout(nextFrame, 50);
+            }
+            getImage(@(Model.device.Id), slider.value);
+        }
+    } *@
+
+    function getImage(deviceId, imageIndex) {
+        imageBlobUri = last24HoursImages[imageIndex].blobUri + '@(Model.SasToken)'.replace(/&amp;/g, '&')
+        image.src = imageBlobUri
+        var imageHeader = document.getElementById("imageHeader");
+        imageHeader.innerHTML = "Image for @(Model.device.Name) as at " + localizeDateTimeAsString(last24HoursImages[imageIndex].timestamp)
+    }
+
+    // Update the current slider value (each time you drag the slider handle)
+    slider.oninput = function() {
+        console.log(this.value)
+        getImage(@(Model.device.Id), this.value);
+    }
+</script>

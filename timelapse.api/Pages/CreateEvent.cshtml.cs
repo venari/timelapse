@@ -12,9 +12,9 @@ namespace timelapse.api.Pages;
 
 [Authorize]
 [AllowAnonymous]
-public class ImageViewModel : PageModel
+public class CreateEventModel : PageModel
 {
-    private readonly ILogger<ImageViewModel> _logger;
+    private readonly ILogger<CreateEventModel> _logger;
     private AppDbContext _appDbContext;
 
     public Device device {get; private set;}
@@ -22,22 +22,27 @@ public class ImageViewModel : PageModel
 
     // public DateTime oldestImageTimestamp {get; private set;}
     // public DateTime newestImageTimestamp {get; private set;}
-    public ImageSubset[] imagesLast24Hours {get; private set;}
+    public Image[] imagesLast24Hours {get; private set;}
 
-    public ImageViewModel(ILogger<ImageViewModel> logger, AppDbContext appDbContext, IConfiguration configuration, IMemoryCache memoryCache)
+    public CreateEventModel(ILogger<CreateEventModel> logger, AppDbContext appDbContext, IConfiguration configuration, IMemoryCache memoryCache)
     {
         _logger = logger;
         _appDbContext = appDbContext;
-        NumberOfHoursToDisplay = 24;
         StorageHelper storageHelper;
         storageHelper = new StorageHelper(configuration, logger, memoryCache);
         SasToken = storageHelper.SasToken;
     }
 
-    [BindProperty]
-    public int NumberOfHoursToDisplay {get; set; }
+    // [BindProperty]
+    // public int NumberOfHoursToDisplay {get; set; }
 
-    public IActionResult OnGet(int id, int? numberOfHoursToDisplay = null)
+    [BindProperty]
+    public DateTime MinTimestamp {get; set; }
+    public DateTime MaxTimestamp {get; set; }
+
+    // public IActionResult OnGet(int deviceId, DateTime intialDateTime)
+    public IActionResult OnGet(int imageId)
+    // public IActionResult OnGet(int deviceId, int intialDateTime)
     {
         // Unusual authentication here - want to accept logged in users, and the Third Party key
         // Duplication of logic in ThirdPartyApiKeyAuthAttribute
@@ -69,39 +74,33 @@ public class ImageViewModel : PageModel
             }
         }
 
+        var image = _appDbContext.Images
+            .Include(i => i.Device)
+            .FirstOrDefault(i => i.Id == imageId);
 
-        if(numberOfHoursToDisplay!=null){
-            NumberOfHoursToDisplay = numberOfHoursToDisplay.Value;
+        if(image==null){
+            return RedirectToPage("/NotFound");
         }
 
-        DateTime latestImageDateTime = _appDbContext.Images
-            .Where(t => t.DeviceId == id)
-            .OrderByDescending(t => t.Timestamp)
-            .Select(t => t.Timestamp)
+        device = image.Device;
+
+        var minAndMaxTimestamps = _appDbContext.Images
+            .Where(t => t.DeviceId == device.Id)
+            .GroupBy(t => t.DeviceId)
+            // .OrderByDescending(t => t.Timestamp)
+            .Select(t => new{
+                MinTimestamp = t.Min(i => i.Timestamp),
+                MaxTimestamp = t.Max(i => i.Timestamp)
+            })
             .FirstOrDefault();
 
-        if(latestImageDateTime==null || latestImageDateTime == DateTime.MinValue){
+        if(minAndMaxTimestamps==null || minAndMaxTimestamps.MinTimestamp == DateTime.MinValue || minAndMaxTimestamps.MaxTimestamp == DateTime.MinValue){
             return RedirectToPage("/NotFound");
         }
 
-        DateTime cutOff = latestImageDateTime.AddHours(-1 * NumberOfHoursToDisplay);
-
-        var d = _appDbContext.Devices
-            .Include(d => d.Images.Where(i =>i.Timestamp >= cutOff))
-            .FirstOrDefault(d => d.Id == id);
-
-        if(d==null){
-            return RedirectToPage("/NotFound");
-        }
-
-        device = d;
-
-        imagesLast24Hours = d.Images.Select(i => new ImageSubset{Id = i.Id, Timestamp = i.Timestamp, BlobUri = i.BlobUri}).OrderBy(i => i.Timestamp).ToArray();
-        if(imagesLast24Hours.Count()==0){
-            return RedirectToPage("/NotFound");
-        }
+        MinTimestamp = minAndMaxTimestamps.MinTimestamp;
+        MaxTimestamp = minAndMaxTimestamps.MaxTimestamp;
 
         return Page();
-
     }
 }
