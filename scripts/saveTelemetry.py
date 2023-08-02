@@ -100,20 +100,23 @@ def scheduleShutdown():
             if config['supportMode'] == True:
                 logger.warning("Night time - we would have scheduled shutdown, but we're in support mode.")
             else:
-                logger.info("Night time so we're scheduling shutdown")
+                if pj.status.GetStatus()['data']['battery'] == 'CHARGING_FROM_IN' or pj.status.GetStatus()['data']['battery'] == 'CHARGING_FROM_5V_IO' :
+                    logger.info("Night time - but we're charging, so we'll stay on.")
+                else:
+                    logger.info("Night time so we're scheduling shutdown")
 
-                alarmObj = {
-                    'year': 'EVERY_YEAR',
-                    'month': 'EVERY_MONTH',
-                    'day': 'EVERY_DAY',
-                    # 'hour': 20, # 8am
-                    # 'minute_period': DELTA_MIN,
-                    'hour': 'EVERY_HOUR',
-                    'minute': 0,
-                    'second': 0,
-                }
+                    alarmObj = {
+                        'year': 'EVERY_YEAR',
+                        'month': 'EVERY_MONTH',
+                        'day': 'EVERY_DAY',
+                        # 'hour': 20, # 8am
+                        # 'minute_period': DELTA_MIN,
+                        'hour': 'EVERY_HOUR',
+                        'minute': 0,
+                        'second': 0,
+                    }
 
-                setAlarm = True
+                    setAlarm = True
 
         else:
 
