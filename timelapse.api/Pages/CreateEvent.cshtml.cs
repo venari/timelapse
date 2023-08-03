@@ -22,7 +22,9 @@ public class CreateEventModel : PageModel
 
     // public DateTime oldestImageTimestamp {get; private set;}
     // public DateTime newestImageTimestamp {get; private set;}
-    public Image[] imagesLast24Hours {get; private set;}
+    // public Image[] imagesLast24Hours {get; private set;}
+
+    public DateTime InitialTimestamp {get; private set;}
 
     public CreateEventModel(ILogger<CreateEventModel> logger, AppDbContext appDbContext, IConfiguration configuration, IMemoryCache memoryCache)
     {
@@ -98,6 +100,7 @@ public class CreateEventModel : PageModel
             return RedirectToPage("/NotFound");
         }
 
+        InitialTimestamp = image.Timestamp;
         MinTimestamp = minAndMaxTimestamps.MinTimestamp;
         MaxTimestamp = minAndMaxTimestamps.MaxTimestamp;
 

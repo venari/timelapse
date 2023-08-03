@@ -9,31 +9,13 @@
 
 <div class="text-center">
     <h1 class="display-4">@(Model.device.Description)</h1>
+    <p id="imageHeader" scope="col">Image for @(Model.device.Name) as at ...</p>
     @* <p id="imageHeader" scope="col">Image for @(Model.device.Name) as at <script type="text/javascript">localizeDateTime('@(Model.device.LatestImageTimestamp.Value.ToString("s"))');</script> *@
     </p>
 </div>
 
 <div class="container">
   <div class="row">
-    <div class="col">
-        @* <h4>Displaying @(Model.NumberOfHoursToDisplay) hours imagery.</h4> *@
-        @{
-            <a href="/ImageView/@(Model.device.Id)/1@(HttpContext.Request.QueryString)" type="button" class="btn btn-secondary">Last hour</a>
-            <a href="/ImageView/@(Model.device.Id)/24@(HttpContext.Request.QueryString)" type="button" class="btn btn-secondary">Last 24 hours</a>
-            <a href="/ImageView/@(Model.device.Id)/48@(HttpContext.Request.QueryString)" type="button" class="btn btn-secondary">Last 48 hours</a>
-            <a href="/ImageView/@(Model.device.Id)/168@(HttpContext.Request.QueryString)" type="button" class="btn btn-secondary">Last week</a>
-        }
-    </div>
-    @* <div class="col">
-        <div class="float-end">
-            @if(Model.device.LatestImage!=null){
-                <a href="/ImageView/@(Model.device.Id)"><img class="img-thumbnail" src="@(Model.device.LatestImage.BlobUri + Model.SasToken)" width=100></img></a>
-            }
-            @if (Model.device.LatestImage!=null && DateTime.UtcNow - Model.device.LatestImage.Timestamp > TimeSpan.FromMinutes(60)){
-                <span class="badge bg-warning text-dark">Warning - @((DateTime.UtcNow - Model.device.LatestImage.Timestamp).Humanize()) old</span>
-            }
-        </div>
-    </div> *@
   </div>
 </div>
 
@@ -54,6 +36,7 @@
                 @* <label id="imageDateSliderValue"></label> *@
                 @* <input type="range" class="form-range" min="0" max="@(Model.imagesLast24Hours.Count() - 1)" value="@(Model.imagesLast24Hours.Count() - 1)" id="imageDateSlider"> *@
                 @* <button id="togglePlay" onclick="togglePlay()" type="button" class="btn btn-primary"><i class="fa fa-play"></i></button> *@
+                <button onclick="eventStart()" type="button" class="btn btn-primary"><i class="fa fa-flag"></i></button>
                 <button onclick="navigate(-99)" type="button" class="btn btn-primary"><i class="fa fa-fast-backward"></i></button>
                 <button onclick="navigate(-60)" type="button" class="btn btn-primary"><i class="fa fa-backward"></i></button>
                 <button onclick="navigate(-1)" type="button" class="btn btn-primary"><i class="fa fa-step-backward"></i></button>
@@ -61,6 +44,9 @@
                 <button onclick="navigate(1)" type="button" class="btn btn-primary"><i class="fa fa-step-forward"></i></button>
                 <button onclick="navigate(60)" type="button" class="btn btn-primary"><i class="fa fa-forward"></i></button>
                 <button onclick="navigate(99)" type="button" class="btn btn-primary"><i class="fa fa-fast-forward"></i></button>
+                <button onclick="eventEnd()" type="button" class="btn btn-primary"><i class="fa fa-flag-checkered"></i></button>
+                <label for="jumpToDateTime">Jump to (date and time):</label>
+                <input onchange="jumpToDateTime()" type="datetime-local" id="jumpToDateTime" name="jumpToDateTime"> 
             </tr>
         </tbody>
     </table>
@@ -68,8 +54,16 @@
 
 <script>
 
-    var last24HoursImages = @(Json.Serialize(Model.imagesLast24Hours));
+    @* var last24HoursImages = @(Json.Serialize(Model.imagesLast24Hours)); *@
     @* var slider = document.getElementById("imageDateSlider") *@
+
+    @* var currentViewedTimestamp = new Date('@(Model.InitialTimestamp.ToString("s"))') *@
+    var currentViewedTimestamp = '@(Model.InitialTimestamp.ToString("s"))'
+        
+    displayCurrentViewedTimestamp();
+
+    console.log("Initial timestamp: " + currentViewedTimestamp)
+
     var image = document.getElementById("image")
 
     var bPlaying=false
@@ -105,6 +99,35 @@
         }
     } *@
 
+    function displayCurrentViewedTimestamp()
+    {
+        var imageHeader = document.getElementById("imageHeader");
+        imageHeader.innerHTML = "Image for @(Model.device.Name) as at " + localizeDateTimeAsString(currentViewedTimestamp)
+
+        document.getElementById("jumpToDateTime").value = ISO8601UTCDatetimeToLocalDatetime(currentViewedTimestamp);
+    }
+    function eventStart(){
+
+    }
+
+    function eventEnd(){
+
+    }
+
+    function navigate(minutes){
+        @* var newTimestamp = new Date(currentViewedTimestamp.getTime() + minutes * 60 * 1000) *@
+        var newTimestamp = new Date(new Date(currentViewedTimestamp).getTime() + minutes * 60 * 1000)
+
+        console.log("Navigating " + minutes + " minutes from " + currentViewedTimestamp + " to " + newTimestamp.toISOString())
+
+        getImageAtOrAfter(@(Model.device.Id), ISO8601UTCDatetimeToLocalDatetime(newTimestamp))
+    }
+
+    function jumpToDateTime(){
+        var jumpToDateTime = document.getElementById("jumpToDateTime").value
+        getImageAtOrAfter(@(Model.device.Id), jumpToDateTime)
+    }
+
     function getImage(deviceId, imageIndex) {
         imageBlobUri = last24HoursImages[imageIndex].blobUri + '@(Model.SasToken)'.replace(/&amp;/g, '&')
         image.src = imageBlobUri
@@ -112,9 +135,49 @@
         imageHeader.innerHTML = "Image for @(Model.device.Name) as at " + localizeDateTimeAsString(last24HoursImages[imageIndex].timestamp)
     }
 
-    // Update the current slider value (each time you drag the slider handle)
+    function getImageAtOrAfter(deviceId, atOrAfterTimestamp) {
+
+        console.log("Navigating to or after " + atOrAfterTimestamp)
+
+        var url = "/api/Image/GetImageAtOrAfter/?deviceId=" + deviceId + "&atOrAfterTimestamp=" + atOrAfterTimestamp;
+        fetch(url, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        })
+        .then(function(response){
+            if(response.ok){
+                return response.json()
+            } else {
+                console.error('Something went wrong');
+            }
+        })
+        .then(function(data){
+            console.log(data.blobUri)
+            console.log(data.timestamp)
+
+            image.src = data.blobUri + '@(Model.SasToken)'.replace(/&amp;/g, '&')
+            imageHeader.innerHTML = "Image for @(Model.device.Name) as at " + localizeDateTimeAsString(data.timestamp)
+        });
+
+        // Call api/Image/GetImageAtOrAfter and get the image blob uri
+        // Then set the image src to the blob uri
+        // Then set the image header to the timestamp
+
+
+        @* imageBlobUri = last24HoursImages[imageIndex].blobUri + '@(Model.SasToken)'.replace(/&amp;/g, '&') *@
+
+        @* imageRedirectSrc = "/ImageView/" + deviceId + "?atOrAfterTimestamp=" + atOrAfterTimestamp *@
+        @* image.src = imageRedirectSrc *@
+        @* image.src = imageBlobUri *@
+        @* var imageHeader = document.getElementById("imageHeader"); *@
+        @* imageHeader.innerHTML = "Image for @(Model.device.Name) as at " + localizeDateTimeAsString(last24HoursImages[imageIndex].timestamp) *@
+    }
+
+    @* // Update the current slider value (each time you drag the slider handle)
     slider.oninput = function() {
         console.log(this.value)
         getImage(@(Model.device.Id), this.value);
-    }
+    } *@
 </script>

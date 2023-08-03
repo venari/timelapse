@@ -86,3 +86,22 @@ function localizeDateAsString(t)
 //     var d=new Date(t);
 //     return d.toLocaleString();
 // }
+
+
+function ISO8601UTCDatetimeToLocalDatetime(ISO8601UTCDatetime)
+{
+    // I can't fully describe how much I have how JavaScript handles dates. 
+    if(ISO8601UTCDatetime.indexOf('Z')==-1){
+        ISO8601UTCDatetime+='Z'
+    }
+
+    //https://stackoverflow.com/questions/24468518/html5-input-datetime-local-default-value-of-today-and-current-time *@
+    var localDatetime = new Date(ISO8601UTCDatetime);
+    localDatetime.setMinutes(localDatetime.getMinutes() - localDatetime.getTimezoneOffset());
+
+    /* remove second/millisecond if needed - credit ref. https://stackoverflow.com/questions/24468518/html5-input-datetime-local-default-value-of-today-and-current-time#comment112871765_60884408 */
+    localDatetime.setMilliseconds(null)
+    localDatetime.setSeconds(null)
+
+    return localDatetime.toISOString().slice(0, -1);
+}
