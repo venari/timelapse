@@ -8,6 +8,7 @@ using Microsoft.Extensions.Caching.Memory;
 using Microsoft.AspNetCore.Authorization;
 using timelapse.api.Filters;
 using System.ComponentModel.DataAnnotations;
+using Microsoft.AspNetCore.Identity;
 
 namespace timelapse.api.Pages;
 
@@ -25,9 +26,6 @@ public class CreateEventModel : PageModel
     public DateTime MinTimestamp {get; set; }
     [BindProperty]
     public DateTime MaxTimestamp {get; set; }
-
-    [BindProperty]
-    public int DeviceId {get; private set;}
 
     [BindProperty]
     public DateTime StartTime {get; set;}
@@ -112,15 +110,34 @@ public class CreateEventModel : PageModel
         InitialTimestamp = image.Timestamp;
         StartTime = InitialTimestamp;
         EndTime = InitialTimestamp;
-        DeviceId = device.Id;
+        // DeviceId = device.Id;
         MinTimestamp = minAndMaxTimestamps.MinTimestamp;
         MaxTimestamp = minAndMaxTimestamps.MaxTimestamp;
 
         return Page();
     }
 
+    private IdentityUser? GetCurrentUser(){
+
+        if(Request.HttpContext.User== null || Request.HttpContext.User.Identity == null || !Request.HttpContext.User.Identity.IsAuthenticated){
+            _logger.LogError($"Current User not found");
+            return null;
+        }
+
+        var currentUser = _appDbContext.Users.SingleOrDefault(u => u.UserName == Request.HttpContext.User.Identity.Name);
+
+        return currentUser;
+    }
+
+
     public async Task<IActionResult> OnPostAsync(int imageId)
     {
+        var user = GetCurrentUser();
+
+        if(user==null){
+            return Redirect("/Identity/Account/Login");
+        }
+
         var image = _appDbContext.Images
             .Include(i => i.Device)
             .FirstOrDefault(i => i.Id == imageId);
@@ -130,7 +147,6 @@ public class CreateEventModel : PageModel
         }
 
         device = image.Device;
-
 
         // device = _appDbContext.Devices
         //     .Where(t => t.Id == DeviceId)
@@ -143,7 +159,8 @@ public class CreateEventModel : PageModel
 
 
         Event newEvent = new Event();
-        newEvent.DeviceId = DeviceId;
+        newEvent.CreatedByUserId = user.Id;
+        newEvent.DeviceId = device.Id;
         newEvent.StartTime = StartTime.ToUniversalTime();
         newEvent.EndTime = EndTime.ToUniversalTime();
         newEvent.Description = Description;
