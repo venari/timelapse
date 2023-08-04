@@ -101,7 +101,7 @@ function ISO8601UTCDatetimeToLocalDatetime(ISO8601UTCDatetime)
 
     /* remove second/millisecond if needed - credit ref. https://stackoverflow.com/questions/24468518/html5-input-datetime-local-default-value-of-today-and-current-time#comment112871765_60884408 */
     localDatetime.setMilliseconds(null)
-    localDatetime.setSeconds(null)
+    // localDatetime.setSeconds(null)
 
     return localDatetime.toISOString().slice(0, -1);
 }

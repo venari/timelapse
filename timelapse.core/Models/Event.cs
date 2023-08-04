@@ -12,7 +12,7 @@ public class Event
     public DateTime EndTime {get; set;}
 
     [Required]
-    public DateTime CreatedDate {get; set;} = DateTime.Now;
+    public DateTime CreatedDate {get; set;} = DateTime.UtcNow;
     [Required]
     public string CreatedByUserId {get; set;}
 

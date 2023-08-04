@@ -7,17 +7,54 @@
     ViewData["Title"] = "Create Event";
 }
 
-<div class="text-center">
+<h1>Create</h1>
+
+<h4>Event</h4>
+<hr />
+
+<div class="row">
+    <div class="col-md-4">
+        <form method="post">
+            <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+            <div class="form-group">
+                <label asp-for="device.Description" class="control-label">Device Description</label>
+                <input readonly asp-for="device.Description" class="form-control" />
+                <span asp-validation-for="device.Description" class="text-danger"></span>
+            </div>
+            <div class="form-group">
+                <button title="Event Start" onclick="eventStart()" type="button" class="btn btn-primary"><i class="fa fa-flag"></i></button>
+                <label asp-for="StartTime" class="control-label"></label>
+                <input type="datetime-local" id="eventStartDateTime" step="1" asp-for="StartTime" class="form-control" />
+                <span asp-validation-for="StartTime" class="text-danger"></span>
+            </div>
+            <div class="form-group">
+                <button title="Event End"onclick="eventEnd()" type="button" class="btn btn-primary"><i class="fa fa-flag-checkered"></i></button>
+                <label asp-for="EndTime" class="control-label"></label>
+                <input type="datetime-local" id="eventEndDateTime" step="1" asp-for="EndTime" class="form-control" />
+                <span asp-validation-for="EndTime" class="text-danger"></span>
+            </div>
+            <div class="form-group">
+                <label asp-for="Description" class="control-label">Event Description</label>
+                <input asp-for="Description" class="form-control" />
+                <span asp-validation-for="Description" class="text-danger"></span>
+            </div>
+            <div class="form-group">
+                <input type="submit" value="Create" class="btn btn-primary" />
+            </div>
+        </form>
+    </div>
+</div>
+
+@* <div class="text-center">
     <h1 class="display-4">@(Model.device.Description)</h1>
-    <p id="imageHeader" scope="col">Image for @(Model.device.Name) as at ...</p>
-    @* <p id="imageHeader" scope="col">Image for @(Model.device.Name) as at <script type="text/javascript">localizeDateTime('@(Model.device.LatestImageTimestamp.Value.ToString("s"))');</script> *@
     </p>
 </div>
 
 <div class="container">
   <div class="row">
   </div>
-</div>
+</div> *@
+
 
 
 <div>
@@ -27,24 +64,34 @@
         <tbody>
             <tr>
                 <td>
+                    <p id="imageHeader" scope="col">Image for @(Model.device.Name) as at ...</p>
+
                     @if(Model.device.LatestImage!=null){
                         <img class="img-fluid" id="image" src="@(Model.device.LatestImage.BlobUri + Model.SasToken)"></img>
                     }
                 </td>
+            @* </tr>
+                <button title="Event Start" onclick="eventStart()" type="button" class="btn btn-primary"><i class="fa fa-flag"></i></button>
+                <label for="eventStartDateTime">Event Start:</label>
+                <input type="datetime-local" id="eventStartDateTime" name="eventStartDateTime"> 
+            <tr> *@
             </tr>
+            @* <tr>
+                <button title="Event End"onclick="eventEnd()" type="button" class="btn btn-primary"><i class="fa fa-flag-checkered"></i></button>
+                <label for="eventEndDateTime">Event End:</label>
+                <input type="datetime-local" id="eventEndDateTime" name="eventEndDateTime"> 
+            </tr> *@
             <tr>
                 @* <label id="imageDateSliderValue"></label> *@
                 @* <input type="range" class="form-range" min="0" max="@(Model.imagesLast24Hours.Count() - 1)" value="@(Model.imagesLast24Hours.Count() - 1)" id="imageDateSlider"> *@
                 @* <button id="togglePlay" onclick="togglePlay()" type="button" class="btn btn-primary"><i class="fa fa-play"></i></button> *@
-                <button onclick="eventStart()" type="button" class="btn btn-primary"><i class="fa fa-flag"></i></button>
-                <button onclick="navigate(-99)" type="button" class="btn btn-primary"><i class="fa fa-fast-backward"></i></button>
-                <button onclick="navigate(-60)" type="button" class="btn btn-primary"><i class="fa fa-backward"></i></button>
-                <button onclick="navigate(-1)" type="button" class="btn btn-primary"><i class="fa fa-step-backward"></i></button>
-                <button id="togglePlay" onclick="togglePlay()" type="button" class="btn btn-primary"><i class="fa fa-play"></i></button>
-                <button onclick="navigate(1)" type="button" class="btn btn-primary"><i class="fa fa-step-forward"></i></button>
-                <button onclick="navigate(60)" type="button" class="btn btn-primary"><i class="fa fa-forward"></i></button>
-                <button onclick="navigate(99)" type="button" class="btn btn-primary"><i class="fa fa-fast-forward"></i></button>
-                <button onclick="eventEnd()" type="button" class="btn btn-primary"><i class="fa fa-flag-checkered"></i></button>
+                <button title="Back 1hr" onclick="navigate(-60)" type="button" class="btn btn-secondary"><i class="fa fa-fast-backward"></i></button>
+                <button title="Back 10m"onclick="navigate(-10)" type="button" class="btn btn-secondary"><i class="fa fa-backward"></i></button>
+                <button title="Back 1m"onclick="navigate(-1)" type="button" class="btn btn-secondary"><i class="fa fa-step-backward"></i></button>
+                <button id="togglePlay" onclick="togglePlay()" type="button" class="btn btn-secondary"><i class="fa fa-play"></i></button>
+                <button title="Forward 1m"onclick="navigate(1)" type="button" class="btn btn-secondary"><i class="fa fa-step-forward"></i></button>
+                <button title="Forward 10m"onclick="navigate(10)" type="button" class="btn btn-secondary"><i class="fa fa-forward"></i></button>
+                <button title="Forward 1hr"onclick="navigate(60)" type="button" class="btn btn-secondary"><i class="fa fa-fast-forward"></i></button>
                 <label for="jumpToDateTime">Jump to (date and time):</label>
                 <input onchange="jumpToDateTime()" type="datetime-local" id="jumpToDateTime" name="jumpToDateTime"> 
             </tr>
@@ -53,12 +100,7 @@
 </div>
 
 <script>
-
-    @* var last24HoursImages = @(Json.Serialize(Model.imagesLast24Hours)); *@
-    @* var slider = document.getElementById("imageDateSlider") *@
-
-    @* var currentViewedTimestamp = new Date('@(Model.InitialTimestamp.ToString("s"))') *@
-    var currentViewedTimestamp = '@(Model.InitialTimestamp.ToString("s"))'
+    var currentViewedTimestamp = '@(Model.InitialTimestamp.ToString("o"))'
         
     displayCurrentViewedTimestamp();
 
@@ -84,21 +126,6 @@
         }
     }
 
-    @* function nextFrame(){
-        if(bPlaying){
-            if(parseInt(slider.value)<parseInt(slider.max)){
-                ++slider.value
-            } else {
-                slider.value = 0
-            }
-
-            image.onload=function(){
-                setTimeout(nextFrame, 50);
-            }
-            getImage(@(Model.device.Id), slider.value);
-        }
-    } *@
-
     function displayCurrentViewedTimestamp()
     {
         var imageHeader = document.getElementById("imageHeader");
@@ -107,25 +134,24 @@
         document.getElementById("jumpToDateTime").value = ISO8601UTCDatetimeToLocalDatetime(currentViewedTimestamp);
     }
     function eventStart(){
-
+        document.getElementById("eventStartDateTime").value = ISO8601UTCDatetimeToLocalDatetime(currentViewedTimestamp);
     }
 
     function eventEnd(){
-
+        document.getElementById("eventEndDateTime").value = ISO8601UTCDatetimeToLocalDatetime(currentViewedTimestamp);
     }
 
     function navigate(minutes){
-        @* var newTimestamp = new Date(currentViewedTimestamp.getTime() + minutes * 60 * 1000) *@
         var newTimestamp = new Date(new Date(currentViewedTimestamp).getTime() + minutes * 60 * 1000)
 
-        console.log("Navigating " + minutes + " minutes from " + currentViewedTimestamp + " to " + newTimestamp.toISOString())
+        console.log("Navigating " + minutes + " minutes from " + new Date(currentViewedTimestamp) + " to " + newTimestamp)
 
-        getImageAtOrAfter(@(Model.device.Id), ISO8601UTCDatetimeToLocalDatetime(newTimestamp))
+        getImageAtOrAround(@(Model.device.Id), ISO8601UTCDatetimeToLocalDatetime(newTimestamp.toISOString()), minutes>0)
     }
 
     function jumpToDateTime(){
         var jumpToDateTime = document.getElementById("jumpToDateTime").value
-        getImageAtOrAfter(@(Model.device.Id), jumpToDateTime)
+        getImageAtOrAround(@(Model.device.Id), jumpToDateTime, true)
     }
 
     function getImage(deviceId, imageIndex) {
@@ -135,11 +161,11 @@
         imageHeader.innerHTML = "Image for @(Model.device.Name) as at " + localizeDateTimeAsString(last24HoursImages[imageIndex].timestamp)
     }
 
-    function getImageAtOrAfter(deviceId, atOrAfterTimestamp) {
+    function getImageAtOrAround(deviceId, atOrAfterTimestamp, forwards) {
 
-        console.log("Navigating to or after " + atOrAfterTimestamp)
+        console.log("Navigating to or around " + atOrAfterTimestamp)
 
-        var url = "/api/Image/GetImageAtOrAfter/?deviceId=" + deviceId + "&atOrAfterTimestamp=" + atOrAfterTimestamp;
+        var url = "/api/Image/GetImageAtOrAround/?deviceId=" + deviceId + "&timestamp=" + atOrAfterTimestamp + "&forwards=" + forwards
         fetch(url, {
             method: 'GET',
             headers: {
@@ -158,26 +184,9 @@
             console.log(data.timestamp)
 
             image.src = data.blobUri + '@(Model.SasToken)'.replace(/&amp;/g, '&')
-            imageHeader.innerHTML = "Image for @(Model.device.Name) as at " + localizeDateTimeAsString(data.timestamp)
+
+            currentViewedTimestamp = data.timestamp
+            displayCurrentViewedTimestamp()
         });
-
-        // Call api/Image/GetImageAtOrAfter and get the image blob uri
-        // Then set the image src to the blob uri
-        // Then set the image header to the timestamp
-
-
-        @* imageBlobUri = last24HoursImages[imageIndex].blobUri + '@(Model.SasToken)'.replace(/&amp;/g, '&') *@
-
-        @* imageRedirectSrc = "/ImageView/" + deviceId + "?atOrAfterTimestamp=" + atOrAfterTimestamp *@
-        @* image.src = imageRedirectSrc *@
-        @* image.src = imageBlobUri *@
-        @* var imageHeader = document.getElementById("imageHeader"); *@
-        @* imageHeader.innerHTML = "Image for @(Model.device.Name) as at " + localizeDateTimeAsString(last24HoursImages[imageIndex].timestamp) *@
     }
-
-    @* // Update the current slider value (each time you drag the slider handle)
-    slider.oninput = function() {
-        console.log(this.value)
-        getImage(@(Model.device.Id), this.value);
-    } *@
 </script>

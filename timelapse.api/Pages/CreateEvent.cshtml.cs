@@ -7,6 +7,7 @@ using timelapse.api.Helpers;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.AspNetCore.Authorization;
 using timelapse.api.Filters;
+using System.ComponentModel.DataAnnotations;
 
 namespace timelapse.api.Pages;
 
@@ -17,12 +18,26 @@ public class CreateEventModel : PageModel
     private readonly ILogger<CreateEventModel> _logger;
     private AppDbContext _appDbContext;
 
-    public Device device {get; private set;}
-    public string SasToken {get; private set;}
+    public Device device {get; set;}
+    public string SasToken {get; set;}
 
-    // public DateTime oldestImageTimestamp {get; private set;}
-    // public DateTime newestImageTimestamp {get; private set;}
-    // public Image[] imagesLast24Hours {get; private set;}
+    [BindProperty]
+    public DateTime MinTimestamp {get; set; }
+    [BindProperty]
+    public DateTime MaxTimestamp {get; set; }
+
+    [BindProperty]
+    public int DeviceId {get; private set;}
+
+    [BindProperty]
+    public DateTime StartTime {get; set;}
+    [BindProperty]
+    public DateTime EndTime {get; set;}
+    
+    [BindProperty]
+    [Required]
+    public string Description {get; set;}
+
 
     public DateTime InitialTimestamp {get; private set;}
 
@@ -35,12 +50,6 @@ public class CreateEventModel : PageModel
         SasToken = storageHelper.SasToken;
     }
 
-    // [BindProperty]
-    // public int NumberOfHoursToDisplay {get; set; }
-
-    [BindProperty]
-    public DateTime MinTimestamp {get; set; }
-    public DateTime MaxTimestamp {get; set; }
 
     // public IActionResult OnGet(int deviceId, DateTime intialDateTime)
     public IActionResult OnGet(int imageId)
@@ -101,9 +110,47 @@ public class CreateEventModel : PageModel
         }
 
         InitialTimestamp = image.Timestamp;
+        StartTime = InitialTimestamp;
+        EndTime = InitialTimestamp;
+        DeviceId = device.Id;
         MinTimestamp = minAndMaxTimestamps.MinTimestamp;
         MaxTimestamp = minAndMaxTimestamps.MaxTimestamp;
 
         return Page();
+    }
+
+    public async Task<IActionResult> OnPostAsync(int imageId)
+    {
+        var image = _appDbContext.Images
+            .Include(i => i.Device)
+            .FirstOrDefault(i => i.Id == imageId);
+
+        if(image==null){
+            return RedirectToPage("/NotFound");
+        }
+
+        device = image.Device;
+
+
+        // device = _appDbContext.Devices
+        //     .Where(t => t.Id == DeviceId)
+        //     .FirstOrDefault();
+
+        if (!ModelState.IsValid)
+        {
+            return Page();
+        }
+
+
+        Event newEvent = new Event();
+        newEvent.DeviceId = DeviceId;
+        newEvent.StartTime = StartTime.ToUniversalTime();
+        newEvent.EndTime = EndTime.ToUniversalTime();
+        newEvent.Description = Description;
+
+        _appDbContext.Events.Add(newEvent);
+        await _appDbContext.SaveChangesAsync();
+
+        return RedirectToPage("./Index");
     }
 }

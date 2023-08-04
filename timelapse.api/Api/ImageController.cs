@@ -86,43 +86,31 @@ namespace timelapse.api{
             return new RedirectResult(image.BlobUri.ToString() + _storageHelper.SasToken);
         }        
 
-        [HttpGet("GetImageAtOrAfter")]
+        [HttpGet("GetImageAtOrAround")]
         [ThirdPartyApiKeyAuth]
-        public ActionResult<Image> GetImageAtOrAfter([FromQuery] int deviceId, DateTime atOrAfterTimestamp){
+        public ActionResult<Image> GetImageAtOrAround([FromQuery] int deviceId, DateTime timestamp, bool forwards){
+            // Fowards == true - get at or after timestamp
+            // Forwards == false - get at or before timestamp
+            
             Device device = _appDbContext.Devices.FirstOrDefault(d => d.Id == deviceId);
 
             if(device==null){
                 return new NotFoundResult();
             }
 
-            Image image = _appDbContext.Images
-                .Where(i => i.DeviceId == device.Id && i.Timestamp >= atOrAfterTimestamp.ToUniversalTime())
-                .OrderBy(i => i.Timestamp)
-                .FirstOrDefault();
-
-            if(image==null){
-                return new NotFoundResult();
+            Image image = null;
+            
+            if(forwards){
+                image = _appDbContext.Images
+                    .Where(i => i.DeviceId == device.Id && i.Timestamp >= timestamp.ToUniversalTime())
+                    .OrderBy(i => i.Timestamp)
+                    .FirstOrDefault();
+            } else {
+                image = _appDbContext.Images
+                    .Where(i => i.DeviceId == device.Id && i.Timestamp <= timestamp.ToUniversalTime())
+                    .OrderBy(i => i.Timestamp)
+                    .LastOrDefault();
             }
-
-            return image;
-
-            // return new RedirectResult(image.BlobUri.ToString() + _storageHelper.SasToken);
-        }        
-
-        [HttpGet("GetImageAtOrBefore")]
-        [ThirdPartyApiKeyAuth]
-        public ActionResult<Image> GetImageAtOrBefore([FromQuery] int deviceId, DateTime atOrBeforeTimestamp){
-            Device device = _appDbContext.Devices.FirstOrDefault(d => d.Id == deviceId);
-
-            if(device==null){
-                return new NotFoundResult();
-            }
-
-            Image image = _appDbContext.Images
-                .Where(i => i.DeviceId == device.Id && i.Timestamp <= atOrBeforeTimestamp)
-                .OrderBy(i => i.Timestamp)
-                .LastOrDefault();
-
             if(image==null){
                 return new NotFoundResult();
             }
