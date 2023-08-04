@@ -22,7 +22,7 @@ public class ImageViewModel : PageModel
 
     // public DateTime oldestImageTimestamp {get; private set;}
     // public DateTime newestImageTimestamp {get; private set;}
-    public Image[] imagesLast24Hours {get; private set;}
+    public ImageSubset[] imagesLast24Hours {get; private set;}
 
     public ImageViewModel(ILogger<ImageViewModel> logger, AppDbContext appDbContext, IConfiguration configuration, IMemoryCache memoryCache)
     {
@@ -96,7 +96,7 @@ public class ImageViewModel : PageModel
 
         device = d;
 
-        imagesLast24Hours = d.Images.OrderBy(i => i.Timestamp).ToArray();
+        imagesLast24Hours = d.Images.Select(i => new ImageSubset{Id = i.Id, Timestamp = i.Timestamp, BlobUri = i.BlobUri}).OrderBy(i => i.Timestamp).ToArray();
         if(imagesLast24Hours.Count()==0){
             return RedirectToPage("/NotFound");
         }

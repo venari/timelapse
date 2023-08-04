@@ -1,0 +1,155 @@
+﻿@page "{numberOfHoursToDisplay:int?}"
+@using Humanizer
+@model DeviceTrendsModel
+@{
+    ViewData["Title"] = "Device Trends";
+}
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+
+<div class="container">
+  <div class="row">
+    <div class="col">
+        <h4>Displaying @(Model.NumberOfHoursToDisplay) hours data.</h4>
+        @{
+            <a href="/DeviceTrends/1" type="button" class="btn btn-secondary">Last hour</a>
+            <a href="/DeviceTrends/24" type="button" class="btn btn-secondary">Last 24 hours</a>
+            <a href="/DeviceTrends/48" type="button" class="btn btn-secondary">Last 48 hours</a>
+            <a href="/DeviceTrends/168" type="button" class="btn btn-secondary">Last week</a>
+        }
+    </div>
+  </div>
+</div>
+
+
+
+<script>
+    const GetTelemetryBetweenDatesUri = '/api/Telemetry/GetTelemetryBetweenDates'
+
+    function getTelemetry(deviceId, startDate, endDate, chart, deviceLabel) {
+        fetch(GetTelemetryBetweenDatesUri + '?deviceId=' + deviceId + '&startDate=' + startDate + '&endDate=' + endDate)
+            .then(response => response.json())
+            .then(data => showTelemetry(chart, data, deviceId, deviceLabel))
+            .catch(error => console.error('Unable to get telemetry.', error));
+    }
+
+    function showTelemetry(chart, data, deviceId, deviceLabel){
+
+        const minVoltage = 2000
+        const maxVoltage = 3600
+
+        console.log("showTelemtery");
+        console.log("deviceLabel:")
+        console.log(deviceLabel)
+
+        data = {
+            @* labels: labels, *@
+            datasets: [{
+                label: deviceLabel + " Battery",
+                backgroundColor: 'rgb(99, 99, 255)',
+                borderColor: 'rgb(99, 99, 255)',
+                yAxisID: 'y',
+                data: data.map(d => ({x: new Date(d.timestamp), y: d.batteryPercent})),
+            }, {
+                label: deviceLabel + " Temperature",
+                backgroundColor: 'rgb(255, 99, 132)',
+                borderColor: 'rgb(255, 99, 132)',
+                yAxisID: 'y',
+                data: data.map(d => ({x: new Date(d.timestamp), y: d.temperatureC})),
+            }, {
+                label: deviceLabel + " Pending Images",
+                backgroundColor: 'rgb(30, 185, 00)',
+                borderColor: 'rgb(30, 185, 00)',
+                hidden: true,
+                yAxisID: 'y',
+                data: data.map(d => ({x: new Date(d.timestamp), y: d.pendingImages})),
+            }, {
+                label: deviceLabel + " Uptime (minutes)",
+                backgroundColor: 'rgb(00, 00, 00)',
+                borderColor: 'rgb(00, 00, 00)',
+                hidden: true,
+                yAxisID: 'y',
+                data: data.map(d => ({x: new Date(d.timestamp), y: d.uptimeSeconds/60}))
+            }]
+        };
+
+        chart.config.data.datasets = chart.config.data.datasets.concat(data.datasets)
+        chart.update();
+    }
+</script>
+
+<div>
+    <table class="table">
+        <thead>
+        </thead>
+        <tbody>
+            <tr>
+                <td>
+                    <canvas id="myChart"></canvas>
+
+                    <script>
+
+                        var config = {
+                            type: 'line',
+                            options: {
+                                plugins: {
+                                    legend: {
+                                        @* display: false, *@
+                                        position: 'right'
+                                    }
+                                },
+                                scales: {
+                                    x: {
+                                            parsing: false,
+                                            @* display: false, *@
+                                            type: 'time',
+                                            time: {
+                                                unit: 'hour'
+                                            },
+                                            suggestedMin: new Date(@(new DateTimeOffset(Model.StartDate).ToUnixTimeMilliseconds())),
+                                            suggestedMax: new Date(@(new DateTimeOffset(Model.EndDate).ToUnixTimeMilliseconds())),
+                                    },
+                                    y: {
+                                            @* display: false, *@
+                                            beginAtZero: true,
+                                            position: 'left'
+                                    },
+                                    y1: {
+                                            @* display: false, *@
+                                            beginAtZero: false,
+                                            position: 'right'
+                                    }
+                                },
+                                elements: {
+                                    line: {
+                                        borderColor: '#000000',
+                                        borderWidth: 1
+                                    },
+                                        point: {
+                                            radius: 0
+                                    } 
+                                },
+                                animation: false
+                                @* responsive: false, *@
+                            }
+                        };
+
+                        config.data={datasets: []};
+
+                        const myChart = new Chart(
+                            document.getElementById('myChart'),
+                            config
+                        );
+
+                        @{foreach(var device in Model.devices){
+                            <text>
+                                getTelemetry(@(device.Id), '@(Model.StartDate.ToUniversalTime().ToString("o"))', '@(Model.EndDate.ToUniversalTime().ToString("o"))', myChart, "@(device.Name)");
+                            </text>
+                        }}
+                    </script>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+</div>

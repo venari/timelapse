@@ -107,9 +107,12 @@
         chart.config.data.datasets[4].data = data.map(d => ({x: new Date(d.timestamp), y: d.pendingTelemetry}));        
         @* chart.config.data.datasets[5].data = data.map(d => ({x: new Date(d.timestamp), y: Math.max(0, (d.batteryVoltage - minVoltage)/(maxVoltage - minVoltage) * 100)})); *@
         chart.config.data.datasets[5].data = data.map(d => ({x: new Date(d.timestamp), y: d.batteryVoltage}));
-        chart.config.data.datasets[6].data = data.map(d => ({x: new Date(d.timestamp), y: d.charging}));        
-        chart.config.data.datasets[7].data = data.map(d => ({x: new Date(d.timestamp), y: d.batteryPercentPerHour}));
-        chart.config.data.datasets[8].data = data.map(d => ({x: new Date(d.timestamp), y: d.uptimeSeconds/60}));
+        chart.config.data.datasets[6].data = data.map(d => ({x: new Date(d.timestamp), y: d.batteryCurrent}));
+        chart.config.data.datasets[7].data = data.map(d => ({x: new Date(d.timestamp), y: d.ioVoltage}));
+        chart.config.data.datasets[8].data = data.map(d => ({x: new Date(d.timestamp), y: d.ioCurrent}));
+        chart.config.data.datasets[9].data = data.map(d => ({x: new Date(d.timestamp), y: d.charging}));        
+        chart.config.data.datasets[10].data = data.map(d => ({x: new Date(d.timestamp), y: d.batteryPercentPerHour}));
+        chart.config.data.datasets[11].data = data.map(d => ({x: new Date(d.timestamp), y: d.uptimeSeconds/60}));
         chart.update();
     }
 </script>
@@ -215,6 +218,24 @@
                                 label: "Battery Voltage",
                                 backgroundColor: 'rgb(99, 99, 255)',
                                 borderColor: 'rgb(99, 99, 255)',
+                                hidden: true,
+                                yAxisID: 'y1',
+                            }, {
+                                label: "Battery Current",
+                                backgroundColor: 'rgb(255, 80, 100)',
+                                borderColor: 'rgb(255, 80, 100)',
+                                hidden: true,
+                                yAxisID: 'y1',
+                            }, {
+                                label: "IO Voltage",
+                                backgroundColor: 'rgb(99, 99, 255)',
+                                borderColor: 'rgb(99, 99, 255)',
+                                hidden: true,
+                                yAxisID: 'y1',
+                            }, {
+                                label: "IO Current",
+                                backgroundColor: 'rgb(255, 80, 100)',
+                                borderColor: 'rgb(255, 80, 100)',
                                 hidden: true,
                                 yAxisID: 'y1',
                             }, {

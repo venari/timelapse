@@ -120,5 +120,28 @@ namespace timelapse.api{
 
             return telemetry;
         }
+
+        [HttpGet("GetTelemetryBetweenDates")]
+        public ActionResult<IEnumerable<Telemetry>> GetTelemetryBetweenDates([FromQuery] int deviceId, DateTime startDate, DateTime endDate){
+            _logger.LogInformation($"Get latest telemetry between {startDate} and {endDate}");
+
+            List<Telemetry> telemetry = new List<Telemetry>();
+
+            Device? device = _appDbContext.Devices
+                .Include(d => d.Telemetries.Where(t =>t.Timestamp.ToUniversalTime() >= startDate.ToUniversalTime() && t.Timestamp.ToUniversalTime() <= endDate.ToUniversalTime()))
+                .FirstOrDefault(d => d.Id == deviceId);
+
+            if(device != null){
+                telemetry =  device.Telemetries.OrderBy(t => t.Timestamp).ToList();
+            }
+
+            if(telemetry.Count==0){
+                return new NotFoundObjectResult(telemetry);
+            }
+
+            return telemetry;
+        }
+
+
     }
 }

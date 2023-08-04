@@ -1,0 +1,85 @@
+﻿@page
+@using Humanizer
+@model Events.IndexModel
+@{
+    ViewData["Title"] = "Events";
+}
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+
+<div class="text-center">
+    <h1 class="display-4">Events</h1>
+</div>
+
+<div>
+    <table class="table">
+        <thead>
+            <tr>
+                <th scope="col" colspan="2">Device</th>
+                <th scope="col" colspan="6">Event</th>
+            </tr>
+        </thead>
+        <thead>
+            <tr>
+                @* <th scope="col">ID</th> *@
+                <th scope="col">Name</th>
+                <th scope="col">Description</th>
+
+                <th scope="col">Description</th>
+                <th scope="col">ID</th>
+                <th scope="col">Event Start</th>
+                <th scope="col"></th>
+                <th scope="col">Event End</th>
+                <th scope="col"></th>
+            </tr>
+        </thead>
+        @{
+            int prevDeviceId=-1;
+        }
+        <tbody>
+                @foreach (var device in Model.devices){
+                    @foreach (var deviceEvent in device.Events.OrderByDescending(e => e.StartTime)){
+                        <tr>
+                            @if(prevDeviceId != device.Id)
+                            {
+                                prevDeviceId = device.Id;
+                                <td>@(device.Name)</td>
+                                <td>@(device.Description)</td>
+                            }
+                            else {
+                                <td></td>
+                                <td></td>
+                            }
+                            <td></td>
+                        <td>
+                            <a href="Events/Detail/@(deviceEvent.Id)">@(deviceEvent.Id)</a>
+                        </td>
+                        <td>
+                            @(deviceEvent.Description)
+                        </td>
+                        <td>
+                            <script type="text/javascript">localizeDateTime('@(deviceEvent.StartTime.ToString("s"))');</script>
+                        </td>
+                        <td>
+                        </td>
+                        <td>
+                            <script type="text/javascript">localizeDateTime('@(deviceEvent.EndTime.ToString("s"))');</script>
+                        </td>
+                        <td>
+                        </td>
+
+                        @* <td>
+                            @if(device.LatestImage!=null){
+                                <a href="ImageView/@(device.Id)"><img class="img-thumbnail" src="@(device.LatestImage.BlobUri + Model.SasToken)" width=100></img></a>
+                                @if (device.LatestImage!=null && DateTime.UtcNow - device.LatestImage.Timestamp > TimeSpan.FromMinutes(60)){
+                                    <span class="badge bg-warning text-dark">Warning - @((DateTime.UtcNow - device.LatestImage.Timestamp).Humanize()) old</span>
+                                }
+                            }
+                        </td> *@
+                    </tr>
+                    }
+                }
+        </tbody>
+    </table>
+</div>
