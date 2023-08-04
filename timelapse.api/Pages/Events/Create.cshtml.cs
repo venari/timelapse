@@ -10,13 +10,13 @@ using timelapse.api.Filters;
 using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Identity;
 
-namespace timelapse.api.Pages;
+namespace timelapse.api.Pages.Events;
 
 [Authorize]
 [AllowAnonymous]
-public class CreateEventModel : PageModel
+public class CreateModel : PageModel
 {
-    private readonly ILogger<CreateEventModel> _logger;
+    private readonly ILogger<CreateModel> _logger;
     private AppDbContext _appDbContext;
 
     public Device device {get; set;}
@@ -39,7 +39,7 @@ public class CreateEventModel : PageModel
 
     public DateTime InitialTimestamp {get; private set;}
 
-    public CreateEventModel(ILogger<CreateEventModel> logger, AppDbContext appDbContext, IConfiguration configuration, IMemoryCache memoryCache)
+    public CreateModel(ILogger<CreateModel> logger, AppDbContext appDbContext, IConfiguration configuration, IMemoryCache memoryCache)
     {
         _logger = logger;
         _appDbContext = appDbContext;
@@ -168,6 +168,6 @@ public class CreateEventModel : PageModel
         _appDbContext.Events.Add(newEvent);
         await _appDbContext.SaveChangesAsync();
 
-        return RedirectToPage("./Index");
+        return RedirectToPage("Index");
     }
 }

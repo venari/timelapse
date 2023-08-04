@@ -120,6 +120,6 @@
         console.log(last24HoursImages[slider.value].id);
         console.log(last24HoursImages[slider.value].timestamp);
         @* var chosenDate = new Date(last24HoursImages[slider.value].timestamp); *@
-        window.location.href = "/CreateEvent/" + last24HoursImages[slider.value].id; //chosenDate.toISOString(); //.getTime();
+        window.location.href = "/Events/Create/" + last24HoursImages[slider.value].id; //chosenDate.toISOString(); //.getTime();
     }
 </script>

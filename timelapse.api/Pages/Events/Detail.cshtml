@@ -1,0 +1,127 @@
+﻿@page "{eventId:int}"
+@using Humanizer
+@model Events.DetailModel
+@{
+    ViewData["Title"] = "Event Detail";
+}
+
+<h1>Event Detail</h1>
+
+@* <h4>Event</h4> *@
+<hr />
+
+<div class="row">
+    <div class="col-md-4">
+        <form method="post">
+            <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+            <div class="form-group">
+                <label asp-for="Device.Description" class="control-label">Device Description</label>
+                <input readonly asp-for="Device.Description" class="form-control" />
+                <span asp-validation-for="Device.Description" class="text-danger"></span>
+            </div>
+            <div class="form-group">
+                <label asp-for="Event.StartTime" class="control-label"></label>
+                <input readonly id="eventStartTime" asp-for="Event.StartTime" class="form-control" />
+                @* <input readonly class="form-control" value="<script type="text/javascript">localizeDateTime('@(Model.Event.StartTime.ToString("s"))');</script>"/> *@
+            </div>
+            <div class="form-group">
+                <label asp-for="Event.EndTime" class="control-label"></label>
+                <input readonly id="eventEndTime" asp-for="Event.EndTime" class="form-control" />
+                @* <input readonly class="form-control" value="<script type="text/javascript">localizeDateTime('@(Model.Event.EndTime.ToString("s"))');</script>"/> *@
+            </div>
+            <div class="form-group">
+                <label class="control-label">Duration</label>
+                <input readonly asp-for="EventDuration" class="form-control" />
+                <span asp-validation-for="Event.EndTime" class="text-danger"></span>
+            </div>
+            <div class="form-group">
+                <label asp-for="Event.Description" class="control-label">Event Description</label>
+                <input readonly asp-for="Event.Description" class="form-control" />
+                <span asp-validation-for="Event.Description" class="text-danger"></span>
+            </div>
+            <div class="form-group">
+                <label>Created By</label>
+                <input readonly asp-for="CreatedBy" class="form-control" />
+            </div>
+            <div class="form-group">
+                <label asp-for="Event.Description" class="control-label">Created</label>
+                <input readonly id="eventCreatedDate" asp-for="Event.CreatedDate" class="form-control" />
+                @* <input readonly class="form-control" value="<script type="text/javascript">localizeDateTime('@(Model.Event.CreatedDate.ToString("s"))');</script>"/> *@
+            </div>
+            @* <div class="form-group">
+                <input type="submit" value="Create" class="btn btn-primary" />
+            </div> *@
+        </form>
+    </div>
+</div>
+
+<div>
+    <table class="table">
+        <thead>
+        </thead>
+        <tbody>
+            <tr>
+                <td>
+                    <p id="imageHeader" scope="col">Image for @(Model.Device.Name) as at ...</p>
+                    <img class="img-fluid" id="image"></img>
+                </td>
+            </tr>
+            @* <tr>
+                <button title="Back 1hr" onclick="navigate(-60)" type="button" class="btn btn-secondary"><i class="fa fa-fast-backward"></i></button>
+                <button title="Back 10m"onclick="navigate(-10)" type="button" class="btn btn-secondary"><i class="fa fa-backward"></i></button>
+                <button title="Back 1m"onclick="navigate(-1)" type="button" class="btn btn-secondary"><i class="fa fa-step-backward"></i></button>
+                <button id="togglePlay" onclick="togglePlay()" type="button" class="btn btn-secondary"><i class="fa fa-play"></i></button>
+                <button title="Forward 1m"onclick="navigate(1)" type="button" class="btn btn-secondary"><i class="fa fa-step-forward"></i></button>
+                <button title="Forward 10m"onclick="navigate(10)" type="button" class="btn btn-secondary"><i class="fa fa-forward"></i></button>
+                <button title="Forward 1hr"onclick="navigate(60)" type="button" class="btn btn-secondary"><i class="fa fa-fast-forward"></i></button>
+                <label for="jumpToDateTime">Jump to (date and time):</label>
+                <input onchange="jumpToDateTime()" type="datetime-local" id="jumpToDateTime" name="jumpToDateTime"> 
+            </tr> *@
+        </tbody>
+    </table>
+</div>
+
+
+<script>
+    @* var currentViewedTimestamp = '@(Model.Event.StartTime.ToString("o"))' *@
+
+    var eventImages = @(Json.Serialize(Model.EventImages));
+    var eventImageIndex = 0;
+
+    // Sort out timezone stuff
+    document.getElementById("eventStartTime").value = ISO8601UTCDatetimeToLocalDatetime('@(Model.Event.StartTime.ToString("s"))');
+    document.getElementById("eventEndTime").value = ISO8601UTCDatetimeToLocalDatetime('@(Model.Event.EndTime.ToString("s"))');
+    document.getElementById("eventCreatedDate").value = ISO8601UTCDatetimeToLocalDatetime('@(Model.Event.CreatedDate.ToString("s"))');
+
+    var image = document.getElementById("image")
+
+    if(eventImages.length>0){
+        getImage(@(Model.Device.Id), eventImageIndex);
+
+        var bPlaying=true
+        nextFrame();
+
+    }
+
+    function nextFrame(){
+        if(bPlaying){
+            if(eventImageIndex<eventImages.length-1){
+                ++eventImageIndex
+            } else {
+                eventImageIndex = 0
+            }
+
+            image.onload=function(){
+                setTimeout(nextFrame, 50);
+            }
+            getImage(@(Model.Device.Id), eventImageIndex);
+        }
+    }
+
+    function getImage(deviceId, eventImageIndex) {
+        imageBlobUri = eventImages[eventImageIndex].blobUri + '@(Model.SasToken)'.replace(/&amp;/g, '&')
+        image.src = imageBlobUri
+        var imageHeader = document.getElementById("imageHeader");
+        imageHeader.innerHTML = "Image for @(Model.Device.Name) as at " + localizeDateTimeAsString(eventImages[eventImageIndex].timestamp)
+    }
+</script>
