@@ -2,6 +2,13 @@ using System.ComponentModel.DataAnnotations;
 
 namespace timelapse.core.models;
 
+public class EventType{
+    public int Id {get; set;}
+    [Required]
+    public string Name {get; set;}
+    public string Description {get; set;}
+}
+
 public class Event
 {
     public int Id {get; set;}
@@ -22,4 +29,7 @@ public class Event
     public Device Device {get; set;}
 
     public List<EventComment> Comments {get; set;} = new List<EventComment>();
+
+    public int EventTypeId {get; set;}
+    public EventType EventType {get; set;}
 }

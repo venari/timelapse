@@ -48,6 +48,11 @@
                 <input readonly id="eventCreatedDate" asp-for="Event.CreatedDate" class="form-control" />
                 @* <input readonly class="form-control" value="<script type="text/javascript">localizeDateTime('@(Model.Event.CreatedDate.ToString("s"))');</script>"/> *@
             </div>
+            <div class="form-group">
+                <label asp-for="Event.EventType.Name" class="control-label">Event Type</label>
+                <input readonly asp-for="Event.EventType.Name" class="form-control" />
+                @* <input readonly class="form-control" value="<script type="text/javascript">localizeDateTime('@(Model.Event.CreatedDate.ToString("s"))');</script>"/> *@
+            </div>
             @* <div class="form-group">
                 <input type="submit" value="Create" class="btn btn-primary" />
             </div> *@

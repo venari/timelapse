@@ -33,6 +33,7 @@ namespace timelapse.infrastructure
         public DbSet<OrganisationUserJoinEntry> OrganisationUserJoinEntry { get; set; } // DEVDO refactor code to change ORganisationUserJoinEntry to OrganisationUserJoinEntries
 
         public DbSet<Event> Events {get; set;}
+        public DbSet<EventType> EventTypes {get; set;}
 
         protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
         {

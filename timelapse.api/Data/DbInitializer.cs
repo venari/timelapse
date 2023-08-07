@@ -34,6 +34,18 @@ namespace timelapse.api.Data
                 context.SaveChanges();                
             }
 
+            if(!context.EventTypes.Any()){
+                context.EventTypes.AddRange(
+                    new EventType() {Name = "Test", Description = "Test"},
+                    new EventType() {Name = "Sediment Discharge", Description = "Sediment Discharge"},
+                    new EventType() {Name = "Water Level", Description = "Water Level"},
+                    new EventType() {Name = "Paint Discharge", Description = "Paint Discharge"},
+                    new EventType() {Name = "Effluent Discharge", Description = "Effluent Discharge"}
+                );
+                context.SaveChanges();                
+            }
+
+
             if(!context.UserRoles.Any()){
 
                 var userLeigh = context.Users.Single(u => u.UserName == "leigh@venari.co.nz");

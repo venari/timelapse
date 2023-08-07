@@ -34,6 +34,10 @@ public class CreateModel : PageModel
     
     [BindProperty]
     [Required]
+    public EventType EventType {get; set;}
+
+    [BindProperty]
+    [Required]
     public string Description {get; set;}
 
 
@@ -163,6 +167,7 @@ public class CreateModel : PageModel
         newEvent.DeviceId = device.Id;
         newEvent.StartTime = StartTime.ToUniversalTime();
         newEvent.EndTime = EndTime.ToUniversalTime();
+        newEvent.EventType = EventType;
         newEvent.Description = Description;
 
         _appDbContext.Events.Add(newEvent);
