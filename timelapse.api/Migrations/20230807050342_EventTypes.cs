@@ -13,8 +13,7 @@ namespace timelapse.api.Migrations
                 name: "event_type_id",
                 table: "events",
                 type: "integer",
-                nullable: false,
-                defaultValue: 0);
+                nullable: true);
 
             migrationBuilder.CreateTable(
                 name: "event_types",
@@ -40,8 +39,7 @@ namespace timelapse.api.Migrations
                 table: "events",
                 column: "event_type_id",
                 principalTable: "event_types",
-                principalColumn: "id",
-                onDelete: ReferentialAction.Cascade);
+                principalColumn: "id");
         }
 
         protected override void Down(MigrationBuilder migrationBuilder)

@@ -382,7 +382,7 @@ namespace timelapse.api.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("end_time");
 
-                    b.Property<int>("EventTypeId")
+                    b.Property<int?>("EventTypeId")
                         .HasColumnType("integer")
                         .HasColumnName("event_type_id");
 
@@ -756,8 +756,6 @@ namespace timelapse.api.Migrations
                     b.HasOne("timelapse.core.models.EventType", "EventType")
                         .WithMany()
                         .HasForeignKey("EventTypeId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired()
                         .HasConstraintName("fk_events_event_types_event_type_id");
 
                     b.Navigation("Device");
