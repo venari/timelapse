@@ -110,8 +110,12 @@
 
 <script>
     var currentViewedTimestamp = '@(Model.InitialTimestamp.ToString("o"))'
+    document.getElementById("eventStartDateTime").value = ISO8601UTCDatetimeToLocalDatetime('@(Model.StartTime.ToUniversalTime().ToString("o"))');
+    document.getElementById("eventEndDateTime").value = ISO8601UTCDatetimeToLocalDatetime('@(Model.EndTime.ToUniversalTime().ToString("o"))');
         
     displayCurrentViewedTimestamp();
+
+    // Sort out timezone of start and end. asp-for messes it up.
 
     console.log("Initial timestamp: " + currentViewedTimestamp)
 

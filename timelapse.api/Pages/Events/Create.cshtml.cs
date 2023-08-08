@@ -52,7 +52,8 @@ public class CreateModel : PageModel
     public string Description {get; set;}
 
 
-    public DateTime InitialTimestamp {get; private set;}
+    [BindProperty]
+    public DateTime InitialTimestamp {get; set;}
 
     public CreateModel(ILogger<CreateModel> logger, AppDbContext appDbContext, IConfiguration configuration, IMemoryCache memoryCache)
     {
@@ -108,26 +109,26 @@ public class CreateModel : PageModel
 
         device = image.Device;
 
-        var minAndMaxTimestamps = _appDbContext.Images
-            .Where(t => t.DeviceId == device.Id)
-            .GroupBy(t => t.DeviceId)
-            // .OrderByDescending(t => t.Timestamp)
-            .Select(t => new{
-                MinTimestamp = t.Min(i => i.Timestamp),
-                MaxTimestamp = t.Max(i => i.Timestamp)
-            })
-            .FirstOrDefault();
+        // var minAndMaxTimestamps = _appDbContext.Images
+        //     .Where(t => t.DeviceId == device.Id)
+        //     .GroupBy(t => t.DeviceId)
+        //     // .OrderByDescending(t => t.Timestamp)
+        //     .Select(t => new{
+        //         MinTimestamp = t.Min(i => i.Timestamp),
+        //         MaxTimestamp = t.Max(i => i.Timestamp)
+        //     })
+        //     .FirstOrDefault();
 
-        if(minAndMaxTimestamps==null || minAndMaxTimestamps.MinTimestamp == DateTime.MinValue || minAndMaxTimestamps.MaxTimestamp == DateTime.MinValue){
-            return RedirectToPage("/NotFound");
-        }
+        // if(minAndMaxTimestamps==null || minAndMaxTimestamps.MinTimestamp == DateTime.MinValue || minAndMaxTimestamps.MaxTimestamp == DateTime.MinValue){
+        //     return RedirectToPage("/NotFound");
+        // }
 
         InitialTimestamp = image.Timestamp;
         StartTime = InitialTimestamp;
         EndTime = InitialTimestamp;
         // DeviceId = device.Id;
-        MinTimestamp = minAndMaxTimestamps.MinTimestamp;
-        MaxTimestamp = minAndMaxTimestamps.MaxTimestamp;
+        // MinTimestamp = minAndMaxTimestamps.MinTimestamp;
+        // MaxTimestamp = minAndMaxTimestamps.MaxTimestamp;
 
         return Page();
     }
@@ -162,6 +163,7 @@ public class CreateModel : PageModel
         }
 
         device = image.Device;
+        InitialTimestamp = image.Timestamp;
 
         // device = _appDbContext.Devices
         //     .Where(t => t.Id == DeviceId)
@@ -171,7 +173,6 @@ public class CreateModel : PageModel
         {
             return Page();
         }
-
 
         Event newEvent = new Event();
         newEvent.CreatedByUserId = user.Id;
