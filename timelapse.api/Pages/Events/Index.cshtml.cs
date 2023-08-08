@@ -18,6 +18,7 @@ public class IndexModel : PageModel
 
     public List<Device> devices {get;}
     public string SasToken {get; private set;}
+    public List<Areas.Identity.Data.AppUser> Users {get; private set;}
 
     public IndexModel(ILogger<IndexModel> logger, AppDbContext appDbContext, IConfiguration configuration, IMemoryCache memoryCache)
     {
@@ -48,6 +49,7 @@ public class IndexModel : PageModel
 
     public void OnGet()
     {
+        Users = _appDbContext.Users.ToList();
 
     }
 }
