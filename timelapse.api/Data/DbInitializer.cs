@@ -40,7 +40,10 @@ namespace timelapse.api.Data
                     new EventType() {Name = "Sediment Discharge", Description = "Sediment Discharge"},
                     new EventType() {Name = "Water Level", Description = "Water Level"},
                     new EventType() {Name = "Paint Discharge", Description = "Paint Discharge"},
-                    new EventType() {Name = "Effluent Discharge", Description = "Effluent Discharge"}
+                    new EventType() {Name = "Effluent Discharge", Description = "Effluent Discharge"},
+                    new EventType() {Name = "Condensation", Description = "Condensation"},
+                    new EventType() {Name = "Lighting Issue", Description = "Lighting Issue"},
+                    new EventType() {Name = "Other Camera Issue", Description = "Other Camera Issue"}               
                 );
                 context.SaveChanges();                
             }

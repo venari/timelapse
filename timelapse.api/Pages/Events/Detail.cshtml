@@ -44,13 +44,15 @@
                 <input readonly asp-for="CreatedBy" class="form-control" />
             </div>
             <div class="form-group">
-                <label asp-for="Event.Description" class="control-label">Created</label>
-                <input readonly id="eventCreatedDate" asp-for="Event.CreatedDate" class="form-control" />
-                @* <input readonly class="form-control" value="<script type="text/javascript">localizeDateTime('@(Model.Event.CreatedDate.ToString("s"))');</script>"/> *@
+                <label asp-for="Event.EventTypeId" class="control-label">Event Type</label>
+                <select disabled asp-for="Event.EventTypeId" class="form-control" asp-items="Model.EventTypes">
+                    <option value=""></option>
+                </select>
+                <span asp-validation-for="SelectedEventTypeId" class="text-danger"></span>
             </div>
             <div class="form-group">
-                <label asp-for="Event.EventType.Name" class="control-label">Event Type</label>
-                <input readonly asp-for="Event.EventType.Name" class="form-control" />
+                <label asp-for="Event.Description" class="control-label">Created</label>
+                <input readonly id="eventCreatedDate" asp-for="Event.CreatedDate" class="form-control" />
                 @* <input readonly class="form-control" value="<script type="text/javascript">localizeDateTime('@(Model.Event.CreatedDate.ToString("s"))');</script>"/> *@
             </div>
             @* <div class="form-group">

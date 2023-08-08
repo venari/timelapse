@@ -10,6 +10,7 @@ using timelapse.api.Filters;
 using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Identity;
 using Humanizer;
+using Microsoft.AspNetCore.Mvc.Rendering;
 
 namespace timelapse.api.Pages.Events;
 
@@ -43,7 +44,18 @@ public class DetailModel : PageModel
             }
         }
     }
-    
+
+    [BindProperty]
+    [Required]
+    public int SelectedEventTypeId {get; set;}
+
+
+    public List<SelectListItem> EventTypes {
+        get {
+            return _appDbContext.EventTypes.Select(et => new SelectListItem($"{et.Name}", et.Id.ToString())).ToList();
+        }
+    }
+
     public DetailModel(ILogger<DetailModel> logger, AppDbContext appDbContext, IConfiguration configuration, IMemoryCache memoryCache)
     {
         _logger = logger;

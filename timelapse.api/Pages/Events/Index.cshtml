@@ -27,6 +27,7 @@
                 <th scope="col">Description</th>
 
                 <th scope="col">ID</th>
+                <th scope="col">Type</th>
                 <th scope="col">Description</th>
                 <th scope="col">Event Start</th>
                 <th scope="col"></th>
@@ -53,6 +54,9 @@
                             }
                         <td>
                             <a href="Events/Detail/@(deviceEvent.Id)">@(deviceEvent.Id)</a>
+                        </td>
+                        <td>
+                            @(deviceEvent.EventType!=null?deviceEvent.EventType.Name:"---")
                         </td>
                         <td>
                             @(deviceEvent.Description)
