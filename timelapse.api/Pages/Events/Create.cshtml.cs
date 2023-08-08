@@ -9,6 +9,7 @@ using Microsoft.AspNetCore.Authorization;
 using timelapse.api.Filters;
 using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Mvc.Rendering;
 
 namespace timelapse.api.Pages.Events;
 
@@ -32,6 +33,20 @@ public class CreateModel : PageModel
     [BindProperty]
     public DateTime EndTime {get; set;}
     
+    // [BindProperty]
+    // [Required]
+    // public EventType EventType {get; set;}
+
+    [BindProperty]
+    [Required]
+    public int SelectedEventTypeId {get; set;}
+
+    public List<SelectListItem> EventTypes {
+        get {
+            return _appDbContext.EventTypes.Select(et => new SelectListItem($"{et.Name}", et.Id.ToString())).ToList();
+        }
+    }
+
     [BindProperty]
     [Required]
     public string Description {get; set;}
@@ -163,6 +178,7 @@ public class CreateModel : PageModel
         newEvent.DeviceId = device.Id;
         newEvent.StartTime = StartTime.ToUniversalTime();
         newEvent.EndTime = EndTime.ToUniversalTime();
+        newEvent.EventTypeId = SelectedEventTypeId;
         newEvent.Description = Description;
 
         _appDbContext.Events.Add(newEvent);

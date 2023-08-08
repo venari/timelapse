@@ -33,6 +33,15 @@
                 <input type="datetime-local" id="eventEndDateTime" step="1" asp-for="EndTime" class="form-control" />
                 <span asp-validation-for="EndTime" class="text-danger"></span>
             </div>
+            <!-- Create a drop down that gives all options from EventType collection
+             -->
+            <div class="form-group">
+                <label asp-for="SelectedEventTypeId" class="control-label">Event Type</label>
+                <select asp-for="SelectedEventTypeId" class="form-control" asp-items="Model.EventTypes">
+                    <option value=""></option>
+                </select>
+                <span asp-validation-for="SelectedEventTypeId" class="text-danger"></span>
+            </div>
             <div class="form-group">
                 <label asp-for="Description" class="control-label">Event Description</label>
                 <input asp-for="Description" class="form-control" />
