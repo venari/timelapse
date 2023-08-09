@@ -159,7 +159,8 @@
 
         console.log("Navigating " + minutes + " minutes from " + new Date(currentViewedTimestamp) + " to " + newTimestamp)
 
-        getImageAtOrAround(@(Model.device.Id), ISO8601UTCDatetimeToLocalDatetime(newTimestamp.toISOString()), minutes>0)
+        @* getImageAtOrAround(@(Model.device.Id), ISO8601UTCDatetimeToLocalDatetime(newTimestamp.toISOString()), minutes>0) *@
+        getImageAtOrAround(@(Model.device.Id), newTimestamp.toISOString(), minutes>0)
     }
 
     function jumpToDateTime(){
