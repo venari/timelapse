@@ -150,6 +150,9 @@ public class CreateModel : PageModel
     {
         var user = GetCurrentUser();
 
+        _logger.LogInformation($"StartTime: {StartTime.ToString()} Kind: {StartTime.Kind} UTC: {StartTime.ToUniversalTime().ToString()}");
+        _logger.LogInformation($"EndTime: {EndTime.ToString()} - {EndTime.ToUniversalTime().ToString()}");
+
         if(user==null){
             return Redirect("/Identity/Account/Login");
         }
