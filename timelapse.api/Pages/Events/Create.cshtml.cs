@@ -129,8 +129,7 @@ public class CreateModel : PageModel
         // }
 
         InitialTimestamp = image.Timestamp;
-        StartTime = InitialTimestamp;
-        EndTime = InitialTimestamp;
+        EndTimeUTC = EndTime = StartTimeUTC = StartTime = InitialTimestamp;
         // DeviceId = device.Id;
         // MinTimestamp = minAndMaxTimestamps.MinTimestamp;
         // MaxTimestamp = minAndMaxTimestamps.MaxTimestamp;

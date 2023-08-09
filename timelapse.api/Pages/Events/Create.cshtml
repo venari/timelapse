@@ -112,11 +112,11 @@
 
 <script>
     var currentViewedTimestamp = '@(Model.InitialTimestamp.ToString("o"))'
-    document.getElementById("eventStartDateTime").value = ISO8601UTCDatetimeToLocalDatetime('@(Model.StartTime.ToUniversalTime().ToString("o"))');
-    document.getElementById("eventEndDateTime").value = ISO8601UTCDatetimeToLocalDatetime('@(Model.EndTime.ToUniversalTime().ToString("o"))');
-    document.getElementById("eventStartDateTimeUTC").value = '@(Model.StartTimeUTC.ToUniversalTime().ToString("o"))';
-    document.getElementById("eventEndDateTimeUTC").value = '@(Model.EndTimeUTC.ToUniversalTime().ToString("o"))';
-        
+    document.getElementById("eventStartDateTime").value = ISO8601UTCDatetimeToLocalDatetime('@(Model.StartTimeUTC.ToString("o"))');
+    document.getElementById("eventEndDateTime").value = ISO8601UTCDatetimeToLocalDatetime('@(Model.EndTimeUTC.ToString("o"))');
+    document.getElementById("eventStartDateTimeUTC").value = '@(Model.StartTimeUTC.ToString("o"))';
+    document.getElementById("eventEndDateTimeUTC").value = '@(Model.EndTimeUTC.ToString("o"))';
+
     displayCurrentViewedTimestamp();
 
     // Sort out timezone of start and end. asp-for messes it up.
