@@ -169,6 +169,10 @@ public class CreateModel : PageModel
         //     .Where(t => t.Id == DeviceId)
         //     .FirstOrDefault();
 
+        if (StartTime != null && EndTime != null && StartTime > EndTime){
+            ModelState.AddModelError("StartTime", "End Time is not later than Start Time.");
+        }
+
         if (!ModelState.IsValid)
         {
             return Page();
