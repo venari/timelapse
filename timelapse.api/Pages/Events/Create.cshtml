@@ -164,8 +164,8 @@
     }
 
     function jumpToDateTime(){
-        var jumpToDateTime = document.getElementById("jumpToDateTime").value
-        getImageAtOrAround(@(Model.device.Id), jumpToDateTime, true)
+        var jumpToDateTime = new Date(document.getElementById("jumpToDateTime").value)
+        getImageAtOrAround(@(Model.device.Id), jumpToDateTime,toISOString(), true)
     }
 
     function getImage(deviceId, imageIndex) {
