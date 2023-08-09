@@ -14,7 +14,7 @@
 
 <div class="row">
     <div class="col-md-4">
-        <form method="post">
+        <form method="post" onsubmit="updateUTCfields()">
             <div asp-validation-summary="ModelOnly" class="text-danger"></div>
             <div class="form-group">
                 <label asp-for="device.Description" class="control-label">Device Description</label>
@@ -114,8 +114,8 @@
     var currentViewedTimestamp = '@(Model.InitialTimestamp.ToString("o"))'
     document.getElementById("eventStartDateTime").value = ISO8601UTCDatetimeToLocalDatetime('@(Model.StartTimeUTC.ToString("o"))');
     document.getElementById("eventEndDateTime").value = ISO8601UTCDatetimeToLocalDatetime('@(Model.EndTimeUTC.ToString("o"))');
-    document.getElementById("eventStartDateTimeUTC").value = '@(Model.StartTimeUTC.ToString("o"))';
-    document.getElementById("eventEndDateTimeUTC").value = '@(Model.EndTimeUTC.ToString("o"))';
+    //document.getElementById("eventStartDateTimeUTC").value = '@(Model.StartTimeUTC.ToString("o"))';
+    //document.getElementById("eventEndDateTimeUTC").value = '@(Model.EndTimeUTC.ToString("o"))';
 
     displayCurrentViewedTimestamp();
 
@@ -152,12 +152,12 @@
     }
     function eventStart(){
         document.getElementById("eventStartDateTime").value = ISO8601UTCDatetimeToLocalDatetime(currentViewedTimestamp);
-        document.getElementById("eventStartDateTimeUTC").value = currentViewedTimestamp;
+        //document.getElementById("eventStartDateTimeUTC").value = currentViewedTimestamp;
     }
 
     function eventEnd(){
         document.getElementById("eventEndDateTime").value = ISO8601UTCDatetimeToLocalDatetime(currentViewedTimestamp);
-        document.getElementById("eventEndDateTimeUTC").value = currentViewedTimestamp;
+        //document.getElementById("eventEndDateTimeUTC").value = currentViewedTimestamp;
     }
 
     function navigate(minutes){
@@ -208,5 +208,12 @@
             currentViewedTimestamp = data.timestamp
             displayCurrentViewedTimestamp()
         });
+    }
+
+    function updateUTCfields(){
+        //document.getElementById("eventStartDateTimeUTC").value = document.getElementById("eventStartDateTime").value
+        //document.getElementById("eventEndDateTimeUTC").value = document.getElementById("eventEndDateTime").value
+        document.getElementById("eventStartDateTimeUTC").value = (new Date(document.getElementById("eventStartDateTime").value)).toISOString()
+        document.getElementById("eventEndDateTimeUTC").value = (new Date(document.getElementById("eventEndDateTime").value)).toISOString()
     }
 </script>
