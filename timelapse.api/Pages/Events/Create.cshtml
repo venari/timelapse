@@ -50,6 +50,8 @@
             <div class="form-group">
                 <input type="submit" value="Create" class="btn btn-primary" />
             </div>
+            <input type="hidden" id="eventStartDateTimeUTC" asp-for="StartTimeUTC" />
+            <input type="hidden" id="eventEndDateTimeUTC" asp-for="EndTimeUTC" />
         </form>
     </div>
 </div>
@@ -112,6 +114,8 @@
     var currentViewedTimestamp = '@(Model.InitialTimestamp.ToString("o"))'
     document.getElementById("eventStartDateTime").value = ISO8601UTCDatetimeToLocalDatetime('@(Model.StartTime.ToUniversalTime().ToString("o"))');
     document.getElementById("eventEndDateTime").value = ISO8601UTCDatetimeToLocalDatetime('@(Model.EndTime.ToUniversalTime().ToString("o"))');
+    document.getElementById("eventStartDateTimeUTC").value = '@(Model.StartTimeUTC.ToUniversalTime().ToString("o"))';
+    document.getElementById("eventEndDateTimeUTC").value = '@(Model.EndTimeUTC.ToUniversalTime().ToString("o"))';
         
     displayCurrentViewedTimestamp();
 
@@ -148,10 +152,12 @@
     }
     function eventStart(){
         document.getElementById("eventStartDateTime").value = ISO8601UTCDatetimeToLocalDatetime(currentViewedTimestamp);
+        document.getElementById("eventStartDateTimeUTC").value = currentViewedTimestamp;
     }
 
     function eventEnd(){
         document.getElementById("eventEndDateTime").value = ISO8601UTCDatetimeToLocalDatetime(currentViewedTimestamp);
+        document.getElementById("eventEndDateTimeUTC").value = currentViewedTimestamp;
     }
 
     function navigate(minutes){

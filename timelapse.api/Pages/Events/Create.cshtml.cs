@@ -32,6 +32,11 @@ public class CreateModel : PageModel
     public DateTime StartTime {get; set;}
     [BindProperty]
     public DateTime EndTime {get; set;}
+
+    [BindProperty]
+    public DateTime StartTimeUTC {get; set;}
+    [BindProperty]
+    public DateTime EndTimeUTC {get; set;}
     
     // [BindProperty]
     // [Required]
@@ -150,8 +155,8 @@ public class CreateModel : PageModel
     {
         var user = GetCurrentUser();
 
-        _logger.LogInformation($"StartTime: {StartTime.ToString()} Kind: {StartTime.Kind} UTC: {StartTime.ToUniversalTime().ToString()}");
-        _logger.LogInformation($"EndTime: {EndTime.ToString()} - {EndTime.ToUniversalTime().ToString()}");
+        _logger.LogInformation($"StartTime: {StartTime.ToString()} Kind: {StartTime.Kind} UTC: {StartTime.ToUniversalTime().ToString()}.  StartTimeUTC: {StartTimeUTC.ToString()} ");
+        _logger.LogInformation($"EndTime: {EndTime.ToString()} - {EndTime.ToUniversalTime().ToString()}.  EndTimeUTC: {EndTimeUTC.ToString()}");
 
         if(user==null){
             return Redirect("/Identity/Account/Login");
@@ -184,8 +189,10 @@ public class CreateModel : PageModel
         Event newEvent = new Event();
         newEvent.CreatedByUserId = user.Id;
         newEvent.DeviceId = device.Id;
-        newEvent.StartTime = StartTime.ToUniversalTime();
-        newEvent.EndTime = EndTime.ToUniversalTime();
+        // newEvent.StartTime = StartTime.ToUniversalTime();
+        newEvent.StartTime = StartTimeUTC;
+        // newEvent.EndTime = EndTime.ToUniversalTime();
+        newEvent.EndTime = EndTimeUTC;
         newEvent.EventTypeId = SelectedEventTypeId;
         newEvent.Description = Description;
 
