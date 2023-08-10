@@ -17,7 +17,7 @@
         <thead>
             <tr>
                 <th scope="col" colspan="2">Device</th>
-                <th scope="col" colspan="7">Event</th>
+                <th scope="col" colspan="8">Event</th>
             </tr>
         </thead>
         <thead>
@@ -29,9 +29,9 @@
                 <th scope="col">ID</th>
                 <th scope="col">Type</th>
                 <th scope="col">Description</th>
-                <th scope="col">Event Start</th>
+                <th scope="col">Start</th>
                 <th scope="col"></th>
-                <th scope="col">Event End</th>
+                <th scope="col">End</th>
                 <th scope="col"></th>
                 <th scope="col">Created By</th>
             </tr>
@@ -54,7 +54,7 @@
                                 <td></td>
                             }
                         <td>
-                            <a href="Events/Detail/@(deviceEvent.Id)">@(deviceEvent.Id)</a>
+                            <a href="/Events/Detail/@(deviceEvent.Id)">@(deviceEvent.Id)</a>
                         </td>
                         <td>
                             @(deviceEvent.EventType!=null?deviceEvent.EventType.Name:"---")
@@ -66,11 +66,16 @@
                             <script type="text/javascript">localizeDateTime('@(deviceEvent.StartTime.ToString("s"))');</script>
                         </td>
                         <td>
+                            <a href="/Events/Detail/@(deviceEvent.Id)"><img class="img-thumbnail" src="@(deviceEvent.StartImage.BlobUri + Model.SasToken)"></img></a>
                         </td>
+                        @* <td>
+                            <a href="/Events/Detail/@(deviceEvent.Id)"><img class="img-thumbnail" src="@(deviceEvent.ThumbnailImage!=null?deviceEvent.ThumbnailImage.BlobUri + Model.SasToken:"")"></img></a>
+                        </td> *@
                         <td>
                             <script type="text/javascript">localizeDateTime('@(deviceEvent.EndTime.ToString("s"))');</script>
                         </td>
                         <td>
+                            <a href="/Events/Detail/@(deviceEvent.Id)"><img class="img-thumbnail" src="@(deviceEvent.EndImage.BlobUri + Model.SasToken)"></img></a>
                         </td>
                         @{
                             var user = Model.Users.FirstOrDefault(u => u.Id == deviceEvent.CreatedByUserId);
@@ -80,14 +85,6 @@
                                 <td>[unknown]</td>
                             }
                         }
-                        @* <td>
-                            @if(device.LatestImage!=null){
-                                <a href="ImageView/@(device.Id)"><img class="img-thumbnail" src="@(device.LatestImage.BlobUri + Model.SasToken)" width=100></img></a>
-                                @if (device.LatestImage!=null && DateTime.UtcNow - device.LatestImage.Timestamp > TimeSpan.FromMinutes(60)){
-                                    <span class="badge bg-warning text-dark">Warning - @((DateTime.UtcNow - device.LatestImage.Timestamp).Humanize()) old</span>
-                                }
-                            }
-                        </td> *@
                     </tr>
                     }
                 }

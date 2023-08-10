@@ -17,6 +17,7 @@ public class IndexModel : PageModel
     private StorageHelper _storageHelper;
 
     public List<Device> devices {get;}
+    public IEnumerable<Image> images {get; set;}
     public string SasToken {get; private set;}
     public List<Areas.Identity.Data.AppUser> Users {get; private set;}
 
@@ -31,13 +32,22 @@ public class IndexModel : PageModel
         devices = _appDbContext.Devices
             // .Include(d => d.Telemetries.Where(t => t.Timestamp >= cutOff))
             // .Include(d => d.Images.OrderByDescending(i => i.Timestamp).Take(1))
+
             .Include(d => d.Events)
             .ThenInclude(e => e.EventType)
+
+            .Include(d => d.Events)
+            .ThenInclude(e => e.StartImage)
+
+            .Include(d => d.Events)
+            .ThenInclude(e => e.EndImage)
             // .AsSplitQuery()
             // .OrderBy(d => d.Name)
             .OrderBy(d => d.Description)
             .Where(d => d.Retired == false)
             .ToList();
+
+        images = _appDbContext.Images;
         _storageHelper = new StorageHelper(configuration, logger, memoryCache);
 
         var sasUri = _storageHelper.GenerateSasUri();
@@ -46,6 +56,26 @@ public class IndexModel : PageModel
 
         // _appDbContext.Database.EnsureCreated();
     }
+
+    // public Uri EventStartImageUri(Event Event){
+    //     var image = images.Where(i => i.DeviceId == Event.DeviceId && i.Timestamp >= Event.StartTime).OrderBy(i => i.Timestamp).FirstOrDefault();
+
+    //     if(image!=null){
+    //         return image.BlobUri;
+    //     }
+
+    //     return null;
+    // }
+
+    // public Uri EventEndImageUri(Event Event){
+    //     var image = images.Where(i => i.DeviceId == Event.DeviceId && i.Timestamp <= Event.EndTime).OrderByDescending(i => i.Timestamp).FirstOrDefault();
+
+    //     if(image!=null){
+    //         return image.BlobUri;
+    //     }
+
+    //     return null;
+    // }
 
     public void OnGet()
     {

@@ -195,6 +195,9 @@ public class CreateModel : PageModel
         newEvent.EventTypeId = SelectedEventTypeId;
         newEvent.Description = Description;
 
+        newEvent.StartImage = _appDbContext.Images.OrderBy(i => i.Timestamp).FirstOrDefault(i => i.DeviceId == device.Id && i.Timestamp >= newEvent.StartTime);
+        newEvent.EndImage = _appDbContext.Images.OrderByDescending(i => i.Timestamp).FirstOrDefault(i => i.DeviceId == device.Id && i.Timestamp <= newEvent.EndTime);
+
         _appDbContext.Events.Add(newEvent);
         await _appDbContext.SaveChangesAsync();
 
