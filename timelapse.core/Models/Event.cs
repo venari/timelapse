@@ -23,6 +23,11 @@ public class Event
     [Required]
     public string CreatedByUserId {get; set;}
 
+    [Required]
+    public DateTime LastEditedDate {get; set;} = DateTime.UtcNow;
+    [Required]
+    public string LastEditedByUserId {get; set;}
+
     public string Description {get; set;}
 
     [Required]
