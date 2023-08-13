@@ -15,9 +15,9 @@ namespace timelapse.api.Pages.Events;
 
 [Authorize]
 [AllowAnonymous]
-public class CreateModel : PageModel
+public class EditModel : PageModel
 {
-    private readonly ILogger<CreateModel> _logger;
+    private readonly ILogger<EditModel> _logger;
     private AppDbContext _appDbContext;
 
     public Device device {get; set;}
@@ -60,7 +60,7 @@ public class CreateModel : PageModel
     [BindProperty]
     public DateTime InitialTimestamp {get; set;}
 
-    public CreateModel(ILogger<CreateModel> logger, AppDbContext appDbContext, IConfiguration configuration, IMemoryCache memoryCache)
+    public EditModel(ILogger<EditModel> logger, AppDbContext appDbContext, IConfiguration configuration, IMemoryCache memoryCache)
     {
         _logger = logger;
         _appDbContext = appDbContext;
@@ -70,9 +70,7 @@ public class CreateModel : PageModel
     }
 
 
-    // public IActionResult OnGet(int deviceId, DateTime intialDateTime)
-    public IActionResult OnGet(int imageId)
-    // public IActionResult OnGet(int deviceId, int intialDateTime)
+    public IActionResult OnGet(int eventId)
     {
         // Unusual authentication here - want to accept logged in users, and the Third Party key
         // Duplication of logic in ThirdPartyApiKeyAuthAttribute
@@ -104,32 +102,27 @@ public class CreateModel : PageModel
             }
         }
 
-        var image = _appDbContext.Images
-            .Include(i => i.Device)
-            .FirstOrDefault(i => i.Id == imageId);
+        var Event = _appDbContext.Events
+            .Include(e => e.EventType)
+            .Include(e => e.Device)
+            .FirstOrDefault(e => e.Id == eventId);
 
-        if(image==null){
+        // var image = _appDbContext.Images
+        //     .Include(i => i.Device)
+        //     .FirstOrDefault(i => i.Id == eventId);
+
+        if(Event==null){
             return RedirectToPage("/NotFound");
         }
 
-        device = image.Device;
+        device = Event.Device;
 
-        // var minAndMaxTimestamps = _appDbContext.Images
-        //     .Where(t => t.DeviceId == device.Id)
-        //     .GroupBy(t => t.DeviceId)
-        //     // .OrderByDescending(t => t.Timestamp)
-        //     .Select(t => new{
-        //         MinTimestamp = t.Min(i => i.Timestamp),
-        //         MaxTimestamp = t.Max(i => i.Timestamp)
-        //     })
-        //     .FirstOrDefault();
+        StartTimeUTC = Event.StartTime;
+        EndTimeUTC = Event.EndTime;
 
-        // if(minAndMaxTimestamps==null || minAndMaxTimestamps.MinTimestamp == DateTime.MinValue || minAndMaxTimestamps.MaxTimestamp == DateTime.MinValue){
-        //     return RedirectToPage("/NotFound");
-        // }
-
-        InitialTimestamp = image.Timestamp;
-        EndTimeUTC = StartTimeUTC = InitialTimestamp;
+        SelectedEventTypeId = Event.EventType.Id;
+        InitialTimestamp = StartTimeUTC;
+        Description = Event.Description;
         // DeviceId = device.Id;
         // MinTimestamp = minAndMaxTimestamps.MinTimestamp;
         // MaxTimestamp = minAndMaxTimestamps.MaxTimestamp;
@@ -150,7 +143,7 @@ public class CreateModel : PageModel
     }
 
 
-    public async Task<IActionResult> OnPostAsync(int imageId)
+    public async Task<IActionResult> OnPostAsync(int eventId)
     {
         var user = GetCurrentUser();
 
@@ -161,21 +154,16 @@ public class CreateModel : PageModel
             return Redirect("/Identity/Account/Login");
         }
 
-        var image = _appDbContext.Images
-            .Include(i => i.Device)
-            .FirstOrDefault(i => i.Id == imageId);
+        var existingEvent = _appDbContext.Events
+            .Include(e => e.Device)
+            .FirstOrDefault(e => e.Id == eventId);
 
-        if(image==null){
+        if(existingEvent==null){
             return RedirectToPage("/NotFound");
         }
 
-        device = image.Device;
-        InitialTimestamp = image.Timestamp;
-
-        // device = _appDbContext.Devices
-        //     .Where(t => t.Id == DeviceId)
-        //     .FirstOrDefault();
-
+        device = existingEvent.Device;
+        
         if (StartTimeUTC != null && EndTimeUTC != null && StartTimeUTC > EndTimeUTC){
             ModelState.AddModelError("StartTimeUTC", "End Time is not later than Start Time.");
         }
@@ -185,20 +173,20 @@ public class CreateModel : PageModel
             return Page();
         }
 
-        Event newEvent = new Event();
-        newEvent.LastEditedByUserId = newEvent.CreatedByUserId = user.Id;
-        newEvent.DeviceId = device.Id;
+        existingEvent.LastEditedByUserId = user.Id;
+        existingEvent.LastEditedDate = DateTime.UtcNow;
+        // existingEvent.DeviceId = device.Id;
         // newEvent.StartTime = StartTime.ToUniversalTime();
-        newEvent.StartTime = StartTimeUTC;
+        existingEvent.StartTime = StartTimeUTC;
         // newEvent.EndTime = EndTime.ToUniversalTime();
-        newEvent.EndTime = EndTimeUTC;
-        newEvent.EventTypeId = SelectedEventTypeId;
-        newEvent.Description = Description;
+        existingEvent.EndTime = EndTimeUTC;
+        existingEvent.EventTypeId = SelectedEventTypeId;
+        existingEvent.Description = Description;
 
-        newEvent.StartImage = _appDbContext.Images.OrderBy(i => i.Timestamp).FirstOrDefault(i => i.DeviceId == device.Id && i.Timestamp >= newEvent.StartTime);
-        newEvent.EndImage = _appDbContext.Images.OrderByDescending(i => i.Timestamp).FirstOrDefault(i => i.DeviceId == device.Id && i.Timestamp <= newEvent.EndTime);
+        existingEvent.StartImage = _appDbContext.Images.OrderBy(i => i.Timestamp).FirstOrDefault(i => i.DeviceId == device.Id && i.Timestamp >= existingEvent.StartTime);
+        existingEvent.EndImage = _appDbContext.Images.OrderByDescending(i => i.Timestamp).FirstOrDefault(i => i.DeviceId == device.Id && i.Timestamp <= existingEvent.EndTime);
 
-        _appDbContext.Events.Add(newEvent);
+        _appDbContext.Events.Update(existingEvent);
         await _appDbContext.SaveChangesAsync();
 
         return RedirectToPage("Index");

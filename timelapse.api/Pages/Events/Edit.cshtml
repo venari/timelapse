@@ -1,8 +1,8 @@
-﻿@page "{imageId:int}"
+﻿@page "{eventId:int}"
 @using Humanizer
-@model Events.CreateModel
+@model Events.EditModel
 @{
-    ViewData["Title"] = "Create Event";
+    ViewData["Title"] = "Edit Event";
 }
 
 <h1>Create</h1>
@@ -44,7 +44,7 @@
                 <span asp-validation-for="Description" class="text-danger"></span>
             </div>
             <div class="form-group">
-                <input type="submit" value="Create" class="btn btn-primary" />
+                <input type="submit" value="Update" class="btn btn-primary" />
             </div>
             <input type="hidden" id="eventStartDateTimeUTC" asp-for="StartTimeUTC" />
             <input type="hidden" id="eventEndDateTimeUTC" asp-for="EndTimeUTC" />

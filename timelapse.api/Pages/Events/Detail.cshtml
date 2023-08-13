@@ -55,10 +55,9 @@
                 <input readonly id="eventCreatedDate" asp-for="Event.CreatedDate" class="form-control" />
                 @* <input readonly class="form-control" value="<script type="text/javascript">localizeDateTime('@(Model.Event.CreatedDate.ToString("s"))');</script>"/> *@
             </div>
-            @* <div class="form-group">
-                <input type="submit" value="Create" class="btn btn-primary" />
-            </div> *@
         </form>
+        <button class="btn btn-primary" onclick="navToEditEvent()">Edit</button>
+        <button class="btn btn-danger" onclick="navToDeleteEvent()">Delete</button>
     </div>
 </div>
 
@@ -131,4 +130,13 @@
         var imageHeader = document.getElementById("imageHeader");
         imageHeader.innerHTML = "Image for @(Model.Device.Name) as at " + localizeDateTimeAsString(eventImages[eventImageIndex].timestamp)
     }
+
+    function navToEditEvent(){
+        window.location.href = "/Events/Edit/" + @(Model.Event.Id);
+    }
+
+    function navToDeleteEvent(){
+        window.location.href = "/Events/Delete/" + @(Model.Event.Id);
+    }
+
 </script>

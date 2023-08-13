@@ -36,8 +36,8 @@ public class Event
 
     public List<EventComment> Comments {get; set;} = new List<EventComment>();
 
-    public int? EventTypeId {get; set;}
-    public EventType? EventType {get; set;}
+    public int EventTypeId {get; set;}
+    public EventType EventType {get; set;}
 
     public int StartImageId {get; set;}
     public Image StartImage {get; set;}
