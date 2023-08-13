@@ -41,15 +41,12 @@
             <th scope="col">Description</th>
             <th scope="col">S</th>
             <th scope="col">M</th>
-            <th scope="col">Latest Telemetry</th>
-            <th scope="col">Battery %</th>
-            <th scope="col"></th>
-            <th scope="col">Power</th>
-            <th scope="col">Disk (GB)</th>
-            <th scope="col">Uptime</th>
-            <th scope="col"></th>
+            <th scope="col">Telemetry</th>
+            <th scope="col" colspan="3">Battery</th>
+            <th scope="col">Disk</th>
+            <th scope="col" colspan="2">Uptime</th>
             <th scope="col">Temp</th>
-            <th scope="col">Latest Image</th>
+            @* <th scope="col">Latest Image</th> *@
             <th scope="col"></th>
             @* <th scope="col"></th> *@
             </tr>
@@ -67,16 +64,20 @@
                             @Html.DisplayFor(modelItem => device.Description)
                         </td>
                         <td>
-                            @Html.DisplayFor(modelItem => device.SupportMode)
+                            @if(device.SupportMode){
+                                <i class="fa fa-cog" data-toggle="tooltip" title="Support Mode"></i>
+                            }
                         </td>
                         <td>
-                            @Html.DisplayFor(modelItem => device.MonitoringMode)
+                            @if(device.MonitoringMode){
+                                <i class="fa fa-eye" data-toggle="tooltip" title="Monitoring Mode"></i>
+                            }
                         </td>
                         <td>
                             @* @(device.LatestTelemetry!=null?device.LatestTelemetry.Timestamp:"---") *@
                             @* <script type="text/javascript">localize('@(device.LatestTelemetryTimestamp.HasValue?device.LatestTelemetryTimestamp.Value.ToString("s"):"---")')</script> *@
                             @if (device.LatestTelemetry!=null && DateTime.UtcNow - device.LatestTelemetry.Timestamp > TimeSpan.FromMinutes(60)){
-                                <span class="badge bg-warning text-dark">Warning - @((DateTime.UtcNow - device.LatestTelemetry.Timestamp).Humanize()) old</span>
+                                <span class="badge bg-warning text-dark">@((DateTime.UtcNow - device.LatestTelemetry.Timestamp).Humanize()) old</span>
                             } else {
                                 <span>@(device.LatestTelemetryTimestamp.HasValue?device.LatestTelemetryTimestamp.Humanize():"---")</span>
                                 @* <span>@((DateTime.UtcNow - device.LatestTelemetry.Timestamp).Humanize()) ago</span> *@
@@ -84,9 +85,38 @@
 
                         </td>
                         @if(device.LatestTelemetry!=null){
-                            <td>@(device.LatestTelemetry.BatteryPercent)</td>
-                            <td>@(device.LatestTelemetry.Status_Battery)</td>
-                            <td>@(device.LatestTelemetry.Status_PowerInput)</td>
+                            <td>
+                                @if(device.LatestTelemetry.BatteryPercent<20){
+                                    <i class="fa fa-battery-empty" data-toggle="tooltip" title="@(device.LatestTelemetry.BatteryPercent)%"></i>
+                                } else if(device.LatestTelemetry.BatteryPercent<40){
+                                    <i class="fa fa-battery-quarter" data-toggle="tooltip" title="@(device.LatestTelemetry.BatteryPercent)%"></i>
+                                } else if(device.LatestTelemetry.BatteryPercent<60){
+                                    <i class="fa fa-battery-half" data-toggle="tooltip" title="@(device.LatestTelemetry.BatteryPercent)%"></i>
+                                } else if(device.LatestTelemetry.BatteryPercent<80){
+                                    <i class="fa fa-battery-three-quarters" data-toggle="tooltip" title="@(device.LatestTelemetry.BatteryPercent)%"></i>
+                                } else {
+                                    <i class="fa fa-battery-full" data-toggle="tooltip" title="@(device.LatestTelemetry.BatteryPercent)%"></i>
+                                }
+                            </td>
+                            <td>
+                                @if(device.LatestTelemetry.Status_Battery=="Charging"){
+                                    <i class="fa fa-bolt" data-toggle="tooltip" title="@(device.LatestTelemetry.Status_Battery)"></i>
+                                } else if(device.LatestTelemetry.Status_Battery=="Normal"){
+                                } else if(device.LatestTelemetry.Status_Battery=="Not Present"){
+                                    <i class="fa fa-xmark" data-toggle="tooltip" title="@(device.LatestTelemetry.Status_Battery)"></i>
+                                }
+                            </td>
+                            <td>
+                                @if(device.LatestTelemetry.Status_PowerInput=="Present"){
+                                  <i class="fa fa-plug-circle-bolt" data-toggle="tooltip" title="@(device.LatestTelemetry.Status_PowerInput)"></i>
+                                } else if(device.LatestTelemetry.Status_PowerInput=="Not Present"){
+                                  <i class="fa fa-plug-circle-minus" data-toggle="tooltip" title="@(device.LatestTelemetry.Status_PowerInput)"></i>
+                                } else if(device.LatestTelemetry.Status_PowerInput=="Weak"){
+                                  <i class="fa fa-plug-circle-exclamation" data-toggle="tooltip" title="@(device.LatestTelemetry.Status_PowerInput)"></i>
+                                } else if(device.LatestTelemetry.Status_PowerInput=="Bad"){
+                                  <i class="fa fa-plug-circle-xmark" data-toggle="tooltip" title="@(device.LatestTelemetry.Status_PowerInput)"></i>
+                                }
+                            </td>
 
                             <td>@(device.LatestTelemetry.DiskSpaceFree)</td>
                             @* <td>@(ByteSize.FromGigabytes(device.LatestTelemetry.DiskSpaceFree))</td> *@
@@ -175,25 +205,17 @@
                         <td>
                             @(device.LatestTelemetry!=null?device.LatestTelemetry.TemperatureC:"-")
                         </td>
-                        <td>
-                            @* @(device.LatestImage!=null?device.LatestImage.Timestamp:"---") *@
-                            @* <script type="text/javascript">localize('@(device.LatestImageTimestamp.HasValue?device.LatestImageTimestamp.Value.ToString("s"):"---")')</script> *@
+                        @* <td>
                             <span>@(device.LatestImageTimestamp.HasValue?device.LatestImageTimestamp.Humanize():"---")</span>
-
-                        </td>
+                        </td> *@
                         <td>
                             @if(device.LatestImage!=null){
-                                <a href="ImageView/@(device.Id)"><img class="img-thumbnail" src="@(device.LatestImage.BlobUri + Model.SasToken)" width=100></img></a>
+                                <a href="ImageView/@(device.Id)"><img class="img-thumbnail" src="@(device.LatestImage.BlobUri + Model.SasToken)" width=200 height=120></img></a>
                                 @if (device.LatestImage!=null && DateTime.UtcNow - device.LatestImage.Timestamp > TimeSpan.FromMinutes(60)){
-                                    <span class="badge bg-warning text-dark">Warning - @((DateTime.UtcNow - device.LatestImage.Timestamp).Humanize()) old</span>
+                                    <span class="badge bg-warning text-dark">@((DateTime.UtcNow - device.LatestImage.Timestamp).Humanize()) old</span>
                                 }
                             }
                         </td>
-                        @* <td>
-                            @Html.ActionLink("Edit", "Edit", new { id=device.Id }) |
-                            @Html.ActionLink("Details", "Details", new { id=device.Id})  |
-                            @Html.ActionLink("Delete", "Delete", new { id=device.Id }) 
-                        </td> *@
                     </tr>
                 }
         </tbody>
