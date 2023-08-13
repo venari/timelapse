@@ -35,6 +35,7 @@ public class EditModel : PageModel
 
     [BindProperty]
     public DateTime StartTimeUTC {get; set;}
+    public Uri EventStartImageBlobUri {get; private set;}
     [BindProperty]
     public DateTime EndTimeUTC {get; set;}
     
@@ -105,6 +106,7 @@ public class EditModel : PageModel
         var Event = _appDbContext.Events
             .Include(e => e.EventType)
             .Include(e => e.Device)
+            .Include(e => e.StartImage)
             .FirstOrDefault(e => e.Id == eventId);
 
         // var image = _appDbContext.Images
@@ -115,6 +117,7 @@ public class EditModel : PageModel
             return RedirectToPage("/NotFound");
         }
 
+        EventStartImageBlobUri = Event.StartImage.BlobUri;
         device = Event.Device;
 
         StartTimeUTC = Event.StartTime;

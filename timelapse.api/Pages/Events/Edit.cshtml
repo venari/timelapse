@@ -61,8 +61,8 @@
                 <td>
                     <p id="imageHeader" scope="col">Image for @(Model.device.Name) as at ...</p>
 
-                    @if(Model.device.LatestImage!=null){
-                        <img class="img-fluid" id="image" src="@(Model.device.LatestImage.BlobUri + Model.SasToken)"></img>
+                    @if(Model.EventStartImageBlobUri!=null){
+                        <img class="img-fluid" id="image" src="@(Model.EventStartImageBlobUri + Model.SasToken)"></img>
                     }
                 </td>
             </tr>
