@@ -57,8 +57,27 @@
             </div>
         </form>
         <button class="btn btn-primary" onclick="navToEditEvent()">Edit</button>
-        <button class="btn btn-danger" onclick="navToDeleteEvent()">Delete</button>
+        <button class="btn btn-danger" data-bs-toggle="modal" data-bs-target="#deleteModal">Delete</button>
     </div>
+</div>
+
+<!-- Modal -->
+<div class="modal fade" id="deleteModal" tabindex="-1" aria-labelledby="deleteModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="exampleModalLabel">Delete Event?</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        Are you sure you wish to Delete this Event?
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+        <button id="deleteButton" type="button" class="btn btn-primary" onclick="deleteEvent()">Delete</button>
+      </div>
+    </div>
+  </div>
 </div>
 
 <div>
@@ -135,8 +154,16 @@
         window.location.href = "/Events/Edit/" + @(Model.Event.Id);
     }
 
-    function navToDeleteEvent(){
-        window.location.href = "/Events/Delete/" + @(Model.Event.Id);
+    function deleteEvent(){
+
+        var deleteURL = '/api/Event?eventId=' + @Model.Event.Id
+
+        fetch(deleteURL, {
+            method: 'DELETE'
+        })
+        .then(response => response.json())
+        .then(data => window.location.href = "/Events/Index/")
+        .catch(error => console.error('Unable to Delete Event.', error));
     }
 
 </script>
