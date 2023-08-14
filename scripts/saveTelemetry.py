@@ -100,8 +100,12 @@ def scheduleShutdown():
             if config['supportMode'] == True:
                 logger.warning("Night time - we would have scheduled shutdown, but we're in support mode.")
             else:
-                if pj.status.GetStatus()['data']['battery'] == 'CHARGING_FROM_IN' or pj.status.GetStatus()['data']['battery'] == 'CHARGING_FROM_5V_IO' :
-                    logger.info("Night time - but we're charging, so we'll stay on.")
+                if (
+                   pj.status.GetStatus()['data']['battery'] == 'CHARGING_FROM_IN' 
+                   or pj.status.GetStatus()['data']['battery'] == 'CHARGING_FROM_5V_IO' 
+                   or  pj.status.GetStart()['data']['powerInput'] == 'PRESENT'
+                ):
+                    logger.info("Night time - but we're charging/powered, so we'll stay on.")
                 else:
                     logger.info("Night time so we're scheduling shutdown")
 
