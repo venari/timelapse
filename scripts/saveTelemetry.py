@@ -103,7 +103,7 @@ def scheduleShutdown():
                 if (
                    pj.status.GetStatus()['data']['battery'] == 'CHARGING_FROM_IN' 
                    or pj.status.GetStatus()['data']['battery'] == 'CHARGING_FROM_5V_IO' 
-                   or  pj.status.GetStart()['data']['powerInput'] == 'PRESENT'
+                   or  pj.status.GetStatus()['data']['powerInput'] == 'PRESENT'
                 ):
                     logger.info("Night time - but we're charging/powered, so we'll stay on.")
                 else:
