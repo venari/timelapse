@@ -94,6 +94,49 @@ https://www.raspberrypi.com/documentation/computers/camera_software.html
 Camera Module 3 (IMX708)
 Ensure software is upgraded (above)
 
+# Waveshare SIM6700X GSM/GPRS/GNSS HAT
+
+- Enable Serial Communication
+```
+sudo raspi-config nonint do_serial 2        # Disable serial login shell and enable serial port hardware
+sudo reboot
+```
+
+https://core-electronics.com.au/guides/raspberry-pi/raspberry-pi-4g-gps-hat/
+```
+sudo apt-get install minicom
+pip3 install pyserial
+wget https://www.waveshare.com/w/upload/2/29/SIM7600X-4G-HAT-Demo.7z
+sudo apt-get install p7zip-full
+
+7z x SIM7600X-4G-HAT-Demo.7z -r -o/home/pi
+
+sudo chmod 777 -R /home/pi/SIM7600X-4G-HAT-Demo
+
+sudo nano /etc/rc.local
+
+```
+Add following line, just above `exit 0`:
+
+```
+sh /home/pi/SIM7600X-4G-HAT-Demo/Raspberry/c/sim7600_4G_hat_init
+```
+
+```
+cd /home/pi/SIM7600X-4G-HAT-Demo/Raspberry/c/bcm2835
+```
+
+Plug in USB cable, testing with minicom
+CTRL-A, E to echo
+CTRL-A, Q to exit
+```
+minicom -D /dev/ttyUSB2
+
+AT+CPIN?
++CME ERROR:10 # No SIM card
+```
+```
+
 <!-- `camera.lensposition` - 1/distance in metres
 - '0' - infinity
 - '1': 1m
