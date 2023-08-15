@@ -13,7 +13,7 @@ import glob
 
 import RPi.GPIO as GPIO
 from time import sleep
-import serial
+# import serial
 
 GPIO_Power_Key = 6
 
@@ -57,13 +57,13 @@ def powerUpSIM7600X():
 
         sleep(20)
 
-        global ser
-        ser = serial.Serial(config["SIM7600X_port"],115200)
-        ser.flushInput()
+        # global ser
+        # ser = serial.Serial(config["SIM7600X_port"],115200)
+        # ser.flushInput()
 
-        logger.debug('Sending AT+CUSBPIDSWITCH=9011,1,1...')
+        # logger.debug('Sending AT+CUSBPIDSWITCH=9011,1,1...')
 
-        send_at('AT+CUSBPIDSWITCH=9011,1,1','OK',1)
+        # send_at('AT+CUSBPIDSWITCH=9011,1,1','OK',1)
     
     except Exception as e:
         logger.error("powerUpSIM7600X() failed.")
@@ -84,24 +84,24 @@ def powerDownSIM7600X():
         sleep(18)
     
     except Exception as e:
-        logger.error("powerUpSIM7600X() failed.")
+        logger.error("powerDownSIM7600X() failed.")
         logger.error(e)
 
 
-def send_at(command,back,timeout):
-	rec_buff = ''
-	ser.write((command+'\r\n').encode())
-	time.sleep(timeout)
-	if ser.inWaiting():
-		time.sleep(0.01 )
-		rec_buff = ser.read(ser.inWaiting())
-	if back not in rec_buff.decode():
-		logger.info(command + ' ERROR')
-		logger.info(command + ' back:\t' + rec_buff.decode())
-		return 0
-	else:
-		logger.info(rec_buff.decode())
-		return 1
+# def send_at(command,back,timeout):
+# 	rec_buff = ''
+# 	ser.write((command+'\r\n').encode())
+# 	time.sleep(timeout)
+# 	if ser.inWaiting():
+# 		time.sleep(0.01 )
+# 		rec_buff = ser.read(ser.inWaiting())
+# 	if back not in rec_buff.decode():
+# 		logger.info(command + ' ERROR')
+# 		logger.info(command + ' back:\t' + rec_buff.decode())
+# 		return 0
+# 	else:
+# 		logger.info(rec_buff.decode())
+# 		return 1
 
     
 
@@ -122,8 +122,8 @@ try:
         logger.info("In support mode - not powering off....")
 
 except Exception as e:
-    if ser != None:
-        ser.close()
+    # if ser != None:
+    #     ser.close()
     GPIO.cleanup()
     logger.error("Catastrophic failure.")
     logger.error(e)
