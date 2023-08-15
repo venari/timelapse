@@ -119,7 +119,7 @@ try:
         logger.info("Powering off....")
         powerOffSIM7600X()
     else:
-         
+        logger.info("In support mode - not powering off....")
 
 except Exception as e:
     if ser != None:
