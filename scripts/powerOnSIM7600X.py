@@ -57,6 +57,7 @@ def powerUpSIM7600X():
 
         sleep(20)
 
+        global ser
         ser = serial.Serial(config["SIM7600X_port"],115200)
         ser.flushInput()
 
