@@ -38,7 +38,7 @@ logger.info("Starting up powerOnSIM7600X.py...")
 os.chmod(logFilePath, 0o777) # Make sure pijuice user script can write to log file.
 
 
-ser = serial.Serial(config["SIM7600X_Port"],115200)
+ser = serial.Serial(config["SIM7600X_port"],115200)
 ser.flushInput()
 
 
