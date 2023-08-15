@@ -117,7 +117,7 @@ try:
     config = json.load(open('config.json'))
     if config['supportMode'] == False:
         logger.info("Powering off....")
-        powerOffSIM7600X()
+        powerDownSIM7600X()
     else:
         logger.info("In support mode - not powering off....")
 
