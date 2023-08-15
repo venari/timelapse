@@ -71,7 +71,7 @@ def powerUpSIM7600X():
 
 
 
-def powerOffSIM7600X():
+def powerDownSIM7600X():
     try:
 
         GPIO.setmode(GPIO.BCM)
@@ -96,11 +96,11 @@ def send_at(command,back,timeout):
 		time.sleep(0.01 )
 		rec_buff = ser.read(ser.inWaiting())
 	if back not in rec_buff.decode():
-		print(command + ' ERROR')
-		print(command + ' back:\t' + rec_buff.decode())
+		logger.info(command + ' ERROR')
+		logger.info(command + ' back:\t' + rec_buff.decode())
 		return 0
 	else:
-		print(rec_buff.decode())
+		logger.info(rec_buff.decode())
 		return 1
 
     
@@ -110,14 +110,16 @@ try:
 
     powerUpSIM7600X()
 
-    print("SIM7600X is powered up.")
-    print("Waiting 2 mins...")
+    logger.info("SIM7600X is powered up.")
+    logger.info("Waiting 2 mins...")
     time.sleep(120)
-    print("Powering off....")
 
     config = json.load(open('config.json'))
     if config['supportMode'] == False:
-         powerOffSIM7600X()
+        logger.info("Powering off....")
+        powerOffSIM7600X()
+    else:
+         
 
 except Exception as e:
     if ser != None:

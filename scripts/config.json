@@ -1,7 +1,6 @@
 {
     "logToFile": true,
     "logToAPI": true,
-    "SIM7600X_port": "/dev/ttyUSB2",
     "apiUrl": "https://timelapse-dev.azurewebsites.net/api/",
     "logFilePath": "/home/pi/logs/timelapse.log",
     "shutdown": false,
@@ -11,6 +10,9 @@
     "hibernate_at_battery_percent": 2,
     "daytime_starts_at_h": 6,
     "daytime_ends_at_h": 18,
+    "modem.type": "thumb",
+    "modem.type_": "SIM7600X",
+    "SIM7600X_port": "/dev/ttyUSB2",
     "modem.power": 500,
     "modem.power_interval": 900,
     "camera.vflip": true,

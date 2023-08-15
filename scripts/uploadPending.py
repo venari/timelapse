@@ -13,6 +13,8 @@ import glob
 import pathlib
 import socket
 
+from powerOnSIM7600X import powerUpSIM7600X, powerDownSIM7600X
+
 config = json.load(open('config.json'))
 logFilePath = config["logFilePath"]
 logFilePath = logFilePath.replace(".log", ".uploadTelemetry.log")
@@ -157,13 +159,10 @@ def uploadPendingPhotos():
                     if bInSupportWindow:
                         logger.info('Closing support window...')
                         bInSupportWindow = False
-                    logger.info('Current System Power Switch:')
-                    logger.info(pj.power.GetSystemPowerSwitch())
-                    logger.info('Setting System Power Switch to Off:')
-                    pj.power.SetSystemPowerSwitch(0)
+                    disconnectFromInternet()
                     logger.info('Sleeping for ' + str(power_interval) + ' seconds...')
                     time.sleep(power_interval)
-                    turnOnSystemPowerSwitch()
+                    connectToInternet()
 
     except Exception as e:
         logger.error(str(datetime.datetime.now()) + " uploadPendingPhotos() failed.")
@@ -184,6 +183,31 @@ def internet(host="8.8.8.8", port=53, timeout=3):
         logger.warning(e)
         return False
 
+def connectToInternet():
+    try:
+        logger.info('Connecting to internet...')
+        if(config['modem.type']=="thumb"):
+            turnOnSystemPowerSwitch()
+        else:
+            powerUpSIM7600X()
+    except Exception as e:
+        logger.error(str(datetime.datetime.now()) + " connectToInternet() failed.")
+        logger.error(e)
+
+def disconnectFromInternet():
+    try:
+        logger.info('Disconnecting from internet...')
+        if(config['modem.type']=="thumb"):
+            logger.info('Current System Power Switch:')
+            logger.info(pj.power.GetSystemPowerSwitch())
+            logger.info('Setting System Power Switch to Off:')
+            pj.power.SetSystemPowerSwitch(0)
+        else:
+            powerDownSIM7600X()
+    except Exception as e:
+        logger.error(str(datetime.datetime.now()) + " disconnectFromInternet() failed.")
+        logger.error(e)
+        
 def turnOnSystemPowerSwitch(retries = 3):
     try:
         sysVoltage = pj.status.GetBatteryVoltage()['data']
@@ -341,7 +365,7 @@ def deleteOldUploadedImagesAndTelemetry():
 
 try:
     
-    turnOnSystemPowerSwitch()
+    connectToInternet()
 
     while True:
 
