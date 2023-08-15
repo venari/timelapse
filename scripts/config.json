@@ -1,6 +1,7 @@
 {
     "logToFile": true,
     "logToAPI": true,
+    "SIM7600X_port": "/dev/ttyUSB2",
     "apiUrl": "https://timelapse-dev.azurewebsites.net/api/",
     "logFilePath": "/home/pi/logs/timelapse.log",
     "shutdown": false,

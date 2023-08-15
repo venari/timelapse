@@ -124,6 +124,7 @@ sh /home/pi/SIM7600X-4G-HAT-Demo/Raspberry/c/sim7600_4G_hat_init
 
 ```
 cd /home/pi/SIM7600X-4G-HAT-Demo/Raspberry/c/bcm2835
+chmod +x configure && ./configure && sudo make && sudo make install
 ```
 
 Plug in USB cable, testing with minicom
