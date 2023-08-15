@@ -75,7 +75,7 @@ def powerUpSIM7600X():
 def powerDownSIM7600X():
     try:
 
-        logger.debug('Powering up SIM7600X...')
+        logger.debug('Powering down SIM7600X...')
         GPIO.setmode(GPIO.BCM)
 
         GPIO.setwarnings(False)
