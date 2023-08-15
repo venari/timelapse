@@ -11,6 +11,8 @@ from logging.handlers import TimedRotatingFileHandler
 import pathlib
 import glob
 
+from powerOnSIM7600X import powerUpSIM7600X, powerDownSIM7600X
+
 config = json.load(open('config.json'))
 logFilePath = config["logFilePath"]
 logFilePath = logFilePath.replace(".log", ".saveTelemetry.log")
@@ -260,6 +262,7 @@ def scheduleShutdown():
         
             logger.info('Setting System Power Switch to Off:')
             pj.power.SetSystemPowerSwitch(0)
+            powerDownSIM7600X()
             logger.info('Shutting down now...')
             subprocess.call(['sudo', 'shutdown', '-h', 'now'])
         else:
