@@ -17,6 +17,7 @@ import serial
 
 GPIO_Power_Key = 6
 
+ser = None
 
 config = json.load(open('config.json'))
 logFilePath = config["logFilePath"]
@@ -38,10 +39,6 @@ logger.info("Starting up powerOnSIM7600X.py...")
 os.chmod(logFilePath, 0o777) # Make sure pijuice user script can write to log file.
 
 
-ser = serial.Serial(config["SIM7600X_port"],115200)
-ser.flushInput()
-
-
 def powerUpSIM7600X():
     try:
 
@@ -59,6 +56,8 @@ def powerUpSIM7600X():
         logger.debug('Waiting 20s...')
 
         sleep(20)
+
+        ser = serial.Serial(config["SIM7600X_port"],115200)
         ser.flushInput()
 
         logger.debug('Sending AT+CUSBPIDSWITCH=9011,1,1...')
@@ -120,5 +119,8 @@ try:
          powerOffSIM7600X()
 
 except Exception as e:
+    if ser != None:
+        ser.close()
+    GPIO.cleanup()
     logger.error("Catastrophic failure.")
     logger.error(e)
