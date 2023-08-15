@@ -56,6 +56,7 @@ def powerUpSIM7600X():
         logger.debug('Waiting 20s...')
 
         sleep(20)
+        logger.debug('SIM7600X should be powered up...')
 
         # global ser
         # ser = serial.Serial(config["SIM7600X_port"],115200)
@@ -74,6 +75,7 @@ def powerUpSIM7600X():
 def powerDownSIM7600X():
     try:
 
+        logger.debug('Powering up SIM7600X...')
         GPIO.setmode(GPIO.BCM)
 
         GPIO.setwarnings(False)
@@ -82,6 +84,7 @@ def powerDownSIM7600X():
         sleep(3)
         GPIO.output(GPIO_Power_Key, GPIO.LOW)
         sleep(18)
+        logger.debug('SIM7600X powered down...')
     
     except Exception as e:
         logger.error("powerDownSIM7600X() failed.")
