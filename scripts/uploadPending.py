@@ -183,13 +183,35 @@ def internet(host="8.8.8.8", port=53, timeout=3):
         logger.warning(e)
         return False
 
-def connectToInternet():
+def connectToInternet(retries = 3):
     try:
         logger.info('Connecting to internet...')
         if(config['modem.type']=="thumb"):
             turnOnSystemPowerSwitch()
         else:
             powerUpSIM7600X()
+
+        logger.info('Waiting for network....')
+        # Call Internet function to wait for network, for a max of 2 minutes
+        waitCounter = 0
+        while not internet() and waitCounter < 12:
+            time.sleep(10)
+            logger.info('Still waiting for network....')
+            waitCounter=waitCounter+1
+        
+        if waitCounter < 120:
+            logger.info('Network connection established.')
+       
+        else:
+            logger.warning('Could not establish network connection after 2 minutes.')
+            if retries > 0:
+                logger.info('Retrying to establish network connection...')
+                connectToInternet(retries-1)
+            else:
+                logger.warning('Retries exhausted - giving up.')
+                disconnectFromInternet()
+                return
+
     except Exception as e:
         logger.error(str(datetime.datetime.now()) + " connectToInternet() failed.")
         logger.error(e)
@@ -208,7 +230,7 @@ def disconnectFromInternet():
         logger.error(str(datetime.datetime.now()) + " disconnectFromInternet() failed.")
         logger.error(e)
         
-def turnOnSystemPowerSwitch(retries = 3):
+def turnOnSystemPowerSwitch():
     try:
         sysVoltage = pj.status.GetBatteryVoltage()['data']
         # if sysVoltage < 3.2:  # 3.2V is the minimum voltage for the XL6009
@@ -232,27 +254,7 @@ def turnOnSystemPowerSwitch(retries = 3):
         # logger.info('Waiting 50s for modem to warm up...')
         # time.sleep(50)
 
-        logger.info('Waiting for network....')
-        # Call Internet function to wait for network, for a max of 2 minutes
-        waitCounter = 0
-        while not internet() and waitCounter < 12:
-            time.sleep(10)
-            logger.info('Still waiting for network....')
-            waitCounter=waitCounter+1
-        
-        if waitCounter < 120:
-            logger.info('Network connection established.')
-       
-        else:
-            logger.warning('Could not establish network connection after 2 minutes.')
-            if retries > 0:
-                logger.info('Retrying to establish network connection...')
-                turnOnSystemPowerSwitch(retries-1)
-            else:
-                logger.warning('Retries exhausted - giving up.')
-                logger.info('Setting System Power Switch to Off')
-                pj.power.SetSystemPowerSwitch(0)
-                return
+
     
     except Exception as e:
         logger.error(str(datetime.datetime.now()) + " turnOnSystemPowerSwitch() failed.")
