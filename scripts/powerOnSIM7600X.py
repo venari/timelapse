@@ -21,7 +21,7 @@ ser = None
 
 config = json.load(open('config.json'))
 logFilePath = config["logFilePath"]
-logFilePath = logFilePath.replace(".log", ".powerOnSIM7600X.log")
+# logFilePath = logFilePath.replace(".log", ".powerOnSIM7600X.log")
 os.makedirs(os.path.dirname(logFilePath), exist_ok=True)
 # os.chmod(os.path.dirname(logFilePath), 0o777) # Make sure pijuice user scrip can write to log file.
 

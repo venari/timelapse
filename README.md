@@ -136,7 +136,14 @@ minicom -D /dev/ttyUSB2
 AT+CPIN?
 +CME ERROR:10 # No SIM card
 ```
+
+Switch to RNDIS dial up mode
+https://www.waveshare.com/wiki/Raspberry_Pi_RNDIS_dial-up_Internet_access
 ```
+AT+CUSBPIDSWITCH=9011,1,1
+```
+
+
 
 <!-- `camera.lensposition` - 1/distance in metres
 - '0' - infinity
@@ -144,7 +151,7 @@ AT+CPIN?
 - `5`: 20cm
 - `10`: 10cm -->
 
-`camera.focus_m`: focus in metres
+<!-- `camera.focus_m`: focus in metres -->
 
 <!-- Add following to /boot/config.txt
 ```
