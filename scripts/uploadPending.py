@@ -112,7 +112,7 @@ def uploadPendingPhotos():
 
             session = requests.Session()
             logger.debug('Posting image to API...')
-            response = session.post(config['apiUrl'] + 'Image', files=files, data=data, timeout=30)
+            response = session.post(config['apiUrl'] + 'Image', files=files, data=data, timeout=config['upload.image.timeout'])
 
             logger.debug(f'Response code: {response.status_code}')
             if response.status_code == 200:
@@ -169,7 +169,7 @@ def uploadPendingPhotos():
         logger.error(e)
 
 # https://stackoverflow.com/questions/3764291/how-can-i-see-if-theres-an-available-and-active-network-connection-in-python
-def internet(host="8.8.8.8", port=53, timeout=3):
+def internet(host="8.8.8.8", port=53, timeout=config['upload.telemetry.timeout']):
     """
     Host: 8.8.8.8 (google-public-dns-a.google.com)
     OpenPort: 53/tcp
@@ -298,7 +298,7 @@ def uploadPendingTelemetry():
 
             logger.debug(api_data)
 
-            response = session.post(config['apiUrl'] + 'Telemetry',data=api_data, timeout=5)
+            response = session.post(config['apiUrl'] + 'Telemetry',data=api_data, timeout=config['upload.telemetry.timeout'])
             logger.debug(response)
             assert response.status_code == 200, "API returned error code"
             #requests.post(config['apiUrl'] + '/Telemetry', json=api_data)
