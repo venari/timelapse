@@ -26,13 +26,13 @@ fi
 
 
 # Overide
-camera_ids=( 19)
-startdate='2023-08-28'
-enddate='2023-08-30'
+# camera_ids=( 19)
+# startdate='2023-08-28'
+# enddate='2023-08-30'
 
-camera_ids=( 10)
-startdate='2023-06-14'
-enddate='2023-06-15'
+# camera_ids=( 10)
+# startdate='2023-06-14'
+# enddate='2023-06-15'
 
 echo $startdate
 echo $enddate
@@ -71,6 +71,7 @@ do
         echo Checking if any files are in s3 root folder...
 
         aws_s3_files_in_root_folder=$(aws s3 ls s3://$DESTINATION_BUCKET_NAME/$azure_blob_filename_prefix | awk '{print $4}')
+        aws_s3_files_already_copied=$(aws s3 ls s3://$DESTINATION_BUCKET_NAME/$s3_target_folder | awk '{print $4}')
 
         for aws_s3_file_in_root_folder in $aws_s3_files_in_root_folder
         do
@@ -90,9 +91,21 @@ do
             # aws s3 ls s3://timelapse-images/$s3_target_folder$source_file
             # aws s3 cp $source_file s3://timelapse-images/$s3_target_folder$source_file --acl public-read
 
-            aws s3api head-object --bucket $DESTINATION_BUCKET_NAME --key $s3_target_folder$source_file 2>&1 >/dev/null || NOT_EXIST=true
-            if [ $NOT_EXIST ]; then
-                echo "File does not exist in S3"
+
+            # check if aws_s3_files_already_copied contains $source_file
+
+            # aws s3api head-object --bucket $DESTINATION_BUCKET_NAME --key $s3_target_folder$source_file 2>&1 >/dev/null || NOT_EXIST=true
+
+            # echo $aws_s3_files_already_copied
+            # echo $source_file
+            # echo ${aws_s3_files_already_copied[@]/$source_file
+
+            # [[ ${aws_s3_files_already_copied[*]} =~ $source_file ]] 
+            if [[ ${aws_s3_files_already_copied[*]} =~ $source_file ]]; then
+            # if [[ "${aws_s3_files_already_copied[@]/$source_file/}" != "${aws_s3_files_already_copied[@]}" ]]; then
+                echo "File $source_file already exists in S3"
+            else
+                echo "File $source_file does not exist in S3"
 
                 # Download locally so we can upload to s3
                 if [ -f "$source_file" ]; then
@@ -105,8 +118,6 @@ do
                 # Upload to s3
                 echo Uploading to s3://$DESTINATION_BUCKET_NAME/$s3_target_folder$source_file...
                 aws s3 cp $source_file s3://$DESTINATION_BUCKET_NAME/$s3_target_folder$source_file --acl private
-            else
-                echo "File $s3_target_folder$source_file already exists in S3"
             fi
 
         done
