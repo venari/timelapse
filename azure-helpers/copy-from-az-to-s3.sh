@@ -35,9 +35,11 @@ camera_ids=( 10)
 startdate='2023-06-14'
 enddate='2023-06-19'
 
-echo $startdate
-echo $enddate
+# startdate='2023-06-15'
+# enddate='2023-06-16'
 
+echo Start Date: $startdate
+echo End Date: $enddate
 
 
 for camera_id in "${camera_ids[@]}"
@@ -48,9 +50,9 @@ do
     d="$startdate"
     while [ "$d" != "$enddate" ]; do 
 
-        echo $d
-        echo $camera_id
-        echo "$camera_id"/"$d"
+        echo Date: $d
+        echo Camera: $camera_id
+        # echo "$camera_id"/"$d"
 
         # year=$(echo $d | cut -d'-' -f1)
         year=${d:0:4}
@@ -77,29 +79,27 @@ do
         # if aws_s3_files_in_root_folder is not empty, move files
         # to s3_target_folder
 
-        echo $aws_s3_files_in_root_folder
-        echo ${#aws_s3_files_in_root_folder[@]}
-        echo ${#aws_s3_files_in_root_folder[*]}
-        echo ${#aws_s3_files_in_root_folder}
+        # echo $aws_s3_files_in_root_folder
+        # echo ${#aws_s3_files_in_root_folder[@]}
+        # echo ${#aws_s3_files_in_root_folder[*]}
+        # echo ${#aws_s3_files_in_root_folder}
+        # echo ${#aws_s3_files_in_root_folder[0]}
 
         # read -p "Press any key to resume ..."
 
         # if [ ${#aws_s3_files_in_root_folder[@]} -eq 0 ]; then
         # if (( ${#aws_s3_files_in_root_folder[@]} )) ; then
         # if [[ ${#aws_s3_files_in_root_folder[@]} ]] ; then
-        if [[ ${#aws_s3_files_in_root_folder} ]] ; then
-            echo Moving ${#aws_s3_files_in_root_folder} files to $s3_target_folder$aws_s3_file_in_root_folder
+        if [[ ${#aws_s3_files_in_root_folder} -ne 0 ]] ; then
+            echo Moving files to $s3_target_folder$aws_s3_file_in_root_folder
             # aws s3 mv s3://$DESTINATION_BUCKET_NAME/$azure_blob_filename_prefix s3://$DESTINATION_BUCKET_NAME/$s3_target_folder$aws_s3_file_in_root_folder --recursive
-            echo $azure_blob_filename_prefix
-            aws s3 mv s3://$DESTINATION_BUCKET_NAME/ s3://$DESTINATION_BUCKET_NAME/$s3_target_folder$aws_s3_file_in_root_folder --recursive --exclude "*" --include "/$azure_blob_filename_prefix*" #--exclude "*/$s3_target_folder/*"
+            # echo $azure_blob_filename_prefix
+
+            # This needs a little explaining....
+            #         Source bucket                         destination buckey and folder               recursive  exclude all, then include matching prefix,       ....but exclude all that are already in a folder
+            aws s3 mv s3://$DESTINATION_BUCKET_NAME/ s3://$DESTINATION_BUCKET_NAME/$s3_target_folder --recursive --exclude "*" --include "$azure_blob_filename_prefix*" --exclude "*/*"
         fi
 
-        # for aws_s3_file_in_root_folder in $aws_s3_files_in_root_folder
-        # do
-        #     # echo $aws_s3_file_in_root_folder
-        #     echo Moving $aws_s3_file_in_root_folder to $s3_target_folder$aws_s3_file_in_root_folder
-        #     aws s3 mv s3://$DESTINATION_BUCKET_NAME/$aws_s3_file_in_root_folder s3://$DESTINATION_BUCKET_NAME/$s3_target_folder$aws_s3_file_in_root_folder
-        # done
 
 # to do optimise to bulk upload after figuring out which files 
 # need to be copied.
@@ -126,8 +126,10 @@ do
             # [[ ${aws_s3_files_already_copied[*]} =~ $source_file ]] 
             if [[ ${aws_s3_files_already_copied[*]} =~ $source_file ]]; then
             # if [[ "${aws_s3_files_already_copied[@]/$source_file/}" != "${aws_s3_files_already_copied[@]}" ]]; then
-                echo "File $source_file already exists in S3"
+                # echo "File $source_file already exists in S3"
+                printf "."
             else
+                echo .
                 echo "File $source_file does not exist in S3"
 
                 # Download locally so we can upload to s3

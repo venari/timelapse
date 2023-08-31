@@ -143,7 +143,17 @@ https://www.waveshare.com/wiki/Raspberry_Pi_RNDIS_dial-up_Internet_access
 AT+CUSBPIDSWITCH=9011,1,1
 ```
 
+Nope - prevents camera from working...
 
+    Disable HDMI:
+    https://picockpit.com/raspberry-pi/raspberry-pi-zero-2-battery/
+
+    sudo raspi-config
+
+    Then, go to Advanced Options -> GL Driver -> Legacy
+
+    Add to /etc/rc.local:
+    /usr/bin/tvservice -o
 
 <!-- `camera.lensposition` - 1/distance in metres
 - '0' - infinity
