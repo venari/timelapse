@@ -4,6 +4,7 @@ export CONTAINER_NAME=timelapse
 export AWS_REGION=ap-southeast-2
 export DESTINATION_BUCKET_NAME=sediment-p133
 
+
 # az storage blob list --container-name=$CONTAINER_NAME --connection-string=$STORAGE_CONNECTION_STRING --output table
 # az storage blob list --container-name=$CONTAINER_NAME --connection-string=$STORAGE_CONNECTION_STRING --output table --query "[?contains(name,'.jpg')].{Name:name}" --num-results 1000
 
@@ -30,9 +31,9 @@ fi
 # startdate='2023-08-28'
 # enddate='2023-08-30'
 
-# camera_ids=( 10)
-# startdate='2023-06-14'
-# enddate='2023-06-15'
+camera_ids=( 10)
+startdate='2023-06-14'
+enddate='2023-06-19'
 
 echo $startdate
 echo $enddate
@@ -73,14 +74,36 @@ do
         aws_s3_files_in_root_folder=$(aws s3 ls s3://$DESTINATION_BUCKET_NAME/$azure_blob_filename_prefix | awk '{print $4}')
         aws_s3_files_already_copied=$(aws s3 ls s3://$DESTINATION_BUCKET_NAME/$s3_target_folder | awk '{print $4}')
 
-        for aws_s3_file_in_root_folder in $aws_s3_files_in_root_folder
-        do
-            # echo $aws_s3_file_in_root_folder
-            echo Moving $aws_s3_file_in_root_folder to $s3_target_folder$aws_s3_file_in_root_folder
-            aws s3 mv s3://$DESTINATION_BUCKET_NAME/$aws_s3_file_in_root_folder s3://$DESTINATION_BUCKET_NAME/$s3_target_folder$aws_s3_file_in_root_folder
-        done
+        # if aws_s3_files_in_root_folder is not empty, move files
+        # to s3_target_folder
 
+        echo $aws_s3_files_in_root_folder
+        echo ${#aws_s3_files_in_root_folder[@]}
+        echo ${#aws_s3_files_in_root_folder[*]}
+        echo ${#aws_s3_files_in_root_folder}
 
+        # read -p "Press any key to resume ..."
+
+        # if [ ${#aws_s3_files_in_root_folder[@]} -eq 0 ]; then
+        # if (( ${#aws_s3_files_in_root_folder[@]} )) ; then
+        # if [[ ${#aws_s3_files_in_root_folder[@]} ]] ; then
+        if [[ ${#aws_s3_files_in_root_folder} ]] ; then
+            echo Moving ${#aws_s3_files_in_root_folder} files to $s3_target_folder$aws_s3_file_in_root_folder
+            # aws s3 mv s3://$DESTINATION_BUCKET_NAME/$azure_blob_filename_prefix s3://$DESTINATION_BUCKET_NAME/$s3_target_folder$aws_s3_file_in_root_folder --recursive
+            echo $azure_blob_filename_prefix
+            aws s3 mv s3://$DESTINATION_BUCKET_NAME/ s3://$DESTINATION_BUCKET_NAME/$s3_target_folder$aws_s3_file_in_root_folder --recursive --exclude "*" --include "/$azure_blob_filename_prefix*" #--exclude "*/$s3_target_folder/*"
+        fi
+
+        # for aws_s3_file_in_root_folder in $aws_s3_files_in_root_folder
+        # do
+        #     # echo $aws_s3_file_in_root_folder
+        #     echo Moving $aws_s3_file_in_root_folder to $s3_target_folder$aws_s3_file_in_root_folder
+        #     aws s3 mv s3://$DESTINATION_BUCKET_NAME/$aws_s3_file_in_root_folder s3://$DESTINATION_BUCKET_NAME/$s3_target_folder$aws_s3_file_in_root_folder
+        # done
+
+# to do optimise to bulk upload after figuring out which files 
+# need to be copied.
+# Maybe use aws s3 sync
 
         for source_file in $source_files
         do
