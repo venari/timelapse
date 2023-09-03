@@ -108,25 +108,25 @@ def powerDownSIM7600X():
 
     
 
-try:
-    logger.info('In powerOnSIM7600.py')
+# try:
+#     logger.info('In powerOnSIM7600.py')
 
-    powerUpSIM7600X()
+#     powerUpSIM7600X()
 
-    logger.info("SIM7600X is powered up.")
-    logger.info("Waiting 2 mins...")
-    time.sleep(120)
+#     logger.info("SIM7600X is powered up.")
+#     logger.info("Waiting 2 mins...")
+#     time.sleep(120)
 
-    config = json.load(open('config.json'))
-    if config['supportMode'] == False:
-        logger.info("Powering off....")
-        powerDownSIM7600X()
-    else:
-        logger.info("In support mode - not powering off....")
+#     config = json.load(open('config.json'))
+#     if config['supportMode'] == False:
+#         logger.info("Powering off....")
+#         powerDownSIM7600X()
+#     else:
+#         logger.info("In support mode - not powering off....")
 
-except Exception as e:
-    # if ser != None:
-    #     ser.close()
-    GPIO.cleanup()
-    logger.error("Catastrophic failure.")
-    logger.error(e)
+# except Exception as e:
+#     # if ser != None:
+#     #     ser.close()
+#     GPIO.cleanup()
+#     logger.error("Catastrophic failure.")
+#     logger.error(e)
