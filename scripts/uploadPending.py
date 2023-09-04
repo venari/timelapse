@@ -176,11 +176,16 @@ def internet(host="8.8.8.8", port=53, timeout=config['upload.telemetry.timeout']
     Service: domain (DNS/TCP)
     """
     try:
+        logger.info('In internet() 1')
         socket.setdefaulttimeout(timeout)
+        logger.info('In internet() 2')
         socket.socket(socket.AF_INET, socket.SOCK_STREAM).connect((host, port))
+        logger.info('In internet() 3')
         return True
     except socket.error as ex:
-        logger.warning(e)
+        logger.warning('In internet() 4')
+        logger.warning(ex)
+        logger.warning('In internet() 5')
         return False
 
 def connectToInternet(retries = 3):
