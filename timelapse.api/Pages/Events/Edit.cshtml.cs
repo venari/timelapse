@@ -47,6 +47,10 @@ public class EditModel : PageModel
     [Required]
     public int SelectedEventTypeId {get; set;}
 
+    [BindProperty]
+    [Required]
+    public List<int> SelectedEventTypeIds {get; set;}
+
     public List<SelectListItem> EventTypes {
         get {
             return _appDbContext.EventTypes.OrderBy(et => et.Name).Select(et => new SelectListItem($"{et.Name}", et.Id.ToString())).ToList();
@@ -105,6 +109,7 @@ public class EditModel : PageModel
 
         var Event = _appDbContext.Events
             .Include(e => e.EventType)
+            .Include(e => e.EventTypes)
             .Include(e => e.Device)
             .Include(e => e.StartImage)
             .FirstOrDefault(e => e.Id == eventId);
@@ -124,6 +129,7 @@ public class EditModel : PageModel
         EndTimeUTC = Event.EndTime;
 
         SelectedEventTypeId = Event.EventType.Id;
+        SelectedEventTypeIds = Event.EventTypes.Select(et => et.Id).ToList();
         InitialTimestamp = StartTimeUTC;
         Description = Event.Description;
         // DeviceId = device.Id;
