@@ -49,12 +49,17 @@ public class DetailModel : PageModel
     [Required]
     public int SelectedEventTypeId {get; set;}
 
-
-    public List<SelectListItem> EventTypes {
+    public List<EventType> EventTypes {
         get {
-            return _appDbContext.EventTypes.Select(et => new SelectListItem($"{et.Name}", et.Id.ToString())).ToList();
+            return _appDbContext.EventTypes.OrderBy(et => et.Name).ToList();
         }
     }
+
+    // public List<SelectListItem> EventTypes {
+    //     get {
+    //         return _appDbContext.EventTypes.Select(et => new SelectListItem($"{et.Name}", et.Id.ToString())).ToList();
+    //     }
+    // }
 
     public DetailModel(ILogger<DetailModel> logger, AppDbContext appDbContext, IConfiguration configuration, IMemoryCache memoryCache)
     {
@@ -100,6 +105,7 @@ public class DetailModel : PageModel
 
         Event = _appDbContext.Events
             .Include(e => e.Device)
+            .Include(e => e.EventTypes)
             .FirstOrDefault(e => e.Id == eventId);
             
         EventImages = _appDbContext.Images

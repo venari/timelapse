@@ -47,13 +47,25 @@ public class EditModel : PageModel
     [Required]
     public int SelectedEventTypeId {get; set;}
 
+    // [BindProperty]
+    // [Required]
+    // public List<int> SelectedEventTypeIds {get; set;}
     [BindProperty]
     [Required]
-    public List<int> SelectedEventTypeIds {get; set;}
+    public List<EventType> SelectedEventTypes {get; set;}
+    [BindProperty]
+    [Required(ErrorMessage = "At least one Event Type must be selected.")]
+    public string SelectedEventTypeIdsCSV {get; set;}
 
-    public List<SelectListItem> EventTypes {
+    public List<SelectListItem> EventTypeSelectListItems {
         get {
             return _appDbContext.EventTypes.OrderBy(et => et.Name).Select(et => new SelectListItem($"{et.Name}", et.Id.ToString())).ToList();
+        }
+    }
+
+    public List<EventType> EventTypes {
+        get {
+            return _appDbContext.EventTypes.OrderBy(et => et.Name).ToList();
         }
     }
 
@@ -129,7 +141,8 @@ public class EditModel : PageModel
         EndTimeUTC = Event.EndTime;
 
         SelectedEventTypeId = Event.EventType.Id;
-        SelectedEventTypeIds = Event.EventTypes.Select(et => et.Id).ToList();
+        SelectedEventTypeIdsCSV = string.Join(",", Event.EventTypes.Select(et => et.Id));
+        SelectedEventTypes = Event.EventTypes;
         InitialTimestamp = StartTimeUTC;
         Description = Event.Description;
         // DeviceId = device.Id;
@@ -165,6 +178,7 @@ public class EditModel : PageModel
 
         var existingEvent = _appDbContext.Events
             .Include(e => e.Device)
+            .Include(e => e.EventTypes)
             .FirstOrDefault(e => e.Id == eventId);
 
         if(existingEvent==null){
@@ -176,6 +190,10 @@ public class EditModel : PageModel
         if (StartTimeUTC != null && EndTimeUTC != null && StartTimeUTC > EndTimeUTC){
             ModelState.AddModelError("StartTimeUTC", "End Time is not later than Start Time.");
         }
+
+        // if (SelectedEventTypeIdsCSV==null || SelectedEventTypeIdsCSV.Length == 0){
+        //     ModelState.AddModelError("SelectedEventTypeIdsCSV", "At least one Event Type must be selected.");
+        // }
 
         if (!ModelState.IsValid)
         {
@@ -190,6 +208,22 @@ public class EditModel : PageModel
         // newEvent.EndTime = EndTime.ToUniversalTime();
         existingEvent.EndTime = EndTimeUTC;
         existingEvent.EventTypeId = SelectedEventTypeId;
+
+        if(string.Join(",", existingEvent.EventTypes.OrderBy(e => e.Id).Select(e => e.Id)) != SelectedEventTypeIdsCSV){
+            // _logger.LogInformation($"EventTypes are different");
+            existingEvent.EventTypes.Clear();
+            foreach(var eventTypeId in SelectedEventTypeIdsCSV.Split(",")){
+                // _logger.LogInformation($"eventTypeId: {eventTypeId}");
+                var eventType = _appDbContext.EventTypes.FirstOrDefault(et => et.Id == int.Parse(eventTypeId));
+                if(eventType!=null){
+                    existingEvent.EventTypes.Add(eventType);
+                }
+            }
+        }
+        // foreach(var eventTypeId in SelectedEventTypeIds){
+        //     _logger.LogInformation($"eventTypeIdint: {eventTypeId}");
+        // }
+
         existingEvent.Description = Description;
 
         existingEvent.StartImage = _appDbContext.Images.OrderBy(i => i.Timestamp).FirstOrDefault(i => i.DeviceId == device.Id && i.Timestamp >= existingEvent.StartTime);
