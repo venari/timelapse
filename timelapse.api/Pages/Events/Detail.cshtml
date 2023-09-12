@@ -44,11 +44,12 @@
                 <input readonly asp-for="CreatedBy" class="form-control" />
             </div>
             <div class="form-group">
-                <label asp-for="Event.EventTypeId" class="control-label">Event Type</label>
-                <select disabled asp-for="Event.EventTypeId" class="form-control" asp-items="Model.EventTypes">
+                <label asp-for="Event.EventTypes" class="control-label">Event Types</label>
+                <input readonly class="form-control" value='@string.Join(", ", Model.Event.EventTypes.OrderBy(et => et.Name).Select(e => e.Name))'/>
+                @* <select disabled asp-for="Event.EventTypeId" class="form-control" asp-items="Model.EventTypes">
                     <option value=""></option>
-                </select>
-                <span asp-validation-for="SelectedEventTypeId" class="text-danger"></span>
+                </select> *@
+                @* <span asp-validation-for="SelectedEventTypeId" class="text-danger"></span> *@
             </div>
             <div class="form-group">
                 <label asp-for="Event.Description" class="control-label">Created</label>
@@ -106,6 +107,9 @@
     </table>
 </div>
 
+<div>
+    <a asp-page="Index">Back to List</a>
+</div>
 
 <script>
     @* var currentViewedTimestamp = '@(Model.Event.StartTime.ToString("o"))' *@

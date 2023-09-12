@@ -7,6 +7,9 @@ public class EventType{
     [Required]
     public string Name {get; set;}
     public string Description {get; set;}
+
+    public List<Event> Events {get;} = new();
+
 }
 
 public class Event
@@ -36,8 +39,10 @@ public class Event
 
     public List<EventComment> Comments {get; set;} = new List<EventComment>();
 
-    public int EventTypeId {get; set;}
-    public EventType EventType {get; set;}
+    // public int EventTypeId {get; set;}
+    // public EventType EventType {get; set;}
+
+    public List<EventType> EventTypes {get;} = new();
 
     public int StartImageId {get; set;}
     public Image StartImage {get; set;}

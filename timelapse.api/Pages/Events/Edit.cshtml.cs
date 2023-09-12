@@ -28,28 +28,22 @@ public class EditModel : PageModel
     [BindProperty]
     public DateTime MaxTimestamp {get; set; }
 
-    // [BindProperty]
-    // public DateTime StartTime {get; set;}
-    // [BindProperty]
-    // public DateTime EndTime {get; set;}
-
     [BindProperty]
     public DateTime StartTimeUTC {get; set;}
     public Uri EventStartImageBlobUri {get; private set;}
     [BindProperty]
     public DateTime EndTimeUTC {get; set;}
     
-    // [BindProperty]
-    // [Required]
-    // public EventType EventType {get; set;}
-
     [BindProperty]
     [Required]
-    public int SelectedEventTypeId {get; set;}
+    public List<EventType> SelectedEventTypes {get; set;}
+    [BindProperty]
+    [Required(ErrorMessage = "At least one Event Type must be selected.")]
+    public string SelectedEventTypeIdsCSV {get; set;}
 
-    public List<SelectListItem> EventTypes {
+    public List<EventType> EventTypes {
         get {
-            return _appDbContext.EventTypes.OrderBy(et => et.Name).Select(et => new SelectListItem($"{et.Name}", et.Id.ToString())).ToList();
+            return _appDbContext.EventTypes.OrderBy(et => et.Name).ToList();
         }
     }
 
@@ -85,8 +79,6 @@ public class EditModel : PageModel
                 if(!HttpContext.Request.Query.TryGetValue(ApiKeyHeaderName, out potentialApiKey))
                 {
                     return Redirect("/Identity/Account/Login");
-                    // return Unauthorized();
-                    // return new UnauthorizedResult();
                 }
             }
 
@@ -104,14 +96,10 @@ public class EditModel : PageModel
         }
 
         var Event = _appDbContext.Events
-            .Include(e => e.EventType)
+            .Include(e => e.EventTypes)
             .Include(e => e.Device)
             .Include(e => e.StartImage)
             .FirstOrDefault(e => e.Id == eventId);
-
-        // var image = _appDbContext.Images
-        //     .Include(i => i.Device)
-        //     .FirstOrDefault(i => i.Id == eventId);
 
         if(Event==null){
             return RedirectToPage("/NotFound");
@@ -123,12 +111,10 @@ public class EditModel : PageModel
         StartTimeUTC = Event.StartTime;
         EndTimeUTC = Event.EndTime;
 
-        SelectedEventTypeId = Event.EventType.Id;
+        SelectedEventTypeIdsCSV = string.Join(",", Event.EventTypes.OrderBy(e => e.Name).Select(et => et.Id));
+        SelectedEventTypes = Event.EventTypes;
         InitialTimestamp = StartTimeUTC;
         Description = Event.Description;
-        // DeviceId = device.Id;
-        // MinTimestamp = minAndMaxTimestamps.MinTimestamp;
-        // MaxTimestamp = minAndMaxTimestamps.MaxTimestamp;
 
         return Page();
     }
@@ -150,15 +136,13 @@ public class EditModel : PageModel
     {
         var user = GetCurrentUser();
 
-        // _logger.LogInformation($"StartTime: {StartTime.ToString()} Kind: {StartTime.Kind} UTC: {StartTime.ToUniversalTime().ToString()}.  StartTimeUTC: {StartTimeUTC.ToString()} ");
-        // _logger.LogInformation($"EndTime: {EndTime.ToString()} - {EndTime.ToUniversalTime().ToString()}.  EndTimeUTC: {EndTimeUTC.ToString()}");
-
         if(user==null){
             return Redirect("/Identity/Account/Login");
         }
 
         var existingEvent = _appDbContext.Events
             .Include(e => e.Device)
+            .Include(e => e.EventTypes)
             .FirstOrDefault(e => e.Id == eventId);
 
         if(existingEvent==null){
@@ -178,12 +162,19 @@ public class EditModel : PageModel
 
         existingEvent.LastEditedByUserId = user.Id;
         existingEvent.LastEditedDate = DateTime.UtcNow;
-        // existingEvent.DeviceId = device.Id;
-        // newEvent.StartTime = StartTime.ToUniversalTime();
         existingEvent.StartTime = StartTimeUTC;
-        // newEvent.EndTime = EndTime.ToUniversalTime();
         existingEvent.EndTime = EndTimeUTC;
-        existingEvent.EventTypeId = SelectedEventTypeId;
+
+        if(string.Join(",", existingEvent.EventTypes.OrderBy(e => e.Name).Select(e => e.Id)) != SelectedEventTypeIdsCSV){
+            existingEvent.EventTypes.Clear();
+            foreach(var eventTypeId in SelectedEventTypeIdsCSV.Split(",")){
+                var eventType = _appDbContext.EventTypes.FirstOrDefault(et => et.Id == int.Parse(eventTypeId));
+                if(eventType!=null){
+                    existingEvent.EventTypes.Add(eventType);
+                }
+            }
+        }
+
         existingEvent.Description = Description;
 
         existingEvent.StartImage = _appDbContext.Images.OrderBy(i => i.Timestamp).FirstOrDefault(i => i.DeviceId == device.Id && i.Timestamp >= existingEvent.StartTime);
@@ -192,6 +183,6 @@ public class EditModel : PageModel
         _appDbContext.Events.Update(existingEvent);
         await _appDbContext.SaveChangesAsync();
 
-        return RedirectToPage("Index");
+        return RedirectToPage("Detail", new { eventId = existingEvent.Id });
     }
 }

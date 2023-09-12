@@ -22,6 +22,25 @@ namespace timelapse.api.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("EventEventType", b =>
+                {
+                    b.Property<int>("EventTypesId")
+                        .HasColumnType("integer")
+                        .HasColumnName("event_types_id");
+
+                    b.Property<int>("EventsId")
+                        .HasColumnType("integer")
+                        .HasColumnName("events_id");
+
+                    b.HasKey("EventTypesId", "EventsId")
+                        .HasName("pk_event_event_type");
+
+                    b.HasIndex("EventsId")
+                        .HasDatabaseName("ix_event_event_type_events_id");
+
+                    b.ToTable("event_event_type", (string)null);
+                });
+
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRole", b =>
                 {
                     b.Property<string>("Id")
@@ -384,10 +403,6 @@ namespace timelapse.api.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("end_time");
 
-                    b.Property<int>("EventTypeId")
-                        .HasColumnType("integer")
-                        .HasColumnName("event_type_id");
-
                     b.Property<string>("LastEditedByUserId")
                         .IsRequired()
                         .HasColumnType("text")
@@ -413,9 +428,6 @@ namespace timelapse.api.Migrations
 
                     b.HasIndex("EndImageId")
                         .HasDatabaseName("ix_events_end_image_id");
-
-                    b.HasIndex("EventTypeId")
-                        .HasDatabaseName("ix_events_event_type_id");
 
                     b.HasIndex("StartImageId")
                         .HasDatabaseName("ix_events_start_image_id");
@@ -687,6 +699,23 @@ namespace timelapse.api.Migrations
                     b.ToTable("unregistered_devices", (string)null);
                 });
 
+            modelBuilder.Entity("EventEventType", b =>
+                {
+                    b.HasOne("timelapse.core.models.EventType", null)
+                        .WithMany()
+                        .HasForeignKey("EventTypesId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_event_event_type_event_types_event_types_id");
+
+                    b.HasOne("timelapse.core.models.Event", null)
+                        .WithMany()
+                        .HasForeignKey("EventsId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_event_event_type_events_events_id");
+                });
+
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<string>", b =>
                 {
                     b.HasOne("Microsoft.AspNetCore.Identity.IdentityRole", null)
@@ -781,13 +810,6 @@ namespace timelapse.api.Migrations
                         .IsRequired()
                         .HasConstraintName("fk_events_images_end_image_id");
 
-                    b.HasOne("timelapse.core.models.EventType", "EventType")
-                        .WithMany()
-                        .HasForeignKey("EventTypeId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired()
-                        .HasConstraintName("fk_events_event_types_event_type_id");
-
                     b.HasOne("timelapse.core.models.Image", "StartImage")
                         .WithMany()
                         .HasForeignKey("StartImageId")
@@ -798,8 +820,6 @@ namespace timelapse.api.Migrations
                     b.Navigation("Device");
 
                     b.Navigation("EndImage");
-
-                    b.Navigation("EventType");
 
                     b.Navigation("StartImage");
                 });
