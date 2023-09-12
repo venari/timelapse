@@ -50,6 +50,11 @@ raspberrypi.lan (192.168.86.32) at b8:27:eb:94:ac:b1 on en0 ifscope [ethernet]
 
 ```
 
+Install software, (LiPo, sedicam v2 configuration) config & code to new Pi
+```
+bash <(curl -fsSL "https://raw.githubusercontent.com/venari/timelapse/deployment/sedicam_v2/install_sedicam.sh?$RANDOM")
+```
+
 Install software, config & code to new Pi
 ```
 bash <(curl -fsSL "https://raw.githubusercontent.com/venari/timelapse/main/install.sh?$RANDOM")
