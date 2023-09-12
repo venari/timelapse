@@ -3,6 +3,12 @@ using System.ComponentModel.DataAnnotations;
 
 namespace timelapse.core.models;
 
+public class ImageSubset{
+    public int Id {get; set;}
+    public DateTime Timestamp {get; set;}
+    public Uri BlobUri {get; set;}
+}
+
 public class Image
 {
     public int Id {get; set;}

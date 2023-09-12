@@ -1,0 +1,233 @@
+﻿@page "{eventId:int}"
+@using Humanizer
+@model Events.EditModel
+@{
+    ViewData["Title"] = "Edit Event";
+}
+
+<h1>Edit</h1>
+
+<h4>Event</h4>
+<hr />
+
+<div class="row">
+    <div class="col-md-4">
+        <form method="post" onsubmit="updateHiddenFields()">
+            <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+            <div class="form-group">
+                <label asp-for="device.Description" class="control-label">Device Description</label>
+                <input readonly asp-for="device.Description" class="form-control" />
+                <span asp-validation-for="device.Description" class="text-danger"></span>
+            </div>
+            <div class="form-group">
+                <button title="Event Start" onclick="eventStart()" type="button" class="btn btn-primary"><i class="fa fa-flag"></i></button>
+                <label class="control-label">Start Time</label>
+                <input type="datetime-local" id="eventStartDateTime" step="1" class="form-control" />
+                <span asp-validation-for="StartTimeUTC" class="text-danger"></span>
+            </div>
+            <div class="form-group">
+                <button title="Event End"onclick="eventEnd()" type="button" class="btn btn-primary"><i class="fa fa-flag-checkered"></i></button>
+                <label class="control-label">End Time</label>
+                <input type="datetime-local" id="eventEndDateTime" step="1" class="form-control" />
+                <span asp-validation-for="EndTimeUTC" class="text-danger"></span>
+            </div>
+
+
+            <div class="form-group">
+                <label class="control-label">Event Types</label>
+
+                <select id="multiselect-event-types" multiple="multiple">
+                    @foreach (var eventType in Model.EventTypes){
+                        if(Model.SelectedEventTypes.Select(e => e.Id).Contains(eventType.Id)){
+                            <option selected value="@(eventType.Id)">@(eventType.Name)</option>
+                        } else {
+                            <option value="@(eventType.Id)">@(eventType.Name)</option>
+                        }
+                    }
+                </select>
+                <span asp-validation-for="SelectedEventTypeIdsCSV" class="text-danger"></span>
+            </div>
+
+            <div class="form-group">
+                <label asp-for="Description" class="control-label">Event Description</label>
+                <input asp-for="Description" class="form-control" />
+                <span asp-validation-for="Description" class="text-danger"></span>
+            </div>
+            <div class="form-group">
+                <input type="submit" value="Update" class="btn btn-primary" />
+            </div>
+            <input type="hidden" id="selectedEventTypeIdsCSV" asp-for="SelectedEventTypeIdsCSV" />
+            <input type="hidden" id="eventStartDateTimeUTC" asp-for="StartTimeUTC" />
+            <input type="hidden" id="eventEndDateTimeUTC" asp-for="EndTimeUTC" />
+        </form>
+    </div>
+</div>
+
+<div>
+    <table class="table">
+        <thead>
+        </thead>
+        <tbody>
+            <tr>
+                <td>
+                    <p id="imageHeader" scope="col">Image for @(Model.device.Name) as at ...</p>
+
+                    @if(Model.EventStartImageBlobUri!=null){
+                        <img class="img-fluid" id="image" src="@(Model.EventStartImageBlobUri + Model.SasToken)"></img>
+                    }
+                </td>
+            </tr>
+            <tr>
+                <button title="Back 1hr" onclick="navigate(-60)" type="button" class="btn btn-secondary"><i class="fa fa-fast-backward"></i></button>
+                <button title="Back 10m"onclick="navigate(-10)" type="button" class="btn btn-secondary"><i class="fa fa-backward"></i></button>
+                <button title="Back 1m"onclick="navigate(-1)" type="button" class="btn btn-secondary"><i class="fa fa-step-backward"></i></button>
+                <button id="togglePlay" onclick="togglePlay()" type="button" class="btn btn-secondary"><i class="fa fa-play"></i></button>
+                <button title="Forward 1m"onclick="navigate(1)" type="button" class="btn btn-secondary"><i class="fa fa-step-forward"></i></button>
+                <button title="Forward 10m"onclick="navigate(10)" type="button" class="btn btn-secondary"><i class="fa fa-forward"></i></button>
+                <button title="Forward 1hr"onclick="navigate(60)" type="button" class="btn btn-secondary"><i class="fa fa-fast-forward"></i></button>
+                <label for="jumpToDateTime">Jump to (date and time):</label>
+                <input onchange="jumpToDateTime()" type="datetime-local" id="jumpToDateTime" name="jumpToDateTime"> 
+            </tr>
+        </tbody>
+    </table>
+</div>
+
+<script>
+    var currentViewedTimestamp = '@(Model.InitialTimestamp.ToString("o"))'
+    document.getElementById("eventStartDateTime").value = ISO8601UTCDatetimeToLocalDatetime('@(Model.StartTimeUTC.ToString("o"))');
+    document.getElementById("eventEndDateTime").value = ISO8601UTCDatetimeToLocalDatetime('@(Model.EndTimeUTC.ToString("o"))');
+
+    
+
+    displayCurrentViewedTimestamp();
+
+    console.log("Initial timestamp: " + currentViewedTimestamp)
+
+    var image = document.getElementById("image")
+
+    var bPlaying=false
+
+    var togglePlayButton = document.getElementById("togglePlay")
+
+    function togglePlay(){
+        bPlaying=!bPlaying;
+         if(bPlaying){
+            togglePlayButton.innerHTML = '<i class="fa fa-pause"></i>'
+            nextFrame();
+         } else {
+            togglePlayButton.innerHTML = '<i class="fa fa-play"></i>'
+         }
+    }
+
+    function nextFrame(){
+        if(bPlaying){
+
+            image.onload=function(){
+                setTimeout(nextFrame, 50);
+            }
+
+            navigate(1);
+        }
+    }
+
+    function displayCurrentViewedTimestamp()
+    {
+        var imageHeader = document.getElementById("imageHeader");
+        imageHeader.innerHTML = "Image for @(Model.device.Name) as at " + localizeDateTimeAsString(currentViewedTimestamp)
+
+        document.getElementById("jumpToDateTime").value = ISO8601UTCDatetimeToLocalDatetime(currentViewedTimestamp);
+    }
+    function eventStart(){
+        document.getElementById("eventStartDateTime").value = ISO8601UTCDatetimeToLocalDatetime(currentViewedTimestamp);
+    }
+
+    function eventEnd(){
+        document.getElementById("eventEndDateTime").value = ISO8601UTCDatetimeToLocalDatetime(currentViewedTimestamp);
+    }
+
+    function navigate(minutes){
+        var newTimestamp = new Date(new Date(currentViewedTimestamp).getTime() + minutes * 60 * 1000)
+
+        console.log("Navigating " + minutes + " minutes from " + new Date(currentViewedTimestamp) + " to " + newTimestamp)
+
+        @* getImageAtOrAround(@(Model.device.Id), ISO8601UTCDatetimeToLocalDatetime(newTimestamp.toISOString()), minutes>0) *@
+        getImageAtOrAround(@(Model.device.Id), newTimestamp.toISOString(), minutes>0)
+    }
+
+    function jumpToDateTime(){
+        var jumpToDateTime = new Date(document.getElementById("jumpToDateTime").value)
+        getImageAtOrAround(@(Model.device.Id), jumpToDateTime.toISOString(), true)
+    }
+
+    function getImage(deviceId, imageIndex) {
+        imageBlobUri = last24HoursImages[imageIndex].blobUri + '@(Model.SasToken)'.replace(/&amp;/g, '&')
+        image.src = imageBlobUri
+        var imageHeader = document.getElementById("imageHeader");
+        imageHeader.innerHTML = "Image for @(Model.device.Name) as at " + localizeDateTimeAsString(last24HoursImages[imageIndex].timestamp)
+    }
+
+    function getImageAtOrAround(deviceId, atOrAfterTimestamp, forwards) {
+
+        console.log("Navigating to or around " + atOrAfterTimestamp)
+
+        var url = "/api/Image/GetImageAtOrAround/?deviceId=" + deviceId + "&timestamp=" + atOrAfterTimestamp + "&forwards=" + forwards
+        fetch(url, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        })
+        .then(function(response){
+            if(response.ok){
+                return response.json()
+            } else {
+                console.error('Something went wrong');
+            }
+        })
+        .then(function(data){
+            console.log(data.blobUri)
+            console.log(data.timestamp)
+
+            image.src = data.blobUri + '@(Model.SasToken)'.replace(/&amp;/g, '&')
+
+            currentViewedTimestamp = data.timestamp
+            displayCurrentViewedTimestamp()
+        })
+        .catch(function(err){
+            console.error(err)
+            if(bPlaying){
+                togglePlay()
+            }
+        });
+    }
+
+    function updateHiddenFields(){
+        document.getElementById("eventStartDateTimeUTC").value = LocalDatetimeToISO8601UTCDatetime(document.getElementById("eventStartDateTime").value)
+        document.getElementById("eventEndDateTimeUTC").value = LocalDatetimeToISO8601UTCDatetime(document.getElementById("eventEndDateTime").value)
+
+        // Iterate through multiselect-event-types
+        var selectedEventTypeIds = []
+        var select = document.getElementById("multiselect-event-types");
+        for (var i = 0; i < select.options.length; i++) {
+            if (select.options[i].selected) {
+                selectedEventTypeIds.push(select.options[i].value);
+            }
+        }
+
+        document.getElementById("selectedEventTypeIdsCSV").value = selectedEventTypeIds.toString();
+    }
+</script>
+
+@section Scripts {
+<script>
+    $(document).ready(function() {
+        $('#multiselect-event-types').multiselect({
+            templates: {
+            button: '<button type="button" class="multiselect dropdown-toggle btn btn-primary" data-bs-toggle="dropdown" aria-expanded="false"><span class="multiselect-selected-text"></span></button>',
+            },           
+        });
+    });
+</script>
+}
+
+
