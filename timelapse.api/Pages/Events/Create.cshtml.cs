@@ -42,13 +42,26 @@ public class CreateModel : PageModel
     // [Required]
     // public EventType EventType {get; set;}
 
+    // [BindProperty]
+    // [Required]
+    // public int SelectedEventTypeId {get; set;}
+
+    // public List<SelectListItem> EventTypes {
+    //     get {
+    //         return _appDbContext.EventTypes.OrderBy(et => et.Name).Select(et => new SelectListItem($"{et.Name}", et.Id.ToString())).ToList();
+    //     }
+    // }
+
     [BindProperty]
     [Required]
-    public int SelectedEventTypeId {get; set;}
+    public List<EventType> SelectedEventTypes {get; set;}
+    [BindProperty]
+    [Required(ErrorMessage = "At least one Event Type must be selected.")]
+    public string SelectedEventTypeIdsCSV {get; set;}
 
-    public List<SelectListItem> EventTypes {
+    public List<EventType> EventTypes {
         get {
-            return _appDbContext.EventTypes.OrderBy(et => et.Name).Select(et => new SelectListItem($"{et.Name}", et.Id.ToString())).ToList();
+            return _appDbContext.EventTypes.OrderBy(et => et.Name).ToList();
         }
     }
 
@@ -172,10 +185,6 @@ public class CreateModel : PageModel
         device = image.Device;
         InitialTimestamp = image.Timestamp;
 
-        // device = _appDbContext.Devices
-        //     .Where(t => t.Id == DeviceId)
-        //     .FirstOrDefault();
-
         if (StartTimeUTC != null && EndTimeUTC != null && StartTimeUTC > EndTimeUTC){
             ModelState.AddModelError("StartTimeUTC", "End Time is not later than Start Time.");
         }
@@ -188,19 +197,30 @@ public class CreateModel : PageModel
         Event newEvent = new Event();
         newEvent.LastEditedByUserId = newEvent.CreatedByUserId = user.Id;
         newEvent.DeviceId = device.Id;
-        // newEvent.StartTime = StartTime.ToUniversalTime();
         newEvent.StartTime = StartTimeUTC;
-        // newEvent.EndTime = EndTime.ToUniversalTime();
         newEvent.EndTime = EndTimeUTC;
-        newEvent.EventTypeId = SelectedEventTypeId;
         newEvent.Description = Description;
 
         newEvent.StartImage = _appDbContext.Images.OrderBy(i => i.Timestamp).FirstOrDefault(i => i.DeviceId == device.Id && i.Timestamp >= newEvent.StartTime);
         newEvent.EndImage = _appDbContext.Images.OrderByDescending(i => i.Timestamp).FirstOrDefault(i => i.DeviceId == device.Id && i.Timestamp <= newEvent.EndTime);
 
+        // newEvent.EventTypeId = 1;
+        foreach(var eventTypeId in SelectedEventTypeIdsCSV.Split(",")){
+            var eventType = _appDbContext.EventTypes.FirstOrDefault(et => et.Id == int.Parse(eventTypeId));
+            if(eventType!=null){
+                newEvent.EventTypes.Add(eventType);
+            }
+        }
+
         _appDbContext.Events.Add(newEvent);
         await _appDbContext.SaveChangesAsync();
 
-        return RedirectToPage("Index");
+        // Add Event Type(s) to just created Event to avoid error:
+        // PostgresException: 23503: insert or update on table "events" violates foreign key constraint "fk_events_event_types_event_type_id" DETAIL: Key (event_type_id)=(0) is not present in table "event_types".
+
+        // _appDbContext.Events.Update(newEvent);
+        // await _appDbContext.SaveChangesAsync();
+
+        return RedirectToPage("Detail", new { eventId = newEvent.Id });
     }
 }

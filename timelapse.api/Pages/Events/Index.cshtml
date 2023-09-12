@@ -57,7 +57,7 @@
                             <a href="/Events/Detail/@(deviceEvent.Id)">@(deviceEvent.Id)</a>
                         </td>
                         <td>
-                            @((deviceEvent.EventTypes!=null && deviceEvent.EventTypes.Count>0)?string.Join(", ", deviceEvent.EventTypes.Select(e => e.Name)):"---")
+                            @((deviceEvent.EventTypes!=null && deviceEvent.EventTypes.Count>0)?string.Join(", ", deviceEvent.EventTypes.OrderBy(et => et.Name).Select(e => e.Name)):"---")
                         </td>
                         <td>
                             @(deviceEvent.Description)

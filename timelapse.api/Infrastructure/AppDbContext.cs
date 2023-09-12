@@ -43,8 +43,8 @@ namespace timelapse.infrastructure
                 .HasMany(e => e.EventTypes)
                 .WithMany(e => e.Events);
 
-            modelBuilder.Entity<Event>()
-                .HasOne(e => e.EventType);
+            // modelBuilder.Entity<Event>()
+            //     .HasOne(e => e.EventType);
         }
 
         protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)

@@ -12,7 +12,7 @@
 
 <div class="row">
     <div class="col-md-4">
-        <form method="post" onsubmit="updateUTCfields()">
+        <form method="post" onsubmit="updateHiddenFields()">
             <div asp-validation-summary="ModelOnly" class="text-danger"></div>
             <div class="form-group">
                 <label asp-for="device.Description" class="control-label">Device Description</label>
@@ -31,12 +31,26 @@
                 <input type="datetime-local" id="eventEndDateTime" step="1" class="form-control" />
                 <span asp-validation-for="EndTimeUTC" class="text-danger"></span>
             </div>
-            <div class="form-group">
+            @* <div class="form-group">
                 <label asp-for="SelectedEventTypeId" class="control-label">Event Types</label>
                 <select asp-for="SelectedEventTypeId" class="form-control" asp-items="Model.EventTypes">
                     <option value=""></option>
                 </select>
                 <span asp-validation-for="SelectedEventTypeId" class="text-danger"></span>
+            </div> *@
+            <div class="form-group">
+                <label class="control-label">Event Types</label>
+
+                <select id="multiselect-event-types" multiple="multiple">
+                    @foreach (var eventType in Model.EventTypes){
+                        @* if(Model.SelectedEventTypes.Select(e => e.Id).Contains(eventType.Id)){
+                            <option selected value="@(eventType.Id)">@(eventType.Name)</option>
+                        } else { *@
+                            <option value="@(eventType.Id)">@(eventType.Name)</option>
+                        @* } *@
+                    }
+                </select>
+                <span asp-validation-for="SelectedEventTypeIdsCSV" class="text-danger"></span>
             </div>
             <div class="form-group">
                 <label asp-for="Description" class="control-label">Event Description</label>
@@ -46,6 +60,7 @@
             <div class="form-group">
                 <input type="submit" value="Create" class="btn btn-primary" />
             </div>
+            <input type="hidden" id="selectedEventTypeIdsCSV" asp-for="SelectedEventTypeIdsCSV" />
             <input type="hidden" id="eventStartDateTimeUTC" asp-for="StartTimeUTC" />
             <input type="hidden" id="eventEndDateTimeUTC" asp-for="EndTimeUTC" />
         </form>
@@ -188,8 +203,31 @@
         });
     }
 
-    function updateUTCfields(){
+    function updateHiddenFields(){
         document.getElementById("eventStartDateTimeUTC").value = LocalDatetimeToISO8601UTCDatetime(document.getElementById("eventStartDateTime").value)
         document.getElementById("eventEndDateTimeUTC").value = LocalDatetimeToISO8601UTCDatetime(document.getElementById("eventEndDateTime").value)
+
+        // Iterate through multiselect-event-types
+        var selectedEventTypeIds = []
+        var select = document.getElementById("multiselect-event-types");
+        for (var i = 0; i < select.options.length; i++) {
+            if (select.options[i].selected) {
+                selectedEventTypeIds.push(select.options[i].value);
+            }
+        }
+
+        document.getElementById("selectedEventTypeIdsCSV").value = selectedEventTypeIds.toString();
     }
 </script>
+
+@section Scripts {
+<script>
+    $(document).ready(function() {
+        $('#multiselect-event-types').multiselect({
+            templates: {
+            button: '<button type="button" class="multiselect dropdown-toggle btn btn-primary" data-bs-toggle="dropdown" aria-expanded="false"><span class="multiselect-selected-text"></span></button>',
+            },           
+        });
+    });
+</script>
+}

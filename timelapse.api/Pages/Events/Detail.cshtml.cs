@@ -107,6 +107,11 @@ public class DetailModel : PageModel
             .Include(e => e.Device)
             .Include(e => e.EventTypes)
             .FirstOrDefault(e => e.Id == eventId);
+
+        if(Event == null){
+            // return new NotFoundResult();
+            return RedirectToPage("/NotFound");
+        }
             
         EventImages = _appDbContext.Images
             .Where(i => i.DeviceId == Event.DeviceId && i.Timestamp >= Event.StartTime.ToUniversalTime() && i.Timestamp <= Event.EndTime.ToUniversalTime())
