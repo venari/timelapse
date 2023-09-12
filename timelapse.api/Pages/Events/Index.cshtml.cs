@@ -34,7 +34,7 @@ public class IndexModel : PageModel
             // .Include(d => d.Images.OrderByDescending(i => i.Timestamp).Take(1))
 
             .Include(d => d.Events)
-            .ThenInclude(e => e.EventType)
+            .ThenInclude(e => e.EventTypes)
 
             .Include(d => d.Events)
             .ThenInclude(e => e.StartImage)

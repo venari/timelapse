@@ -43,9 +43,9 @@ public class EditModel : PageModel
     // [Required]
     // public EventType EventType {get; set;}
 
-    [BindProperty]
-    [Required]
-    public int SelectedEventTypeId {get; set;}
+    // [BindProperty]
+    // [Required]
+    // public int SelectedEventTypeId {get; set;}
 
     // [BindProperty]
     // [Required]
@@ -140,7 +140,7 @@ public class EditModel : PageModel
         StartTimeUTC = Event.StartTime;
         EndTimeUTC = Event.EndTime;
 
-        SelectedEventTypeId = Event.EventType.Id;
+        // SelectedEventTypeId = Event.EventType.Id;
         SelectedEventTypeIdsCSV = string.Join(",", Event.EventTypes.Select(et => et.Id));
         SelectedEventTypes = Event.EventTypes;
         InitialTimestamp = StartTimeUTC;
@@ -191,10 +191,6 @@ public class EditModel : PageModel
             ModelState.AddModelError("StartTimeUTC", "End Time is not later than Start Time.");
         }
 
-        // if (SelectedEventTypeIdsCSV==null || SelectedEventTypeIdsCSV.Length == 0){
-        //     ModelState.AddModelError("SelectedEventTypeIdsCSV", "At least one Event Type must be selected.");
-        // }
-
         if (!ModelState.IsValid)
         {
             return Page();
@@ -207,7 +203,7 @@ public class EditModel : PageModel
         existingEvent.StartTime = StartTimeUTC;
         // newEvent.EndTime = EndTime.ToUniversalTime();
         existingEvent.EndTime = EndTimeUTC;
-        existingEvent.EventTypeId = SelectedEventTypeId;
+        // existingEvent.EventTypeId = SelectedEventTypeId;
 
         if(string.Join(",", existingEvent.EventTypes.OrderBy(e => e.Id).Select(e => e.Id)) != SelectedEventTypeIdsCSV){
             // _logger.LogInformation($"EventTypes are different");
@@ -232,6 +228,7 @@ public class EditModel : PageModel
         _appDbContext.Events.Update(existingEvent);
         await _appDbContext.SaveChangesAsync();
 
-        return RedirectToPage("Index");
+        // return RedirectToPage("Index");
+        return RedirectToPage("Detail", new { eventId = existingEvent.Id });
     }
 }
