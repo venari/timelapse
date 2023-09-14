@@ -10,8 +10,10 @@ rec_buff = receiveSMS()
 print('Returned from receiveSMS()')
 print(rec_buff)
 print('Printed rec_buff')
+print(rec_buff.decode())
+print('Printed rec_buff.decode()')
 
-rec_lines = rec_buff.splitlines()
+rec_lines = rec_buff.decode().splitlines()
 print('Split rec_buff into rec_lines')
 print(rec_lines)
 
