@@ -214,6 +214,10 @@ def connectToInternet(retries = 3):
        
         else:
             logger.warning('Could not establish network connection after 2 minutes.')
+
+            logger.info('Turning on NDIS...')
+            turnOnNDIS()
+
             if retries > 0:
                 logger.info('Retrying to establish network connection...')
                 connectToInternet(retries-1)

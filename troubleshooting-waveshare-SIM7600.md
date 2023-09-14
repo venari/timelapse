@@ -18,7 +18,50 @@ AT+CPIN?
 OK
 
 
+# Set text mode
+```
+$ atcom --port /dev/serial0 "AT+CMGF=1"
 
+OK
+
+```
+
+# Check message storage
+```
+$ atcom --port /dev/serial0 "AT+CPMS?"
+
++CPMS: "SM",10,10,"SM",10,10,"SM",10,10
+
+OK
+```
+
+
+# Read all messages
+```
+$ atcom --port /dev/serial0 'AT+CMGL="ALL"'
++CMGL: 0,"REC READ","791101017890","","23/09/13,14:38:05+48"
+You have no Prepay credit. For easy ways to top up check out one.nz/topup or view your balance and top up from our My One NZ app.
++CMGL: 2,"REC READ","+64xxxxxxxxx","","23/09/14,17:01:14+48"
+Hello
++CMGL: 3,"REC READ","+64xxxxxxxxx","","23/09/14,17:17:16+48"
+Hello 2
+
+OK
+```
+
+# Delete message at index 0
+```
+$ atcom --port /dev/serial0 'AT+CMGD=0'
+
+OK
+```
+
+# Delete all messages
+```
+$ atcom --port /dev/serial0 'AT+CMGD=0,1'
+
+OK
+```
 
 pi@timelapse-camera-ethan:~ $ lsusb
 Bus 001 Device 003: ID 1e0e:9011 Qualcomm / Option SimTech, Incorporated
