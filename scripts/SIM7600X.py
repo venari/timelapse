@@ -134,6 +134,9 @@ def receiveSMS():
     answer = send_at('AT+CMGL="ALL"','+CMGL:',2)
     if 1 == answer:
         answer = 0
+        print('A')
+        print(rec_buff)
+        print('B')
         if 'OK' in rec_buff:
             answer = 1
             print(rec_buff)
