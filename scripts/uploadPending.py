@@ -13,7 +13,7 @@ import glob
 import pathlib
 import socket
 
-from powerOnSIM7600X import powerUpSIM7600X, powerDownSIM7600X
+from SIM7600X import powerUpSIM7600X, powerDownSIM7600X, turnOnNDIS
 
 config = json.load(open('config.json'))
 logFilePath = config["logFilePath"]

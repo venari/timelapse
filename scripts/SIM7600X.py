@@ -23,7 +23,7 @@ ser = None
 
 config = json.load(open('config.json'))
 logFilePath = config["logFilePath"]
-# logFilePath = logFilePath.replace(".log", ".powerOnSIM7600X.log")
+# logFilePath = logFilePath.replace(".log", ".SIM7600X.log")
 os.makedirs(os.path.dirname(logFilePath), exist_ok=True)
 # os.chmod(os.path.dirname(logFilePath), 0o777) # Make sure pijuice user scrip can write to log file.
 
@@ -33,11 +33,11 @@ handler = TimedRotatingFileHandler(logFilePath,
                                    when='midnight',
                                    backupCount=10)
 handler.setFormatter(formatter)
-logger = logging.getLogger("powerOnSIM7600X")
+logger = logging.getLogger("SIM7600X")
 logger.addHandler(handler)
 logger.setLevel(logging.DEBUG)
 
-# logger.info("Starting up powerOnSIM7600X.py...")
+# logger.info("Starting up SIM7600X.py...")
 os.chmod(logFilePath, 0o777) # Make sure pijuice user script can write to log file.
 
 
