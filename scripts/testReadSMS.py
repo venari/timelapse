@@ -3,8 +3,13 @@ from SIM7600X import turnOnNDIS, sendSMS, receiveSMS, deleteAllSMS, powerUpSIM76
 #try:
 #powerUpSIM7600X()
 #sendSMS('+64xxxxxxxxx','Testing tesing')
+
+print('About to call receiveSMS()...')
+
 rec_buff = receiveSMS()
+print('Returned from receiveSMS()')
 print(rec_buff)
+print('Printed rec_buff')
 
 rec_lines = rec_buff.splitlines()
 
