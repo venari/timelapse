@@ -12,6 +12,8 @@ print(rec_buff)
 print('Printed rec_buff')
 
 rec_lines = rec_buff.splitlines()
+print('Split rec_buff into rec_lines')
+print(rec_lines)
 
 for line in rec_lines:
     print(line)
