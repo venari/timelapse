@@ -108,6 +108,8 @@ def sendSMS(phone_number,text_message):
     print("Setting SMS mode...")
     send_at("AT+CMGF=1","OK",1)
     print("Sending Short Message")
+    print(phone_number)
+    print(text_message)
     answer = send_at("AT+CMGS=\""+phone_number+"\"",">",2)
     if 1 == answer:
         ser.write(text_message.encode())
