@@ -15,6 +15,8 @@ rec_lines = rec_buff.splitlines()
 print('Split rec_buff into rec_lines')
 print(rec_lines)
 
+phone_number=''
+
 for line in rec_lines:
     print(line)
     if(line.startswith("+CMGL:")):
@@ -34,6 +36,12 @@ for line in rec_lines:
 
         if line.upper() == "STATUS?":
             print("Status query")
+            sendSMS(phone_number, "Status query received.")
+
+        if line.upper() == "HELLO":
+            print("Hello")
+            sendSMS(phone_number, "Hello")
+
         # Body
 
 
