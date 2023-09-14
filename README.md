@@ -3,12 +3,6 @@ A set of tools/scripts to automate the taking and creation of timelapse videos a
 
 # PI Setup
 
-For now, use Buster rather than Bullseye - owing to raspicam issues on Pi Zero.
-
-Raspberry Pi OS Lite (Legacy) 
-Debian version 10 - https://downloads.raspberrypi.org/raspios_oldstable_lite_armhf/images/raspios_oldstable_lite_armhf-2022-01-28/2022-01-28-raspios-buster-armhf-lite.zip
-
-
 Raspberry Pi OS Lite (32 bit - Pi Zero W)
 Debian version 11 (bullseye) - https://downloads.raspberrypi.org/raspios_lite_armhf/images/raspios_lite_armhf-2022-09-26/2022-09-22-raspios-bullseye-armhf-lite.img.xz
 
@@ -50,12 +44,17 @@ raspberrypi.lan (192.168.86.32) at b8:27:eb:94:ac:b1 on en0 ifscope [ethernet]
 
 ```
 
-Install software, (LiPo, sedicam v2 configuration) config & code to new Pi
+# Install software, (LiPo, sedicam v2 configuration) config & code to new Pi
 ```
 bash <(curl -fsSL "https://raw.githubusercontent.com/venari/timelapse/deployment/sedicam_v2/install_sedicam.sh?$RANDOM")
 ```
 
-Install software, config & code to new Pi
+Update config and code to existing install
+```
+bash <(curl -fsSL "https://raw.githubusercontent.com/venari/timelapse/deployment/sedicam_v2/update_sedicam.sh?$RANDOM")
+```
+
+## Install software, (LiFePO4, sedicam v1 cofiguration) config & code to new Pi
 ```
 bash <(curl -fsSL "https://raw.githubusercontent.com/venari/timelapse/main/install.sh?$RANDOM")
 ```
@@ -65,7 +64,7 @@ Update config and code to existing install
 bash <(curl -fsSL "https://raw.githubusercontent.com/venari/timelapse/main/update.sh?$RANDOM")
 ```
 
-Connect to intermitently connected Pi and tail log:
+# Connect to intermitently connected Pi and tail log:
 ```
 ssh -o ConnectTimeout=60 -o ConnectionAttempts=30 pi@sediment-pi-zero-w-v1-a 'tail -f -n 100 logs/timelapse.log'
 ```
@@ -79,14 +78,6 @@ Copy log files to local machine:
 ```
 scp -o ConnectTimeout=60 -o ConnectionAttempts=30 pi@sediment-pi-zero-w-v1-a:/home/pi/logs/*.* .
 ```
-
-
-# Raspberry Pi Camera Module v3
-
-- 12MP sensor using IMX708
-https://www.raspberrypi.com/documentation/computers/camera_software.html
-Camera Module 3 (IMX708)
-Ensure software is upgraded (above)
 
 # Waveshare SIM6700X GSM/GPRS/GNSS HAT
 
@@ -106,6 +97,8 @@ sudo apt-get install p7zip-full
 7z x SIM7600X-4G-HAT-Demo.7z -r -o/home/pi
 
 sudo chmod 777 -R /home/pi/SIM7600X-4G-HAT-Demo
+
+
 
 sudo nano /etc/rc.local
 
