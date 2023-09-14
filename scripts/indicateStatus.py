@@ -6,7 +6,7 @@ from logging.handlers import TimedRotatingFileHandler
 import pathlib
 import json
 
-from powerOnSIM7600X import powerUpSIM7600X, powerDownSIM7600X
+from SIM7600X import powerUpSIM7600X, powerDownSIM7600X
 
 config = json.load(open('config.json'))
 logFilePath = config["logFilePath"]

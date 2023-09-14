@@ -27,6 +27,7 @@
     "camera.interval": 60,
     "camera.quality": 30,
     "camera.focus_m": 100,
+    "hibernateMode": false,
     "supportMode": false,
     "monitoringMode": false
 }

@@ -136,6 +136,11 @@ def uploadPendingPhotos():
                     config['monitoringMode'] = json.loads(response.text)['device']['monitoringMode']
                     json.dump(config, open('config.json', 'w'), indent=4)
 
+                if json.loads(response.text)['device']['hibernateMode'] != config['hibernateMode']:
+                    logger.info('Hibernate mode changed to ' + str(json.loads(response.text)['device']['hibernateMode']))
+                    config['hibernateMode'] = json.loads(response.text)['device']['hibernateMode']
+                    json.dump(config, open('config.json', 'w'), indent=4)
+
                    
             except json.decoder.JSONDecodeError:
                 logger.debug(response.text)
@@ -324,6 +329,11 @@ def uploadPendingTelemetry():
                 if json.loads(response.text)['device']['monitoringMode'] != config['monitoringMode']:
                     logger.info('Monitoring mode changed to ' + str(json.loads(response.text)['device']['monitoringMode']))
                     config['monitoringMode'] = json.loads(response.text)['device']['monitoringMode']
+                    json.dump(config, open('config.json', 'w'), indent=4)
+
+                if json.loads(response.text)['device']['hibernateMode'] != config['hibernateMode']:
+                    logger.info('Hibernate mode changed to ' + str(json.loads(response.text)['device']['hibernateMode']))
+                    config['hibernateMode'] = json.loads(response.text)['device']['hibernateMode']
                     json.dump(config, open('config.json', 'w'), indent=4)
 
                    
