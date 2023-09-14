@@ -139,9 +139,27 @@ def receiveSMS():
             print(rec_buff)
     else:
         print('error%d'%answer)
+        return 'error%d'%answer
+        # return False
+    return rec_buff
+
+def deleteAllSMS():
+    global ser
+    ser = serial.Serial(config["SIM7600X_port"],115200)
+    ser.flushInput()
+
+    rec_buff = ''
+    print('Setting SMS mode...')
+    send_at('AT+CMGF=1','OK',1)
+    # send_at('AT+CPMS=\"SM\",\"SM\",\"SM\"', 'OK', 1)
+    answer = send_at('AT+CMGD=0,1','OK',2)
+    if 1 == answer:
+        answer = 0
+        if 'OK' in rec_buff:
+            answer = 1
+    else:
         return False
     return True
-
 
 
 def send_at(command,back,timeout):
