@@ -132,15 +132,15 @@ def receiveSMS():
     # answer = send_at('AT+CMGR=1','+CMGR:',2)
     # answer = send_at('AT+CMGL="REC UNREAD"','+CMGL:',2)
     answer = send_at('AT+CMGL="ALL"','+CMGL:',2)
-    if 1 == answer:
-        answer = 0
-        print('A')
-        print(rec_buff)
-        print('B')
-        if 'OK' in rec_buff:
-            answer = 1
-            print(rec_buff)
-    else:
+    if 1 != answer:
+        # answer = 0
+        # print('A')
+        # print(rec_buff)
+        # print('B')
+        # if 'OK' in rec_buff.decode():
+        #     answer = 1
+        #     # print(rec_buff)
+    # else:
         print('error%d'%answer)
         return 'error%d'%answer
         # return False
@@ -156,11 +156,11 @@ def deleteAllSMS():
     send_at('AT+CMGF=1','OK',1)
     # send_at('AT+CPMS=\"SM\",\"SM\",\"SM\"', 'OK', 1)
     answer = send_at('AT+CMGD=0,1','OK',2)
-    if 1 == answer:
-        answer = 0
-        if 'OK' in rec_buff:
-            answer = 1
-    else:
+    if 1 != answer:
+    #     answer = 0
+    #     if 'OK' in rec_buff.decode():
+    #         answer = 1
+    # else:
         return False
     return True
 
