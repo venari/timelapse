@@ -23,14 +23,16 @@ for line in rec_lines:
         # Header
         comma_buff = line.split(',')
         message_index = comma_buff[0]
-        message_status = comma_buff[1]
-        phone_number = comma_buff[2]
+        message_status = comma_buff[1].removeprefix('"').removesuffix('"')
+        phone_number = comma_buff[2].removeprefix('"').removesuffix('"')
         address_text = comma_buff[3]
-        timestamp = comma_buff[4]
+        timestamp_date = comma_buff[4].removeprefix('"').removesuffix('"')
+        timestamp_time = comma_buff[5].removeprefix('"').removesuffix('"')
         print(message_index)
         print(message_status)
         print(phone_number)
-        print(timestamp)
+        print(timestamp_date)
+        print(timestamp_time)
     else:
         print(line)
 
