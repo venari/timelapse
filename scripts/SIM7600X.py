@@ -121,7 +121,7 @@ def sendSMS(phone_number,text_message):
         print('error%d'%answer)
 
 def receiveSMS():
-    global ser
+    global ser, rec_buff
     ser = serial.Serial(config["SIM7600X_port"],115200)
     ser.flushInput()
 
@@ -147,7 +147,7 @@ def receiveSMS():
     return rec_buff
 
 def deleteAllSMS():
-    global ser
+    global ser, rec_buff
     ser = serial.Serial(config["SIM7600X_port"],115200)
     ser.flushInput()
 
@@ -166,19 +166,20 @@ def deleteAllSMS():
 
 
 def send_at(command,back,timeout):
-	rec_buff = ''
-	ser.write((command+'\r\n').encode())
-	time.sleep(timeout)
-	if ser.inWaiting():
-		time.sleep(0.01 )
-		rec_buff = ser.read(ser.inWaiting())
-	if back not in rec_buff.decode():
-		print(command + ' ERROR')
-		print(command + ' back:\t' + rec_buff.decode())
-		return 0
-	else:
-		print(rec_buff.decode())
-		return 1
+    global ser, rec_buff
+    rec_buff = ''
+    ser.write((command+'\r\n').encode())
+    time.sleep(timeout)
+    if ser.inWaiting():
+        time.sleep(0.01 )
+        rec_buff = ser.read(ser.inWaiting())
+    if back not in rec_buff.decode():
+        print(command + ' ERROR')
+        print(command + ' back:\t' + rec_buff.decode())
+        return 0
+    else:
+        print(rec_buff.decode())
+        return 1
 
 
 
