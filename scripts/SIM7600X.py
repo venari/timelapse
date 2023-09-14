@@ -129,7 +129,8 @@ def receiveSMS():
     print('Setting SMS mode...')
     send_at('AT+CMGF=1','OK',1)
     send_at('AT+CPMS=\"SM\",\"SM\",\"SM\"', 'OK', 1)
-    answer = send_at('AT+CMGR=1','+CMGR:',2)
+    # answer = send_at('AT+CMGR=1','+CMGR:',2)
+    answer = send_at('AT+CMGL="REC UNREAD"','+CMGL:',2)
     if 1 == answer:
         answer = 0
         if 'OK' in rec_buff:
