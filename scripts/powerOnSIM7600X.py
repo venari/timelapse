@@ -10,12 +10,14 @@ import logging
 from logging.handlers import TimedRotatingFileHandler
 import pathlib
 import glob
+import serial
 
 import RPi.GPIO as GPIO
 from time import sleep
 # import serial
 
 GPIO_Power_Key = 6
+rec_buff = ''
 
 ser = None
 
@@ -35,7 +37,7 @@ logger = logging.getLogger("powerOnSIM7600X")
 logger.addHandler(handler)
 logger.setLevel(logging.DEBUG)
 
-logger.info("Starting up powerOnSIM7600X.py...")
+# logger.info("Starting up powerOnSIM7600X.py...")
 os.chmod(logFilePath, 0o777) # Make sure pijuice user script can write to log file.
 
 
@@ -57,14 +59,6 @@ def powerUpSIM7600X():
 
         sleep(20)
         logger.debug('SIM7600X should be powered up...')
-
-        # global ser
-        # ser = serial.Serial(config["SIM7600X_port"],115200)
-        # ser.flushInput()
-
-        # logger.debug('Sending AT+CUSBPIDSWITCH=9011,1,1...')
-
-        # send_at('AT+CUSBPIDSWITCH=9011,1,1','OK',1)
     
     except Exception as e:
         logger.error("powerUpSIM7600X() failed.")
@@ -89,6 +83,74 @@ def powerDownSIM7600X():
     except Exception as e:
         logger.error("powerDownSIM7600X() failed.")
         logger.error(e)
+
+def turnOnNDIS():
+    try:
+        logger.debug('Turrning on NDIS...')
+
+        global ser
+        ser = serial.Serial(config["SIM7600X_port"],115200)
+        ser.flushInput()
+
+        logger.debug('Sending AT+CUSBPIDSWITCH=9011,1,1...')
+
+        send_at('AT+CUSBPIDSWITCH=9011,1,1','OK',1)
+
+    except Exception as e:
+        logger.error("turnOnNDIS() failed.")
+        logger.error(e)
+
+def sendSMS(phone_number,text_message):
+	
+	print("Setting SMS mode...")
+	send_at("AT+CMGF=1","OK",1)
+	print("Sending Short Message")
+	answer = send_at("AT+CMGS=\""+phone_number+"\"",">",2)
+	if 1 == answer:
+		ser.write(text_message.encode())
+		ser.write(b'\x1A')
+		answer = send_at('','OK',20)
+		if 1 == answer:
+			print('send successfully')
+		else:
+			print('error')
+	else:
+		print('error%d'%answer)
+
+def receiveSMS():
+	rec_buff = ''
+	print('Setting SMS mode...')
+	send_at('AT+CMGF=1','OK',1)
+	send_at('AT+CPMS=\"SM\",\"SM\",\"SM\"', 'OK', 1)
+	answer = send_at('AT+CMGR=1','+CMGR:',2)
+	if 1 == answer:
+		answer = 0
+		if 'OK' in rec_buff:
+			answer = 1
+			print(rec_buff)
+	else:
+		print('error%d'%answer)
+		return False
+	return True
+
+
+
+def send_at(command,back,timeout):
+	rec_buff = ''
+	ser.write((command+'\r\n').encode())
+	time.sleep(timeout)
+	if ser.inWaiting():
+		time.sleep(0.01 )
+		rec_buff = ser.read(ser.inWaiting())
+	if back not in rec_buff.decode():
+		print(command + ' ERROR')
+		print(command + ' back:\t' + rec_buff.decode())
+		return 0
+	else:
+		print(rec_buff.decode())
+		return 1
+
+
 
 
 # def send_at(command,back,timeout):

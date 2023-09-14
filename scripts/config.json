@@ -12,6 +12,7 @@
     "daytime_ends_at_h": 18,
     "modem.type_": "thumb",
     "modem.type": "SIM7600X",
+    "SIM7600X_port": "/dev/ttyUSB2",
     "modem.power": 500,
     "modem.power_interval": 900,
     "upload.image.timeout": 30,
