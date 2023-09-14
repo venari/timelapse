@@ -74,6 +74,11 @@
                             }
                         </td>
                         <td>
+                            @if(device.HibernateMode){
+                                <i class="fa fa-moon" data-toggle="tooltip" title="Hibernate Mode"></i>
+                            }
+                        </td>
+                        <td>
                             @* @(device.LatestTelemetry!=null?device.LatestTelemetry.Timestamp:"---") *@
                             @* <script type="text/javascript">localize('@(device.LatestTelemetryTimestamp.HasValue?device.LatestTelemetryTimestamp.Value.ToString("s"):"---")')</script> *@
                             @if (device.LatestTelemetry!=null && DateTime.UtcNow - device.LatestTelemetry.Timestamp > TimeSpan.FromMinutes(60)){

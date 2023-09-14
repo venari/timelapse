@@ -6,6 +6,8 @@ from logging.handlers import TimedRotatingFileHandler
 import pathlib
 import json
 
+from SIM7600X import powerUpSIM7600X, powerDownSIM7600X
+
 config = json.load(open('config.json'))
 logFilePath = config["logFilePath"]
 
@@ -47,6 +49,7 @@ def indicateStatus():
 def turnOnSystemPowerSwitch(retries = 3):
 
     pj.power.SetSystemPowerSwitch(500)
+    powerUpSIM7600X()
 
     waitCounter = 0
     while not internet() and waitCounter < 12:
@@ -67,6 +70,7 @@ def turnOnSystemPowerSwitch(retries = 3):
             turnOnSystemPowerSwitch(retries-1)
         else:
             pj.power.SetSystemPowerSwitch(0)
+            powerDownSIM7600X()
             flashLED('D2', 255, 0, 0, 3, 1)
             return
     
@@ -89,10 +93,12 @@ def togglePowerSwitch():
 
     if pj.power.GetSystemPowerSwitch()['data'] == 0:
         logger.info("Toggling power switch ON")
+        powerUpSIM7600X()
         turnOnSystemPowerSwitch()
     else:
         logger.info("Toggling power switch OFF")
         pj.power.SetSystemPowerSwitch(0)
+        powerDownSIM7600X()
         flashLED('D2', 255, 0, 0, 1, 5)
 
 
