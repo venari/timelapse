@@ -101,37 +101,44 @@ def turnOnNDIS():
         logger.error(e)
 
 def sendSMS(phone_number,text_message):
-	
-	print("Setting SMS mode...")
-	send_at("AT+CMGF=1","OK",1)
-	print("Sending Short Message")
-	answer = send_at("AT+CMGS=\""+phone_number+"\"",">",2)
-	if 1 == answer:
-		ser.write(text_message.encode())
-		ser.write(b'\x1A')
-		answer = send_at('','OK',20)
-		if 1 == answer:
-			print('send successfully')
-		else:
-			print('error')
-	else:
-		print('error%d'%answer)
+    global ser
+    ser = serial.Serial(config["SIM7600X_port"],115200)
+    ser.flushInput()
+
+    print("Setting SMS mode...")
+    send_at("AT+CMGF=1","OK",1)
+    print("Sending Short Message")
+    answer = send_at("AT+CMGS=\""+phone_number+"\"",">",2)
+    if 1 == answer:
+        ser.write(text_message.encode())
+        ser.write(b'\x1A')
+        answer = send_at('','OK',20)
+        if 1 == answer:
+            print('send successfully')
+        else:
+            print('error')
+    else:
+        print('error%d'%answer)
 
 def receiveSMS():
-	rec_buff = ''
-	print('Setting SMS mode...')
-	send_at('AT+CMGF=1','OK',1)
-	send_at('AT+CPMS=\"SM\",\"SM\",\"SM\"', 'OK', 1)
-	answer = send_at('AT+CMGR=1','+CMGR:',2)
-	if 1 == answer:
-		answer = 0
-		if 'OK' in rec_buff:
-			answer = 1
-			print(rec_buff)
-	else:
-		print('error%d'%answer)
-		return False
-	return True
+    global ser
+    ser = serial.Serial(config["SIM7600X_port"],115200)
+    ser.flushInput()
+
+    rec_buff = ''
+    print('Setting SMS mode...')
+    send_at('AT+CMGF=1','OK',1)
+    send_at('AT+CPMS=\"SM\",\"SM\",\"SM\"', 'OK', 1)
+    answer = send_at('AT+CMGR=1','+CMGR:',2)
+    if 1 == answer:
+        answer = 0
+        if 'OK' in rec_buff:
+            answer = 1
+            print(rec_buff)
+    else:
+        print('error%d'%answer)
+        return False
+    return True
 
 
 
