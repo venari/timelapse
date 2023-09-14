@@ -122,6 +122,7 @@ def sendSMS(phone_number,text_message):
 
 def receiveSMS():
     global ser
+    global rec_buff
     ser = serial.Serial(config["SIM7600X_port"],115200)
     ser.flushInput()
 
@@ -141,7 +142,7 @@ def receiveSMS():
         print('error%d'%answer)
         return 'error%d'%answer
         # return False
-    return rec_buff
+    return rec_buff.decode()
 
 def deleteAllSMS():
     global ser
