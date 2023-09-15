@@ -11,7 +11,7 @@ from logging.handlers import TimedRotatingFileHandler
 import pathlib
 import glob
 
-from powerOnSIM7600X import powerUpSIM7600X, powerDownSIM7600X
+from SIM7600X import powerUpSIM7600X, powerDownSIM7600X
 
 config = json.load(open('config.json'))
 logFilePath = config["logFilePath"]
@@ -81,28 +81,28 @@ def scheduleShutdown():
 
         config = json.load(open('config.json'))
 
-        if config['shutdown']:
-            # print(str(datetime.datetime.now()) + ' scheduling regular shutdown')
-            logger.info('scheduling regular shutdown')
-            DELTA_MIN=10
+        # if config['shutdown']:
+        #     # print(str(datetime.datetime.now()) + ' scheduling regular shutdown')
+        #     logger.info('scheduling regular shutdown')
+        #     DELTA_MIN=10
 
-            alarmObj = {
-                    'year': 'EVERY_YEAR',
-                    'month': 'EVERY_MONTH',
-                    'day': 'EVERY_DAY',
-                    'hour': 'EVERY_HOUR',
-                    'minute_period': DELTA_MIN,
-                    'second': 0,
-            }
+        #     alarmObj = {
+        #             'year': 'EVERY_YEAR',
+        #             'month': 'EVERY_MONTH',
+        #             'day': 'EVERY_DAY',
+        #             'hour': 'EVERY_HOUR',
+        #             'minute_period': DELTA_MIN,
+        #             'second': 0,
+        #     }
 
-            setAlarm = True
+        #     setAlarm = True
 
 
         bCharging = False
         if (
-            pj.status.GetStatus()['data']['battery'] == 'CHARGING_FROM_IN' 
-            or pj.status.GetStatus()['data']['battery'] == 'CHARGING_FROM_5V_IO' 
-            or  pj.status.GetStatus()['data']['powerInput'] == 'PRESENT'
+            (pj.status.GetStatus()['data']['battery'] == 'CHARGING_FROM_IN' 
+            or pj.status.GetStatus()['data']['battery'] == 'CHARGING_FROM_5V_IO' )
+            and  pj.status.GetStatus()['data']['powerInput'] == 'PRESENT'
         ):
             bCharging = True
 
@@ -114,19 +114,21 @@ def scheduleShutdown():
                 logger.info("Night time - but we're charging/powered, so we'll stay on.")
 
 
+        if config['hibernateMode']:
+            # print(str(datetime.datetime.now()) + ' scheduling regular shutdown')
+            logger.info('hibernate mode - sleeping for 6 hours...')
 
+            hoursToWakeAfter = 6
+            hourToWakeAt = datetime.datetime.now().hour + hoursToWakeAfter
+            if hoursToWakeAfter >= 24:
+                hourToWakeAt = hourToWakeAt - 12
 
-
-        if config['sleep_during_night'] == True and (datetime.datetime.now().hour >= config['daytime_ends_at_h'] or datetime.datetime.now().hour < config['daytime_starts_at_h']) and config['supportMode'] == False and bCharging == False:
-            logger.info("Night time so we're scheduling shutdown")
 
             alarmObj = {
                 'year': 'EVERY_YEAR',
                 'month': 'EVERY_MONTH',
                 'day': 'EVERY_DAY',
-                # 'hour': 20, # 8am
-                # 'minute_period': DELTA_MIN,
-                'hour': 'EVERY_HOUR',
+                'hour': hourToWakeAt,
                 'minute': 0,
                 'second': 0,
             }
@@ -135,91 +137,109 @@ def scheduleShutdown():
 
         else:
 
-            # sleep_at_battery_percent - at this battery percentage, we go to sleep and wake up every 10 minutes.
-            # hibernate_at_battery_percent - at this battery percentage, the pi_juice min_charge setting puts us to sleep until battery gets to wakeup_on_charge value,
-            # so we let this setting take precedence via the pijuice_config.JSON file and don't set an alarm here.
-
-            if config['sleep_at_battery_percent'] > 0 and config['hibernate_at_battery_percent'] > 0 \
-            and pj.status.GetChargeLevel()['data'] <= config['sleep_at_battery_percent'] \
-            and pj.status.GetChargeLevel()['data'] > config['hibernate_at_battery_percent'] \
-            and pj.status.GetStatus()['data']['battery'] != 'NOT_PRESENT':
-                logger.info('scheduling 10 minute sleep due to low battery')
-                logger.info(pj.status.GetChargeLevel())
-                logger.info(pj.status.GetStatus())
-                DELTA_MIN=10
-
-                time.sleep(30)
+            if config['sleep_during_night'] == True and (datetime.datetime.now().hour >= config['daytime_ends_at_h'] or datetime.datetime.now().hour < config['daytime_starts_at_h']) and config['supportMode'] == False and bCharging == False:
+                logger.info("Night time so we're scheduling shutdown")
 
                 alarmObj = {
-                        'year': 'EVERY_YEAR',
-                        'month': 'EVERY_MONTH',
-                        'day': 'EVERY_DAY',
-                        'hour': 'EVERY_HOUR',
-                        'minute_period': DELTA_MIN,
-                        'second': 0,
+                    'year': 'EVERY_YEAR',
+                    'month': 'EVERY_MONTH',
+                    'day': 'EVERY_DAY',
+                    # 'hour': 20, # 8am
+                    # 'minute_period': DELTA_MIN,
+                    'hour': 'EVERY_HOUR',
+                    'minute': 0,
+                    'second': 0,
                 }
 
                 setAlarm = True
 
             else:
 
-                # If we've been up for more than 2 modem cycles or 30 minutes, and the most recently captured image is older than 10 minutes, or the most recently uploaded image is older than 30 minutes, 
-                # either network is out, or we can't get a cellular signal, DNS is messing around, or camera isn't capturing.
-                # Let's shutdown, power down, and wake up again in 3 mins to see if that fixes it.
-                uptimeSeconds = int(time.clock_gettime(time.CLOCK_BOOTTIME))
-                power_interval = config['modem.power_interval']
-                
-                if uptimeSeconds > power_interval * 2 and uptimeSeconds > 1800:
-                    mostRecentUploadedFiles = sorted(glob.iglob(uploadedImageFolder + "/*.*"), key=os.path.getctime, reverse=True)
-                    mostRecentPendingFiles = sorted(glob.iglob(pendingImageFolder + "/*.*"), key=os.path.getctime, reverse=True)
+                # sleep_at_battery_percent - at this battery percentage, we go to sleep and wake up every 10 minutes.
+                # hibernate_at_battery_percent - at this battery percentage, the pi_juice min_charge setting puts us to sleep until battery gets to wakeup_on_charge value,
+                # so we let this setting take precedence via the pijuice_config.JSON file and don't set an alarm here.
 
-                    secondsSinceLastUpload = -1
-                    secondsSinceLastImageCapture = -1
+                if config['sleep_at_battery_percent'] > 0 and config['hibernate_at_battery_percent'] > 0 \
+                and pj.status.GetChargeLevel()['data'] <= config['sleep_at_battery_percent'] \
+                and pj.status.GetChargeLevel()['data'] > config['hibernate_at_battery_percent'] \
+                and pj.status.GetStatus()['data']['battery'] != 'NOT_PRESENT':
+                    logger.info('scheduling 10 minute sleep due to low battery')
+                    logger.info(pj.status.GetChargeLevel())
+                    logger.info(pj.status.GetStatus())
+                    DELTA_MIN=10
 
-                    if len(mostRecentPendingFiles) > 0:
-                        latestImageCapturedFilename = max(mostRecentPendingFiles, key=os.path.getctime)
-                        secondsSinceLastImageCapture = (datetime.datetime.now() - datetime.datetime.fromtimestamp(os.path.getctime(latestImageCapturedFilename))).total_seconds()
-                        logger.debug("secondsSinceLastImageCapture: " + str(secondsSinceLastImageCapture))
+                    time.sleep(30)
 
-                    if len(mostRecentUploadedFiles) > 0:
+                    alarmObj = {
+                            'year': 'EVERY_YEAR',
+                            'month': 'EVERY_MONTH',
+                            'day': 'EVERY_DAY',
+                            'hour': 'EVERY_HOUR',
+                            'minute_period': DELTA_MIN,
+                            'second': 0,
+                    }
 
-                        latestUploadedFilename = max(mostRecentUploadedFiles, key=os.path.getctime)
-                        # logger.debug("latestUploadedFilename: " + str(latestUploadedFilename))
+                    setAlarm = True
 
-                        secondsSinceLastUpload = (datetime.datetime.now() - datetime.datetime.fromtimestamp(os.path.getctime(latestUploadedFilename))).total_seconds()
-                        logger.debug("secondsSinceLastUpload: " + str(secondsSinceLastUpload))
+                else:
+
+                    # If we've been up for more than 2 modem cycles or 30 minutes, and the most recently captured image is older than 10 minutes, or the most recently uploaded image is older than 30 minutes, 
+                    # either network is out, or we can't get a cellular signal, DNS is messing around, or camera isn't capturing.
+                    # Let's shutdown, power down, and wake up again in 3 mins to see if that fixes it.
+                    uptimeSeconds = int(time.clock_gettime(time.CLOCK_BOOTTIME))
+                    power_interval = config['modem.power_interval']
+                    
+                    if uptimeSeconds > power_interval * 2 and uptimeSeconds > 1800:
+                        mostRecentUploadedFiles = sorted(glob.iglob(uploadedImageFolder + "/*.*"), key=os.path.getctime, reverse=True)
+                        mostRecentPendingFiles = sorted(glob.iglob(pendingImageFolder + "/*.*"), key=os.path.getctime, reverse=True)
+
+                        secondsSinceLastUpload = -1
+                        secondsSinceLastImageCapture = -1
+
+                        if len(mostRecentPendingFiles) > 0:
+                            latestImageCapturedFilename = max(mostRecentPendingFiles, key=os.path.getctime)
+                            secondsSinceLastImageCapture = (datetime.datetime.now() - datetime.datetime.fromtimestamp(os.path.getctime(latestImageCapturedFilename))).total_seconds()
+                            logger.debug("secondsSinceLastImageCapture: " + str(secondsSinceLastImageCapture))
+
+                        if len(mostRecentUploadedFiles) > 0:
+
+                            latestUploadedFilename = max(mostRecentUploadedFiles, key=os.path.getctime)
+                            # logger.debug("latestUploadedFilename: " + str(latestUploadedFilename))
+
+                            secondsSinceLastUpload = (datetime.datetime.now() - datetime.datetime.fromtimestamp(os.path.getctime(latestUploadedFilename))).total_seconds()
+                            logger.debug("secondsSinceLastUpload: " + str(secondsSinceLastUpload))
 
 
-                    # Most recent image captured (may also be in uploaded folder) is older than 10 minutes
-                    if secondsSinceLastImageCapture > 600 and secondsSinceLastUpload > 600:
-                        logger.warning('Most recent captured image is ' + str(secondsSinceLastImageCapture) + 'seconds old, and uploaded image is ' + str(secondsSinceLastUpload) + ' seconds old - restarting...')
-                        triggerRestart = True
+                        # Most recent image captured (may also be in uploaded folder) is older than 10 minutes
+                        if secondsSinceLastImageCapture > 600 and secondsSinceLastUpload > 600:
+                            logger.warning('Most recent captured image is ' + str(secondsSinceLastImageCapture) + 'seconds old, and uploaded image is ' + str(secondsSinceLastUpload) + ' seconds old - restarting...')
+                            triggerRestart = True
 
-                    if secondsSinceLastUpload > 1800:
-                        logger.warning('Most recent uploaded image is ' + str(secondsSinceLastUpload) + ' seconds old - restarting...')
-                        triggerRestart = True
+                        if secondsSinceLastUpload > 1800:
+                            logger.warning('Most recent uploaded image is ' + str(secondsSinceLastUpload) + ' seconds old - restarting...')
+                            triggerRestart = True
 
-                    if len(mostRecentPendingFiles) == 0 and len(mostRecentUploadedFiles) == 0:
-                        logger.debug("No uploaded or captured images found - restarting...")
-                        triggerRestart = True
+                        if len(mostRecentPendingFiles) == 0 and len(mostRecentUploadedFiles) == 0:
+                            logger.debug("No uploaded or captured images found - restarting...")
+                            triggerRestart = True
 
-                    if triggerRestart:
-                        minsToWakeAfter = 3
-                        minToWakeAt = datetime.datetime.now().minute + minsToWakeAfter
-                        if minToWakeAt >= 60:
-                            minToWakeAt = minToWakeAt - 60
+                        if triggerRestart:
+                            minsToWakeAfter = 3
+                            minToWakeAt = datetime.datetime.now().minute + minsToWakeAfter
+                            if minToWakeAt >= 60:
+                                minToWakeAt = minToWakeAt - 60
 
-                        alarmObj = {
-                                'year': 'EVERY_YEAR',
-                                'month': 'EVERY_MONTH',
-                                'day': 'EVERY_DAY',
-                                'hour': 'EVERY_HOUR',
-                                # 'minute_period': DELTA_MIN,
-                                'minute': minToWakeAt,
-                                'second': 0,
-                        }
+                            alarmObj = {
+                                    'year': 'EVERY_YEAR',
+                                    'month': 'EVERY_MONTH',
+                                    'day': 'EVERY_DAY',
+                                    'hour': 'EVERY_HOUR',
+                                    # 'minute_period': DELTA_MIN,
+                                    'minute': minToWakeAt,
+                                    'second': 0,
+                            }
 
-                        setAlarm = True
+                            setAlarm = True
 
         if setAlarm == True:
             logger.info("scheduleShutdown - we're setting the shutdown...")

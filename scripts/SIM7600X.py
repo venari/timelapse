@@ -10,18 +10,20 @@ import logging
 from logging.handlers import TimedRotatingFileHandler
 import pathlib
 import glob
+import serial
 
 import RPi.GPIO as GPIO
 from time import sleep
 # import serial
 
 GPIO_Power_Key = 6
+rec_buff = ''
 
 ser = None
 
 config = json.load(open('config.json'))
 logFilePath = config["logFilePath"]
-# logFilePath = logFilePath.replace(".log", ".powerOnSIM7600X.log")
+# logFilePath = logFilePath.replace(".log", ".SIM7600X.log")
 os.makedirs(os.path.dirname(logFilePath), exist_ok=True)
 # os.chmod(os.path.dirname(logFilePath), 0o777) # Make sure pijuice user scrip can write to log file.
 
@@ -31,11 +33,11 @@ handler = TimedRotatingFileHandler(logFilePath,
                                    when='midnight',
                                    backupCount=10)
 handler.setFormatter(formatter)
-logger = logging.getLogger("powerOnSIM7600X")
+logger = logging.getLogger("SIM7600X")
 logger.addHandler(handler)
 logger.setLevel(logging.DEBUG)
 
-logger.info("Starting up powerOnSIM7600X.py...")
+# logger.info("Starting up SIM7600X.py...")
 os.chmod(logFilePath, 0o777) # Make sure pijuice user script can write to log file.
 
 
@@ -57,14 +59,6 @@ def powerUpSIM7600X():
 
         sleep(20)
         logger.debug('SIM7600X should be powered up...')
-
-        # global ser
-        # ser = serial.Serial(config["SIM7600X_port"],115200)
-        # ser.flushInput()
-
-        # logger.debug('Sending AT+CUSBPIDSWITCH=9011,1,1...')
-
-        # send_at('AT+CUSBPIDSWITCH=9011,1,1','OK',1)
     
     except Exception as e:
         logger.error("powerUpSIM7600X() failed.")
@@ -89,6 +83,107 @@ def powerDownSIM7600X():
     except Exception as e:
         logger.error("powerDownSIM7600X() failed.")
         logger.error(e)
+
+def turnOnNDIS():
+    try:
+        logger.debug('Turrning on NDIS...')
+
+        global ser
+        ser = serial.Serial(config["SIM7600X_port"],115200)
+        ser.flushInput()
+
+        logger.debug('Sending AT+CUSBPIDSWITCH=9011,1,1...')
+
+        send_at('AT+CUSBPIDSWITCH=9011,1,1','OK',1)
+
+    except Exception as e:
+        logger.error("turnOnNDIS() failed.")
+        logger.error(e)
+
+def sendSMS(phone_number,text_message):
+    global ser
+    ser = serial.Serial(config["SIM7600X_port"],115200)
+    ser.flushInput()
+
+    print("Setting SMS mode...")
+    send_at("AT+CMGF=1","OK",1)
+    print("Sending Short Message")
+    print(phone_number)
+    print(text_message)
+    answer = send_at("AT+CMGS=\""+phone_number+"\"",">",2)
+    if 1 == answer:
+        ser.write(text_message.encode())
+        ser.write(b'\x1A')
+        answer = send_at('','OK',20)
+        if 1 == answer:
+            print('send successfully')
+        else:
+            print('error')
+    else:
+        print('error%d'%answer)
+
+def receiveSMS():
+    global ser, rec_buff
+    ser = serial.Serial(config["SIM7600X_port"],115200)
+    ser.flushInput()
+
+    rec_buff = ''
+    print('Setting SMS mode...')
+    send_at('AT+CMGF=1','OK',1)
+    send_at('AT+CPMS=\"SM\",\"SM\",\"SM\"', 'OK', 1)
+    # answer = send_at('AT+CMGR=1','+CMGR:',2)
+    # answer = send_at('AT+CMGL="REC UNREAD"','+CMGL:',2)
+    answer = send_at('AT+CMGL="ALL"','+CMGL:',2)
+    if 1 != answer:
+        # answer = 0
+        # print('A')
+        # print(rec_buff)
+        # print('B')
+        # if 'OK' in rec_buff.decode():
+        #     answer = 1
+        #     # print(rec_buff)
+    # else:
+        print('error%d'%answer)
+        return 'error%d'%answer
+        # return False
+    return rec_buff.decode()
+
+def deleteAllSMS():
+    global ser, rec_buff
+    ser = serial.Serial(config["SIM7600X_port"],115200)
+    ser.flushInput()
+
+    rec_buff = ''
+    print('Setting SMS mode...')
+    send_at('AT+CMGF=1','OK',1)
+    # send_at('AT+CPMS=\"SM\",\"SM\",\"SM\"', 'OK', 1)
+    answer = send_at('AT+CMGD=0,1','OK',2)
+    if 1 != answer:
+    #     answer = 0
+    #     if 'OK' in rec_buff.decode():
+    #         answer = 1
+    # else:
+        return False
+    return True
+
+
+def send_at(command,back,timeout):
+    global ser, rec_buff
+    rec_buff = ''
+    ser.write((command+'\r\n').encode())
+    time.sleep(timeout)
+    if ser.inWaiting():
+        time.sleep(0.01 )
+        rec_buff = ser.read(ser.inWaiting())
+    if back not in rec_buff.decode():
+        print(command + ' ERROR')
+        print(command + ' back:\t' + rec_buff.decode())
+        return 0
+    else:
+        print(rec_buff.decode())
+        return 1
+
+
 
 
 # def send_at(command,back,timeout):

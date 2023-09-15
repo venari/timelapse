@@ -13,7 +13,7 @@ import glob
 import pathlib
 import socket
 
-from powerOnSIM7600X import powerUpSIM7600X, powerDownSIM7600X
+from SIM7600X import powerUpSIM7600X, powerDownSIM7600X, turnOnNDIS
 
 config = json.load(open('config.json'))
 logFilePath = config["logFilePath"]
@@ -136,6 +136,11 @@ def uploadPendingPhotos():
                     config['monitoringMode'] = json.loads(response.text)['device']['monitoringMode']
                     json.dump(config, open('config.json', 'w'), indent=4)
 
+                if json.loads(response.text)['device']['hibernateMode'] != config['hibernateMode']:
+                    logger.info('Hibernate mode changed to ' + str(json.loads(response.text)['device']['hibernateMode']))
+                    config['hibernateMode'] = json.loads(response.text)['device']['hibernateMode']
+                    json.dump(config, open('config.json', 'w'), indent=4)
+
                    
             except json.decoder.JSONDecodeError:
                 logger.debug(response.text)
@@ -209,6 +214,10 @@ def connectToInternet(retries = 3):
        
         else:
             logger.warning('Could not establish network connection after 2 minutes.')
+
+            logger.info('Turning on NDIS...')
+            turnOnNDIS()
+
             if retries > 0:
                 logger.info('Retrying to establish network connection...')
                 connectToInternet(retries-1)
@@ -324,6 +333,11 @@ def uploadPendingTelemetry():
                 if json.loads(response.text)['device']['monitoringMode'] != config['monitoringMode']:
                     logger.info('Monitoring mode changed to ' + str(json.loads(response.text)['device']['monitoringMode']))
                     config['monitoringMode'] = json.loads(response.text)['device']['monitoringMode']
+                    json.dump(config, open('config.json', 'w'), indent=4)
+
+                if json.loads(response.text)['device']['hibernateMode'] != config['hibernateMode']:
+                    logger.info('Hibernate mode changed to ' + str(json.loads(response.text)['device']['hibernateMode']))
+                    config['hibernateMode'] = json.loads(response.text)['device']['hibernateMode']
                     json.dump(config, open('config.json', 'w'), indent=4)
 
                    
