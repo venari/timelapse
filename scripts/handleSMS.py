@@ -50,11 +50,13 @@ for line in rec_lines:
     else:
         # logger.debug(line)
 
-        if line.upper() == "STATUS?":
+        # Check again plain text or GSM 7 bit encoded text
+        # https://en.wikipedia.org/wiki/GSM_03.38
+        if line.upper() == "STATUS?" or line == "005300740061007400750073003F":
             logger.info("Status query")
             sendSMS(phone_number, "Status query received.")
 
-        if line.upper() == "HELLO":
+        if line.upper() == "HELLO" or line == "00480065006C006C006F":
             logger.info("Hello")
             sendSMS(phone_number, "Hello")
 
