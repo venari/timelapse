@@ -98,6 +98,8 @@ def scheduleShutdown():
         #     setAlarm = True
 
 
+        uptimeSeconds = int(time.clock_gettime(time.CLOCK_BOOTTIME))
+
         bCharging = False
         if (
             (pj.status.GetStatus()['data']['battery'] == 'CHARGING_FROM_IN' 
@@ -114,8 +116,8 @@ def scheduleShutdown():
                 logger.info("Night time - but we're charging/powered, so we'll stay on.")
 
 
-        if config['hibernateMode']:
-            # print(str(datetime.datetime.now()) + ' scheduling regular shutdown')
+        # Hhibernate mode? Lets have 5 minutes to give it a chance to check again before hibernating.
+        if config['hibernateMode'] and uptimeSeconds > 300:
             logger.info('hibernate mode - sleeping for 6 hours...')
 
             hoursToWakeAfter = 6
@@ -186,7 +188,6 @@ def scheduleShutdown():
                     # If we've been up for more than 2 modem cycles or 30 minutes, and the most recently captured image is older than 10 minutes, or the most recently uploaded image is older than 30 minutes, 
                     # either network is out, or we can't get a cellular signal, DNS is messing around, or camera isn't capturing.
                     # Let's shutdown, power down, and wake up again in 3 mins to see if that fixes it.
-                    uptimeSeconds = int(time.clock_gettime(time.CLOCK_BOOTTIME))
                     power_interval = config['modem.power_interval']
                     
                     if uptimeSeconds > power_interval * 2 and uptimeSeconds > 1800:
