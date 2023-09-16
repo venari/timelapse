@@ -122,7 +122,7 @@ def scheduleShutdown():
 
             hoursToWakeAfter = 6
             hourToWakeAt = datetime.datetime.now().hour + hoursToWakeAfter
-            if hoursToWakeAfter >= 24:
+            if hourToWakeAt >= 24:
                 hourToWakeAt = hourToWakeAt - 24
 
 
