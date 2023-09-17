@@ -117,25 +117,27 @@ def scheduleShutdown():
 
 
         # Hhibernate mode? Lets have 5 minutes to give it a chance to check again before hibernating.
-        if config['hibernateMode'] and uptimeSeconds > 300:
-            logger.info('hibernate mode - sleeping for 6 hours...')
+        if config['hibernateMode']:
+            logger.info('hibernate mode - stay awke for 5 mins')
+            if uptimeSeconds > 300:
+                logger.info('hibernate mode - sleeping for 6 hours...')
 
-            hoursToWakeAfter = 6
-            hourToWakeAt = datetime.datetime.utcnow().hour + hoursToWakeAfter
-            if hourToWakeAt >= 24:
-                hourToWakeAt = hourToWakeAt - 24
+                hoursToWakeAfter = 6
+                hourToWakeAt = datetime.datetime.utcnow().hour + hoursToWakeAfter
+                if hourToWakeAt >= 24:
+                    hourToWakeAt = hourToWakeAt - 24
 
 
-            alarmObj = {
-                'year': 'EVERY_YEAR',
-                'month': 'EVERY_MONTH',
-                'day': 'EVERY_DAY',
-                'hour': hourToWakeAt,
-                'minute': 0,
-                'second': 0,
-            }
+                alarmObj = {
+                    'year': 'EVERY_YEAR',
+                    'month': 'EVERY_MONTH',
+                    'day': 'EVERY_DAY',
+                    'hour': hourToWakeAt,
+                    'minute': 0,
+                    'second': 0,
+                }
 
-            setAlarm = True
+                setAlarm = True
 
         else:
 
