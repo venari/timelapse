@@ -121,7 +121,7 @@ def scheduleShutdown():
             logger.info('hibernate mode - sleeping for 6 hours...')
 
             hoursToWakeAfter = 6
-            hourToWakeAt = datetime.datetime.now().hour + hoursToWakeAfter
+            hourToWakeAt = datetime.datetime.utcnow().hour + hoursToWakeAfter
             if hourToWakeAt >= 24:
                 hourToWakeAt = hourToWakeAt - 24
 
