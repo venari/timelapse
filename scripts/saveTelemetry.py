@@ -302,6 +302,15 @@ def scheduleShutdown():
             # # Ensure Wake up alarm is *not* enabled - or it will cause pi to reboot
             # status = pj.rtcAlarm.SetWakeupEnabled(False)
 
+            SetSafetyWakeup()
+
+    except Exception as e:
+        logger.error("scheduleShutdown() failed.")
+        logger.error(e)
+
+def SetSafetyWakeup():
+                
+    try:
             minsToWakeAfter = 10
 
             logger.debug('skipping shutdown - scheduling safety wakeup in ' + str(minsToWakeAfter) + ' minutes incase we crash...')
@@ -352,8 +361,10 @@ def scheduleShutdown():
                     wakeUpEnabled = True
 
     except Exception as e:
-        logger.error("scheduleShutdown() failed.")
+        logger.error("SetSafetyWakeup() failed.")
         logger.error(e)
+
+
 
 def saveTelemetry():
     try:
@@ -405,9 +416,13 @@ except Exception as e:
 
 try:
     logger.info('In saveTelemetry.py')
-    if config['shutdown']:
-        logger.info('Setting failsafe power off for 2 minutes 30 seconds from now.')
-        pj.power.SetPowerOff(150)   # Fail safe turn the thing off
+
+    # Set safety wakeup right up front incase modem causes us to fall over.
+    SetSafetyWakeup()
+
+    # if config['shutdown']:
+    #     logger.info('Setting failsafe power off for 2 minutes 30 seconds from now.')
+    #     pj.power.SetPowerOff(150)   # Fail safe turn the thing off
 
     while True:
         saveTelemetry()
