@@ -2,7 +2,8 @@ import json
 import logging
 from logging.handlers import TimedRotatingFileHandler
 from SIM7600X import turnOnNDIS, sendSMS, receiveSMS, deleteAllSMS, powerUpSIM7600X
-
+import time
+import pijuice
 
 config = json.load(open('config.json'))
 logFilePath = config["logFilePath"]
@@ -51,13 +52,48 @@ for line in rec_lines:
     else:
         # logger.debug(line)
 
-        # Check again plain text or GSM 7 bit encoded text
-        # https://en.wikipedia.org/wiki/GSM_03.38
-        if line.upper() == "STATUS?" or line == "005300740061007400750073003F":
+        if line.upper() == "STATUS?":
             logger.info("Status query")
-            sendSMS(phone_number, "Status query received.")
 
-        if line.upper() == "HELLO" or line == "00480065006C006C006F":
+            statusMessage = ""
+            uptimeSeconds = int(time.clock_gettime(time.CLOCK_BOOTTIME))
+
+            pj = pijuice.PiJuice(1, 0x14)
+
+            bCharging = False
+            if (
+                (pj.status.GetStatus()['data']['battery'] == 'CHARGING_FROM_IN' 
+                or pj.status.GetStatus()['data']['battery'] == 'CHARGING_FROM_5V_IO' )
+                and  pj.status.GetStatus()['data']['powerInput'] == 'PRESENT'
+            ):
+                bCharging = True
+
+
+            outputImageFolder = '../output/images/'
+            workingImageFolder = outputImageFolder + 'working/'
+            pendingImageFolder = outputImageFolder + 'pending/'
+            uploadedImageFolder = outputImageFolder + 'uploaded/'
+
+            outputTelemetryFolder = '../output/telemetry/'
+            pendingTelemetryFolder = outputTelemetryFolder + 'pending/'
+            uploadedTelemetryFolder = outputTelemetryFolder + 'uploaded/'
+
+            batteryPercent = pj.status.GetChargeLevel()['data']
+            temperatureC = pj.status.GetBatteryTemperature()['data']
+            pendingImages = len(os.listdir(pendingImageFolder))
+            pendingTelemetry = len(os.listdir(pendingTelemetryFolder))
+
+            statusMessage += "UT: " + str(uptimeSeconds) + " s\n"
+            statusMessage += "Ch: " + str(bCharging) + "\n"
+            statusMessage += "B%: " + str(batteryPercent) + "\n"
+            statusMessage += "T: " + str(temperatureC) + "C\n"
+            statusMessage += "P I: " + str(pendingImages) + "\n"
+            statusMessage += "P T: " + str(pendingTelemetry) + "\n"
+
+            sendSMS(phone_number, statusMessage)
+
+
+        if line.upper() == "HELLO":
             logger.info("Hello")
             sendSMS(phone_number, "Hello")
 
