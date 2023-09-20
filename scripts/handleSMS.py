@@ -1,8 +1,8 @@
 import json
 import logging
 from logging.handlers import TimedRotatingFileHandler
+import socket
 from SIM7600X import turnOnNDIS, sendSMS, receiveSMS, deleteAllSMS, powerUpSIM7600X
-from uploadPending import internet
 import time
 import pijuice
 import os
@@ -16,6 +16,36 @@ handler.setFormatter(formatter)
 logger = logging.getLogger("handleSMS")
 logger.addHandler(handler)
 logger.setLevel(logging.DEBUG)
+
+
+
+
+
+
+# https://stackoverflow.com/questions/3764291/how-can-i-see-if-theres-an-available-and-active-network-connection-in-python
+def internet(host="8.8.8.8", port=53, timeout=config['upload.telemetry.timeout']):
+    """
+    Host: 8.8.8.8 (google-public-dns-a.google.com)
+    OpenPort: 53/tcp
+    Service: domain (DNS/TCP)
+    """
+    try:
+        socket.setdefaulttimeout(timeout)
+        socket.socket(socket.AF_INET, socket.SOCK_STREAM).connect((host, port))
+        return True
+    except socket.error as ex:
+        logger.warning(ex)
+        return False
+
+
+
+
+
+
+
+
+
+
 
 #try:
 #powerUpSIM7600X()
