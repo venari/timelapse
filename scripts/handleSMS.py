@@ -2,6 +2,7 @@ import json
 import logging
 from logging.handlers import TimedRotatingFileHandler
 from SIM7600X import turnOnNDIS, sendSMS, receiveSMS, deleteAllSMS, powerUpSIM7600X
+from uploadPending import internet
 import time
 import pijuice
 import os
@@ -84,12 +85,13 @@ for line in rec_lines:
             pendingImages = len(os.listdir(pendingImageFolder))
             pendingTelemetry = len(os.listdir(pendingTelemetryFolder))
 
-            statusMessage += "UT: " + str(uptimeSeconds) + " s\n"
-            statusMessage += "Ch: " + str(bCharging) + "\n"
-            statusMessage += "B%: " + str(batteryPercent) + "\n"
-            statusMessage += "T: " + str(temperatureC) + "C\n"
-            statusMessage += "P I: " + str(pendingImages) + "\n"
-            statusMessage += "P T: " + str(pendingTelemetry) + "\n"
+            statusMessage += "Uptime: " + str(uptimeSeconds) + " s\n"
+            statusMessage += "Internet: " + internet() + " \n"
+            statusMessage += "Charging: " + str(bCharging) + "\n"
+            statusMessage += "Battery %: " + str(batteryPercent) + "\n"
+            statusMessage += "Temp : " + str(temperatureC) + "C\n"
+            statusMessage += "Pending Images: " + str(pendingImages) + "\n"
+            statusMessage += "Pending Telemetry: " + str(pendingTelemetry) + "\n"
 
             sendSMS(phone_number, statusMessage)
 
