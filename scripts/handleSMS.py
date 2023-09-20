@@ -4,6 +4,7 @@ from logging.handlers import TimedRotatingFileHandler
 from SIM7600X import turnOnNDIS, sendSMS, receiveSMS, deleteAllSMS, powerUpSIM7600X
 import time
 import pijuice
+import os
 
 config = json.load(open('config.json'))
 logFilePath = config["logFilePath"]
