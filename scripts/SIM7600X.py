@@ -146,7 +146,7 @@ def receiveSMS():
         print('error%d'%answer)
         return 'error%d'%answer
         # return False
-    return rec_buff.decode()
+    return rec_buff
 
 def deleteAllSMS():
     global ser, rec_buff

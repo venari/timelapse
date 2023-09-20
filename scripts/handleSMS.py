@@ -32,6 +32,7 @@ logger.debug(rec_lines)
 phone_number=''
 
 for line in rec_lines:
+    line = line.decode()
     logger.info(line)
     if(line.startswith("+CMGL:")):
         # Header
