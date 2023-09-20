@@ -1,15 +1,8 @@
-import subprocess
 import json
-import pijuice
 import os
 import time
-import shutil
-import datetime
-import sys
 import logging
 from logging.handlers import TimedRotatingFileHandler
-import pathlib
-import glob
 import serial
 
 import RPi.GPIO as GPIO
@@ -135,17 +128,8 @@ def receiveSMS():
     # answer = send_at('AT+CMGL="REC UNREAD"','+CMGL:',2)
     answer = send_at('AT+CMGL="ALL"','+CMGL:',2)
     if 1 != answer:
-        # answer = 0
-        # print('A')
-        # print(rec_buff)
-        # print('B')
-        # if 'OK' in rec_buff.decode():
-        #     answer = 1
-        #     # print(rec_buff)
-    # else:
         print('error%d'%answer)
         return 'error%d'%answer
-        # return False
     return rec_buff
 
 def deleteAllSMS():
