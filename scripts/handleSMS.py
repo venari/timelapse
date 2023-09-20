@@ -116,7 +116,7 @@ for line in rec_lines:
             pendingTelemetry = len(os.listdir(pendingTelemetryFolder))
 
             statusMessage += "Uptime: " + str(uptimeSeconds) + " s\n"
-            statusMessage += "Internet: " + internet() + " \n"
+            statusMessage += "Internet: " + str(internet()) + " \n"
             statusMessage += "Charging: " + str(bCharging) + "\n"
             statusMessage += "Battery %: " + str(batteryPercent) + "\n"
             statusMessage += "Temp : " + str(temperatureC) + "C\n"
