@@ -3,7 +3,7 @@ graph TD
     boot --> crontab
     crontab --> saveTelemetry.sh
     crontab --> savePhotos.sh
-    crontab --> uploadPending.sh
+    crontab --> sleep[sleep 60] --> uploadPending.sh
 
     subgraph saveTelemetry
     saveTelemetry.sh --> outTel[output to saveTelemetry.sh.out]
@@ -17,6 +17,10 @@ graph TD
 
     subgraph uploadPending
     uploadPending.sh --> outPending[output to uploadPending.sh.out]
-    outPending --> uploadPending.py
+    outPending --> uploadPending.py --> upPendingLoop[while True]
+    subgraph uploadPendingpy[uploadPending.py]
+    upPendingLoop --> loadConfig[load config] --> deleteOld["deleteOldUploadedImagesAndTelemetry()"] --> upPenTel["uploadPendingTelemetry()"] --> upPenPhot["uploadPendingPhotos()"] --> sleep2["time.sleep(30)"]
+    sleep2 --> upPendingLoop
+    end
     end
 ```
