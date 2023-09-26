@@ -1,6 +1,7 @@
 Following entries for crontab:
 
-```
-@reboot /usr/bin/bash /home/pi/dev/timelapse/scripts/startup.sh
-@reboot /usr/bin/bash /home/pi/dev/timelapse/scripts/uploadPending.sh 
+```bash
+@reboot /usr/bin/bash /home/pi/dev/timelapse/scripts/saveTelemetry.sh
+@reboot /usr/bin/bash /home/pi/dev/timelapse/scripts/savePhotos.sh
+@reboot sleep 60 && /usr/bin/bash /home/pi/dev/timelapse/scripts/uploadPending.sh
 ```
