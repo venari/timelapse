@@ -10,6 +10,8 @@ import logging
 from logging.handlers import TimedRotatingFileHandler
 import pathlib
 import glob
+import suntime
+from dateutil import tz
 
 from SIM7600X import powerUpSIM7600X, powerDownSIM7600X
 
@@ -45,6 +47,19 @@ uploadedImageFolder = outputImageFolder + 'uploaded/'
 outputTelemetryFolder = '../output/telemetry/'
 pendingTelemetryFolder = outputTelemetryFolder + 'pending/'
 uploadedTelemetryFolder = outputTelemetryFolder + 'uploaded/'
+
+# suntime
+latitude = config['latitude']
+longitude = config['longitude']
+sun = suntime.Sun(latitude, longitude)
+
+sunrise_time = sun.get_local_sunrise_time().astimezone(tz.UTC)
+sunset_time = sun.get_local_sunset_time().astimezone(tz.UTC)
+
+if sunrise_time > sunset_time: # sun.get_local_sunrise_time() assumes UTC as default so gives sunrise of next day instead of this day
+    sunrise_time = sunrise_time - datetime.timedelta(1)
+
+
 
 # pijuice
 time.sleep(10)
@@ -108,7 +123,7 @@ def scheduleShutdown():
         ):
             bCharging = True
 
-        if config['sleep_during_night'] == True and (datetime.datetime.now().hour >= config['daytime_ends_at_h'] or datetime.datetime.now().hour < config['daytime_starts_at_h']):
+        if config['sleep_during_night'] == True and (datetime.datetime.now(tz=tz.UTC) > sunset_time + datetime.timedelta(hours=config['sunset_offset_h']) or datetime.datetime.now(tz=tz.UTC) < sunrise_time + datetime.timedelta(hours=config['sunrise_offset_h'])):
             if config['supportMode'] == True:
                 logger.warning("Night time - we would have scheduled shutdown, but we're in support mode.")
 
@@ -116,9 +131,9 @@ def scheduleShutdown():
                 logger.info("Night time - but we're charging/powered, so we'll stay on.")
 
 
-        # Hhibernate mode? Lets have 5 minutes to give it a chance to check again before hibernating.
+        # Hibernate mode? Lets have 5 minutes to give it a chance to check again before hibernating.
         if config['hibernateMode']:
-            logger.info('hibernate mode - stay awke for 5 mins')
+            logger.info('hibernate mode - stay awake for 5 mins')
             if uptimeSeconds > 300:
                 logger.info('hibernate mode - sleeping for 6 hours...')
 
@@ -141,7 +156,7 @@ def scheduleShutdown():
 
         else:
 
-            if config['sleep_during_night'] == True and (datetime.datetime.now().hour >= config['daytime_ends_at_h'] or datetime.datetime.now().hour < config['daytime_starts_at_h']) and config['supportMode'] == False and bCharging == False:
+            if config['sleep_during_night'] == True and (datetime.datetime.now(tz=tz.UTC) >= sunset_time + datetime.timedelta(hours=config['sunset_offset_h']) or datetime.datetime.now().hour < sunrise_time + datetime.timedelta(hours=config['sunrise_offset_h'])) and config['supportMode'] == False and bCharging == False:
                 logger.info("Night time so we're scheduling shutdown")
 
                 alarmObj = {

@@ -2,3 +2,4 @@ pijuice
 requests
 gpiozero
 picamera
+suntime
