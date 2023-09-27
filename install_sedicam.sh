@@ -11,7 +11,7 @@ sudo apt-get install git pijuice-base python3-pip -y
 sudo apt install -y python3-picamera2 --no-install-recommends
 sudo apt-get install vim byobu -y
 
-pip3 install pyserial
+pip3 install pyserial suntime
 
 byobu-enable
 
