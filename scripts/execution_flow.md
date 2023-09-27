@@ -1,9 +1,11 @@
+# Boot
 ```mermaid
 graph TD
     boot --> crontab
     crontab --> saveTelemetry.sh
     crontab --> savePhotos.sh
     crontab --> sleep[sleep 60] --> uploadPending.sh
+    crontab --> crontab5[*/5 * * * *] --> handleSMS.sh
 
     subgraph saveTelemetry
     saveTelemetry.sh --> outTel[output to saveTelemetry.sh.out]
@@ -41,4 +43,10 @@ graph TD
     sleep2 --> upPendingLoop
     end
     end
+```
+
+# Install scripts
+```mermaid
+graph TD
+    installsh[install.sh] 
 ```
