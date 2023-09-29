@@ -134,7 +134,7 @@ def savePhotos():
 
     except Exception as e:
         logger.error("SavePhoto() failed.")
-        logger.error(e)
+        logger.exception(e)
 
 
 try:
@@ -150,4 +150,4 @@ try:
             
 except Exception as e:
     logger.error("Catastrophic failure.")
-    logger.error(e)
+    logger.exception(e)

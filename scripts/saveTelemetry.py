@@ -328,7 +328,7 @@ def scheduleShutdown():
 
     except Exception as e:
         logger.error("scheduleShutdown() failed.")
-        logger.error(e)
+        logger.exception(e)
 
 def SetSafetyWakeup():
                 
@@ -384,7 +384,7 @@ def SetSafetyWakeup():
 
     except Exception as e:
         logger.error("SetSafetyWakeup() failed.")
-        logger.error(e)
+        logger.exception(e)
 
 
 
@@ -417,7 +417,7 @@ def saveTelemetry():
 
     except Exception as e:
         logger.error("saveTelemetry() failed.")
-        logger.error(e)
+        logger.exception(e)
 
 try:
     waitForRTCAttempts = 0
@@ -433,7 +433,7 @@ try:
     logger.debug("sudo hwclock --hctosys succeeded")
 except Exception as e:
     logger.error("sudo hwclock --hctosys failed")
-    logger.error(e)
+    logger.exception(e)
     
 
 try:
@@ -453,4 +453,4 @@ try:
 except Exception as e:
     logger.error("Catastrophic failure.")
     scheduleShutdown()
-    logger.error(e)
+    logger.exception(e)

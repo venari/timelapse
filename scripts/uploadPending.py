@@ -171,7 +171,7 @@ def uploadPendingPhotos():
 
     except Exception as e:
         logger.error(str(datetime.datetime.now()) + " uploadPendingPhotos() failed.")
-        logger.error(e)
+        logger.exception(e)
 
 # https://stackoverflow.com/questions/3764291/how-can-i-see-if-theres-an-available-and-active-network-connection-in-python
 def internet(host="8.8.8.8", port=53, timeout=config['upload.telemetry.timeout']):
@@ -228,7 +228,7 @@ def connectToInternet(retries = 3):
 
     except Exception as e:
         logger.error(str(datetime.datetime.now()) + " connectToInternet() failed.")
-        logger.error(e)
+        logger.exception(e)
 
 def disconnectFromInternet():
     try:
@@ -242,7 +242,7 @@ def disconnectFromInternet():
             powerDownSIM7600X()
     except Exception as e:
         logger.error(str(datetime.datetime.now()) + " disconnectFromInternet() failed.")
-        logger.error(e)
+        logger.exception(e)
         
 def turnOnSystemPowerSwitch():
     try:
@@ -272,7 +272,7 @@ def turnOnSystemPowerSwitch():
     
     except Exception as e:
         logger.error(str(datetime.datetime.now()) + " turnOnSystemPowerSwitch() failed.")
-        logger.error(e)
+        logger.exception(e)
 
 def uploadPendingTelemetry():
 
@@ -347,10 +347,10 @@ def uploadPendingTelemetry():
 
     except requests.exceptions.ConnectionError as e:
         logger.error(str(datetime.datetime.now()) + " uploadPendingTelemetry() failed - connection error. Leave in place.")
-        logger.error(e)
+        logger.exception(e)
     except Exception as e:
         logger.error(str(datetime.datetime.now()) + " uploadPendingTelemetry() failed.")
-        logger.error(e)
+        logger.exception(e)
         if lastAttemptedFilename!="":          
           logger.error("lastAttemptedFilename: " + lastAttemptedFilename)
           # os.remove(telemetryFilename)
@@ -381,7 +381,7 @@ def deleteOldUploadedImagesAndTelemetry():
 
     except Exception as e:
         logger.error(str(datetime.datetime.now()) + " deleteOldUploadedImagesAndTelemetry() failed.")
-        logger.error(e)
+        logger.exception(e)
 
 
 try:
@@ -397,4 +397,4 @@ try:
       time.sleep(30)
 
 except Exception as e:
-    logger.error(e)
+    logger.exception(e)
