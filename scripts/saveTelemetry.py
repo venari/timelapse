@@ -49,15 +49,20 @@ pendingTelemetryFolder = outputTelemetryFolder + 'pending/'
 uploadedTelemetryFolder = outputTelemetryFolder + 'uploaded/'
 
 # suntime
-latitude = config['latitude']
-longitude = config['longitude']
-sun = suntime.Sun(latitude, longitude)
+if config['dynamic_sunrise_sunset']:
+    latitude = config['latitude']
+    longitude = config['longitude']
+    sun = suntime.Sun(latitude, longitude)
 
-sunrise_time = sun.get_local_sunrise_time().astimezone(tz.UTC)
-sunset_time = sun.get_local_sunset_time().astimezone(tz.UTC)
+    sunrise_time = sun.get_local_sunrise_time().astimezone(tz.UTC)
+    sunset_time = sun.get_local_sunset_time().astimezone(tz.UTC)
 
-if sunrise_time > sunset_time: # sun.get_local_sunrise_time() assumes UTC as default so gives sunrise of next day instead of this day
-    sunrise_time = sunrise_time - datetime.timedelta(1)
+    if sunrise_time > sunset_time: # sun.get_local_sunrise_time() assumes UTC as default so gives sunrise of next day instead of this day
+        sunrise_time = sunrise_time - datetime.timedelta(1)
+
+else:
+    sunrise_time = datetime.datetime.now().replace(hour=config['sunrise_time_h'])
+    sunset_time = datetime.datetime.now().replace(hour=config['sunset_time_h'])
 
 logger.debug(f'sunrise_time: {sunrise_time.isoformat()}')
 logger.debug(f'sunset_time: {sunset_time.isoformat()}')
