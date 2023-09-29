@@ -12,6 +12,7 @@
     "_comment": "if dynamic_sunrise_sunset is true, use latitude and longitude and ignore sunrise_time_h and sunset_time_h",
     "sunrise_time_h": 7,
     "sunset_time_h": 19,
+    "_comment": "if dynamic_sunrise_sunset is false, sunrise_offset_h and sunrise_offset_h are still used",
     "sunrise_offset_h": 0,
     "sunset_offset_h": 0,
     "latitude": -40,
