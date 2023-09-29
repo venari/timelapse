@@ -136,8 +136,6 @@ def scheduleShutdown():
 
             if bCharging:
                 logger.info("Night time - but we're charging/powered, so we'll stay on.")
-                logger.debug(f'sunrise_time: {sunrise_time.isoformat()}')
-                logger.debug(f'sunset_time: {sunset_time.isoformat()}')
 
 
         # Hibernate mode? Lets have 5 minutes to give it a chance to check again before hibernating.
@@ -165,7 +163,7 @@ def scheduleShutdown():
 
         else:
 
-            if config['sleep_during_night'] == True and (datetime.datetime.now(tz=tz.UTC) >= sunset_time + datetime.timedelta(hours=config['sunset_offset_h']) or datetime.datetime.now().hour < sunrise_time + datetime.timedelta(hours=config['sunrise_offset_h'])) and config['supportMode'] == False and bCharging == False:
+            if config['sleep_during_night'] == True and (datetime.datetime.now(tz=tz.UTC) >= sunset_time + datetime.timedelta(hours=config['sunset_offset_h']) or datetime.datetime.now(tz=tz.UTC) < sunrise_time + datetime.timedelta(hours=config['sunrise_offset_h'])) and config['supportMode'] == False and bCharging == False:
                 logger.info("Night time so we're scheduling shutdown")
 
                 alarmObj = {
