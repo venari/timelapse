@@ -27,6 +27,7 @@ echo Installing crontab entries...
 (echo "@reboot /usr/bin/bash /home/pi/dev/timelapse/scripts/saveTelemetry.sh")| crontab -
 (crontab -l 2>/dev/null; echo "@reboot /usr/bin/bash /home/pi/dev/timelapse/scripts/savePhotos.sh")| crontab -
 (crontab -l 2>/dev/null; echo "@reboot /usr/bin/bash /home/pi/dev/timelapse/scripts/uploadPending.sh")| crontab -
+(crontab -l 2>/dev/null; echo "@reboot sleep 120 && /usr/bin/bash /home/pi/dev/timelapse/scripts/handleSMS.sh")| crontab -
 (crontab -l 2>/dev/null; echo "*/5 * * * * /usr/bin/bash /home/pi/dev/timelapse/scripts/handleSMS.sh")| crontab -
 
 echo Overwriting pijuice config...
