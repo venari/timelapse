@@ -136,6 +136,8 @@ def scheduleShutdown():
 
             if bCharging:
                 logger.info("Night time - but we're charging/powered, so we'll stay on.")
+                logger.debug(f'sunrise_time: {sunrise_time.isoformat()}')
+                logger.debug(f'sunset_time: {sunset_time.isoformat()}')
 
 
         # Hibernate mode? Lets have 5 minutes to give it a chance to check again before hibernating.
