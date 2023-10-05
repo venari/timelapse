@@ -26,7 +26,7 @@ handler = TimedRotatingFileHandler(logFilePath,
                                    when='midnight',
                                    backupCount=10)
 handler.setFormatter(formatter)
-logger = logging.getLogger("uploadPending")
+logger = logging.getLogger(__name__)
 logger.addHandler(handler)
 logger.setLevel(logging.DEBUG)
 
@@ -384,17 +384,18 @@ def deleteOldUploadedImagesAndTelemetry():
         logger.error(e)
 
 
-try:
-    
-    connectToInternet()
+def main():
+    try:
+        
+        connectToInternet()
 
-    while True:
+        while True:
 
-      config = json.load(open('config.json'))
-      deleteOldUploadedImagesAndTelemetry()
-      uploadPendingTelemetry()
-      uploadPendingPhotos()
-      time.sleep(30)
+          config = json.load(open('config.json'))
+          deleteOldUploadedImagesAndTelemetry()
+          uploadPendingTelemetry()
+          uploadPendingPhotos()
+          time.sleep(30)
 
-except Exception as e:
-    logger.error(e)
+    except Exception as e:
+        logger.error(e)

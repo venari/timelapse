@@ -21,7 +21,7 @@ os.makedirs(os.path.dirname(logFilePath), exist_ok=True)
 formatter = logging.Formatter('%(asctime)s %(name)s %(levelname)s %(message)s')
 handler = TimedRotatingFileHandler(logFilePath, when='midnight', backupCount=10)
 handler.setFormatter(formatter)
-logger = logging.getLogger("savePhotos")
+logger = logging.getLogger(__name__)
 logger.addHandler(handler)
 logger.setLevel(logging.DEBUG)
 
@@ -137,17 +137,18 @@ def savePhotos():
         logger.error(e)
 
 
-try:
-    logger.info('In savePhotos.py')
+def main():
+    try:
+        logger.info('In savePhotos.py')
 
-    while True:
-        savePhotos()
+        while True:
+            savePhotos()
 
-        if not config['shutdown']:
-            logger.warning("Bailed out of savePhotos() - let's pause to catch our breath...")
-            # If we get here something went wrong. Let's pause for a bit and try again.
-            time.sleep(30)
-            
-except Exception as e:
-    logger.error("Catastrophic failure.")
-    logger.error(e)
+            if not config['shutdown']:
+                logger.warning("Bailed out of savePhotos() - let's pause to catch our breath...")
+                # If we get here something went wrong. Let's pause for a bit and try again.
+                time.sleep(30)
+                
+    except Exception as e:
+        logger.error("Catastrophic failure.")
+        logger.error(e)

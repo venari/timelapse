@@ -25,7 +25,7 @@ handler = TimedRotatingFileHandler(logFilePath,
                                    when='midnight',
                                    backupCount=10)
 handler.setFormatter(formatter)
-logger = logging.getLogger("saveTelemetry")
+logger = logging.getLogger(__name__)
 logger.addHandler(handler)
 logger.setLevel(logging.DEBUG)
 
@@ -414,21 +414,22 @@ except Exception as e:
     logger.error(e)
     
 
-try:
-    logger.info('In saveTelemetry.py')
+def main():
+    try:
+        logger.info('In saveTelemetry.py')
 
-    # Set safety wakeup right up front incase modem causes us to fall over.
-    SetSafetyWakeup()
+        # Set safety wakeup right up front incase modem causes us to fall over.
+        SetSafetyWakeup()
 
-    # if config['shutdown']:
-    #     logger.info('Setting failsafe power off for 2 minutes 30 seconds from now.')
-    #     pj.power.SetPowerOff(150)   # Fail safe turn the thing off
+        # if config['shutdown']:
+        #     logger.info('Setting failsafe power off for 2 minutes 30 seconds from now.')
+        #     pj.power.SetPowerOff(150)   # Fail safe turn the thing off
 
-    while True:
-        saveTelemetry()
-        time.sleep(60)
+        while True:
+            saveTelemetry()
+            time.sleep(60)
+            scheduleShutdown()
+    except Exception as e:
+        logger.error("Catastrophic failure.")
         scheduleShutdown()
-except Exception as e:
-    logger.error("Catastrophic failure.")
-    scheduleShutdown()
-    logger.error(e)
+        logger.error(e)
