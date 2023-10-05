@@ -21,8 +21,13 @@ logger = logging.getLogger(__name__)
 logger.addHandler(handler)
 logger.setLevel(logging.DEBUG)
 
-logger.info('starting module threads')
+try:
+    logger.info('starting module threads')
 
-threading.Thread(target=savePhotos.main).start()
-threading.Thread(target=saveTelemetry.main).start()
-threading.Thread(target=uploadPending.main).start()
+    threading.Thread(target=savePhotos.main).start()
+    threading.Thread(target=saveTelemetry.main).start()
+    threading.Thread(target=uploadPending.main).start()
+
+except Exception as e:
+    logger.critical('onBoot.py encountered an exception')
+    logger.exception(e)
