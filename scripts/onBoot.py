@@ -2,6 +2,8 @@ import threading
 import logging
 import os
 
+os.chdir('dev/timelapse/scripts')
+
 import savePhotos
 import saveTelemetry
 import uploadPending
@@ -14,8 +16,6 @@ handler.setFormatter(formatter)
 logger = logging.getLogger(__name__)
 logger.addHandler(handler)
 logger.setLevel(logging.DEBUG)
-
-os.chdir('dev/timelapse/scripts')
 
 logger.info('starting module threads')
 
