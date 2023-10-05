@@ -1,8 +1,20 @@
 import threading
+import logging
 
 import savePhotos
 import saveTelemetry
 import uploadPending
+
+formatter = logging.Formatter('%(asctime)s %(name)s %(levelname)s %(message)s')
+handler = TimedRotatingFileHandler(logFilePath, 
+                                   when='midnight',
+                                   backupCount=10)
+handler.setFormatter(formatter)
+logger = logging.getLogger(__name__)
+logger.addHandler(handler)
+logger.setLevel(logging.DEBUG)
+
+logger.info('starting module threads')
 
 threading.Thread(target=savePhotos.main).start()
 threading.Thread(target=saveTelemetry.main).start()
