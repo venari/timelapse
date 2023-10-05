@@ -1,6 +1,8 @@
 import threading
 import logging
 import os
+import json
+from logging.handlers import TimedRotatingFileHandler
 
 os.chdir('dev/timelapse/scripts')
 
@@ -8,6 +10,8 @@ import savePhotos
 import saveTelemetry
 import uploadPending
 
+config = json.load(open('config.json'))
+logFilePath = config["logFilePath"]
 formatter = logging.Formatter('%(asctime)s %(name)s %(levelname)s %(message)s')
 handler = TimedRotatingFileHandler(logFilePath, 
                                    when='midnight',
