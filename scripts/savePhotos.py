@@ -28,10 +28,6 @@ logger.setLevel(logging.DEBUG)
 logger.info("Starting up savePhotos.py...")
 os.chmod(logFilePath, 0o777) # Make sure pijuice user script can write to log file.
 
-# clock
-while not os.path.exists('/dev/i2c-1'):
-    time.sleep(0.1)
-
 outputImageFolder = '../output/images/'
 workingImageFolder = outputImageFolder + 'working/'
 pendingImageFolder = outputImageFolder + 'pending/'
@@ -136,8 +132,12 @@ def savePhotos():
         logger.error("SavePhoto() failed.")
         logger.error(e)
 
-
 def main():
+    # clock
+    while not os.path.exists('/dev/i2c-1'):
+        logger.info("dev i2c-1 doesn't exist")
+        time.sleep(0.1)
+
     try:
         logger.info('In savePhotos.py')
 

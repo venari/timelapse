@@ -32,11 +32,6 @@ logger.setLevel(logging.DEBUG)
 logger.info("Starting up saveTelemetry.py...")
 os.chmod(logFilePath, 0o777) # Make sure pijuice user script can write to log file.
 
-# clock
-while not os.path.exists('/dev/i2c-1'):
-    logger.info("dev i2c-1 doesn't exist")
-    time.sleep(0.1)
-
 outputImageFolder = '../output/images/'
 workingImageFolder = outputImageFolder + 'working/'
 pendingImageFolder = outputImageFolder + 'pending/'
@@ -46,10 +41,6 @@ outputTelemetryFolder = '../output/telemetry/'
 pendingTelemetryFolder = outputTelemetryFolder + 'pending/'
 uploadedTelemetryFolder = outputTelemetryFolder + 'uploaded/'
 
-# pijuice
-time.sleep(10)
-pj = pijuice.PiJuice(1, 0x14)
-logger.info("Starting up saveTelemetry.py 3b...")
 
 def getSerialNumber():
   # Extract serial from cpuinfo file
@@ -364,8 +355,6 @@ def SetSafetyWakeup():
         logger.error("SetSafetyWakeup() failed.")
         logger.error(e)
 
-
-
 def saveTelemetry():
     try:
         warningTemp = 50
@@ -397,24 +386,33 @@ def saveTelemetry():
         logger.error("saveTelemetry() failed.")
         logger.error(e)
 
-try:
-    waitForRTCAttempts = 0
-    while not os.path.exists('/dev/rtc') and waitForRTCAttempts <= 60:
-        logger.info("dev rtc doesn't exist - waiting... " + str(waitForRTCAttempts))
-        time.sleep(1)
-        waitForRTCAttempts = waitForRTCAttempts + 1
-        subprocess.call(['sudo', 'modprobe', '-r', 'rtc_ds1307'])
-        subprocess.call(['sudo', 'modprobe', 'rtc_ds1307'])
-
-    logger.debug('setting sys clock from RTC...')
-    subprocess.call(['sudo', 'hwclock', '--hctosys'])
-    logger.debug("sudo hwclock --hctosys succeeded")
-except Exception as e:
-    logger.error("sudo hwclock --hctosys failed")
-    logger.error(e)
-    
-
 def main():
+    # clock
+    while not os.path.exists('/dev/i2c-1'):
+        logger.info("dev i2c-1 doesn't exist")
+        time.sleep(0.1)
+
+    global pj
+    time.sleep(10)
+    pj = pijuice.PiJuice(1, 0x14)
+    logger.info("Starting up saveTelemetry.py 3b...")
+
+    try:
+        waitForRTCAttempts = 0
+        while not os.path.exists('/dev/rtc') and waitForRTCAttempts <= 60:
+            logger.info("dev rtc doesn't exist - waiting... " + str(waitForRTCAttempts))
+            time.sleep(1)
+            waitForRTCAttempts = waitForRTCAttempts + 1
+            subprocess.call(['sudo', 'modprobe', '-r', 'rtc_ds1307'])
+            subprocess.call(['sudo', 'modprobe', 'rtc_ds1307'])
+
+        logger.debug('setting sys clock from RTC...')
+        subprocess.call(['sudo', 'hwclock', '--hctosys'])
+        logger.debug("sudo hwclock --hctosys succeeded")
+    except Exception as e:
+        logger.error("sudo hwclock --hctosys failed")
+        logger.error(e)
+
     try:
         logger.info('In saveTelemetry.py')
 

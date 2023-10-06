@@ -64,10 +64,6 @@ def getSerialNumber():
 
 serialNumber = getSerialNumber()
 
-time.sleep(10)
-pj = pijuice.PiJuice(1, 0x14)
-logger.info("Starting up uploadPending.py 2...")
-
 
 def uploadPendingPhotos():
     try:
@@ -383,8 +379,12 @@ def deleteOldUploadedImagesAndTelemetry():
         logger.error(str(datetime.datetime.now()) + " deleteOldUploadedImagesAndTelemetry() failed.")
         logger.error(e)
 
-
 def main():
+    global pj
+    time.sleep(10)
+    pj = pijuice.PiJuice(1, 0x14)
+    logger.info("Starting up uploadPending.py 2...")
+
     try:
         
         connectToInternet()
