@@ -4,7 +4,7 @@ import os
 import json
 from logging.handlers import TimedRotatingFileHandler
 
-os.chdir('dev/timelapse/scripts')
+os.chdir('/home/pi/dev/timelapse/scripts')
 
 import savePhotos
 import saveTelemetry
