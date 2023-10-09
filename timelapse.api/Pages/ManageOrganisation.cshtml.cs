@@ -6,6 +6,7 @@ using timelapse.core.models;
 using timelapse.infrastructure;
 using Microsoft.AspNetCore.Authorization;
 using System.ComponentModel.DataAnnotations;
+using Microsoft.EntityFrameworkCore;
 
 namespace timelapse.api.Pages
 {
@@ -15,11 +16,12 @@ namespace timelapse.api.Pages
         private readonly UserManager<AppUser> _userManager;
         private readonly SignInManager<AppUser> _signInManager;
         private readonly ILogger<OrganisationsModel> _logger;
-        public List<Organisation> Organisations;
-        public List<OrganisationUserJoinEntry> OrgUserJoins;
+        // public List<Organisation> Organisations;
+        // public List<OrganisationUserJoinEntry> OrgUserJoins;
         public List<AppUser> Users;
         public List<Project> Projects;
         public Organisation? Org;
+        public List<Container> Containers;
         public Boolean UserIsAdmin;
         public Boolean UserIsOwner;
         public String UserId;
@@ -35,22 +37,30 @@ namespace timelapse.api.Pages
             _signInManager = signInManager;
             _logger = logger;
             _appDbContext = appDbContext;
-            
-            Organisations = _appDbContext.Organisations.ToList();
-            OrgUserJoins = _appDbContext.OrganisationUserJoinEntry.OrderBy(e => e.UserId).ToList();
-            Users = _appDbContext.Users.OrderBy(u => u.Id).ToList();
-            Projects = _appDbContext.Projects.ToList();
+            // Organisations = _appDbContext.Organisations.ToList();
+            // OrgUserJoins = _appDbContext.OrganisationUserJoinEntry.OrderBy(e => e.UserId).ToList();
+            // Users = _appDbContext.Users.OrderBy(u => u.Id).ToList();
+            // Projects = _appDbContext.Projects.ToList();
         }
 
         public IActionResult OnGet(int Id)
         {
             UserId = _userManager.GetUserId(User);
-            Org = Organisations.Where(o => o.Id == Id).FirstOrDefault();
+            Org = _appDbContext.Organisations
+                .Include(o => o.OrganisationUserJoinEntries)
+                .Where(o => o.Id == Id)
+                .FirstOrDefault();
+            
             if (Org == null)
             {
                 return NotFound($"No Organisation with ID {Id}");
             }
 
+            // Organisations = _appDbContext.Organisations.ToList();
+            // OrgUserJoins = _appDbContext.OrganisationUserJoinEntry.OrderBy(e => e.UserId).ToList();
+            Users = _appDbContext.Users.OrderBy(u => u.Id).ToList();
+            Projects = _appDbContext.Projects.Where(p => p.OrganisationId == Id).ToList();
+            Containers = _appDbContext.Containers.Where(c => c.OwnerOrganisationId == Id).ToList();
 
             var userOrgRelation = Org.OrganisationUserJoinEntries.Where(e => e.UserId == UserId);
             if (userOrgRelation.Count() == 0)

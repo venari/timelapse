@@ -11,4 +11,6 @@ public class Organisation
     public List<Project> Projects { get; } = new List<Project>();
     [System.Text.Json.Serialization.JsonIgnore]
     public List<OrganisationUserJoinEntry> OrganisationUserJoinEntries { get; } = new List<OrganisationUserJoinEntry>();
+
+    public List<Container> Containers { get; } = new List<Container>();
 }

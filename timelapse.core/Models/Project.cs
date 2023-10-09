@@ -10,4 +10,6 @@ public class Project
     [System.Text.Json.Serialization.JsonIgnore]
     public Organisation Organisation { get; set; }
     public List<DeviceProjectContract> DeviceProjectContracts { get; } = new List<DeviceProjectContract>();
+
+    public Container? ContainerOveride {get; set;}
 }

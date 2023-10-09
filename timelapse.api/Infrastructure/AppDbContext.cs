@@ -35,6 +35,8 @@ namespace timelapse.infrastructure
         public DbSet<Event> Events {get; set;}
         public DbSet<EventType> EventTypes {get; set;}
 
+        public DbSet<Container> Containers {get; set; }
+
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
@@ -42,6 +44,9 @@ namespace timelapse.infrastructure
             modelBuilder.Entity<Event>()
                 .HasMany(e => e.EventTypes)
                 .WithMany(e => e.Events);
+
+            modelBuilder.Entity<Container_Azure_Blob>();
+            modelBuilder.Entity<Container_AWS_S3>();
 
             // modelBuilder.Entity<Event>()
             //     .HasOne(e => e.EventType);

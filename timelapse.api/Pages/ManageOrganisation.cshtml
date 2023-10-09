@@ -8,7 +8,10 @@
 
 <div>
     <div>
-        <h1> Members </h1>
+        <h1>Organisation: @Model.Org.Name</h1>
+    </div>
+    <div>
+        <h2> Members </h2>
         <table class="table">
             <thead>
                 <th scope="col"> Email </th>
@@ -158,7 +161,7 @@
 
     <div>
         @* placeholder *@
-        <h1> Contact Information </h1>
+        <h2> Contact Information </h2>
         <p>
             Nothing is here yet
         </p>
@@ -166,14 +169,14 @@
 
     <div>
         @* placeholder *@
-        <h1> Projects </h1>
+        <h2> Projects </h2>
         <table class="table">
             <thead>
                 <th scope="col"> Name </th>
                 <th scope="col" class="text-end"> Manage </th>
             </thead>
             <tbody>
-                @foreach (var item in Model.Projects.Where(p => p.OrganisationId == Model.Org.Id))
+                @foreach (var item in Model.Projects)
                 {
                     <tr>
                         <td>
@@ -199,6 +202,50 @@
             <p>
                 <a href="/CreateProject?OrganisationId=@(Model.Org.Id)">
                     <button id="CreateProjectButton" class="btn btn-primary"> Create new project </button>
+                </a>
+            </p>
+        }
+    </div>
+
+        <div>
+        @* placeholder *@
+        <h2> Containers </h2>
+        <table class="table">
+            <thead>
+                <th scope="col"> Name </th>
+                <th scope="col"> Type </th>
+                <th scope="col" class="text-end"> Manage </th>
+            </thead>
+            <tbody>
+                @foreach (var container in Model.Containers)
+                {
+                    <tr>
+                        <td>
+                            @(container.Name)
+                        </td>
+                        <td>
+                            @(container.GetType())
+                        </td>
+                        <td class="text-end">
+                            <a href="/ManageContainer?Id=@(container.Id)">
+                                <button class="btn btn-primary" >Manage Container</button>
+                            </a>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+        @if (Model.Org.Containers.Count() == 0)
+        {
+            <p>
+                No Containers found
+            </p>
+        }
+        @if (Model.UserIsAdmin)
+        {
+            <p>
+                <a href="/CreateContainer?OrganisationId=@(Model.Org.Id)">
+                    <button id="CreateContainerButton" class="btn btn-primary"> Create new container </button>
                 </a>
             </p>
         }
