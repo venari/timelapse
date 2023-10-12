@@ -2,10 +2,10 @@ using System.ComponentModel.DataAnnotations;
 
 namespace timelapse.core.models;
 
-// public enum ContainerProvider{
-//     ContainerProvider_Azure_Blob,
-//     ContainerProvider_AWS_S3
-// }
+public enum ContainerProvider{
+    Azure_Blob,
+    AWS_S3
+}
 
 public abstract class Container
 {

@@ -244,7 +244,7 @@
         @if (Model.UserIsAdmin)
         {
             <p>
-                <a href="/CreateContainer?OrganisationId=@(Model.Org.Id)">
+                <a href="/CreateContainer/@(Model.Org.Id)">
                     <button id="CreateContainerButton" class="btn btn-primary"> Create new container </button>
                 </a>
             </p>
