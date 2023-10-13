@@ -5,6 +5,8 @@ using Microsoft.AspNetCore.Authorization;
 using timelapse.api.Areas.Identity.Data;
 using timelapse.infrastructure;
 using timelapse.core.models;
+using Microsoft.AspNetCore.Mvc.Rendering;
+using Microsoft.EntityFrameworkCore;
 
 namespace timelapse.api.Pages
 {
@@ -31,12 +33,30 @@ namespace timelapse.api.Pages
         public Project project { get; set; }
         [BindProperty]
         public String ProjectName { get; set; }
+
+        [BindProperty]
+        // public Container? ContainerOveride {get; set;}
+        public int ContainerOverideId {get; set;}
+
+        public List<SelectListItem> ContainerIds {get; set;}
+
         public ActionResult OnGet(int OrganisationId)
         {
             if (! _appDbContext.OrganisationUserJoinEntry.Any(e => e.OrganisationId == OrganisationId && e.UserId == _userManager.GetUserId(User) && e.OrganisationAdmin))
             {
                 return NotFound("You are not authenticated to add projects to this organisation");
             }
+
+            var organisation = _appDbContext.Organisations
+                .Include(o => o.Containers)
+                .FirstOrDefault(o => o.Id == OrganisationId);
+            if(organisation==null){
+                return NotFound($"No organisation with ID {OrganisationId}");
+            }
+
+            ContainerIds = organisation.Containers.Select(c => new SelectListItem(c.Name, c.Id.ToString())).ToList();
+            ContainerIds.Insert(0, new SelectListItem("None", "-1"));
+            ContainerOverideId = -1;
 
             return Page();
         }
@@ -61,11 +81,14 @@ namespace timelapse.api.Pages
             project = new Project();
             project.Organisation = _appDbContext.Organisations.First(o => o.Id == OrganisationId);
             project.Name = ProjectName;
+            if(ContainerOverideId!=-1){
+                project.ContainerOveride = _appDbContext.Containers.FirstOrDefault(c => c.Id == ContainerOverideId);
+            }
             _appDbContext.Projects.Add(project);
             
             await _appDbContext.SaveChangesAsync();
 
-            return Redirect($"ManageProject?Id={project.Id}");
+            return Redirect($"ManageOrganisation?Id={OrganisationId}");
         }
     }
 }

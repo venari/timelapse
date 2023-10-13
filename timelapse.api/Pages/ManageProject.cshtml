@@ -33,7 +33,27 @@
     }
 </script>
 
-<div>
+<div class="row">
+    <form method="post">
+        <div class="form-group">
+            <label asp-for="ProjectName"></label>
+            <input asp-for="ProjectName" class="form-control" />
+            <span asp-validation-for="ProjectName" class="text-danger"></span>
+        </div>
+        <div class="form-group">
+            <label asp-for="ContainerOverideId">Container Overide (optional)</label>
+            @* <input asp-for="ContainerOveride" class="form-control" /> *@
+            <select id="containerOverideId" asp-for="ContainerOverideId" asp-items="Model.ContainerIds">
+            </select>
+            <span asp-validation-for="ContainerOverideId" class="text-danger"></span>
+        </div>
+        <div class="form-group">
+            <input type="submit" value="Update" class="btn btn-primary" />
+        </div>
+    </form>
+</div>
+
+<div class="row">
     <h2> Cameras </h2>
     <table class="table">
         <thead>
@@ -41,7 +61,7 @@
             <th scope="col"> Device Status </th>
         </thead>
         <tbody>
-            @foreach (var deviceContract in Model.DeviceProjectContracts.Where(d => d.ProjectId == Model.Project.Id))
+            @foreach (var deviceContract in Model.DeviceProjectContracts.Where(d => d.ProjectId == Model.ProjectId))
             {
                 var device = Model.Devices.First(d => d.Id == deviceContract.DeviceId);
 
@@ -64,7 +84,12 @@
     </div>
     <div>
         @* DEVDO this is a placeholder *@
-        <button class="btn btn-primary" onclick="makeReq('/api/Project/AddMockDevice?ProjectId=@(Model.Project.Id)', document.getElementById('AddMockError'))"> Add mock device </button> <br>
+        <button class="btn btn-primary" onclick="makeReq('/api/Project/AddMockDevice?ProjectId=@(Model.ProjectId)', document.getElementById('AddMockError'))"> Add mock device </button> <br>
         <label class="text-danger" id="AddMockError"></label>
     </div>
+
+    <div>
+        <a asp-page="/ManageOrganisation" asp-route-id="@(Model.RetOrganisationId)">Back to Organisation</a>
+    </div>
+
 </div>
