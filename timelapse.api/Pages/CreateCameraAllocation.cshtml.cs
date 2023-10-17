@@ -47,7 +47,7 @@ namespace timelapse.api.Pages
         public List<SelectListItem> DeviceIds {get; set;}
 
         // [BindProperty]
-        public DeviceProjectContract DeviceProjectContract { get; set; }
+        // public DeviceProjectContract DeviceProjectContract { get; set; }
 
         private bool LoadProject(int projectId){
             Project = _appDbContext.Projects
@@ -103,14 +103,15 @@ namespace timelapse.api.Pages
                 return Page();
             }
 
-            DeviceProjectContract = new DeviceProjectContract
+            var deviceProjectContract = new DeviceProjectContract
             {
                 ProjectId = projectId,
                 StartDate = StartTimeUTC.Value,
-                EndDate = EndTimeUTC
+                EndDate = EndTimeUTC,
+                DeviceId = DeviceId
             };
 
-            _appDbContext.DeviceProjectContracts.Add(DeviceProjectContract);
+            _appDbContext.DeviceProjectContracts.Add(deviceProjectContract);
             await _appDbContext.SaveChangesAsync();
 
             return RedirectToPage("/ManageProject", new {projectId = Project.Id});

@@ -22,8 +22,8 @@
 
 
     <div class="form-group">
-        <label asp-for="DeviceProjectContract.DeviceId"></label>
-        <select asp-for="DeviceProjectContract.DeviceId" class="form-control" asp-items="@(new SelectList(Model.Devices, "Id", "Name"))"></select>
+        <label asp-for="DeviceId"></label>
+        <select asp-for="DeviceId" class="form-control" asp-items="@(new SelectList(Model.Devices, "Id", "Name"))"></select>
     </div>
 
     <button type="submit" class="btn btn-primary">Save</button>

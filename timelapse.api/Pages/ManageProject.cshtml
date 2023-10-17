@@ -58,7 +58,8 @@
     <table class="table">
         <thead>
             <th scope="col"> Device Name </th>
-            <th scope="col"> Device Status </th>
+            <th scope="col"> Start Date </th>
+            <th scope="col"> End Date </th>
         </thead>
         <tbody>
             @foreach (var deviceContract in Model.DeviceProjectContracts.Where(d => d.ProjectId == Model.ProjectId))
@@ -70,6 +71,10 @@
                         @Html.DisplayFor(m => deviceContract.Device.Name)
                     </td>
                     <td>
+                            <script type="text/javascript">localizeDateTime('@(deviceContract.StartDate.ToString("s"))')</script>
+                    </td>
+                    <td>
+                            <script type="text/javascript">localizeDateTime('@(deviceContract.EndDate.HasValue?deviceContract.EndDate.Value.ToString("s"):"---")')</script>
                     </td>
                 </tr>
             }
