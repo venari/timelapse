@@ -31,6 +31,8 @@ namespace timelapse.api.Pages
         }
 
         public Project project { get; set; }
+        public Organisation Organisation {get; private set; }
+
         [BindProperty]
         public String ProjectName { get; set; }
 
@@ -38,48 +40,59 @@ namespace timelapse.api.Pages
         // public Container? ContainerOveride {get; set;}
         public int ContainerOverideId {get; set;}
 
+        [BindProperty]
         public List<SelectListItem> ContainerIds {get; set;}
 
-        public ActionResult OnGet(int OrganisationId)
-        {
-            if (! _appDbContext.OrganisationUserJoinEntry.Any(e => e.OrganisationId == OrganisationId && e.UserId == _userManager.GetUserId(User) && e.OrganisationAdmin))
-            {
-                return NotFound("You are not authenticated to add projects to this organisation");
-            }
-
-            var organisation = _appDbContext.Organisations
+        private bool LoadOrganisation(int organisationId){
+            Organisation = _appDbContext.Organisations
                 .Include(o => o.Containers)
-                .FirstOrDefault(o => o.Id == OrganisationId);
-            if(organisation==null){
-                return NotFound($"No organisation with ID {OrganisationId}");
+                .FirstOrDefault(o => o.Id == organisationId);
+
+            if(Organisation == null){
+                return false;
+            }
+            
+            if (! _appDbContext.OrganisationUserJoinEntry.Any(e => e.OrganisationId == organisationId && e.UserId == _userManager.GetUserId(User) && e.OrganisationAdmin))
+            {
+                _logger.LogWarning($"Unauthorised project creation attempt for organisation {organisationId} by user {_userManager.GetUserId(User)} (\"{_userManager.GetUserName(User)}\")");
             }
 
-            ContainerIds = organisation.Containers.Select(c => new SelectListItem(c.Name, c.Id.ToString())).ToList();
+            ContainerIds = Organisation.Containers.Select(c => new SelectListItem(c.Name, c.Id.ToString())).ToList();
             ContainerIds.Insert(0, new SelectListItem("None", "-1"));
+
+            return true;
+        }
+
+        public ActionResult OnGet(int organisationId)
+        {
+
+            if(!LoadOrganisation(organisationId)){
+                return NotFound($"No organisation with ID {organisationId}");
+            }
+
             ContainerOverideId = -1;
 
             return Page();
         }
 
         public int RetOrganisationId;
-        public async Task<IActionResult> OnPostAsync(int OrganisationId)
+        public async Task<IActionResult> OnPostAsync(int organisationId)
         {
-            RetOrganisationId = OrganisationId;
+            RetOrganisationId = organisationId;
+
+            if(!LoadOrganisation(organisationId)){
+                return NotFound($"No organisation with ID {organisationId}");
+            }
+
             if (! ModelState.IsValid)
             {
                 return Page();
             }
             
-            if (! _appDbContext.OrganisationUserJoinEntry.Any(e => e.OrganisationId == OrganisationId && e.UserId == _userManager.GetUserId(User) && e.OrganisationAdmin))
-            {
-                _logger.LogWarning($"Unauthorised project creation attempt for organisation {OrganisationId} by user {_userManager.GetUserId(User)} (\"{_userManager.GetUserName(User)}\")");
-                return NotFound($"Not authorised to create projects for organisation {OrganisationId}");
-            }
-
             _logger.LogInformation($"Project created by user {_userManager.GetUserId(User)} (\"{_userManager.GetUserName(User)}\")");
 
             project = new Project();
-            project.Organisation = _appDbContext.Organisations.First(o => o.Id == OrganisationId);
+            project.Organisation = _appDbContext.Organisations.First(o => o.Id == organisationId);
             project.Name = ProjectName;
             if(ContainerOverideId!=-1){
                 project.ContainerOveride = _appDbContext.Containers.FirstOrDefault(c => c.Id == ContainerOverideId);
@@ -88,7 +101,7 @@ namespace timelapse.api.Pages
             
             await _appDbContext.SaveChangesAsync();
 
-            return Redirect($"ManageOrganisation?Id={OrganisationId}");
+            return Redirect($"ManageOrganisation?Id={organisationId}");
         }
     }
 }

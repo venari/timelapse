@@ -74,7 +74,7 @@ namespace timelapse.api.Pages
         public ActionResult OnGet(int OrganisationId)
         {
             RetOrganisationId = OrganisationId;
-            
+
             if (! _appDbContext.OrganisationUserJoinEntry.Any(e => e.OrganisationId == OrganisationId && e.UserId == _userManager.GetUserId(User) && e.OrganisationAdmin))
             {
                 return NotFound("You are not authenticated to add containers to this organisation");

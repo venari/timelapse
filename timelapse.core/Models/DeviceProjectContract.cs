@@ -6,7 +6,7 @@ public class DeviceProjectContract
 {
     public int Id { get; set; }
     public DateTime StartDate { get; set; }
-    public DateTime EndDate { get; set; }
+    public DateTime? EndDate { get; set; }
     public int ProjectId { get; set; }
     [System.Text.Json.Serialization.JsonIgnore]
     public Project Project { get; set; }

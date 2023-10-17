@@ -1,0 +1,69 @@
+@page "{projectId:int}"
+@model timelapse.api.Pages.CreateCameraAllocationModel
+@{
+    ViewData["Title"] = "Allocate Camera";
+}
+
+<h1>Allocate Camera</h1>
+<h2>Project: @(Model.Project.Name)</h2>
+
+<form method="post" onsubmit="updateHiddenFields()">
+
+    <div class="form-group">
+        <label class="control-label">Start Time</label>
+        <input type="datetime-local" id="StartDateTime" step="1" class="form-control" />
+        <span asp-validation-for="StartTimeUTC" class="text-danger"></span>
+    </div>
+    <div class="form-group">
+        <label class="control-label">End Time</label>
+        <input type="datetime-local" id="EndDateTime" step="1" class="form-control" />
+        <span asp-validation-for="EndTimeUTC" class="text-danger"></span>
+    </div>
+
+
+    <div class="form-group">
+        <label asp-for="DeviceProjectContract.DeviceId"></label>
+        <select asp-for="DeviceProjectContract.DeviceId" class="form-control" asp-items="@(new SelectList(Model.Devices, "Id", "Name"))"></select>
+    </div>
+
+    <button type="submit" class="btn btn-primary">Save</button>
+
+    <input type="hidden" id="StartDateTimeUTC" asp-for="StartTimeUTC" />
+    <input type="hidden" id="EndDateTimeUTC" asp-for="EndTimeUTC" />
+</form>
+
+    <div>
+        <a asp-page="/ManageProject" asp-route-id="@(Model.Project.Id)">Back to Organisation</a>
+    </div>
+
+
+<script>
+    if('@(Model.StartTimeUTC!=null)'=='True'){
+        document.getElementById("StartDateTime").value = ISO8601UTCDatetimeToLocalDatetime('@(Model.StartTimeUTC!=null?Model.StartTimeUTC.Value.ToString("o"):"---")');
+    }
+
+    if('@(Model.EndTimeUTC!=null)'=='True'){
+        document.getElementById("EndDateTimeUTC").value = ISO8601UTCDatetimeToLocalDatetime('@(Model.EndTimeUTC!=null?Model.EndTimeUTC.Value.ToString("o"):"---")');
+    }
+
+    function updateHiddenFields(){
+        var startDateTime = document.getElementById("StartDateTime").value;
+        var endDateTime = document.getElementById("EndDateTime").value;
+
+        // if startDateTime is valid date
+        var date = new Date(startDateTime);
+        if(date instanceof Date && !isNaN(date.valueOf())){
+            document.getElementById("StartDateTimeUTC").value = LocalDatetimeToISO8601UTCDatetime(document.getElementById("StartDateTime").value)
+        } else {
+            document.getElementById("StartDateTimeUTC").value = null;
+        }
+
+        // if endDateTime is valid date
+        date = new Date(endDateTime);
+        if(date instanceof Date && !isNaN(date.valueOf())){
+            document.getElementById("EndDateTimeUTC").value = LocalDatetimeToISO8601UTCDatetime(document.getElementById("EndDateTime").value)
+        } else {
+            document.getElementById("EndDateTimeUTC").value = null;
+        }
+    }
+</script>

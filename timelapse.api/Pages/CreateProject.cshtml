@@ -1,7 +1,12 @@
-﻿@page
+﻿@page "{organisationId:int}"
 @model timelapse.api.Pages.CreateProjectModel
 @{
+    ViewData["Title"] = "Create Project";
 }
+
+<div class="row">
+<h1 class="display-4">Organisation: @(Model.Organisation.Name)</h1>
+</div>
 
 <div class="row">
     <form method="post">

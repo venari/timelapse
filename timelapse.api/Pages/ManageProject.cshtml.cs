@@ -18,6 +18,8 @@ namespace timelapse.api.Pages
         private readonly UserManager<AppUser> _userManager;
         private readonly SignInManager<AppUser> _signInManager;
                 
+        private Project Project { get; set; }
+
         [BindProperty]
         public string ProjectName { get; set; }
 
@@ -48,69 +50,70 @@ namespace timelapse.api.Pages
             _signInManager = signInManager;
         }
 
-        public IActionResult OnGet(int Id)
-        {
-            if (! _appDbContext.Projects.Any(p => p.Id == Id))
-            {
-                return NotFound($"No project with Id {Id}");
-            }
-
-            var project = _appDbContext.Projects
+        private bool LoadProject(int projectId){
+            Project = _appDbContext.Projects
                 .Include(p => p.Organisation)
                 .ThenInclude(o => o.Containers)
-                .First(p => p.Id == Id);
+                .FirstOrDefault(p => p.Id == projectId);
 
-            ProjectName = project.Name;
-            ProjectId = project.Id;
-
-            RetOrganisationId = project.OrganisationId;
-
-            ContainerIds = project.Organisation.Containers.Select(c => new SelectListItem(c.Name, c.Id.ToString())).ToList();
-            ContainerIds.Insert(0, new SelectListItem("None", "-1"));
-            ContainerOverideId = project.ContainerOveride?.Id ?? -1;
-
-            DeviceProjectContracts = _appDbContext.DeviceProjectContracts.Where(c => c.ProjectId == Id).ToList();
-            Devices = _appDbContext.Devices.ToList();
-            
-            var userId = _userManager.GetUserId(User);
-            if (! _appDbContext.OrganisationUserJoinEntry.Any(e => e.OrganisationId == project.OrganisationId && e.UserId == userId))
-            {
-                _logger.LogWarning($"Unauthorised access attempt on project {project.Id} by user {_userManager.GetUserId(User)} (\"{_userManager.GetUserName(User)}\")");
-                return NotFound($"Not authorised to access project with id {project.Id}");
+            if(Project == null){
+                return false;
             }
+
+            var userId = _userManager.GetUserId(User);
+            if (! _appDbContext.OrganisationUserJoinEntry.Any(e => e.OrganisationId == Project.OrganisationId && e.UserId == userId))
+            {
+                _logger.LogWarning($"Unauthorised access attempt on project {Project.Id} by user {_userManager.GetUserId(User)} (\"{_userManager.GetUserName(User)}\")");
+                return false;
+            }
+
+            ProjectName = Project.Name;
+            ProjectId = Project.Id;
+
+            RetOrganisationId = Project.OrganisationId;
+
+            ContainerIds = Project.Organisation.Containers.Select(c => new SelectListItem(c.Name, c.Id.ToString())).ToList();
+            ContainerIds.Insert(0, new SelectListItem("None", "-1"));
+
+            DeviceProjectContracts = _appDbContext.DeviceProjectContracts.Where(c => c.ProjectId == projectId).ToList();
+            Devices = _appDbContext.Devices.Where(d => d.Retired==false).ToList();
+
+            return true;
+        }
+
+        public IActionResult OnGet(int projectId)
+        {
+            if(!LoadProject(projectId)){
+                return NotFound($"No project with Id {projectId}");
+            }
+
+            ContainerOverideId = Project.ContainerOveride?.Id ?? -1;
 
             return Page();
         }
 
-        public async Task<IActionResult> OnPostAsync(int Id)
+        public async Task<IActionResult> OnPostAsync(int projectId)
         {
+            if(!LoadProject(projectId)){
+                return NotFound($"No project with Id {projectId}");
+            }
+
             if (! ModelState.IsValid)
             {
                 return Page();
             }
 
-            var project = _appDbContext.Projects.FirstOrDefault(p => p.Id == Id);
-            if(project==null){
-                return NotFound($"No project with Id {ProjectId}");
-            }
-
-            if (! _appDbContext.OrganisationUserJoinEntry.Any(e => e.OrganisationId == project.OrganisationId && e.UserId == _userManager.GetUserId(User) && e.OrganisationAdmin))
-            {
-                _logger.LogWarning($"Unauthorised project update attempt for organisation {project.OrganisationId} by user {_userManager.GetUserId(User)} (\"{_userManager.GetUserName(User)}\")");
-                return NotFound($"Not authorised to update projects for organisation {project.OrganisationId}");
-            }
-
-            project.Name = ProjectName;
+            Project.Name = ProjectName;
             if(ContainerOverideId!=-1){
-                project.ContainerOveride = _appDbContext.Containers.FirstOrDefault(c => c.Id == ContainerOverideId);
+                Project.ContainerOveride = _appDbContext.Containers.FirstOrDefault(c => c.Id == ContainerOverideId);
             } else {
-                project.ContainerOveride = null;
+                Project.ContainerOveride = null;
             }
-            _appDbContext.Projects.Update(project);
+            _appDbContext.Projects.Update(Project);
             
             await _appDbContext.SaveChangesAsync();
 
-            return Redirect($"ManageOrganisation?Id={project.OrganisationId}");
+            return Redirect($"ManageOrganisation?Id={Project.OrganisationId}");
         }
     }
 }

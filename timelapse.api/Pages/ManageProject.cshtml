@@ -1,4 +1,4 @@
-﻿@page
+﻿@page "{projectId:int}"
 @model timelapse.api.Pages.ManageProjectModel
 @{
 }
@@ -80,7 +80,7 @@
         {
             <p> No devices found </p>
         }
-        <a href="/requestDevicePage"> Request a camera </a> @* DEVDO actually make this page *@
+        <a href="/CreateCameraAllocation/@(Model.ProjectId)"> Allocate a camera </a>
     </div>
     <div>
         @* DEVDO this is a placeholder *@
