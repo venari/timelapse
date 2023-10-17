@@ -67,13 +67,20 @@ namespace timelapse.api{
 
         [HttpGet("GetLatest24HoursTelemetry")]
         public ActionResult<IEnumerable<Telemetry>> GetLatest24HoursTelemetry([FromQuery] int deviceId){
+
+            System.Diagnostics.Stopwatch stopwatch = new System.Diagnostics.Stopwatch();
+            stopwatch.Start();
+
             _logger.LogInformation("Get latest 24 hours' telemetry");
 
             DateTime ?latestTelemetryDateTime = _appDbContext.Telemetry
                 .Where(t => t.DeviceId == deviceId)
+                // .OrderByDescending(t => t.Id)
                 .OrderByDescending(t => t.Timestamp)
                 .Select(t => t.Timestamp)
                 .FirstOrDefault();
+
+            _logger.LogInformation($"Got latestTelemetryDateTime - about to get Device.... {stopwatch.ElapsedMilliseconds}ms");
 
             List<Telemetry> telemetry = new List<Telemetry>();
 
@@ -83,25 +90,37 @@ namespace timelapse.api{
 
             Device? device = _appDbContext.Devices
                 .Include(d => d.Telemetries.Where(t =>t.Timestamp >= latestTelemetryDateTime.Value.AddDays(-1)))
+                // .Include(d => d.Telemetries.Where(t =>t.Timestamp >= DateTime.UtcNow.AddDays(-1)))
                 .FirstOrDefault(d => d.Id == deviceId);
+
+            _logger.LogInformation($"Got Device - about to get telemetry.... {stopwatch.ElapsedMilliseconds}ms");
 
             if(device != null){
                 telemetry =  device.Telemetries.OrderBy(t => t.Timestamp).ToList();
                 // telemetry =  device.Telemetries.OrderBy(t => t.Timestamp).ToList();
             }
 
+            _logger.LogInformation($"All done {stopwatch.ElapsedMilliseconds}ms");
+
             return telemetry;
         }
  
         [HttpGet("GetLatestTelemetry")]
         public ActionResult<IEnumerable<Telemetry>> GetLatestTelemetry([FromQuery] int deviceId, int numberOfHoursToDisplay){
+
+            System.Diagnostics.Stopwatch stopwatch = new System.Diagnostics.Stopwatch();
+            stopwatch.Start();
+
             _logger.LogInformation($"Get latest {numberOfHoursToDisplay} hours' telemetry");
 
             DateTime ?latestTelemetryDateTime = _appDbContext.Telemetry
                 .Where(t => t.DeviceId == deviceId)
+                // .OrderByDescending(t => t.Id)
                 .OrderByDescending(t => t.Timestamp)
                 .Select(t => t.Timestamp)
                 .FirstOrDefault();
+
+            _logger.LogInformation($"Got latestTelemetryDateTime - about to get Device.... {stopwatch.ElapsedMilliseconds}ms");
 
             List<Telemetry> telemetry = new List<Telemetry>();
 
@@ -117,6 +136,8 @@ namespace timelapse.api{
                 telemetry =  device.Telemetries.OrderBy(t => t.Timestamp).ToList();
                 // telemetry =  device.Telemetries.OrderBy(t => t.Timestamp).ToList();
             }
+
+            _logger.LogInformation($"All done {stopwatch.ElapsedMilliseconds}ms");
 
             return telemetry;
         }
