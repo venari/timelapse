@@ -48,6 +48,9 @@ namespace timelapse.infrastructure
             modelBuilder.Entity<Container_Azure_Blob>();
             modelBuilder.Entity<Container_AWS_S3>();
 
+            modelBuilder.Entity<Telemetry>()
+                .HasIndex(t => t.Timestamp);
+
             // modelBuilder.Entity<Event>()
             //     .HasOne(e => e.EventType);
         }
