@@ -34,7 +34,7 @@ namespace timelapse.api{
 
             Device device = _appDbContext.Devices.FirstOrDefault(d => d.SerialNumber == model.SerialNumber);
 
-           if(device==null){
+            if(device==null){
                 UnregisteredDevice unregistered = _appDbContext.UnregisteredDevices.FirstOrDefault(d => d.SerialNumber == model.SerialNumber);
 
                 if(unregistered==null){
@@ -56,6 +56,20 @@ namespace timelapse.api{
             };
 
             string blobName = device.Id + "_" + model.File.FileName;
+
+            Project? project = _appDbContext.Projects
+                .Include(p => p.DeviceProjectContracts)
+                .ThenInclude(dpc => dpc.Device)
+                .Include(p => p.ContainerOveride)
+                .Where(p => p.DeviceProjectContracts
+                    .Any(dpc => dpc.DeviceId == device.Id && dpc.StartDate <= image.Timestamp && (dpc.EndDate == null || dpc.EndDate >= image.Timestamp)))
+                .FirstOrDefault();
+
+            Container? containerOveride=null;
+            if(project!=null){
+                containerOveride = project.ContainerOveride;
+            }
+
             image.BlobUri = _storageHelper.Upload(blobName, model.File.OpenReadStream());
 
             // _logger.LogInformation("Add Image");
