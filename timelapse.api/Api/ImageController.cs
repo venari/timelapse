@@ -17,7 +17,7 @@ namespace timelapse.api{
         public ImageController(AppDbContext appDbContext, ILogger<ImageController> logger, IConfiguration configuration, IMemoryCache memoryCache){
             _appDbContext = appDbContext;
             _logger = logger;
-            _storageHelper = new StorageHelper(configuration, logger, memoryCache);
+            _storageHelper = new StorageHelper(configuration, appDbContext, logger, memoryCache);
         }
 
         private AppDbContext _appDbContext;
@@ -70,7 +70,7 @@ namespace timelapse.api{
                 containerOveride = project.ContainerOveride;
             }
 
-            image.BlobUri = _storageHelper.Upload(blobName, model.File.OpenReadStream());
+            image.BlobUri = _storageHelper.Upload(blobName, model.File.OpenReadStream(), containerOveride);
 
             // _logger.LogInformation("Add Image");
             _appDbContext.Images.Add(image);

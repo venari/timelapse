@@ -19,6 +19,7 @@ public class EditModel : PageModel
 {
     private readonly ILogger<EditModel> _logger;
     private AppDbContext _appDbContext;
+    private StorageHelper _storageHelper;
 
     public Device device {get; set;}
     public string SasToken {get; set;}
@@ -59,9 +60,7 @@ public class EditModel : PageModel
     {
         _logger = logger;
         _appDbContext = appDbContext;
-        StorageHelper storageHelper;
-        storageHelper = new StorageHelper(configuration, logger, memoryCache);
-        SasToken = storageHelper.SasToken;
+        _storageHelper = new StorageHelper(configuration, appDbContext, logger, memoryCache);
     }
 
 
@@ -104,6 +103,8 @@ public class EditModel : PageModel
         if(Event==null){
             return RedirectToPage("/NotFound");
         }
+
+        SasToken = _storageHelper.SasToken(Event.StartImageId);
 
         EventStartImageBlobUri = Event.StartImage.BlobUri;
         device = Event.Device;

@@ -17,13 +17,17 @@ public class IndexModel : PageModel
     private StorageHelper _storageHelper;
 
     public List<Device> devices {get; private set;}
-    public string SasToken {get; private set;}
+    // public string SasToken {get; private set;}
 
     public IndexModel(ILogger<IndexModel> logger, AppDbContext appDbContext, IConfiguration configuration, IMemoryCache memoryCache)
     {
         _logger = logger;
         _appDbContext = appDbContext;
-        _storageHelper = new StorageHelper(configuration, logger, memoryCache);
+        _storageHelper = new StorageHelper(configuration, appDbContext, logger, memoryCache);
+    }
+
+    public string GetSasTokenForImage(int imageId){
+        return _storageHelper.SasToken(imageId);
     }
 
     public void OnGet()
@@ -47,10 +51,6 @@ public class IndexModel : PageModel
             .ToList();
 
         _logger.LogInformation($"Query done {stopwatch.ElapsedMilliseconds}ms");
-
-        var sasUri = _storageHelper.GenerateSasUri();
-        // Extract the Token from the URI
-        SasToken = sasUri.Query;
 
         // _appDbContext.Database.EnsureCreated();
     }

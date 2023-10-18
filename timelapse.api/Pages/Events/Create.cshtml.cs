@@ -19,6 +19,7 @@ public class CreateModel : PageModel
 {
     private readonly ILogger<CreateModel> _logger;
     private AppDbContext _appDbContext;
+    private StorageHelper _storageHelper;
 
     public Device device {get; set;}
     public string SasToken {get; set;}
@@ -77,9 +78,7 @@ public class CreateModel : PageModel
     {
         _logger = logger;
         _appDbContext = appDbContext;
-        StorageHelper storageHelper;
-        storageHelper = new StorageHelper(configuration, logger, memoryCache);
-        SasToken = storageHelper.SasToken;
+        _storageHelper = new StorageHelper(configuration, appDbContext, logger, memoryCache);
     }
 
 
@@ -126,6 +125,8 @@ public class CreateModel : PageModel
         }
 
         device = image.Device;
+
+        SasToken = _storageHelper.SasToken(imageId);
 
         // var minAndMaxTimestamps = _appDbContext.Images
         //     .Where(t => t.DeviceId == device.Id)

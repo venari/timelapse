@@ -16,6 +16,7 @@ public class ImageViewModel : PageModel
 {
     private readonly ILogger<ImageViewModel> _logger;
     private AppDbContext _appDbContext;
+    private StorageHelper _storageHelper;
 
     public Device device {get; private set;}
     public string SasToken {get; private set;}
@@ -29,9 +30,7 @@ public class ImageViewModel : PageModel
         _logger = logger;
         _appDbContext = appDbContext;
         NumberOfHoursToDisplay = 24;
-        StorageHelper storageHelper;
-        storageHelper = new StorageHelper(configuration, logger, memoryCache);
-        SasToken = storageHelper.SasToken;
+        _storageHelper = new StorageHelper(configuration, appDbContext, logger, memoryCache);
     }
 
     [BindProperty]
@@ -100,6 +99,9 @@ public class ImageViewModel : PageModel
         if(imagesLast24Hours.Count()==0){
             return RedirectToPage("/NotFound");
         }
+
+        SasToken = _storageHelper.SasToken(imagesLast24Hours[0].Id);
+
 
         return Page();
 

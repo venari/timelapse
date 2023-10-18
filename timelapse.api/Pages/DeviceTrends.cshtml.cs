@@ -14,18 +14,18 @@ public class DeviceTrendsModel : PageModel
 {
     private readonly ILogger<DeviceTrendsModel> _logger;
     private AppDbContext _appDbContext;
+    // private StorageHelper _storageHelper;
 
     public List<Device> devices {get; private set;}
-    public string SasToken {get; private set;}
+    // public string SasToken {get; private set;}
 
     public DeviceTrendsModel(ILogger<DeviceTrendsModel> logger, AppDbContext appDbContext, IConfiguration configuration, IMemoryCache memoryCache)
     {
         _logger = logger;
         _appDbContext = appDbContext;
         NumberOfHoursToDisplay = 24;
-        StorageHelper storageHelper;
-        storageHelper = new StorageHelper(configuration, logger, memoryCache);
-        SasToken = storageHelper.SasToken;
+        // StorageHelper storageHelper;
+        // _storageHelper = new StorageHelper(configuration, appDbContext, logger, memoryCache);
     }
 
     [BindProperty]

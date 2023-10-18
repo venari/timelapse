@@ -20,6 +20,7 @@ public class DetailModel : PageModel
 {
     private readonly ILogger<DetailModel> _logger;
     private AppDbContext _appDbContext;
+    private StorageHelper _storageHelper;
 
     public Device Device {get; set;}
     public Event Event {get; set;}
@@ -65,9 +66,7 @@ public class DetailModel : PageModel
     {
         _logger = logger;
         _appDbContext = appDbContext;
-        StorageHelper storageHelper;
-        storageHelper = new StorageHelper(configuration, logger, memoryCache);
-        SasToken = storageHelper.SasToken;
+        _storageHelper = new StorageHelper(configuration, appDbContext, logger, memoryCache);
     }
 
 
@@ -112,7 +111,7 @@ public class DetailModel : PageModel
             // return new NotFoundResult();
             return RedirectToPage("/NotFound");
         }
-            
+        
         EventImages = _appDbContext.Images
             .Where(i => i.DeviceId == Event.DeviceId && i.Timestamp >= Event.StartTime.ToUniversalTime() && i.Timestamp <= Event.EndTime.ToUniversalTime())
             .OrderBy(i => i.Timestamp)
@@ -122,6 +121,11 @@ public class DetailModel : PageModel
                 BlobUri = i.BlobUri
             })
             .ToArray();
+
+        // We'll assume SasToken same for all images.
+        // Will fail if going across project boundary.
+        SasToken = _storageHelper.SasToken(EventImages[0].Id);
+
 
         if(Event==null){
             return RedirectToPage("/NotFound");

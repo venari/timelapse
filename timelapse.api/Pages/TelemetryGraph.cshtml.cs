@@ -14,6 +14,7 @@ public class TelemetryGraphModel : PageModel
 {
     private readonly ILogger<TelemetryGraphModel> _logger;
     private AppDbContext _appDbContext;
+    private StorageHelper _storageHelper;
 
     public Device device {get; private set;}
     public string SasToken {get; private set;}
@@ -33,9 +34,7 @@ public class TelemetryGraphModel : PageModel
         _logger = logger;
         _appDbContext = appDbContext;
         NumberOfHoursToDisplay = 24;
-        StorageHelper storageHelper;
-        storageHelper = new StorageHelper(configuration, logger, memoryCache);
-        SasToken = storageHelper.SasToken;
+        _storageHelper = new StorageHelper(configuration, appDbContext, logger, memoryCache);
     }
 
     [BindProperty]
@@ -79,6 +78,8 @@ public class TelemetryGraphModel : PageModel
             .OrderBy(t => t.Timestamp)
             .Select(t => t.Timestamp)
             .FirstOrDefault();
+
+        SasToken = _storageHelper.SasToken(d.Images[0].Id);
 
         return Page();
 

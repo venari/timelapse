@@ -17,8 +17,8 @@ public class IndexModel : PageModel
     private StorageHelper _storageHelper;
 
     public List<Device> devices {get;}
-    public IEnumerable<Image> images {get; set;}
-    public string SasToken {get; private set;}
+    // public IEnumerable<Image> images {get; set;}
+    // public string SasToken {get; private set;}
     public List<Areas.Identity.Data.AppUser> Users {get; private set;}
 
     public IndexModel(ILogger<IndexModel> logger, AppDbContext appDbContext, IConfiguration configuration, IMemoryCache memoryCache)
@@ -47,14 +47,13 @@ public class IndexModel : PageModel
             // .Where(d => d.Retired == false)
             .ToList();
 
-        images = _appDbContext.Images;
-        _storageHelper = new StorageHelper(configuration, logger, memoryCache);
+        // images = _appDbContext.Images;
+        _storageHelper = new StorageHelper(configuration, appDbContext, logger, memoryCache);
 
-        var sasUri = _storageHelper.GenerateSasUri();
-        // Extract the Token from the URI
-        SasToken = sasUri.Query;
+    }
 
-        // _appDbContext.Database.EnsureCreated();
+    public string GetSasTokenForImage(int imageId){
+        return _storageHelper.SasToken(imageId);
     }
 
     // public Uri EventStartImageUri(Event Event){
