@@ -146,7 +146,6 @@ namespace timelapse.api.Pages
             container.Name = ContainerName;
 
             container.OwnerOrganisation = _appDbContext.Organisations.First(o => o.Id == OrganisationId);
-            container.Name = ContainerName;
             _appDbContext.Containers.Add(container);
             
             await _appDbContext.SaveChangesAsync();

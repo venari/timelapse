@@ -1,29 +1,16 @@
-@page "{OrganisationId:int}"
-@model timelapse.api.Pages.CreateContainerModel
+@page "{ContainerId:int}"
+@model timelapse.api.Pages.EditContainerModel
 @{
-    ViewData["Title"] = "Create Container";
+    ViewData["Title"] = "Edit Container";
 }
 
-<div class="row">
-    <h4>Note, container must already exist in cloud service provider.</h4>
-</div>
 <div class="row">
     <form method="post">
         <div asp-validation-summary="All" class="text-danger"></div>
         <div class="form-group">
             <label asp-for="ContainerProvider"></label>
-            @* <select id="container-providers" onchange="containerProviderChange()">
-                @foreach (var containerProvider in Model.ContainerProviders){
-                    if(Model.ContainerProvider!=null && Model.ContainerProvider==containerProvider){
-                        <option selected value="@(containerProvider)">@(containerProvider.ToString())</option>
-                    } else {
-                        <option value="@(containerProvider)">@(containerProvider.ToString())</option>
-                    }
-                }
-            </select> *@
-            <select id="container-providers" asp-for="ContainerProvider" asp-items="Model.ContainerProviders" onchange="containerProviderChange()">
+            <input id="container-provider" asp-for="ContainerProvider" class="form-control" readonly />
             </select>
-            <span asp-validation-for="ContainerProvider" class="text-danger"></span>
         </div>
         <div class="form-group">
             <label asp-for="ContainerName"></label>
@@ -75,7 +62,7 @@
 
 
         <div class="form-group">
-            <input type="submit" value="Create" class="btn btn-primary">
+            <input type="submit" value="Update" class="btn btn-primary">
         </div>
     </form>
 
@@ -90,7 +77,7 @@
     <script>
             function containerProviderChange(){
 
-                var containerProvider = document.getElementById("container-providers").value;
+                var containerProvider = document.getElementById("container-provider").value;
 
                 var azureGroup = document.getElementById("azure-group");
                 var azureGroupControls = azureGroup.getElementsByTagName("input");

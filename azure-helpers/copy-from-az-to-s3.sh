@@ -18,11 +18,11 @@ copy_from=2023-07-01
 if [[ "$OSTYPE" == "darwin"* ]]; then
     startdate=$(gdate -I -d "$copy_from") || exit -1
     enddate=$(gdate -I)     || exit -1
-    enddate=$(gdate -I -d "$enddate + 1 day")
+    # enddate=$(gdate -I -d "$enddate + 1 day")
 else
     startdate=$(date -I -d "$copy_from") || exit -1
     enddate=$(date -I)     || exit -1
-    enddate=$(date -I -d "$enddate + 1 day")
+    # enddate=$(date -I -d "$enddate + 1 day")
 fi
 
 
@@ -41,15 +41,11 @@ startdate='2023-09-01'
 echo Start Date: $startdate
 echo End Date: $enddate
 
+d="$enddate"
+while [ "$d" != "$startdate" ]; do 
 
-for camera_id in "${camera_ids[@]}"
-do
-    # echo $camera_id
-
-
-    d="$startdate"
-    while [ "$d" != "$enddate" ]; do 
-
+    for camera_id in "${camera_ids[@]}"
+    do
         echo '\n\n\n********************************************************************************************************************'
         echo Date: $d
         echo Camera: $camera_id
@@ -71,6 +67,9 @@ do
         
         # az storage blob list --container-name=$CONTAINER_NAME --connection-string=$STORAGE_CONNECTION_STRING --output table --prefix $azure_blob_filename_prefix --query "[].{Name:name}" --num-results 1000
         source_files=$(az storage blob list --container-name=$CONTAINER_NAME --connection-string=$STORAGE_CONNECTION_STRING --output tsv --prefix $azure_blob_filename_prefix --query "[].{Name:name}" --num-results 5000)
+
+        # Put into reverse time order
+        source_files=$(echo "${source_files[@]}" | tac)
 
         # echo Checking if any files are in s3 root folder...
         # aws_s3_files_in_root_folder=$(aws s3 ls s3://$DESTINATION_BUCKET_NAME/$azure_blob_filename_prefix | awk '{print $4}')
@@ -144,13 +143,13 @@ do
         done
 
 
-        if [[ "$OSTYPE" == "darwin"* ]]; then
-            d=$(gdate -I -d "$d + 1 day")
-        else
-            d=$(date -I -d "$d + 1 day")
-        fi
-
     done
+
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+        d=$(gdate -I -d "$d - 1 day")
+    else
+        d=$(date -I -d "$d - 1 day")
+    fi
 
 
 
