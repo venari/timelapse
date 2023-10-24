@@ -53,20 +53,20 @@ namespace timelapse.api.Pages
 
         #region Azure specific controls
         [BindProperty]
-        public string StorageAccountName {get; set; }
+        public string? StorageAccountName {get; set; }
         [BindProperty]
-        public string ConnectionString {get; set; }
+        public string? ConnectionString {get; set; }
         #endregion
 
         #region AWS specific controls
         [BindProperty]
-        public string Region { get; set; }
+        public string? Region { get; set; }
         [BindProperty]
-        public string BucketName { get; set; }
+        public string? BucketName { get; set; }
         [BindProperty]
-        public string AccessKey {get; set; }
+        public string? AccessKey {get; set; }
         [BindProperty]
-        public string SecretKey { get; set; }
+        public string? SecretKey { get; set; }
         #endregion
 
 
@@ -89,18 +89,33 @@ namespace timelapse.api.Pages
 
             if(ContainerProvider == ContainerProvider.Azure_Blob)
             {
-                if(String.IsNullOrEmpty(StorageAccountName) || String.IsNullOrEmpty(ConnectionString))
+                if(String.IsNullOrEmpty(StorageAccountName))
                 {
-                    ModelState.AddModelError("StorageAccountName", "StorageAccountName and Connection String are required");
-                    return Page();
+                    ModelState.AddModelError("StorageAccountName", "StorageAccountName is required");
+                }
+
+                if(String.IsNullOrEmpty(ConnectionString))
+                {
+                    ModelState.AddModelError("ConnectionString", "Connection String are required");
                 }
             }
             else if(ContainerProvider == ContainerProvider.AWS_S3)
             {
-                if(String.IsNullOrEmpty(Region) || String.IsNullOrEmpty(BucketName) || String.IsNullOrEmpty(AccessKey) || String.IsNullOrEmpty(SecretKey))
+                if(String.IsNullOrEmpty(Region))
                 {
-                    ModelState.AddModelError("Region", "Region, BucketName, AccessKey and SecretKey are required");
-                    return Page();
+                    ModelState.AddModelError("Region", "Region is required");
+                }
+                if(String.IsNullOrEmpty(BucketName))
+                {
+                    ModelState.AddModelError("BucketName", "BucketName is required");
+                }
+                if(String.IsNullOrEmpty(AccessKey))
+                {
+                    ModelState.AddModelError("AccessKey", "AccessKey is required");
+                }
+                if(String.IsNullOrEmpty(SecretKey))
+                {
+                    ModelState.AddModelError("SecretKey", "SecretKey is required");
                 }
             }
             else
@@ -130,7 +145,7 @@ namespace timelapse.api.Pages
                     container = new Container_Azure_Blob();
 
                     ((Container_Azure_Blob)container).ConnectionString = $"DefaultEndpointsProtocol=https;AccountName={StorageAccountName};AccountKey={AccessKey};EndpointSuffix=core.windows.net";
-                    ((Container_Azure_Blob)container).StorageAccountName = StorageAccountName;
+                    // ((Container_Azure_Blob)container).StorageAccountName = StorageAccountName;
                     break;
                 case ContainerProvider.AWS_S3:
                     container = new Container_AWS_S3();

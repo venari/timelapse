@@ -43,20 +43,20 @@ namespace timelapse.api.Pages
 
         #region Azure specific controls
         [BindProperty]
-        public string StorageAccountName {get; set; }
+        public string? StorageAccountName {get; set; }
         [BindProperty]
-        public string ConnectionString {get; set; }
+        public string? ConnectionString {get; set; }
         #endregion
 
         #region AWS specific controls
         [BindProperty]
-        public string Region { get; set; }
+        public string? Region { get; set; }
         [BindProperty]
-        public string BucketName { get; set; }
+        public string? BucketName { get; set; }
         [BindProperty]
-        public string AccessKey {get; set; }
+        public string? AccessKey {get; set; }
         [BindProperty]
-        public string SecretKey { get; set; }
+        public string? SecretKey { get; set; }
         #endregion
 
 
@@ -79,24 +79,30 @@ namespace timelapse.api.Pages
 
             ContainerName = container.Name;
             if(container is Container_Azure_Blob){
-                    ((Container_Azure_Blob)container).ConnectionString = $"DefaultEndpointsProtocol=https;AccountName={StorageAccountName};AccountKey={AccessKey};EndpointSuffix=core.windows.net";
+                    // ((Container_Azure_Blob)container).ConnectionString = $"DefaultEndpointsProtocol=https;AccountName={StorageAccountName};AccountKey={AccessKey};EndpointSuffix=core.windows.net";
 
-                    // Convert string in the form "DefaultEndpointsProtocol=https;AccountName={StorageAccountName};AccountKey={AccessKey};EndpointSuffix=core.windows.net" to its StorageAccountName and AccessKey components
-                    var storageAccountNameStartIndex = ((Container_Azure_Blob)container).ConnectionString.IndexOf("AccountName=") + "AccountName=".Length;
-                    var storageAccountNameEndIndex = ((Container_Azure_Blob)container).ConnectionString.IndexOf(";", storageAccountNameStartIndex);
-                    StorageAccountName = ((Container_Azure_Blob)container).ConnectionString.Substring(storageAccountNameStartIndex, storageAccountNameEndIndex - storageAccountNameStartIndex);
-
-                    var accessKeyStartIndex = ((Container_Azure_Blob)container).ConnectionString.IndexOf("AccountKey=") + "AccountKey=".Length;
-                    var accessKeyEndIndex = ((Container_Azure_Blob)container).ConnectionString.IndexOf(";", accessKeyStartIndex);
-                    AccessKey = ((Container_Azure_Blob)container).ConnectionString.Substring(accessKeyStartIndex, accessKeyEndIndex - accessKeyStartIndex);
+                    ConnectionString = ((Container_Azure_Blob)container).ConnectionString;
                     
-                    StorageAccountName = ((Container_Azure_Blob)container).StorageAccountName;
+                    // Convert string in the form "DefaultEndpointsProtocol=https;AccountName={StorageAccountName};AccountKey={AccessKey};EndpointSuffix=core.windows.net" to its StorageAccountName and AccessKey components
+                    // var storageAccountNameStartIndex = ((Container_Azure_Blob)container).ConnectionString.IndexOf("AccountName=") + "AccountName=".Length;
+                    // var storageAccountNameEndIndex = ((Container_Azure_Blob)container).ConnectionString.IndexOf(";", storageAccountNameStartIndex);
+                    // StorageAccountName = ((Container_Azure_Blob)container).ConnectionString.Substring(storageAccountNameStartIndex, storageAccountNameEndIndex - storageAccountNameStartIndex);
+
+                    // var accessKeyStartIndex = ((Container_Azure_Blob)container).ConnectionString.IndexOf("AccountKey=") + "AccountKey=".Length;
+                    // var accessKeyEndIndex = ((Container_Azure_Blob)container).ConnectionString.IndexOf(";", accessKeyStartIndex);
+                    // AccessKey = ((Container_Azure_Blob)container).ConnectionString.Substring(accessKeyStartIndex, accessKeyEndIndex - accessKeyStartIndex);
+
+                    ContainerProvider = ContainerProvider.Azure_Blob;
+                    
+                    // StorageAccountName = ((Container_Azure_Blob)container).StorageAccountName;
             } else {
                 if(container is Container_AWS_S3){
                     BucketName = ((Container_AWS_S3)container).BucketName;
                     Region = ((Container_AWS_S3)container).Region;
                     AccessKey = ((Container_AWS_S3)container).AccessKey;
                     SecretKey = ((Container_AWS_S3)container).SecretKey;
+
+                    ContainerProvider = ContainerProvider.AWS_S3;
                 } else 
                 {
                     throw new Exception($"ContainerProvider {ContainerProvider} not implemented!");
@@ -118,18 +124,28 @@ namespace timelapse.api.Pages
 
             if(ContainerProvider == ContainerProvider.Azure_Blob)
             {
-                if(String.IsNullOrEmpty(StorageAccountName) || String.IsNullOrEmpty(ConnectionString))
+                if(String.IsNullOrEmpty(ConnectionString))
                 {
-                    ModelState.AddModelError("StorageAccountName", "StorageAccountName and Connection String are required");
-                    return Page();
+                    ModelState.AddModelError("ConnectionString", "Connection String are required");
                 }
             }
             else if(ContainerProvider == ContainerProvider.AWS_S3)
             {
-                if(String.IsNullOrEmpty(Region) || String.IsNullOrEmpty(BucketName) || String.IsNullOrEmpty(AccessKey) || String.IsNullOrEmpty(SecretKey))
+                if(String.IsNullOrEmpty(Region))
                 {
-                    ModelState.AddModelError("Region", "Region, BucketName, AccessKey and SecretKey are required");
-                    return Page();
+                    ModelState.AddModelError("Region", "Region is required");
+                }
+                if(String.IsNullOrEmpty(BucketName))
+                {
+                    ModelState.AddModelError("BucketName", "BucketName is required");
+                }
+                if(String.IsNullOrEmpty(AccessKey))
+                {
+                    ModelState.AddModelError("AccessKey", "AccessKey is required");
+                }
+                if(String.IsNullOrEmpty(SecretKey))
+                {
+                    ModelState.AddModelError("SecretKey", "SecretKey is required");
                 }
             }
             else
@@ -154,8 +170,9 @@ namespace timelapse.api.Pages
             // Container container = null;
 
             if(container is Container_Azure_Blob){
-                    ((Container_Azure_Blob)container).ConnectionString = $"DefaultEndpointsProtocol=https;AccountName={StorageAccountName};AccountKey={AccessKey};EndpointSuffix=core.windows.net";
-                    ((Container_Azure_Blob)container).StorageAccountName = StorageAccountName;
+                    ((Container_Azure_Blob)container).ConnectionString = ConnectionString;
+                    // ((Container_Azure_Blob)container).ConnectionString = $"DefaultEndpointsProtocol=https;AccountName={StorageAccountName};AccountKey={AccessKey};EndpointSuffix=core.windows.net";
+                    // ((Container_Azure_Blob)container).StorageAccountName = StorageAccountName;
             } else {
                 if(container is Container_AWS_S3){
                     ((Container_AWS_S3)container).BucketName=BucketName;

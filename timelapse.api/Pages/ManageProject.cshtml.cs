@@ -113,7 +113,7 @@ namespace timelapse.api.Pages
             
             await _appDbContext.SaveChangesAsync();
 
-            return Redirect($"ManageOrganisation?Id={Project.OrganisationId}");
+            return Redirect($"/ManageOrganisation?Id={Project.OrganisationId}");
         }
     }
 }

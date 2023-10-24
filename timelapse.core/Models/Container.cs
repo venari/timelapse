@@ -33,7 +33,7 @@ public class Container_AWS_S3: Container
 
 public class Container_Azure_Blob: Container
 {
-    public string StorageAccountName { get; set; }
+    // public string StorageAccountName { get; set; }
     public string ConnectionString { get; set; }
 
     public override Uri Upload(string blobName, Stream stream){
