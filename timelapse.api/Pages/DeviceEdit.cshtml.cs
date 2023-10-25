@@ -59,6 +59,7 @@ namespace timelapse.api.Pages
             device.Description = Device.Description;
             device.SupportMode = Device.SupportMode;
             device.MonitoringMode = Device.MonitoringMode;
+            device.HibernateMode = Device.HibernateMode;
             device.Retired = Device.Retired;
 
             _appDbContext.Devices.Update(device);

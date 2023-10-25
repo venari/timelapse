@@ -3,12 +3,6 @@ A set of tools/scripts to automate the taking and creation of timelapse videos a
 
 # PI Setup
 
-For now, use Buster rather than Bullseye - owing to raspicam issues on Pi Zero.
-
-Raspberry Pi OS Lite (Legacy) 
-Debian version 10 - https://downloads.raspberrypi.org/raspios_oldstable_lite_armhf/images/raspios_oldstable_lite_armhf-2022-01-28/2022-01-28-raspios-buster-armhf-lite.zip
-
-
 Raspberry Pi OS Lite (32 bit - Pi Zero W)
 Debian version 11 (bullseye) - https://downloads.raspberrypi.org/raspios_lite_armhf/images/raspios_lite_armhf-2022-09-26/2022-09-22-raspios-bullseye-armhf-lite.img.xz
 
@@ -50,49 +44,103 @@ raspberrypi.lan (192.168.86.32) at b8:27:eb:94:ac:b1 on en0 ifscope [ethernet]
 
 ```
 
+# Install software, (LiPo, sedicam v2 configuration) config & code to new Pi
+```
+bash <(curl -fsSL "https://raw.githubusercontent.com/venari/timelapse/deployment/sedicam_v2/install_sedicam.sh?$RANDOM")
+```
+
+Update config and code to existing install
+```
+bash <(curl -fsSL "https://raw.githubusercontent.com/venari/timelapse/deployment/sedicam_v2/update_sedicam.sh?$RANDOM")
+```
+
+## Install software, (LiFePO4, sedicam v1 cofiguration) config & code to new Pi
+```
+bash <(curl -fsSL "https://raw.githubusercontent.com/venari/timelapse/main/install.sh?$RANDOM")
+```
+
+Update config and code to existing install
+```
+bash <(curl -fsSL "https://raw.githubusercontent.com/venari/timelapse/main/update.sh?$RANDOM")
+```
+
+# Connect to intermitently connected Pi and tail log:
+```
+ssh -o ConnectTimeout=60 -o ConnectionAttempts=30 pi@sediment-pi-zero-w-v1-a 'tail -f -n 100 logs/timelapse.log'
+```
+
+Connect to intermitently connected Pi and trigger reboot:
+```
+ssh -o ConnectTimeout=60 -o ConnectionAttempts=30 pi@sediment-pi-zero-w-v1-a 'sudo reboot now'
+```
+
+Copy log files to local machine:
+```
+scp -o ConnectTimeout=60 -o ConnectionAttempts=30 pi@sediment-pi-zero-w-v1-a:/home/pi/logs/*.* .
+```
+
+# Waveshare SIM6700X GSM/GPRS/GNSS HAT
+
+- Enable Serial Communication
+```
+sudo raspi-config nonint do_serial 2        # Disable serial login shell and enable serial port hardware
+sudo reboot
+```
+
+https://core-electronics.com.au/guides/raspberry-pi/raspberry-pi-4g-gps-hat/
+```
+sudo apt-get install minicom
+pip3 install pyserial
+wget https://www.waveshare.com/w/upload/2/29/SIM7600X-4G-HAT-Demo.7z
+sudo apt-get install p7zip-full
+
+7z x SIM7600X-4G-HAT-Demo.7z -r -o/home/pi
+
+sudo chmod 777 -R /home/pi/SIM7600X-4G-HAT-Demo
+
+
+
+sudo nano /etc/rc.local
+
+```
+Add following line, just above `exit 0`:
+
+```
+sh /home/pi/SIM7600X-4G-HAT-Demo/Raspberry/c/sim7600_4G_hat_init
 ```
 
 ```
-
-```
-sudo apt-get update
-sudo apt-get upgrade
-# Note - Camera module v3 won't work until you've done this update, and it will take 5-10 mins
-
-sudo apt-get install git pijuice-base python3-pip -y
-sudo apt install -y python3-picamera2 --no-install-recommends
-
-#S Set hostname
-<!-- sudo hostname timelapse-pi-zero-w-v1-A -->
-sudo hostnamectl set-hostname timelapse-pi-zero-w-v1-A.local
-sudo shutdown -r now
-
-
-# Set timezone (if necessary)
-sudo timedatectl set-timezone Pacific/Auckland
-
-mkdir -p dev
-cd dev
-git clone https://github.com/venari/timelapse.git
-git config pull.rebase false
-cd timelapse
+cd /home/pi/SIM7600X-4G-HAT-Demo/Raspberry/c/bcm2835
+chmod +x configure && ./configure && sudo make && sudo make install
 ```
 
-Add scheduled tasks:
+Plug in USB cable, testing with minicom
+CTRL-A, E to echo
+CTRL-A, Q to exit
 ```
-crontab -e
-```
-```
-@reboot /usr/bin/bash /home/pi/dev/timelapse/scripts/startup.sh
-@reboot /usr/bin/bash /home/pi/dev/timelapse/scripts/uploadPending.sh 
+minicom -D /dev/ttyUSB2
+
+AT+CPIN?
++CME ERROR:10 # No SIM card
 ```
 
-# Raspberry Pi Camera Module v3
+Switch to RNDIS dial up mode
+https://www.waveshare.com/wiki/Raspberry_Pi_RNDIS_dial-up_Internet_access
+```
+AT+CUSBPIDSWITCH=9011,1,1
+```
 
-- 12MP sensor using IMX708
-https://www.raspberrypi.com/documentation/computers/camera_software.html
-Camera Module 3 (IMX708)
-Ensure software is upgraded (above)
+Nope - prevents camera from working...
+
+    Disable HDMI:
+    https://picockpit.com/raspberry-pi/raspberry-pi-zero-2-battery/
+
+    sudo raspi-config
+
+    Then, go to Advanced Options -> GL Driver -> Legacy
+
+    Add to /etc/rc.local:
+    /usr/bin/tvservice -o
 
 <!-- `camera.lensposition` - 1/distance in metres
 - '0' - infinity
@@ -100,7 +148,7 @@ Ensure software is upgraded (above)
 - `5`: 20cm
 - `10`: 10cm -->
 
-`camera.focus_m`: focus in metres
+<!-- `camera.focus_m`: focus in metres -->
 
 <!-- Add following to /boot/config.txt
 ```
@@ -137,37 +185,18 @@ ffmpeg -r 30 -f image2 -pattern_type glob -i "./<YYYY-MM-DD>*.jpg" -s 1014x760 -
 ffmpeg -r 30 -f image2 -pattern_type glob -i  "*11_2023-01-03*.jpg" -s 3280x1844 -vcodec libx264 output.mp4
 ```
 
-## Overlay lable and date/time in images:
+## Overlay label and date/time in images:
 ```
 mkdir -p mod
 
-for filename in *.jpg; do 
-    # Escape the colon so it doesn't confuse the text expansion for drawtext
+label="<Label for bottom left>"
+
+for filename in <filter>_*.jpg; do 
     date_time="$(echo ${filename:3:10} ${filename:14:2}\\:${filename:16:2})"
-    label="Forest Lodge Orchard"
     ffmpeg -i $filename -y -vf "drawtext=fontfile=/System/Library/Fonts/Avenir.ttc:text='$label':fontcolor=white:fontsize=90:box=1:boxcolor=black@0.3:boxborderw=5:x=10:y=h-th-10,drawtext=fontfile=/System/Library/Fonts/Avenir.ttc:text='$date_time':fontcolor=white:fontsize=90:box=1:boxcolor=black@0.3:boxborderw=5:x=w-tw-10:y=h-th-10" -hide_banner -loglevel error mod/$filename
 done
 
-
-
-ffmpeg -r 60 -f image2 -pattern_type glob -i  "mod/*.jpg" -s 3280x1844 -vcodec libx264 text-test.mp4
-
-```
-
-ffmpeg -r 30 -f image2 -pattern_type glob -i  "*11_2023-01-03*.jpg" -s 3280x1844 -vcodec libx264 output.mp4 -vf "drawtext=fontfile=/System/Library/Fonts/Geneva.ttf:text='Stack Overflow':fontcolor=white:fontsize=24:box=1:boxcolor=black@0.5:boxborderw=5:x=(w-text_w)/2:y=(h-text_h)/2,drawtext=fontfile=/System/Library/Fonts/Avenir.ttc:text='%{split(split(filename, '_')[2], \\\\.)[0]} %{split(split(filename, '_')[2], \\\\.)[1]}':fontcolor=white:fontsize=90:box=1:boxcolor=black@0.2:boxborderw=5:x=w-tw-10:y=h-th-10" 
-
-ffmpeg -r 60 -f image2 -pattern_type glob -i  "*11_2023-01-03_120*.jpg" -s 3280x1844 -vcodec libx264 -vf "drawtext=fontfile=/System/Library/Fonts/Geneva.ttf:text='TEST':x=10:y=10:fontcolor=white:fontsize=24" text-test.mp4
-ffmpeg -r 60 -f image2 -pattern_type glob -i  "*11_2023-01-03_120*.jpg" -s 3280x1844 -vcodec libx264 -vf "drawtext=fontfile=/System/Library/Fonts/Geneva.ttf:text='Stack Overflow':fontcolor=white:fontsize=24:box=1:boxcolor=black@0.5:boxborderw=5:x=(w-text_w)/2:y=(h-text_h)/2,drawtext=fontfile=/System/Library/Fonts/Avenir.ttc:text='%{split(split(filename, '_')[2], \\\\.)[0]} %{split(split(filename, '_')[2], \\\\.)[1]}':fontcolor=white:fontsize=90:box=1:boxcolor=black@0.2:boxborderw=5:x=w-tw-10:y=h-th-10" text-test.mp4
-
-Avenir.ttc
-
-
-ffmpeg -i text-test.mp4 -vf "drawtext=fontfile=/System/Library/Fonts/Geneva.ttf:text='Stack Overflow':fontcolor=white:fontsize=24:box=1:boxcolor=black@0.5:boxborderw=5:x=(w-text_w)/2:y=(h-text_h)/2,drawtext=fontfile=/System/Library/Fonts/Avenir.ttc:text='Bottom right text':fontcolor=white:fontsize=60:x=w-tw-10:y=h-th-10" -codec:a copy output.mp4
-
-ffmpeg -i text-test.mp4 -vf "drawtext=fontfile=/System/Library/Fonts/Geneva.ttf:text='Stack Overflow':fontcolor=white:fontsize=24:box=1:boxcolor=black@0.5:boxborderw=5:x=(w-text_w)/2:y=(h-text_h)/2,drawtext=fontfile=/System/Library/Fonts/Avenir.ttc:text='Bottom right text':fontcolor=white:fontsize=90:box=1:boxcolor=black@0.5:boxborderw=5:x=w-tw-10:y=h-th-10" -codec:a copy output.mp4
-
-
-
+ffmpeg  -pattern_type glob -i "mod/14_*.jpg" -vf "scale='min(1280,iw)':-2,format=yuv420p" -c:v libx264 -preset medium -profile:v main -c:a aac -shortest -movflags +faststart ../Output/<SiteName>.mp4
 ```
 
 # Video stabilization
