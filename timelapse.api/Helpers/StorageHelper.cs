@@ -51,13 +51,32 @@ namespace timelapse.api.Helpers
         private Amazon.S3.AmazonS3Client s3Client = null;
 
         public ContainerHelper_AWS_S3(Container_AWS_S3 container, IMemoryCache memoryCache): base(container, memoryCache){
+            s3Client = new Amazon.S3.AmazonS3Client(container.AccessKey, container.SecretKey, Amazon.RegionEndpoint.GetBySystemName(container.Region));
         }
 
         public override Uri Upload(string blobName, Stream stream){
+
             throw new NotImplementedException();
         }
 
         public override string GenerateSasToken(){
+
+            throw new NotImplementedException();
+
+            // Looks like we can't generate one key for the whole container.
+            // :-(
+                
+            var container = _container as Container_AWS_S3;
+
+            var request = new Amazon.S3.Model.GetPreSignedUrlRequest(){
+                BucketName = container.BucketName,
+                Key = "bugger",
+                Expires = DateTime.UtcNow.AddHours(1),
+                Protocol = Amazon.S3.Protocol.HTTPS
+            };
+
+            var sasUri = s3Client.GetPreSignedURL(request);
+                // container.BucketName,  "test", DateTime.UtcNow.AddHours(1), Amazon.S3.Protocol.HTTPS);
             throw new NotImplementedException();
         }
     }
@@ -163,7 +182,7 @@ namespace timelapse.api.Helpers
             }
         }
 
-        private string GenerateSasToken(Container? containerOverride){
+        private string GetSasToken(Container? containerOverride){
             try{
 
                 string containerHelpersKey = GetContainerHelperId(containerOverride);
@@ -186,12 +205,18 @@ namespace timelapse.api.Helpers
             }
         }
 
-        public string SasToken(int imageId){
-            var containerOverride = GetContainerOverrideForImage(imageId);
-            return GenerateSasToken(containerOverride);
+        public string SasToken(Project project){
+            
+            var containerOverride = project.ContainerOveride;
+            return GetSasToken(containerOverride);
         }
 
-        public Container? GetContainerOverrideForImage(int imageId){
+        public string SasToken(int imageId){
+            var containerOverride = GetContainerOverrideForImage(imageId);
+            return GetSasToken(containerOverride);
+        }
+
+        public Project? GetProjectForImage(int imageId){
             var image = _appDbContext.Images
                 .Include(i => i.Device)
                 .FirstOrDefault(i => i.Id == imageId);
@@ -214,17 +239,18 @@ namespace timelapse.api.Helpers
                     .Any(dpc => dpc.DeviceId == device.Id && dpc.StartDate <= image.Timestamp && (dpc.EndDate == null || dpc.EndDate >= image.Timestamp)))
                 .FirstOrDefault();
 
-            Container? containerOveride=null;
-            if(project!=null){
-                containerOveride = project.ContainerOveride;
-            }
-
-            return containerOveride;
+            return project;
         }
-        // public string SasToken{
-        //     get{
-        //         return GenerateSasUri().Query;
-        //     }
-        // }
+
+        public Container? GetContainerOverrideForImage(int imageId){
+
+            var project = GetProjectForImage(imageId);
+
+            if(project!=null){
+                return project.ContainerOveride;
+            } else {
+                return null;
+            }
+        }
     }
 }

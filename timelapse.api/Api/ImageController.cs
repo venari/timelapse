@@ -97,7 +97,7 @@ namespace timelapse.api{
                 return new NotFoundResult();
             }
 
-            return new RedirectResult(image.BlobUri.ToString() + _storageHelper.SasToken);
+            return new RedirectResult(image.BlobUri.ToString() + _storageHelper.SasToken(image.Id));
         }        
 
         [HttpGet("GetImageAtOrAround")]

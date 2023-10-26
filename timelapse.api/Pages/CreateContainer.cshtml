@@ -33,15 +33,15 @@
 
 
         <fieldset id="azure-group">
-            <div class="form-group">
+            @* <div class="form-group">
                 <label asp-for="StorageAccountName"></label>
                 <input asp-for="StorageAccountName" class="form-control" />
                 <span asp-validation-for="StorageAccountName" class="text-danger"></span>
-            </div>
+            </div> *@
             <div class="form-group">
-                <label asp-for="ConnectionString"></label>
-                <input asp-for="ConnectionString" class="form-control" />
-                <span asp-validation-for="ConnectionString" class="text-danger"></span>
+                <label asp-for="Azure_ConnectionString"></label>
+                <input asp-for="Azure_ConnectionString" class="form-control" />
+                <span asp-validation-for="Azure_ConnectionString" class="text-danger"></span>
             </div>
 
 
@@ -50,26 +50,26 @@
 
         <fieldset id="aws-group">
             <div class="form-group">
-                <label asp-for="Region"></label>
-                <input asp-for="Region" class="form-control" />
-                <span asp-validation-for="Region" class="text-danger"></span>
+                <label asp-for="AWS_S3_Region"></label>
+                <input asp-for="AWS_S3_Region" class="form-control" />
+                <span asp-validation-for="AWS_S3_Region" class="text-danger"></span>
             </div>
 
             <div class="form-group">
-                <label asp-for="BucketName"></label>
-                <input asp-for="BucketName" class="form-control" />
-                <span asp-validation-for="BucketName" class="text-danger"></span>
+                <label asp-for="AWS_S3_BucketName"></label>
+                <input asp-for="AWS_S3_BucketName" class="form-control" />
+                <span asp-validation-for="AWS_S3_BucketName" class="text-danger"></span>
             </div>
             <div class="form-group">
-                <label asp-for="AccessKey"></label>
-                <input asp-for="AccessKey" class="form-control" />
-                <span asp-validation-for="AccessKey" class="text-danger"></span>
+                <label asp-for="AWS_S3_AccessKey"></label>
+                <input asp-for="AWS_S3_AccessKey" class="form-control" />
+                <span asp-validation-for="AWS_S3_AccessKey" class="text-danger"></span>
             </div>
 
             <div class="form-group">
-                <label asp-for="SecretKey"></label>
-                <input asp-for="SecretKey" class="form-control" />
-                <span asp-validation-for="SecretKey" class="text-danger"></span>
+                <label asp-for="AWS_S3_SecretKey"></label>
+                <input type="password" asp-for="AWS_S3_SecretKey" class="form-control" />
+                <span asp-validation-for="AWS_S3_SecretKey" class="text-danger"></span>
             </div>
         </fieldset>
 

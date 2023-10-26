@@ -1,10 +1,10 @@
-@page "{projectId:int}"
-@model timelapse.api.Pages.CreateCameraAllocationModel
+@page "{deviceProjectContractId:int}"
+@model timelapse.api.Pages.EditCameraAllocationModel
 @{
-    ViewData["Title"] = "Allocate Camera";
+    ViewData["Title"] = "Edit Camera Allocation";
 }
 
-<h1>Allocate Camera</h1>
+<h1>Edit Camera Allocation</h1>
 <h2>Project: @(Model.Project.Name)</h2>
 
 <form method="post" onsubmit="updateHiddenFields()">
@@ -43,7 +43,7 @@
     }
 
     if('@(Model.EndTimeUTC!=null)'=='True'){
-        document.getElementById("EndDateTimeUTC").value = ISO8601UTCDatetimeToLocalDatetime('@(Model.EndTimeUTC!=null?Model.EndTimeUTC.Value.ToString("o"):"---")');
+        document.getElementById("EndDateTime").value = ISO8601UTCDatetimeToLocalDatetime('@(Model.EndTimeUTC!=null?Model.EndTimeUTC.Value.ToString("o"):"---")');
     }
 
     function updateHiddenFields(){

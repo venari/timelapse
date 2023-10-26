@@ -1,6 +1,7 @@
 ﻿@page "{projectId:int}"
 @model timelapse.api.Pages.ManageProjectModel
 @{
+    ViewData["Title"] = "Manage Project";
 }
 
 <script>
@@ -60,6 +61,7 @@
             <th scope="col"> Device Name </th>
             <th scope="col"> Start Date </th>
             <th scope="col"> End Date </th>
+            <th></th>
         </thead>
         <tbody>
             @foreach (var deviceContract in Model.DeviceProjectContracts.Where(d => d.ProjectId == Model.ProjectId))
@@ -69,7 +71,7 @@
                 <tr>
                     <td>
                         @* @Html.DisplayFor(m => deviceContract.Device.Name) *@
-                        <a href="/DeviceEdit/@(device.Id)">@(deviceContract.Device.Name)</a>
+                        <a href="/DeviceEdit/@(device.Id)">@(deviceContract.Device.Name + " - " + deviceContract.Device.Description)</a>
 
                     </td>
                     <td>
@@ -77,6 +79,9 @@
                     </td>
                     <td>
                             <script type="text/javascript">localizeDateTime('@(deviceContract.EndDate.HasValue?deviceContract.EndDate.Value.ToString("s"):"---")')</script>
+                    </td>
+                    <td>
+                        <a href="/EditCameraAllocation/@(deviceContract.Id)"> Edit </a>
                     </td>
                 </tr>
             }
@@ -89,10 +94,9 @@
         }
         <a href="/CreateCameraAllocation/@(Model.ProjectId)"> Allocate a camera </a>
     </div>
+
     <div>
-        @* DEVDO this is a placeholder *@
-        <button class="btn btn-primary" onclick="makeReq('/api/Project/AddMockDevice?ProjectId=@(Model.ProjectId)', document.getElementById('AddMockError'))"> Add mock device </button> <br>
-        <label class="text-danger" id="AddMockError"></label>
+        <a href="/Events/@(Model.ProjectId)"> Events </a>
     </div>
 
     <div>

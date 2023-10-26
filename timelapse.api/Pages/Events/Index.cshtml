@@ -1,4 +1,4 @@
-﻿@page
+﻿@page "{projectId:int}"
 @using Humanizer
 @model Events.IndexModel
 @{
@@ -10,6 +10,7 @@
 
 <div class="text-center">
     <h1 class="display-4">Events</h1>
+    <h4 class="display-4">Project: @(Model.Project.Name)</h4>
 </div>
 
 <div>
@@ -66,7 +67,8 @@
                             <script type="text/javascript">localizeDateTime('@(deviceEvent.StartTime.ToString("s"))');</script>
                         </td>
                         <td>
-                            <a href="/Events/Detail/@(deviceEvent.Id)"><img class="img-thumbnail" src="@(deviceEvent.StartImage.BlobUri + Model.GetSasTokenForImage(deviceEvent.StartImageId))"></img></a>
+                            <a href="/Events/Detail/@(deviceEvent.Id)"><img class="img-thumbnail" src="@(deviceEvent.StartImage.BlobUri + Model.SasToken)"></img></a>
+                            @* <a href="/Events/Detail/@(deviceEvent.Id)"><img class="img-thumbnail" src="@(deviceEvent.StartImage.BlobUri + Model.GetSasTokenForImage(deviceEvent.StartImageId))"></img></a> *@
                         </td>
                         @* <td>
                             <a href="/Events/Detail/@(deviceEvent.Id)"><img class="img-thumbnail" src="@(deviceEvent.ThumbnailImage!=null?deviceEvent.ThumbnailImage.BlobUri + Model.SasToken:"")"></img></a>
@@ -75,7 +77,8 @@
                             <script type="text/javascript">localizeDateTime('@(deviceEvent.EndTime.ToString("s"))');</script>
                         </td>
                         <td>
-                            <a href="/Events/Detail/@(deviceEvent.Id)"><img class="img-thumbnail" src="@(deviceEvent.EndImage.BlobUri + Model.GetSasTokenForImage(deviceEvent.EndImageId))"></img></a>
+                            <a href="/Events/Detail/@(deviceEvent.Id)"><img class="img-thumbnail" src="@(deviceEvent.EndImage.BlobUri + Model.SasToken)"></img></a>
+                            @* <a href="/Events/Detail/@(deviceEvent.Id)"><img class="img-thumbnail" src="@(deviceEvent.EndImage.BlobUri + Model.GetSasTokenForImage(deviceEvent.EndImageId))"></img></a> *@
                         </td>
                         @{
                             var user = Model.Users.FirstOrDefault(u => u.Id == deviceEvent.CreatedByUserId);

@@ -11,25 +11,25 @@ using Microsoft.EntityFrameworkCore;
 namespace timelapse.api.Pages
 {
 
-    public class CreateCameraAllocationModel : PageModel
+    public class EditCameraAllocationModel : PageModel
     {
-        private readonly ILogger<CreateCameraAllocationModel> _logger;
+        private readonly ILogger<EditCameraAllocationModel> _logger;
         private readonly UserManager<AppUser> _userManager;
-        private readonly SignInManager<AppUser> _signInManager;
+        // private readonly SignInManager<AppUser> _signInManager;
         private AppDbContext _appDbContext;
         
         [BindProperty]
         public List<Device> Devices { get; set; }
 
-        public CreateCameraAllocationModel(
-            ILogger<CreateCameraAllocationModel> Logger,
+        public EditCameraAllocationModel(
+            ILogger<EditCameraAllocationModel> Logger,
             UserManager<AppUser> UserManager,
-            SignInManager<AppUser> SignInManager,
+            // SignInManager<AppUser> SignInManager,
             AppDbContext AppDbContext)
         {
             _logger = Logger;
             _userManager = UserManager;
-            _signInManager = SignInManager;
+            // _signInManager = SignInManager;
             _appDbContext = AppDbContext;
         }
 
@@ -74,24 +74,35 @@ namespace timelapse.api.Pages
         }
 
 
-        public ActionResult OnGet(int projectId)
+        public ActionResult OnGet(int deviceProjectContractId)
         {
-            if(!LoadProject(projectId)){
-                return NotFound($"No project with ID {projectId}");
+            var deviceProjectContract = _appDbContext.DeviceProjectContracts.FirstOrDefault(dpc => dpc.Id == deviceProjectContractId);
+
+            if(deviceProjectContract==null){
+                return new NotFoundResult();
             }
 
-            StartTimeUTC = DateTime.UtcNow;
-            EndTimeUTC = null;
+            if(!LoadProject(deviceProjectContract.ProjectId)){
+                return NotFound($"No project with ID {deviceProjectContract.ProjectId}");
+            }
 
-            DeviceId = -1;
+            StartTimeUTC = deviceProjectContract.StartDate;
+            EndTimeUTC = deviceProjectContract.EndDate;
+            DeviceId = deviceProjectContract.DeviceId;
 
             return Page();
         }
 
-        public async Task<IActionResult> OnPostAsync(int projectId)
+        public async Task<IActionResult> OnPostAsync(int deviceProjectContractId)
         {
-            if(!LoadProject(projectId)){
-                return NotFound($"No project with ID {projectId}");
+            var deviceProjectContract = _appDbContext.DeviceProjectContracts.FirstOrDefault(dpc => dpc.Id == deviceProjectContractId);
+
+            if(deviceProjectContract==null){
+                return NotFound();
+            }
+
+            if(!LoadProject(deviceProjectContract.ProjectId)){
+                return NotFound($"No project with ID {deviceProjectContract.ProjectId}");
             }
 
             if(StartTimeUTC==null){
@@ -103,15 +114,12 @@ namespace timelapse.api.Pages
                 return Page();
             }
 
-            var deviceProjectContract = new DeviceProjectContract
-            {
-                ProjectId = projectId,
-                StartDate = StartTimeUTC.Value,
-                EndDate = EndTimeUTC,
-                DeviceId = DeviceId
-            };
+            // deviceProjectContract.ProjectId = projectId;
+            deviceProjectContract.StartDate = StartTimeUTC.Value;
+            deviceProjectContract.EndDate = EndTimeUTC;
+            deviceProjectContract.DeviceId = DeviceId;
 
-            _appDbContext.DeviceProjectContracts.Add(deviceProjectContract);
+            _appDbContext.DeviceProjectContracts.Update(deviceProjectContract);
             await _appDbContext.SaveChangesAsync();
 
             return RedirectToPage("/ManageProject", new {projectId = Project.Id});

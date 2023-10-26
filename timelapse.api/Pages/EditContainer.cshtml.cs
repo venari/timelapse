@@ -42,21 +42,21 @@ namespace timelapse.api.Pages
         // public List<ContainerProvider> ContainerProviders {get; set; } = new List<ContainerProvider>(){core.models.ContainerProvider.Azure_Blob, core.models.ContainerProvider.AWS_S3};
 
         #region Azure specific controls
+        // [BindProperty]
+        // public string? StorageAccountName {get; set; }
         [BindProperty]
-        public string? StorageAccountName {get; set; }
-        [BindProperty]
-        public string? ConnectionString {get; set; }
+        public string? Azure_ConnectionString {get; set; }
         #endregion
 
         #region AWS specific controls
         [BindProperty]
-        public string? Region { get; set; }
+        public string? AWS_S3_Region { get; set; }
         [BindProperty]
-        public string? BucketName { get; set; }
+        public string? AWS_S3_BucketName { get; set; }
         [BindProperty]
-        public string? AccessKey {get; set; }
+        public string? AWS_S3_AccessKey {get; set; }
         [BindProperty]
-        public string? SecretKey { get; set; }
+        public string? AWS_S3_SecretKey { get; set; }
         #endregion
 
 
@@ -79,28 +79,21 @@ namespace timelapse.api.Pages
 
             ContainerName = container.Name;
             if(container is Container_Azure_Blob){
-                    // ((Container_Azure_Blob)container).ConnectionString = $"DefaultEndpointsProtocol=https;AccountName={StorageAccountName};AccountKey={AccessKey};EndpointSuffix=core.windows.net";
-
-                    ConnectionString = ((Container_Azure_Blob)container).ConnectionString;
                     
-                    // Convert string in the form "DefaultEndpointsProtocol=https;AccountName={StorageAccountName};AccountKey={AccessKey};EndpointSuffix=core.windows.net" to its StorageAccountName and AccessKey components
-                    // var storageAccountNameStartIndex = ((Container_Azure_Blob)container).ConnectionString.IndexOf("AccountName=") + "AccountName=".Length;
-                    // var storageAccountNameEndIndex = ((Container_Azure_Blob)container).ConnectionString.IndexOf(";", storageAccountNameStartIndex);
-                    // StorageAccountName = ((Container_Azure_Blob)container).ConnectionString.Substring(storageAccountNameStartIndex, storageAccountNameEndIndex - storageAccountNameStartIndex);
+                    var accessKeyStartIndex = ((Container_Azure_Blob)container).ConnectionString.IndexOf("AccountKey=") + "AccountKey=".Length;
+                    var accessKeyEndIndex = ((Container_Azure_Blob)container).ConnectionString.IndexOf(";", accessKeyStartIndex);
+                    var accessKey = ((Container_Azure_Blob)container).ConnectionString.Substring(accessKeyStartIndex, accessKeyEndIndex - accessKeyStartIndex);
 
-                    // var accessKeyStartIndex = ((Container_Azure_Blob)container).ConnectionString.IndexOf("AccountKey=") + "AccountKey=".Length;
-                    // var accessKeyEndIndex = ((Container_Azure_Blob)container).ConnectionString.IndexOf(";", accessKeyStartIndex);
-                    // AccessKey = ((Container_Azure_Blob)container).ConnectionString.Substring(accessKeyStartIndex, accessKeyEndIndex - accessKeyStartIndex);
-
+                    Azure_ConnectionString = ((Container_Azure_Blob)container).ConnectionString.Replace(accessKey, "********");
                     ContainerProvider = ContainerProvider.Azure_Blob;
                     
                     // StorageAccountName = ((Container_Azure_Blob)container).StorageAccountName;
             } else {
                 if(container is Container_AWS_S3){
-                    BucketName = ((Container_AWS_S3)container).BucketName;
-                    Region = ((Container_AWS_S3)container).Region;
-                    AccessKey = ((Container_AWS_S3)container).AccessKey;
-                    SecretKey = ((Container_AWS_S3)container).SecretKey;
+                    AWS_S3_BucketName = ((Container_AWS_S3)container).BucketName;
+                    AWS_S3_Region = ((Container_AWS_S3)container).Region;
+                    AWS_S3_AccessKey = ((Container_AWS_S3)container).AccessKey;
+                    AWS_S3_SecretKey = ((Container_AWS_S3)container).SecretKey;
 
                     ContainerProvider = ContainerProvider.AWS_S3;
                 } else 
@@ -124,26 +117,26 @@ namespace timelapse.api.Pages
 
             if(ContainerProvider == ContainerProvider.Azure_Blob)
             {
-                if(String.IsNullOrEmpty(ConnectionString))
+                if(String.IsNullOrEmpty(Azure_ConnectionString))
                 {
                     ModelState.AddModelError("ConnectionString", "Connection String are required");
                 }
             }
             else if(ContainerProvider == ContainerProvider.AWS_S3)
             {
-                if(String.IsNullOrEmpty(Region))
+                if(String.IsNullOrEmpty(AWS_S3_Region))
                 {
                     ModelState.AddModelError("Region", "Region is required");
                 }
-                if(String.IsNullOrEmpty(BucketName))
+                if(String.IsNullOrEmpty(AWS_S3_BucketName))
                 {
                     ModelState.AddModelError("BucketName", "BucketName is required");
                 }
-                if(String.IsNullOrEmpty(AccessKey))
+                if(String.IsNullOrEmpty(AWS_S3_AccessKey))
                 {
                     ModelState.AddModelError("AccessKey", "AccessKey is required");
                 }
-                if(String.IsNullOrEmpty(SecretKey))
+                if(String.IsNullOrEmpty(AWS_S3_SecretKey))
                 {
                     ModelState.AddModelError("SecretKey", "SecretKey is required");
                 }
@@ -170,15 +163,20 @@ namespace timelapse.api.Pages
             // Container container = null;
 
             if(container is Container_Azure_Blob){
-                    ((Container_Azure_Blob)container).ConnectionString = ConnectionString;
+                    var accessKeyStartIndex = ((Container_Azure_Blob)container).ConnectionString.IndexOf("AccountKey=") + "AccountKey=".Length;
+                    var accessKeyEndIndex = ((Container_Azure_Blob)container).ConnectionString.IndexOf(";", accessKeyStartIndex);
+                    var accessKey = ((Container_Azure_Blob)container).ConnectionString.Substring(accessKeyStartIndex, accessKeyEndIndex - accessKeyStartIndex);
+
+                    ((Container_Azure_Blob)container).ConnectionString = Azure_ConnectionString.Replace("********", accessKey);
+
                     // ((Container_Azure_Blob)container).ConnectionString = $"DefaultEndpointsProtocol=https;AccountName={StorageAccountName};AccountKey={AccessKey};EndpointSuffix=core.windows.net";
                     // ((Container_Azure_Blob)container).StorageAccountName = StorageAccountName;
             } else {
                 if(container is Container_AWS_S3){
-                    ((Container_AWS_S3)container).BucketName=BucketName;
-                    ((Container_AWS_S3)container).Region=Region;
-                    ((Container_AWS_S3)container).AccessKey=AccessKey;
-                    ((Container_AWS_S3)container).SecretKey=SecretKey;
+                    ((Container_AWS_S3)container).BucketName=AWS_S3_BucketName;
+                    ((Container_AWS_S3)container).Region=AWS_S3_Region;
+                    ((Container_AWS_S3)container).AccessKey=AWS_S3_AccessKey;
+                    ((Container_AWS_S3)container).SecretKey=AWS_S3_SecretKey;
                 } else 
                 {
                     throw new Exception($"ContainerProvider {ContainerProvider} not implemented!");

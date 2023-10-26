@@ -52,21 +52,21 @@ namespace timelapse.api.Pages
 
 
         #region Azure specific controls
+        // [BindProperty]
+        // public string? AzureStorageAccountName {get; set; }
         [BindProperty]
-        public string? StorageAccountName {get; set; }
-        [BindProperty]
-        public string? ConnectionString {get; set; }
+        public string? Azure_ConnectionString {get; set; }
         #endregion
 
         #region AWS specific controls
         [BindProperty]
-        public string? Region { get; set; }
+        public string? AWS_S3_Region { get; set; }
         [BindProperty]
-        public string? BucketName { get; set; }
+        public string? AWS_S3_BucketName { get; set; }
         [BindProperty]
-        public string? AccessKey {get; set; }
+        public string? AWS_S3_AccessKey {get; set; }
         [BindProperty]
-        public string? SecretKey { get; set; }
+        public string? AWS_S3_SecretKey { get; set; }
         #endregion
 
 
@@ -89,33 +89,33 @@ namespace timelapse.api.Pages
 
             if(ContainerProvider == ContainerProvider.Azure_Blob)
             {
-                if(String.IsNullOrEmpty(StorageAccountName))
-                {
-                    ModelState.AddModelError("StorageAccountName", "StorageAccountName is required");
-                }
+                // if(String.IsNullOrEmpty(AzureStorageAccountName))
+                // {
+                //     ModelState.AddModelError("StorageAccountName", "StorageAccountName is required");
+                // }
 
-                if(String.IsNullOrEmpty(ConnectionString))
+                if(String.IsNullOrEmpty(Azure_ConnectionString))
                 {
                     ModelState.AddModelError("ConnectionString", "Connection String are required");
                 }
             }
             else if(ContainerProvider == ContainerProvider.AWS_S3)
             {
-                if(String.IsNullOrEmpty(Region))
+                if(String.IsNullOrEmpty(AWS_S3_Region))
                 {
-                    ModelState.AddModelError("Region", "Region is required");
+                    ModelState.AddModelError("AWS_S3_Region", "Region is required");
                 }
-                if(String.IsNullOrEmpty(BucketName))
+                if(String.IsNullOrEmpty(AWS_S3_BucketName))
                 {
-                    ModelState.AddModelError("BucketName", "BucketName is required");
+                    ModelState.AddModelError("AWS_S3_BucketName", "BucketName is required");
                 }
-                if(String.IsNullOrEmpty(AccessKey))
+                if(String.IsNullOrEmpty(AWS_S3_AccessKey))
                 {
-                    ModelState.AddModelError("AccessKey", "AccessKey is required");
+                    ModelState.AddModelError("AWS_S3_AccessKey", "AccessKey is required");
                 }
-                if(String.IsNullOrEmpty(SecretKey))
+                if(String.IsNullOrEmpty(AWS_S3_SecretKey))
                 {
-                    ModelState.AddModelError("SecretKey", "SecretKey is required");
+                    ModelState.AddModelError("AWS_S3_SecretKey", "SecretKey is required");
                 }
             }
             else
@@ -144,15 +144,16 @@ namespace timelapse.api.Pages
                 case ContainerProvider.Azure_Blob:
                     container = new Container_Azure_Blob();
 
-                    ((Container_Azure_Blob)container).ConnectionString = $"DefaultEndpointsProtocol=https;AccountName={StorageAccountName};AccountKey={AccessKey};EndpointSuffix=core.windows.net";
+                    // ((Container_Azure_Blob)container).ConnectionString = $"DefaultEndpointsProtocol=https;AccountName={AzureStorageAccountName};AccountKey={AWS_S3_AccessKey};EndpointSuffix=core.windows.net";
+                    ((Container_Azure_Blob)container).ConnectionString = Azure_ConnectionString;
                     // ((Container_Azure_Blob)container).StorageAccountName = StorageAccountName;
                     break;
                 case ContainerProvider.AWS_S3:
                     container = new Container_AWS_S3();
-                    ((Container_AWS_S3)container).BucketName=BucketName;
-                    ((Container_AWS_S3)container).Region=Region;
-                    ((Container_AWS_S3)container).AccessKey=AccessKey;
-                    ((Container_AWS_S3)container).SecretKey=SecretKey;
+                    ((Container_AWS_S3)container).BucketName=AWS_S3_BucketName;
+                    ((Container_AWS_S3)container).Region=AWS_S3_Region;
+                    ((Container_AWS_S3)container).AccessKey=AWS_S3_AccessKey;
+                    ((Container_AWS_S3)container).SecretKey=AWS_S3_SecretKey;
                     break;
                 default:
                     throw new Exception($"ContainerProvider {ContainerProvider} not implemented!");
