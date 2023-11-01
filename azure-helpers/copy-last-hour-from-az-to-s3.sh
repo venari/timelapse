@@ -18,7 +18,8 @@ while true; do
 
     # camera_prefixes=(10 11 13 14 15 19 20 21 22 23 24 25)
     #15 retired
-    camera_ids=( 10 11 13 14 19 20 21 22 23 24 25)
+    camera_ids=( 10 11 13 14 18 19 20 21 22 23 24 25)
+# camera_ids=( 10 11 13 14 18 19 20 21 22 23 24 25 26 27)
 
     # Overide
     # camera_ids=( 19)

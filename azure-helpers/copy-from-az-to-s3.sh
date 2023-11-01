@@ -11,7 +11,8 @@ export DESTINATION_BUCKET_NAME=sediment-p133
 
 # camera_prefixes=(10 11 13 14 15 19 20 21 22 23 24 25)
 #15 retired
-camera_ids=( 10 11 13 14 19 20 21 22 23 24 25)
+camera_ids=( 10 11 13 14 18 19 20 21 22 23 24 25)
+# camera_ids=( 10 11 13 14 18 19 20 21 22 23 24 25 26 27)
 
 copy_from=2023-07-01
 
