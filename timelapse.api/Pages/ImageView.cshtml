@@ -50,7 +50,8 @@
             <tr>
                 <td>
                     @if(Model.device.LatestImage!=null){
-                        <img class="img-fluid" id="image" src="@(Model.device.LatestImage.BlobUri + Model.SasToken)"></img>
+                        @* <img class="img-fluid" id="image" src="@(Model.device.LatestImage.BlobUri + Model.SasToken)"></img> *@
+                        <img class="img-fluid" id="image"></img>
                     }
                 </td>
             </tr>
@@ -65,13 +66,15 @@
 
 <script>
 
-    var last24HoursImages = @(Json.Serialize(Model.imagesToShow));
+    var imagesToShow = @(Json.Serialize(Model.imagesToShow));
     var slider = document.getElementById("imageDateSlider")
     var image = document.getElementById("image")
 
     var bPlaying=false
 
     var togglePlayButton = document.getElementById("togglePlay")
+
+    getImage(@(Model.device.Id), @(Model.imageToSeekTo));
 
     function togglePlay(){
         bPlaying=!bPlaying;
@@ -103,10 +106,10 @@
     }
 
     function getImage(deviceId, imageIndex) {
-        imageBlobUri = last24HoursImages[imageIndex].blobUri + '@(Model.SasToken)'.replace(/&amp;/g, '&')
+        imageBlobUri = imagesToShow[imageIndex].blobUri + '@(Model.SasToken)'.replace(/&amp;/g, '&')
         image.src = imageBlobUri
         var imageHeader = document.getElementById("imageHeader");
-        imageHeader.innerHTML = "Image for @(Model.device.Name) as at " + localizeDateTimeAsString(last24HoursImages[imageIndex].timestamp)
+        imageHeader.innerHTML = "Image for @(Model.device.Name) as at " + localizeDateTimeAsString(imagesToShow[imageIndex].timestamp)
     }
 
     // Update the current slider value (each time you drag the slider handle)
@@ -117,9 +120,9 @@
 
     function navToCreateEvent(){
         console.log(slider.value);
-        console.log(last24HoursImages[slider.value].id);
-        console.log(last24HoursImages[slider.value].timestamp);
-        @* var chosenDate = new Date(last24HoursImages[slider.value].timestamp); *@
-        window.location.href = "/Events/Create/" + last24HoursImages[slider.value].id; //chosenDate.toISOString(); //.getTime();
+        console.log(imagesToShow[slider.value].id);
+        console.log(imagesToShow[slider.value].timestamp);
+        @* var chosenDate = new Date(imagesToShow[slider.value].timestamp); *@
+        window.location.href = "/Events/Create/" + imagesToShow[slider.value].id; //chosenDate.toISOString(); //.getTime();
     }
 </script>
