@@ -23,7 +23,9 @@ public class ImageViewModel : PageModel
 
     // public DateTime oldestImageTimestamp {get; private set;}
     // public DateTime newestImageTimestamp {get; private set;}
-    public ImageSubset[] imagesLast24Hours {get; private set;}
+    public ImageSubset[] imagesToShow {get; private set;}
+    public DateTime SeekTo {get; private set;}
+    public int imageToSeekTo {get; private set;}
 
     public ImageViewModel(ILogger<ImageViewModel> logger, AppDbContext appDbContext, IConfiguration configuration, IMemoryCache memoryCache)
     {
@@ -36,7 +38,7 @@ public class ImageViewModel : PageModel
     [BindProperty]
     public int NumberOfHoursToDisplay {get; set; }
 
-    public IActionResult OnGet(int id, int? numberOfHoursToDisplay = null)
+    public IActionResult OnGet(int id, int? numberOfHoursToDisplay = null, DateTime? seekTo = null)
     {
         // Unusual authentication here - want to accept logged in users, and the Third Party key
         // Duplication of logic in ThirdPartyApiKeyAuthAttribute
@@ -68,25 +70,40 @@ public class ImageViewModel : PageModel
             }
         }
 
-
         if(numberOfHoursToDisplay!=null){
             NumberOfHoursToDisplay = numberOfHoursToDisplay.Value;
         }
 
-        DateTime latestImageDateTime = _appDbContext.Images
-            .Where(t => t.DeviceId == id)
-            .OrderByDescending(t => t.Timestamp)
-            .Select(t => t.Timestamp)
-            .FirstOrDefault();
+        DateTime? showFrom = null;
+        DateTime? showTo = null;
 
-        if(latestImageDateTime==null || latestImageDateTime == DateTime.MinValue){
+        if(seekTo==null){
+
+            showTo = _appDbContext.Images
+                .Where(t => t.DeviceId == id)
+                .OrderByDescending(t => t.Timestamp)
+                .Select(t => t.Timestamp)
+                .FirstOrDefault();
+
+        } else {
+            showTo = _appDbContext.Images
+                .Where(t => t.DeviceId == id && t.Timestamp <= seekTo.Value.AddHours(0.5 * NumberOfHoursToDisplay))
+                .OrderByDescending(t => t.Timestamp)
+                .Select(t => t.Timestamp)
+                .FirstOrDefault();
+
+        }
+
+        if(showTo==null || showTo == DateTime.MinValue){
             return RedirectToPage("/NotFound");
         }
 
-        DateTime cutOff = latestImageDateTime.AddHours(-1 * NumberOfHoursToDisplay);
+        if(showTo.HasValue){
+            showFrom = showTo.Value.AddHours(-1 * NumberOfHoursToDisplay);
+        }
 
         var d = _appDbContext.Devices
-            .Include(d => d.Images.Where(i =>i.Timestamp >= cutOff))
+            .Include(d => d.Images.Where(i =>i.Timestamp >= showFrom && i.Timestamp <= showTo))
             .FirstOrDefault(d => d.Id == id);
 
         if(d==null){
@@ -95,9 +112,25 @@ public class ImageViewModel : PageModel
 
         device = d;
 
-        imagesLast24Hours = d.Images.Select(i => new ImageSubset{Id = i.Id, Timestamp = i.Timestamp, BlobUri = i.BlobUri}).OrderBy(i => i.Timestamp).ToArray();
-        if(imagesLast24Hours.Count()==0){
+        imagesToShow = d.Images.Select(i => new ImageSubset{Id = i.Id, Timestamp = i.Timestamp, BlobUri = i.BlobUri}).OrderBy(i => i.Timestamp).ToArray();
+        if(imagesToShow.Count()==0){
             return RedirectToPage("/NotFound");
+        }
+
+        if(seekTo!=null){
+            // imageToSeekTo = d.Images.Where(i =>i.Timestamp >= showFrom && i.Timestamp <= showTo).OrderBy(i => i.Timestamp).Select(i => i.Id).FirstOrDefault();
+            imageToSeekTo = d.Images.Where(i => i.Timestamp < seekTo).Count();
+            if(imageToSeekTo<0){
+                imageToSeekTo = 0;
+            }
+            if(imageToSeekTo>=imagesToShow.Count()){
+                imageToSeekTo = imagesToShow.Count()-1;
+            }
+            SeekTo = imagesToShow[imageToSeekTo].Timestamp;
+            // imageToSeekTo = d.Images.Count/2;
+        } else {
+            imageToSeekTo = d.Images.Count() - 1;
+            SeekTo = imagesToShow.Last().Timestamp;
         }
 
         SasToken = _storageHelper.SasToken(imagesLast24Hours[0].Id);
