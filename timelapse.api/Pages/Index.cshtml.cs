@@ -27,7 +27,7 @@ public class IndexModel : PageModel
     }
 
     public string GetSasTokenForImage(int imageId){
-        return _storageHelper.SasToken(imageId);
+        return _storageHelper.GetSasTokenForImage(imageId);
     }
 
     public void OnGet()

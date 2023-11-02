@@ -19,8 +19,6 @@ public class IndexModel : PageModel
     private AppDbContext _appDbContext;
     private StorageHelper _storageHelper;
 
-    public string SasToken {get; private set;}
-
     public Project Project { get; private set; }
     public List<Device> devices {get; private set;}
     // public IEnumerable<Image> images {get; set;}
@@ -74,7 +72,7 @@ public class IndexModel : PageModel
             return new NotFoundObjectResult("Project not found");
         }
 
-        SasToken = _storageHelper.SasToken(Project);
+        // SasToken = _storageHelper.SasToken(Project);
 
         // I think we'll need to do this in mulitple passes,
         // as I can't work out how to do it in one go in LINQ. 
@@ -108,4 +106,9 @@ public class IndexModel : PageModel
         return Page();
 
     }
+
+    public string GetSasToken(string key) {
+        return _storageHelper.GetSasToken(Project.ContainerOveride, key);
+    }
+
 }

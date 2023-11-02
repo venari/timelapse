@@ -79,7 +79,7 @@ public class TelemetryGraphModel : PageModel
             .Select(t => t.Timestamp)
             .FirstOrDefault();
 
-        SasToken = _storageHelper.SasToken(d.Images[0].Id);
+        SasToken = _storageHelper.GetSasTokenForImage(d.Images[0].Id);
 
         return Page();
 

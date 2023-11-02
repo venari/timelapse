@@ -50,7 +50,7 @@
             <tr>
                 <td>
                     @if(Model.device.LatestImage!=null){
-                        <img class="img-fluid" id="image" src="@(Model.device.LatestImage.BlobUri + Model.SasToken)"></img>
+                        <img class="img-fluid" id="image" src="@(Model.device.LatestImage.BlobUri + Model.GetSasTokenForImage(Model.device.LatestImage.Id))"></img>
                     }
                 </td>
             </tr>
@@ -103,7 +103,7 @@
     }
 
     function getImage(deviceId, imageIndex) {
-        imageBlobUri = last24HoursImages[imageIndex].blobUri + '@(Model.SasToken)'.replace(/&amp;/g, '&')
+        imageBlobUri = last24HoursImages[imageIndex].blobUri + '@(Model.GetSasTokenForImage(imageIndex))'.replace(/&amp;/g, '&')
         image.src = imageBlobUri
         var imageHeader = document.getElementById("imageHeader");
         imageHeader.innerHTML = "Image for @(Model.device.Name) as at " + localizeDateTimeAsString(last24HoursImages[imageIndex].timestamp)

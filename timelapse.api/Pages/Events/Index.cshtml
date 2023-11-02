@@ -67,7 +67,7 @@
                             <script type="text/javascript">localizeDateTime('@(deviceEvent.StartTime.ToString("s"))');</script>
                         </td>
                         <td>
-                            <a href="/Events/Detail/@(deviceEvent.Id)"><img class="img-thumbnail" src="@(deviceEvent.StartImage.BlobUri + Model.SasToken)"></img></a>
+                            <a href="/Events/Detail/@(deviceEvent.Id)"><img class="img-thumbnail" src="@(deviceEvent.StartImage.BlobUri + Model.GetSasToken(deviceEvent.StartImage.BlobUri.ToString()))"></img></a>
                             @* <a href="/Events/Detail/@(deviceEvent.Id)"><img class="img-thumbnail" src="@(deviceEvent.StartImage.BlobUri + Model.GetSasTokenForImage(deviceEvent.StartImageId))"></img></a> *@
                         </td>
                         @* <td>
@@ -77,7 +77,7 @@
                             <script type="text/javascript">localizeDateTime('@(deviceEvent.EndTime.ToString("s"))');</script>
                         </td>
                         <td>
-                            <a href="/Events/Detail/@(deviceEvent.Id)"><img class="img-thumbnail" src="@(deviceEvent.EndImage.BlobUri + Model.SasToken)"></img></a>
+                            <a href="/Events/Detail/@(deviceEvent.Id)"><img class="img-thumbnail" src="@(deviceEvent.EndImage.BlobUri + Model.GetSasToken(deviceEvent.EndImage.BlobUri.ToString()))"></img></a>
                             @* <a href="/Events/Detail/@(deviceEvent.Id)"><img class="img-thumbnail" src="@(deviceEvent.EndImage.BlobUri + Model.GetSasTokenForImage(deviceEvent.EndImageId))"></img></a> *@
                         </td>
                         @{

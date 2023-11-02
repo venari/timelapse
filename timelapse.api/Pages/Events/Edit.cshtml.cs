@@ -104,7 +104,7 @@ public class EditModel : PageModel
             return RedirectToPage("/NotFound");
         }
 
-        SasToken = _storageHelper.SasToken(Event.StartImageId);
+        SasToken = _storageHelper.GetSasTokenForImage(Event.StartImageId);
 
         EventStartImageBlobUri = Event.StartImage.BlobUri;
         device = Event.Device;

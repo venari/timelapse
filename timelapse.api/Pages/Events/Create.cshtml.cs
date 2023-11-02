@@ -126,7 +126,7 @@ public class CreateModel : PageModel
 
         device = image.Device;
 
-        SasToken = _storageHelper.SasToken(imageId);
+        SasToken = _storageHelper.GetSasTokenForImage(imageId);
 
         // var minAndMaxTimestamps = _appDbContext.Images
         //     .Where(t => t.DeviceId == device.Id)

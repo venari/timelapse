@@ -124,7 +124,7 @@ public class DetailModel : PageModel
 
         // We'll assume SasToken same for all images.
         // Will fail if going across project boundary.
-        SasToken = _storageHelper.SasToken(EventImages[0].Id);
+        SasToken = _storageHelper.GetSasTokenForImage(EventImages[0].Id);
 
 
         if(Event==null){

@@ -19,7 +19,7 @@ public class ImageViewModel : PageModel
     private StorageHelper _storageHelper;
 
     public Device device {get; private set;}
-    public string SasToken {get; private set;}
+    // public string SasToken {get; private set;}
 
     // public DateTime oldestImageTimestamp {get; private set;}
     // public DateTime newestImageTimestamp {get; private set;}
@@ -133,10 +133,17 @@ public class ImageViewModel : PageModel
             SeekTo = imagesToShow.Last().Timestamp;
         }
 
-        SasToken = _storageHelper.SasToken(imagesLast24Hours[0].Id);
+        // SasToken = _storageHelper.SasToken(imagesToShow[0].Id);
 
 
         return Page();
-
     }
+
+    // public string GetSasTokenForImage(int imageId) {
+    //     return _storageHelper.GetSasTokenForImage(imageId);
+    // }
+    public string GetSasTokenForImage(int imageIndex) {
+        return _storageHelper.GetSasTokenForImage(imagesToShow[imageIndex].Id);
+    }
+
 }

@@ -22,7 +22,7 @@ namespace timelapse.api.Helpers
         }
 
         public abstract Uri Upload(string blobName, Stream stream);
-        public abstract string GenerateSasToken();
+        public abstract string GenerateSasToken(string key);
 
     }
 
@@ -40,7 +40,7 @@ namespace timelapse.api.Helpers
             return blobClient.Uri;
         }
 
-        public override string GenerateSasToken(){
+        public override string GenerateSasToken(string ignored){
             var sasUri = blobContainerClient.GenerateSasUri(Azure.Storage.Sas.BlobContainerSasPermissions.Read, DateTimeOffset.UtcNow.AddHours(1));
             return sasUri.Query;
         }
@@ -59,25 +59,20 @@ namespace timelapse.api.Helpers
             throw new NotImplementedException();
         }
 
-        public override string GenerateSasToken(){
+        public override string GenerateSasToken(string key){
 
-            throw new NotImplementedException();
-
-            // Looks like we can't generate one key for the whole container.
-            // :-(
-                
             var container = _container as Container_AWS_S3;
 
             var request = new Amazon.S3.Model.GetPreSignedUrlRequest(){
                 BucketName = container.BucketName,
-                Key = "bugger",
+                Key = key,
                 Expires = DateTime.UtcNow.AddHours(1),
                 Protocol = Amazon.S3.Protocol.HTTPS
             };
 
             var sasUri = s3Client.GetPreSignedURL(request);
-                // container.BucketName,  "test", DateTime.UtcNow.AddHours(1), Amazon.S3.Protocol.HTTPS);
-            throw new NotImplementedException();
+
+            return sasUri;
         }
     }
 
@@ -182,17 +177,17 @@ namespace timelapse.api.Helpers
             }
         }
 
-        private string GetSasToken(Container? containerOverride){
+        public string GetSasToken(Container? containerOverride, string key){
             try{
 
                 string containerHelpersKey = GetContainerHelperId(containerOverride);
-                string SasUriKey = containerHelpersKey + "SasUri";
+                string SasUriKey = containerHelpersKey + "SasUri" + key;
 
                 string token;
                 if(!_memoryCache.TryGetValue(SasUriKey, out token)){
                     ContainerHelper containerHelper = GetContainerHelper(containerOverride);
 
-                    token = containerHelper.GenerateSasToken();
+                    token = containerHelper.GenerateSasToken(key);
                     _memoryCache.Set(SasUriKey, token, TimeSpan.FromHours(1));
                 } 
 
@@ -205,15 +200,17 @@ namespace timelapse.api.Helpers
             }
         }
 
-        public string SasToken(Project project){
+        // public string SasToken(Project project){
             
-            var containerOverride = project.ContainerOveride;
-            return GetSasToken(containerOverride);
-        }
+        //     var containerOverride = project.ContainerOveride;
+        //     return GetSasToken(containerOverride);
+        // }
 
-        public string SasToken(int imageId){
+        public string GetSasTokenForImage(int imageId){
             var containerOverride = GetContainerOverrideForImage(imageId);
-            return GetSasToken(containerOverride);
+            var image = _appDbContext.Images.FirstOrDefault(i => i.Id == imageId);
+
+            return GetSasToken(containerOverride, image.BlobUri.ToString());
         }
 
         public Project? GetProjectForImage(int imageId){
