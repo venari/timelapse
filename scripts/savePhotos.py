@@ -14,6 +14,7 @@ import pathlib
 
 config = json.load(open('config.json'))
 logFilePath = config["logFilePath"]
+# logFilePath = logFilePath.replace(".log", ".savePhotos.log")
 os.makedirs(os.path.dirname(logFilePath), exist_ok=True)
 # os.chmod(os.path.dirname(logFilePath), 0o777) # Make sure pijuice user scrip can write to log file.
 
@@ -70,6 +71,10 @@ def savePhotos():
                 config = json.load(open('config.json'))
                 #camera_config = camera.create_preview_configuration()
                 camera_config = camera.create_still_configuration()
+
+                # # Use sensor mode 2 to give greater max exposure time.
+                # camera_config = camera.create_still_configuration(raw = picam2.sensor_modes[2])
+
                 camera_config["transform"] = Transform(vflip = config['camera.vflip'], hflip = config['camera.hflip'])
                 camera_config["size"] = (config['camera.resolution.width'], config['camera.resolution.height'])
                 logger.debug(camera_config["size"])
@@ -90,7 +95,16 @@ def savePhotos():
 
                 # camera.rotation = config['camera.rotation']
                 camera.configure(camera_config)
-                camera.set_controls({"AfMode": controls.AfModeEnum.Manual, "LensPosition": lensposition})
+
+                if(config['camera.long_exposure_mode']):
+                    # camera.set_controls({"AfMode": controls.AfModeEnum.Manual, "LensPosition": lensposition, "AeEnable": False, "ExposureTime": config['camera.long_exposure_time'], "AnalogueGain": config['camera.analogue_gain']}) #, "ColourGains": (2, 1.81)})
+                    camera.set_controls({"AfMode": controls.AfModeEnum.Manual, "LensPosition": lensposition, "ExposureTime": config['camera.long_exposure_time'], "AnalogueGain": config['camera.analogue_gain']})
+                    
+                    # #imx708 doesn't have long exposure mode in tuning file
+                    # camera.set_controls({"AfMode": controls.AfModeEnum.Manual, "LensPosition": lensposition, "AeExposureMode": controls.AeExposureModeEnum.Long}) 
+                else:
+                    camera.set_controls({"AfMode": controls.AfModeEnum.Manual, "LensPosition": lensposition})
+                    
                 camera.options["quality"] = config['camera.quality']
 
                 logger.debug('beginning capture')
@@ -113,7 +127,10 @@ def savePhotos():
             if config['shutdown']:
                 break
             else:
-                time.sleep(config['camera.interval'])
+                if config['monitoringMode']:
+                    logger.debug('monitoring mode is true, so no capture delay....')
+                else:
+                    time.sleep(config['camera.interval'])
 
     except Exception as e:
         logger.error("SavePhoto() failed.")

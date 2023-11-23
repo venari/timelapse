@@ -32,6 +32,21 @@ namespace timelapse.infrastructure
         public DbSet<Organisation> Organisations { get; set; }
         public DbSet<OrganisationUserJoinEntry> OrganisationUserJoinEntry { get; set; } // DEVDO refactor code to change ORganisationUserJoinEntry to OrganisationUserJoinEntries
 
+        public DbSet<Event> Events {get; set;}
+        public DbSet<EventType> EventTypes {get; set;}
+
+        protected override void OnModelCreating(ModelBuilder modelBuilder)
+        {
+            base.OnModelCreating(modelBuilder);
+
+            modelBuilder.Entity<Event>()
+                .HasMany(e => e.EventTypes)
+                .WithMany(e => e.Events);
+
+            // modelBuilder.Entity<Event>()
+            //     .HasOne(e => e.EventType);
+        }
+
         protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
         {
             // _logger.LogInformation("OnConfiguring 4");

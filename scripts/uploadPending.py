@@ -13,8 +13,11 @@ import glob
 import pathlib
 import socket
 
+from SIM7600X import powerUpSIM7600X, powerDownSIM7600X, turnOnNDIS
+
 config = json.load(open('config.json'))
 logFilePath = config["logFilePath"]
+# logFilePath = logFilePath.replace(".log", ".uploadTelemetry.log")
 os.makedirs(os.path.dirname(logFilePath), exist_ok=True)
 # os.chmod(os.path.dirname(logFilePath), 0o777) # Make sure pijuice user scrip can write to log file.
 
@@ -27,7 +30,11 @@ logger = logging.getLogger("uploadPending")
 logger.addHandler(handler)
 logger.setLevel(logging.DEBUG)
 
+logger.info("******************************************************************************")
+logger.info("")
 logger.info("Starting up uploadPending.py...")
+logger.info("")
+logger.info("******************************************************************************")
 os.chmod(logFilePath, 0o777) # Make sure pijuice user script can write to log file.
 
 outputImageFolder = '../output/images/'
@@ -105,7 +112,7 @@ def uploadPendingPhotos():
 
             session = requests.Session()
             logger.debug('Posting image to API...')
-            response = session.post(config['apiUrl'] + 'Image', files=files, data=data, timeout=30)
+            response = session.post(config['apiUrl'] + 'Image', files=files, data=data, timeout=config['upload.image.timeout'])
 
             logger.debug(f'Response code: {response.status_code}')
             if response.status_code == 200:
@@ -118,6 +125,23 @@ def uploadPendingPhotos():
             logger.debug(f'Response text:')
             try:
                 logger.debug(json.dumps(json.loads(response.text), indent = 4))
+
+                if json.loads(response.text)['device']['supportMode'] != config['supportMode']:
+                    logger.info('Support mode changed to ' + str(json.loads(response.text)['device']['supportMode']))
+                    config['supportMode'] = json.loads(response.text)['device']['supportMode']
+                    json.dump(config, open('config.json', 'w'), indent=4)
+
+                if json.loads(response.text)['device']['monitoringMode'] != config['monitoringMode']:
+                    logger.info('Monitoring mode changed to ' + str(json.loads(response.text)['device']['monitoringMode']))
+                    config['monitoringMode'] = json.loads(response.text)['device']['monitoringMode']
+                    json.dump(config, open('config.json', 'w'), indent=4)
+
+                if json.loads(response.text)['device']['hibernateMode'] != config['hibernateMode']:
+                    logger.info('Hibernate mode changed to ' + str(json.loads(response.text)['device']['hibernateMode']))
+                    config['hibernateMode'] = json.loads(response.text)['device']['hibernateMode']
+                    json.dump(config, open('config.json', 'w'), indent=4)
+
+                   
             except json.decoder.JSONDecodeError:
                 logger.debug(response.text)
 
@@ -129,50 +153,104 @@ def uploadPendingPhotos():
                 # Give the telemetry an opportunity to upload before powering off modem
                 uploadPendingTelemetry()
 
-                # If it's 9am or 12pm or 5pm, don't turn the modem off for 15 minutes.
-                if (datetime.datetime.now().hour == 9 or datetime.datetime.now().hour == 12 or datetime.datetime.now().hour == 17) and datetime.datetime.now().minute < 15:
+                # If it's 9am or 12pm or 5pm, don't turn the modem off for 15 minutes, 
+                # or config['supportMode'] == True
+                if ((datetime.datetime.now().hour == 9 or datetime.datetime.now().hour == 12 or datetime.datetime.now().hour == 17) and datetime.datetime.now().minute < 15) or config['supportMode']==True:
                     if not bInSupportWindow:
-                        logger.info('Opening 15 minute support window...')
+                        logger.info('Opening minute support window...')
                         bInSupportWindow = True
 
                 else:
                     if bInSupportWindow:
                         logger.info('Closing support window...')
                         bInSupportWindow = False
-                    logger.info('Current System Power Switch:')
-                    logger.info(pj.power.GetSystemPowerSwitch())
-                    logger.info('Setting System Power Switch to Off:')
-                    pj.power.SetSystemPowerSwitch(0)
+                    disconnectFromInternet()
                     logger.info('Sleeping for ' + str(power_interval) + ' seconds...')
                     time.sleep(power_interval)
-                    turnOnSystemPowerSwitch()
+                    connectToInternet()
 
     except Exception as e:
         logger.error(str(datetime.datetime.now()) + " uploadPendingPhotos() failed.")
         logger.error(e)
 
 # https://stackoverflow.com/questions/3764291/how-can-i-see-if-theres-an-available-and-active-network-connection-in-python
-def internet(host="8.8.8.8", port=53, timeout=3):
+def internet(host="8.8.8.8", port=53, timeout=config['upload.telemetry.timeout']):
     """
     Host: 8.8.8.8 (google-public-dns-a.google.com)
     OpenPort: 53/tcp
     Service: domain (DNS/TCP)
     """
     try:
+        logger.info('In internet() 1')
         socket.setdefaulttimeout(timeout)
+        logger.info('In internet() 2')
         socket.socket(socket.AF_INET, socket.SOCK_STREAM).connect((host, port))
+        logger.info('In internet() 3')
         return True
     except socket.error as ex:
-        logger.warning(e)
+        logger.warning('In internet() 4')
+        logger.warning(ex)
+        logger.warning('In internet() 5')
         return False
 
-def turnOnSystemPowerSwitch(retries = 3):
+def connectToInternet(retries = 3):
+    try:
+        logger.info('Connecting to internet...')
+        if(config['modem.type']=="thumb"):
+            turnOnSystemPowerSwitch()
+        else:
+            powerUpSIM7600X()
+
+        logger.info('Waiting for network....')
+        # Call Internet function to wait for network, for a max of 2 minutes
+        waitCounter = 0
+        while not internet() and waitCounter < 12:
+            time.sleep(10)
+            logger.info('Still waiting for network....')
+            waitCounter=waitCounter+1
+        
+        if waitCounter < 120:
+            logger.info('Network connection established.')
+       
+        else:
+            logger.warning('Could not establish network connection after 2 minutes.')
+
+            logger.info('Turning on NDIS...')
+            turnOnNDIS()
+
+            if retries > 0:
+                logger.info('Retrying to establish network connection...')
+                connectToInternet(retries-1)
+            else:
+                logger.warning('Retries exhausted - giving up.')
+                disconnectFromInternet()
+                return
+
+    except Exception as e:
+        logger.error(str(datetime.datetime.now()) + " connectToInternet() failed.")
+        logger.error(e)
+
+def disconnectFromInternet():
+    try:
+        logger.info('Disconnecting from internet...')
+        if(config['modem.type']=="thumb"):
+            logger.info('Current System Power Switch:')
+            logger.info(pj.power.GetSystemPowerSwitch())
+            logger.info('Setting System Power Switch to Off:')
+            pj.power.SetSystemPowerSwitch(0)
+        else:
+            powerDownSIM7600X()
+    except Exception as e:
+        logger.error(str(datetime.datetime.now()) + " disconnectFromInternet() failed.")
+        logger.error(e)
+        
+def turnOnSystemPowerSwitch():
     try:
         sysVoltage = pj.status.GetBatteryVoltage()['data']
         # if sysVoltage < 3.2:  # 3.2V is the minimum voltage for the XL6009
         #     logger.info('Battery voltage too low for XL6009 - not powering up modem.')
         #     return
-        if sysVoltage < 3.0:  # 3.0V is a bit on the low side
+        if sysVoltage < 3.2:  # 3.0V is a bit on the low side
             logger.info('Battery voltage too low - not powering up modem.')
             return
         logger.info('System Voltage looks good at ' + str(sysVoltage) + 'mV')
@@ -187,30 +265,10 @@ def turnOnSystemPowerSwitch(retries = 3):
         logger.info('Setting System Power Switch to ' + str(modemPower) + ':')
         pj.power.SetSystemPowerSwitch(modemPower)
 
-        logger.info('Waiting 50s for modem to warm up...')
-        time.sleep(50)
+        # logger.info('Waiting 50s for modem to warm up...')
+        # time.sleep(50)
 
-        logger.info('Waiting for network....')
-        # Call Internet function to wait for network, for a max of 1 minute
-        waitCounter = 0
-        while not internet() and waitCounter < 6:
-            time.sleep(10)
-            logger.info('Still waiting for network....')
-            waitCounter=waitCounter+1
-        
-        if waitCounter < 120:
-            logger.info('Network connection established.')
-       
-        else:
-            logger.warning('Could not establish network connection after 2 minutes.')
-            if retries > 0:
-                logger.info('Retrying to establish network connection...')
-                turnOnSystemPowerSwitch(retries-1)
-            else:
-                logger.warning('Retries exhausted - giving up.')
-                logger.info('Setting System Power Switch to Off')
-                pj.power.SetSystemPowerSwitch(0)
-                return
+
     
     except Exception as e:
         logger.error(str(datetime.datetime.now()) + " turnOnSystemPowerSwitch() failed.")
@@ -254,15 +312,38 @@ def uploadPendingTelemetry():
 
             logger.debug(api_data)
 
-            postResponse = session.post(config['apiUrl'] + 'Telemetry',data=api_data, timeout=5)
-            logger.debug(postResponse)
-            assert postResponse.status_code == 200, "API returned error code"
+            response = session.post(config['apiUrl'] + 'Telemetry',data=api_data, timeout=config['upload.telemetry.timeout'])
+            logger.debug(response)
+            assert response.status_code == 200, "API returned error code"
             #requests.post(config['apiUrl'] + '/Telemetry', json=api_data)
 
-            if postResponse.status_code == 200:
+            if response.status_code == 200:
                 logger.debug(f'Telemetry uploaded successfully')
                 shutil.move(telemetryFilename, uploadedTelemetryFolder + pathlib.Path(telemetryFilename).name)
                 logger.debug('Logged to API.')
+
+            try:
+                logger.debug(json.dumps(json.loads(response.text), indent = 4))
+
+                if json.loads(response.text)['device']['supportMode'] != config['supportMode']:
+                    logger.info('Support mode changed to ' + str(json.loads(response.text)['device']['supportMode']))
+                    config['supportMode'] = json.loads(response.text)['device']['supportMode']
+                    json.dump(config, open('config.json', 'w'), indent=4)
+
+                if json.loads(response.text)['device']['monitoringMode'] != config['monitoringMode']:
+                    logger.info('Monitoring mode changed to ' + str(json.loads(response.text)['device']['monitoringMode']))
+                    config['monitoringMode'] = json.loads(response.text)['device']['monitoringMode']
+                    json.dump(config, open('config.json', 'w'), indent=4)
+
+                if json.loads(response.text)['device']['hibernateMode'] != config['hibernateMode']:
+                    logger.info('Hibernate mode changed to ' + str(json.loads(response.text)['device']['hibernateMode']))
+                    config['hibernateMode'] = json.loads(response.text)['device']['hibernateMode']
+                    json.dump(config, open('config.json', 'w'), indent=4)
+
+                   
+            except json.decoder.JSONDecodeError:
+                logger.debug(response.text)
+
 
     except requests.exceptions.ConnectionError as e:
         logger.error(str(datetime.datetime.now()) + " uploadPendingTelemetry() failed - connection error. Leave in place.")
@@ -305,7 +386,7 @@ def deleteOldUploadedImagesAndTelemetry():
 
 try:
     
-    turnOnSystemPowerSwitch()
+    connectToInternet()
 
     while True:
 

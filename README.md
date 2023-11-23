@@ -3,12 +3,6 @@ A set of tools/scripts to automate the taking and creation of timelapse videos a
 
 # PI Setup
 
-For now, use Buster rather than Bullseye - owing to raspicam issues on Pi Zero.
-
-Raspberry Pi OS Lite (Legacy) 
-Debian version 10 - https://downloads.raspberrypi.org/raspios_oldstable_lite_armhf/images/raspios_oldstable_lite_armhf-2022-01-28/2022-01-28-raspios-buster-armhf-lite.zip
-
-
 Raspberry Pi OS Lite (32 bit - Pi Zero W)
 Debian version 11 (bullseye) - https://downloads.raspberrypi.org/raspios_lite_armhf/images/raspios_lite_armhf-2022-09-26/2022-09-22-raspios-bullseye-armhf-lite.img.xz
 
@@ -50,7 +44,17 @@ raspberrypi.lan (192.168.86.32) at b8:27:eb:94:ac:b1 on en0 ifscope [ethernet]
 
 ```
 
-Install software, config & code to new Pi
+# Install software, (LiPo, sedicam v2 configuration) config & code to new Pi
+```
+bash <(curl -fsSL "https://raw.githubusercontent.com/venari/timelapse/deployment/sedicam_v2/install_sedicam.sh?$RANDOM")
+```
+
+Update config and code to existing install
+```
+bash <(curl -fsSL "https://raw.githubusercontent.com/venari/timelapse/deployment/sedicam_v2/update_sedicam.sh?$RANDOM")
+```
+
+## Install software, (LiFePO4, sedicam v1 cofiguration) config & code to new Pi
 ```
 bash <(curl -fsSL "https://raw.githubusercontent.com/venari/timelapse/main/install.sh?$RANDOM")
 ```
@@ -60,7 +64,7 @@ Update config and code to existing install
 bash <(curl -fsSL "https://raw.githubusercontent.com/venari/timelapse/main/update.sh?$RANDOM")
 ```
 
-Connect to intermitently connected Pi and tail log:
+# Connect to intermitently connected Pi and tail log:
 ```
 ssh -o ConnectTimeout=60 -o ConnectionAttempts=30 pi@sediment-pi-zero-w-v1-a 'tail -f -n 100 logs/timelapse.log'
 ```
@@ -75,13 +79,68 @@ Copy log files to local machine:
 scp -o ConnectTimeout=60 -o ConnectionAttempts=30 pi@sediment-pi-zero-w-v1-a:/home/pi/logs/*.* .
 ```
 
+# Waveshare SIM6700X GSM/GPRS/GNSS HAT
 
-# Raspberry Pi Camera Module v3
+- Enable Serial Communication
+```
+sudo raspi-config nonint do_serial 2        # Disable serial login shell and enable serial port hardware
+sudo reboot
+```
 
-- 12MP sensor using IMX708
-https://www.raspberrypi.com/documentation/computers/camera_software.html
-Camera Module 3 (IMX708)
-Ensure software is upgraded (above)
+https://core-electronics.com.au/guides/raspberry-pi/raspberry-pi-4g-gps-hat/
+```
+sudo apt-get install minicom
+pip3 install pyserial
+wget https://www.waveshare.com/w/upload/2/29/SIM7600X-4G-HAT-Demo.7z
+sudo apt-get install p7zip-full
+
+7z x SIM7600X-4G-HAT-Demo.7z -r -o/home/pi
+
+sudo chmod 777 -R /home/pi/SIM7600X-4G-HAT-Demo
+
+
+
+sudo nano /etc/rc.local
+
+```
+Add following line, just above `exit 0`:
+
+```
+sh /home/pi/SIM7600X-4G-HAT-Demo/Raspberry/c/sim7600_4G_hat_init
+```
+
+```
+cd /home/pi/SIM7600X-4G-HAT-Demo/Raspberry/c/bcm2835
+chmod +x configure && ./configure && sudo make && sudo make install
+```
+
+Plug in USB cable, testing with minicom
+CTRL-A, E to echo
+CTRL-A, Q to exit
+```
+minicom -D /dev/ttyUSB2
+
+AT+CPIN?
++CME ERROR:10 # No SIM card
+```
+
+Switch to RNDIS dial up mode
+https://www.waveshare.com/wiki/Raspberry_Pi_RNDIS_dial-up_Internet_access
+```
+AT+CUSBPIDSWITCH=9011,1,1
+```
+
+Nope - prevents camera from working...
+
+    Disable HDMI:
+    https://picockpit.com/raspberry-pi/raspberry-pi-zero-2-battery/
+
+    sudo raspi-config
+
+    Then, go to Advanced Options -> GL Driver -> Legacy
+
+    Add to /etc/rc.local:
+    /usr/bin/tvservice -o
 
 <!-- `camera.lensposition` - 1/distance in metres
 - '0' - infinity
@@ -89,7 +148,7 @@ Ensure software is upgraded (above)
 - `5`: 20cm
 - `10`: 10cm -->
 
-`camera.focus_m`: focus in metres
+<!-- `camera.focus_m`: focus in metres -->
 
 <!-- Add following to /boot/config.txt
 ```

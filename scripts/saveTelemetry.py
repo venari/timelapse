@@ -9,9 +9,13 @@ import sys
 import logging
 from logging.handlers import TimedRotatingFileHandler
 import pathlib
+import glob
+
+from SIM7600X import powerUpSIM7600X, powerDownSIM7600X
 
 config = json.load(open('config.json'))
 logFilePath = config["logFilePath"]
+# logFilePath = logFilePath.replace(".log", ".saveTelemetry.log")
 os.makedirs(os.path.dirname(logFilePath), exist_ok=True)
 # os.chmod(os.path.dirname(logFilePath), 0o777) # Make sure pijuice user scrip can write to log file.
 
@@ -64,165 +68,289 @@ def getSerialNumber():
 serialNumber = getSerialNumber()
 
 def scheduleShutdown():
-    alarmObj = {}
+    try:
+        alarmObj = {}
 
-    # print(str(datetime.datetime.now()) + ' scheduleShutdown')
-    logger.debug('scheduleShutdown')
-    setAlarm = False
+        # print(str(datetime.datetime.now()) + ' scheduleShutdown')
+        logger.debug('scheduleShutdown')
+        logger.debug('rtcAlarm.GetControlStatus(): ' + str(pj.rtcAlarm.GetControlStatus()))
+        logger.debug('rtcAlarm.GetTime(): ' + str(pj.rtcAlarm.GetTime()))
 
-    config = json.load(open('config.json'))
+        setAlarm = False
+        triggerRestart = False
 
-    if config['shutdown']:
-        # print(str(datetime.datetime.now()) + ' scheduling regular shutdown')
-        logger.info('scheduling regular shutdown')
-        DELTA_MIN=10
+        config = json.load(open('config.json'))
 
-        alarmObj = {
+        # if config['shutdown']:
+        #     # print(str(datetime.datetime.now()) + ' scheduling regular shutdown')
+        #     logger.info('scheduling regular shutdown')
+        #     DELTA_MIN=10
+
+        #     alarmObj = {
+        #             'year': 'EVERY_YEAR',
+        #             'month': 'EVERY_MONTH',
+        #             'day': 'EVERY_DAY',
+        #             'hour': 'EVERY_HOUR',
+        #             'minute_period': DELTA_MIN,
+        #             'second': 0,
+        #     }
+
+        #     setAlarm = True
+
+
+        bCharging = False
+        if (
+            (pj.status.GetStatus()['data']['battery'] == 'CHARGING_FROM_IN' 
+            or pj.status.GetStatus()['data']['battery'] == 'CHARGING_FROM_5V_IO' )
+            and  pj.status.GetStatus()['data']['powerInput'] == 'PRESENT'
+        ):
+            bCharging = True
+
+        if config['sleep_during_night'] == True and (datetime.datetime.now().hour >= config['daytime_ends_at_h'] or datetime.datetime.now().hour < config['daytime_starts_at_h']):
+            if config['supportMode'] == True:
+                logger.warning("Night time - we would have scheduled shutdown, but we're in support mode.")
+
+            if bCharging:
+                logger.info("Night time - but we're charging/powered, so we'll stay on.")
+
+
+        if config['hibernateMode']:
+            # print(str(datetime.datetime.now()) + ' scheduling regular shutdown')
+            logger.info('hibernate mode - sleeping for 6 hours...')
+
+            hoursToWakeAfter = 6
+            hourToWakeAt = datetime.datetime.now().hour + hoursToWakeAfter
+            if hoursToWakeAfter >= 24:
+                hourToWakeAt = hourToWakeAt - 12
+
+
+            alarmObj = {
                 'year': 'EVERY_YEAR',
                 'month': 'EVERY_MONTH',
                 'day': 'EVERY_DAY',
-                'hour': 'EVERY_HOUR',
-                'minute_period': DELTA_MIN,
+                'hour': hourToWakeAt,
+                'minute': 0,
                 'second': 0,
-        }
+            }
 
-        setAlarm = True
+            setAlarm = True
 
-    # sleep_at_battery_percent - at this battery percentage, we go to sleep and wake up every 10 minutes.
-    # hibernate_at_battery_percent - at this battery percentage, the pi_juice min_charge setting puts us to sleep until battery gets to wakeup_on_charge value,
-    # so we let this setting take precedence via the pijuice_config.JSON file and don't set an alarm here.
+        else:
 
-    if config['sleep_at_battery_percent'] > 0 and config['hibernate_at_battery_percent'] > 0 \
-    and pj.status.GetChargeLevel()['data'] <= config['sleep_at_battery_percent'] \
-    and pj.status.GetChargeLevel()['data'] > config['hibernate_at_battery_percent'] \
-    and pj.status.GetStatus()['data']['battery'] != 'NOT_PRESENT':
-        logger.info('scheduling 10 minute sleep due to low battery')
-        logger.info(pj.status.GetChargeLevel())
-        logger.info(pj.status.GetStatus())
-        DELTA_MIN=10
+            if config['sleep_during_night'] == True and (datetime.datetime.now().hour >= config['daytime_ends_at_h'] or datetime.datetime.now().hour < config['daytime_starts_at_h']) and config['supportMode'] == False and bCharging == False:
+                logger.info("Night time so we're scheduling shutdown")
 
-        time.sleep(30)
+                alarmObj = {
+                    'year': 'EVERY_YEAR',
+                    'month': 'EVERY_MONTH',
+                    'day': 'EVERY_DAY',
+                    # 'hour': 20, # 8am
+                    # 'minute_period': DELTA_MIN,
+                    'hour': 'EVERY_HOUR',
+                    'minute': 0,
+                    'second': 0,
+                }
 
-        alarmObj = {
-                'year': 'EVERY_YEAR',
-                'month': 'EVERY_MONTH',
-                'day': 'EVERY_DAY',
-                'hour': 'EVERY_HOUR',
-                'minute_period': DELTA_MIN,
-                'second': 0,
-        }
+                setAlarm = True
 
-        setAlarm = True
-
-    if config['sleep_during_night'] == True and (datetime.datetime.now().hour >= config['daytime_ends_at_h'] or datetime.datetime.now().hour < config['daytime_starts_at_h']):
-        logger.info("Night time so we're scheduling shutdown")
-
-        alarmObj = {
-            'year': 'EVERY_YEAR',
-            'month': 'EVERY_MONTH',
-            'day': 'EVERY_DAY',
-            # 'hour': 20, # 8am
-            # 'minute_period': DELTA_MIN,
-            'hour': 'EVERY_HOUR',
-            'minute': 0,
-            'second': 0,
-        }
-
-        setAlarm = True
-
-    if setAlarm == True:
-        logger.info("scheduleShutdown - we're setting the shutdown...")
-
-        alarmSet = False
-        while alarmSet == False:
-            status = pj.rtcAlarm.SetAlarm(alarmObj)
-
-            if status['error'] != 'NO_ERROR':
-                logger.error('Cannot set alarm\n')
-                # sys.exit()
-                alarmSet = False
-                logger.info('Sleeping and retrying...\n')
-                time.sleep(10)
             else:
-                logger.debug('Alarm set for ' + str(pj.rtcAlarm.GetAlarm()))
-                alarmSet = True
 
-        # Ensure Wake up alarm is actually enabled!
-        wakeUpEnabled = False
-        while wakeUpEnabled == False:
+                # sleep_at_battery_percent - at this battery percentage, we go to sleep and wake up every 10 minutes.
+                # hibernate_at_battery_percent - at this battery percentage, the pi_juice min_charge setting puts us to sleep until battery gets to wakeup_on_charge value,
+                # so we let this setting take precedence via the pijuice_config.JSON file and don't set an alarm here.
 
-            status = pj.rtcAlarm.SetWakeupEnabled(True)
+                if config['sleep_at_battery_percent'] > 0 and config['hibernate_at_battery_percent'] > 0 \
+                and pj.status.GetChargeLevel()['data'] <= config['sleep_at_battery_percent'] \
+                and pj.status.GetChargeLevel()['data'] > config['hibernate_at_battery_percent'] \
+                and pj.status.GetStatus()['data']['battery'] != 'NOT_PRESENT':
+                    logger.info('scheduling 10 minute sleep due to low battery')
+                    logger.info(pj.status.GetChargeLevel())
+                    logger.info(pj.status.GetStatus())
+                    DELTA_MIN=10
 
-            if status['error'] != 'NO_ERROR':
-                logger.error('Cannot enable wakeup\n')
-                # sys.exit()
-                wakeUpEnabled = False
-                logger.info('Sleeping and retrying for wakeup...\n')
-                time.sleep(10)
+                    time.sleep(30)
+
+                    alarmObj = {
+                            'year': 'EVERY_YEAR',
+                            'month': 'EVERY_MONTH',
+                            'day': 'EVERY_DAY',
+                            'hour': 'EVERY_HOUR',
+                            'minute_period': DELTA_MIN,
+                            'second': 0,
+                    }
+
+                    setAlarm = True
+
+                else:
+
+                    # If we've been up for more than 2 modem cycles or 30 minutes, and the most recently captured image is older than 10 minutes, or the most recently uploaded image is older than 30 minutes, 
+                    # either network is out, or we can't get a cellular signal, DNS is messing around, or camera isn't capturing.
+                    # Let's shutdown, power down, and wake up again in 3 mins to see if that fixes it.
+                    uptimeSeconds = int(time.clock_gettime(time.CLOCK_BOOTTIME))
+                    power_interval = config['modem.power_interval']
+                    
+                    if uptimeSeconds > power_interval * 2 and uptimeSeconds > 1800:
+                        mostRecentUploadedFiles = sorted(glob.iglob(uploadedImageFolder + "/*.*"), key=os.path.getctime, reverse=True)
+                        mostRecentPendingFiles = sorted(glob.iglob(pendingImageFolder + "/*.*"), key=os.path.getctime, reverse=True)
+
+                        secondsSinceLastUpload = -1
+                        secondsSinceLastImageCapture = -1
+
+                        if len(mostRecentPendingFiles) > 0:
+                            latestImageCapturedFilename = max(mostRecentPendingFiles, key=os.path.getctime)
+                            secondsSinceLastImageCapture = (datetime.datetime.now() - datetime.datetime.fromtimestamp(os.path.getctime(latestImageCapturedFilename))).total_seconds()
+                            logger.debug("secondsSinceLastImageCapture: " + str(secondsSinceLastImageCapture))
+
+                        if len(mostRecentUploadedFiles) > 0:
+
+                            latestUploadedFilename = max(mostRecentUploadedFiles, key=os.path.getctime)
+                            # logger.debug("latestUploadedFilename: " + str(latestUploadedFilename))
+
+                            secondsSinceLastUpload = (datetime.datetime.now() - datetime.datetime.fromtimestamp(os.path.getctime(latestUploadedFilename))).total_seconds()
+                            logger.debug("secondsSinceLastUpload: " + str(secondsSinceLastUpload))
+
+
+                        # Most recent image captured (may also be in uploaded folder) is older than 10 minutes
+                        if secondsSinceLastImageCapture > 600 and secondsSinceLastUpload > 600:
+                            logger.warning('Most recent captured image is ' + str(secondsSinceLastImageCapture) + 'seconds old, and uploaded image is ' + str(secondsSinceLastUpload) + ' seconds old - restarting...')
+                            triggerRestart = True
+
+                        if secondsSinceLastUpload > 1800:
+                            logger.warning('Most recent uploaded image is ' + str(secondsSinceLastUpload) + ' seconds old - restarting...')
+                            triggerRestart = True
+
+                        if len(mostRecentPendingFiles) == 0 and len(mostRecentUploadedFiles) == 0:
+                            logger.debug("No uploaded or captured images found - restarting...")
+                            triggerRestart = True
+
+                        if triggerRestart:
+                            minsToWakeAfter = 3
+                            minToWakeAt = datetime.datetime.now().minute + minsToWakeAfter
+                            if minToWakeAt >= 60:
+                                minToWakeAt = minToWakeAt - 60
+
+                            alarmObj = {
+                                    'year': 'EVERY_YEAR',
+                                    'month': 'EVERY_MONTH',
+                                    'day': 'EVERY_DAY',
+                                    'hour': 'EVERY_HOUR',
+                                    # 'minute_period': DELTA_MIN,
+                                    'minute': minToWakeAt,
+                                    'second': 0,
+                            }
+
+                            setAlarm = True
+
+        if setAlarm == True:
+            logger.info("scheduleShutdown - we're setting the shutdown...")
+
+            alarmSet = False
+            while alarmSet == False:
+                status = pj.rtcAlarm.SetAlarm(alarmObj)
+
+                if status['error'] != 'NO_ERROR':
+                    logger.error('Cannot set alarm\n')
+                    # sys.exit()
+                    alarmSet = False
+                    logger.info('Sleeping and retrying...\n')
+                    time.sleep(10)
+                else:
+                    logger.debug('Alarm set for ' + str(pj.rtcAlarm.GetAlarm()))
+                    alarmSet = True
+
+            # Ensure Wake up alarm is actually enabled!
+            wakeUpEnabled = False
+            while wakeUpEnabled == False:
+
+                status = pj.rtcAlarm.SetWakeupEnabled(True)
+
+                if status['error'] != 'NO_ERROR':
+                    logger.error('Cannot enable wakeup\n')
+                    # sys.exit()
+                    wakeUpEnabled = False
+                    logger.info('Sleeping and retrying for wakeup...\n')
+                    time.sleep(10)
+                else:
+                    logger.debug('Wakeup enabled')
+                    wakeUpEnabled = True
+
+            logger.debug('rtcAlarm.GetControlStatus(): ' + str(pj.rtcAlarm.GetControlStatus()))
+            logger.debug('rtcAlarm.GetTime(): ' + str(pj.rtcAlarm.GetTime()))
+
+            logger.debug('Clearing Alarm Flag...')
+            pj.rtcAlarm.ClearAlarmFlag()
+            logger.debug('rtcAlarm.GetControlStatus(): ' + str(pj.rtcAlarm.GetControlStatus()))
+            logger.debug('rtcAlarm.GetTime(): ' + str(pj.rtcAlarm.GetTime()))
+
+            if triggerRestart:
+                logger.info('Restart scheduled for ' + str(minsToWakeAfter) + ' minutes from now')
+                logger.info("So we'll skip the power off.")
             else:
-                logger.debug('Wakeup enabled')
-                wakeUpEnabled = True
+                logger.info('Power off scheduled for 30s from now')
+                pj.power.SetPowerOff(30)
+        
+            logger.info('Setting System Power Switch to Off:')
+            pj.power.SetSystemPowerSwitch(0)
+            powerDownSIM7600X()
+            logger.info('Shutting down now...')
+            subprocess.call(['sudo', 'shutdown', '-h', 'now'])
+        else:
+            # logger.debug('skipping shutdown scheduling because of config.json')
+            # # Ensure Wake up alarm is *not* enabled - or it will cause pi to reboot
+            # status = pj.rtcAlarm.SetWakeupEnabled(False)
 
-        logger.info('Shutting down...')
-        subprocess.call(['sudo', 'shutdown'])
-        logger.info('Power off scheduled for 30s from now')
-        pj.power.SetPowerOff(30)
-        logger.info('Setting System Power Switch to Off:')
-        pj.power.SetSystemPowerSwitch(0)
-    else:
-        # logger.debug('skipping shutdown scheduling because of config.json')
-        # # Ensure Wake up alarm is *not* enabled - or it will cause pi to reboot
-        # status = pj.rtcAlarm.SetWakeupEnabled(False)
+            minsToWakeAfter = 10
 
-        minsToWakeAfter = 10
+            logger.debug('skipping shutdown - scheduling safety wakeup in ' + str(minsToWakeAfter) + ' minutes incase we crash...')
+            # Set wake up for near period in future in case we crash.
 
-        logger.debug('skipping shutdown - scheduling safety wakeup in ' + str(minsToWakeAfter) + ' minutes incase we crash...')
-        # Set wake up for near period in future in case we crash.
+            minToWakeAt = datetime.datetime.now().minute + minsToWakeAfter
+            if minToWakeAt >= 60:
+                minToWakeAt = minToWakeAt - 60
 
-        minToWakeAt = datetime.datetime.now().minute + minsToWakeAfter
-        if minToWakeAt >= 60:
-            minToWakeAt = minToWakeAt - 60
+            alarmObj = {
+                    'year': 'EVERY_YEAR',
+                    'month': 'EVERY_MONTH',
+                    'day': 'EVERY_DAY',
+                    'hour': 'EVERY_HOUR',
+                    # 'minute_period': DELTA_MIN,
+                    'minute': minToWakeAt,
+                    'second': 0,
+            }
 
-        alarmObj = {
-                'year': 'EVERY_YEAR',
-                'month': 'EVERY_MONTH',
-                'day': 'EVERY_DAY',
-                'hour': 'EVERY_HOUR',
-                # 'minute_period': DELTA_MIN,
-                'minute': minToWakeAt,
-                'second': 0,
-        }
+            alarmSet = False
+            while alarmSet == False:
+                status = pj.rtcAlarm.SetAlarm(alarmObj)
 
-        alarmSet = False
-        while alarmSet == False:
-            status = pj.rtcAlarm.SetAlarm(alarmObj)
+                if status['error'] != 'NO_ERROR':
+                    logger.error('Cannot set alarm\n')
+                    # sys.exit()
+                    alarmSet = False
+                    logger.info('Sleeping and retrying...\n')
+                    time.sleep(10)
+                else:
+                    logger.debug('Safety Alarm set for ' + str(pj.rtcAlarm.GetAlarm()))
+                    alarmSet = True
 
-            if status['error'] != 'NO_ERROR':
-                logger.error('Cannot set alarm\n')
-                # sys.exit()
-                alarmSet = False
-                logger.info('Sleeping and retrying...\n')
-                time.sleep(10)
-            else:
-                logger.debug('Safety Alarm set for ' + str(pj.rtcAlarm.GetAlarm()))
-                alarmSet = True
+            # Ensure Wake up alarm is actually enabled!
+            wakeUpEnabled = False
+            while wakeUpEnabled == False:
 
-        # Ensure Wake up alarm is actually enabled!
-        wakeUpEnabled = False
-        while wakeUpEnabled == False:
+                status = pj.rtcAlarm.SetWakeupEnabled(True)
 
-            status = pj.rtcAlarm.SetWakeupEnabled(True)
+                if status['error'] != 'NO_ERROR':
+                    logger.error('Cannot enable wakeup\n')
+                    # sys.exit()
+                    wakeUpEnabled = False
+                    logger.info('Sleeping and retrying for wakeup...\n')
+                    time.sleep(10)
+                else:
+                    logger.debug('Safety Wakeup enabled')
+                    wakeUpEnabled = True
 
-            if status['error'] != 'NO_ERROR':
-                logger.error('Cannot enable wakeup\n')
-                # sys.exit()
-                wakeUpEnabled = False
-                logger.info('Sleeping and retrying for wakeup...\n')
-                time.sleep(10)
-            else:
-                logger.debug('Safety Wakeup enabled')
-                wakeUpEnabled = True
-
+    except Exception as e:
+        logger.error("scheduleShutdown() failed.")
+        logger.error(e)
 
 def saveTelemetry():
     try:

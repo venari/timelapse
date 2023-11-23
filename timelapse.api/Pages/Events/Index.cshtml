@@ -1,0 +1,93 @@
+﻿@page
+@using Humanizer
+@model Events.IndexModel
+@{
+    ViewData["Title"] = "Events";
+}
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+
+<div class="text-center">
+    <h1 class="display-4">Events</h1>
+</div>
+
+<div>
+    <table class="table">
+        <thead>
+            <tr>
+                <th scope="col" colspan="2">Device</th>
+                <th scope="col" colspan="8">Event</th>
+            </tr>
+        </thead>
+        <thead>
+            <tr>
+                @* <th scope="col">ID</th> *@
+                <th scope="col">Name</th>
+                <th scope="col">Description</th>
+
+                <th scope="col">ID</th>
+                <th scope="col">Type</th>
+                <th scope="col">Description</th>
+                <th scope="col">Start</th>
+                <th scope="col"></th>
+                <th scope="col">End</th>
+                <th scope="col"></th>
+                <th scope="col">Created By</th>
+            </tr>
+        </thead>
+        @{
+            int prevDeviceId=-1;
+        }
+        <tbody>
+                @foreach (var device in Model.devices){
+                    @foreach (var deviceEvent in device.Events.OrderByDescending(e => e.StartTime)){
+                        <tr>
+                            @if(prevDeviceId != device.Id)
+                            {
+                                prevDeviceId = device.Id;
+                                <td>@(device.Name)</td>
+                                <td>@(device.Description)</td>
+                            }
+                            else {
+                                <td></td>
+                                <td></td>
+                            }
+                        <td>
+                            <a href="/Events/Detail/@(deviceEvent.Id)">@(deviceEvent.Id)</a>
+                        </td>
+                        <td>
+                            @((deviceEvent.EventTypes!=null && deviceEvent.EventTypes.Count>0)?string.Join(", ", deviceEvent.EventTypes.OrderBy(et => et.Name).Select(e => e.Name)):"---")
+                        </td>
+                        <td>
+                            @(deviceEvent.Description)
+                        </td>
+                        <td>
+                            <script type="text/javascript">localizeDateTime('@(deviceEvent.StartTime.ToString("s"))');</script>
+                        </td>
+                        <td>
+                            <a href="/Events/Detail/@(deviceEvent.Id)"><img class="img-thumbnail" src="@(deviceEvent.StartImage.BlobUri + Model.SasToken)"></img></a>
+                        </td>
+                        @* <td>
+                            <a href="/Events/Detail/@(deviceEvent.Id)"><img class="img-thumbnail" src="@(deviceEvent.ThumbnailImage!=null?deviceEvent.ThumbnailImage.BlobUri + Model.SasToken:"")"></img></a>
+                        </td> *@
+                        <td>
+                            <script type="text/javascript">localizeDateTime('@(deviceEvent.EndTime.ToString("s"))');</script>
+                        </td>
+                        <td>
+                            <a href="/Events/Detail/@(deviceEvent.Id)"><img class="img-thumbnail" src="@(deviceEvent.EndImage.BlobUri + Model.SasToken)"></img></a>
+                        </td>
+                        @{
+                            var user = Model.Users.FirstOrDefault(u => u.Id == deviceEvent.CreatedByUserId);
+                            if(user!=null){
+                                <td>@user.UserName</td>
+                            } else {
+                                <td>[unknown]</td>
+                            }
+                        }
+                    </tr>
+                    }
+                }
+        </tbody>
+    </table>
+</div>
