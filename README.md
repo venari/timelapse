@@ -7,7 +7,7 @@ A set of tools/scripts to automate the taking and creation of timelapse videos a
 > 
 > I am having a number of PiJuice reliability issues even when using PiSupply's own batteries.
 > 
-> Since their merger with or aquisition by Nebra, I've found attempts to purchase batteries from PiSupply to be unsucessful as their payment options are not working. Attempts to contact them on Twitter go unanswered.
+> Since their merger with or aquisition by Nebra, I've found attempts to purchase batteries from PiSupply to be unsuccessful as their payment options are not working. Attempts to contact them on Twitter go unanswered.
 > 
 > If this situation changes, I will update this warning. Last updated 23 November 2023.
 
