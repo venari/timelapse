@@ -154,6 +154,25 @@ Nope - prevents camera from working...
 ```
 dtoverlay=imx708
 ``` -->
+
+# Waveshare 1.54" e-Paper Module
+
+https://github.com/waveshareteam/e-Paper/blob/master/RaspberryPi_JetsonNano/python/examples/epd_1in54b_V2_test.py
+
+```
+    sudo apt-get update
+    sudo apt-get install python3-pip
+    sudo apt-get install python3-pil
+    sudo pip3 install RPi.GPIO
+```
+
+- Enable Serial Communication
+```
+sudo raspi-config nonint do_spi 0        
+sudo reboot
+```
+
+
 # preview image over VNC
 https://www.youtube.com/watch?v=dbBWyeHbGs0&ab_channel=WillyKjellstrom
 
