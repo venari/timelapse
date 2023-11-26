@@ -85,6 +85,11 @@ sudo minicom -D /dev/ttyUSB2
 
 AT+CUSBPIDSWITCH=9011,1,1
 
+```
+$ atcom --port /dev/serial0 'AT+CUSBPIDSWITCH=9011,1,1'
+
+OK
+```
 
 
 

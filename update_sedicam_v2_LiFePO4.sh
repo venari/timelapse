@@ -8,13 +8,15 @@ if [ ! -d "/home/pi/dev/timelapse" ]; then
     git clone https://github.com/venari/timelapse.git
     cd timelapse
     git config pull.rebase false
-    git checkout deployment/sedicam_v2
+    git checkout deployment/sedicam_v2_LiFePO4
 else
     cd dev/timelapse
     # git checkout development
-    git checkout deployment/sedicam_v2
+    git checkout deployment/sedicam_v2_LiFePO4
     git pull
 fi
+
+pip3 install pyserial
 
 echo Checking RTC module is enabled in boot/config.txt
 grep -qxF 'dtoverlay=i2c-rtc,ds1307=1' /boot/config.txt || echo 'dtoverlay=i2c-rtc,ds1307=1' | sudo tee -a /boot/config.txt
@@ -28,7 +30,7 @@ echo Installing crontab entries...
 (crontab -l 2>/dev/null; echo "@reboot /usr/bin/bash /home/pi/dev/timelapse/scripts/savePhotos.sh")| crontab -
 (crontab -l 2>/dev/null; echo "@reboot /usr/bin/bash /home/pi/dev/timelapse/scripts/uploadPending.sh")| crontab -
 (crontab -l 2>/dev/null; echo "@reboot sleep 120 && /usr/bin/bash /home/pi/dev/timelapse/scripts/handleSMS.sh")| crontab -
-(crontab -l 2>/dev/null; echo "*/5 * * * * /usr/bin/bash /home/pi/dev/timelapse/scripts/handleSMS.sh")| crontab -
+# (crontab -l 2>/dev/null; echo "*/5 * * * * /usr/bin/bash /home/pi/dev/timelapse/scripts/handleSMS.sh")| crontab -
 
 echo Overwriting pijuice config...
 sudo mv /var/lib/pijuice/pijuice_config.JSON /var/lib/pijuice/pijuice_config.JSON.bak
