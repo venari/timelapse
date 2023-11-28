@@ -59,8 +59,8 @@ try:
         latestStatusUpdate['monitoringMode'] = config['monitoringMode']
         latestStatusUpdate['supportMode'] = config['supportMode']
         latestStatusUpdate['Uptime(s)'] = int(time.clock_gettime(time.CLOCK_BOOTTIME))
-        latestStatusUpdate['Last update'] = time.strftime("%d/%m/%Y", time.localtime())
-        latestStatusUpdate['Last update'] = time.strftime("%H:%M:%S", time.localtime())
+        latestStatusUpdate['Date'] = time.strftime("%d/%m/%Y", time.localtime())
+        latestStatusUpdate['Time'] = time.strftime("%H:%M:%S", time.localtime())
 
         latestStatusUpdate['Internet'] = str(internet())
 
