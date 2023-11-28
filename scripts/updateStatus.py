@@ -11,6 +11,7 @@ from PIL import Image,ImageDraw,ImageFont
 import traceback
 import glob
 import subprocess
+import pijuice
 
 logging.basicConfig(level=logging.DEBUG)
 
@@ -60,6 +61,14 @@ try:
         latestStatusUpdate['Uptime(s)'] = int(time.clock_gettime(time.CLOCK_BOOTTIME))
         latestStatusUpdate['Last updated'] = time.strftime("%d/%m/%Y %H:%M:%S", time.localtime())
 
+        latestStatusUpdate['Internet'] = str(internet())
+
+        pj = pijuice.PiJuice(1, 0x14)
+        latestStatusUpdate['syssVoltage'] = pj.status.GetBatteryVoltage()['data']
+        latestStatusUpdate['rtcAlarm'] = str(pj.rtcAlarm.GetAlarm())
+        latestStatusUpdate['batteryPercent'] = pj.status.GetChargeLevel()['data']
+        latestStatusUpdate['temperatureC'] = pj.status.GetBatteryTemperature()['data']
+                    
         drawblack = ImageDraw.Draw(blackimage)
         drawred = ImageDraw.Draw(redimage)
 
@@ -82,3 +91,17 @@ except IOError as e:
 #     logging.info("ctrl + c:")
 #     epd1in54b_V2.epdconfig.module_exit()
 #     exit()
+
+
+def internet(host="8.8.8.8", port=53, timeout=3):
+    """
+    Host: 8.8.8.8 (google-public-dns-a.google.com)
+    OpenPort: 53/tcp
+    Service: domain (DNS/TCP)
+    """
+    try:
+        socket.setdefaulttimeout(timeout)
+        socket.socket(socket.AF_INET, socket.SOCK_STREAM).connect((host, port))
+        return True
+    except socket.error as ex:
+        return False
