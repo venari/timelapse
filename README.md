@@ -180,6 +180,12 @@ sudo raspi-config nonint do_spi 0
 sudo reboot
 ```
 
+# Uptimed service
+
+```
+sudo apt-get install uptimed
+sudo systemctl enable uptimed
+```
 
 # preview image over VNC
 https://www.youtube.com/watch?v=dbBWyeHbGs0&ab_channel=WillyKjellstrom
