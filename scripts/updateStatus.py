@@ -46,23 +46,26 @@ try:
         blackimage = Image.open(imageMonitoringPreview)
 
     else:
-        font = ImageFont.truetype('Font.ttc', 24)
-        font18 = ImageFont.truetype('Font.ttc', 18)
+        fontSize = 12
+        font = ImageFont.truetype('Font.ttc', fontSize)
+        #font18 = ImageFont.truetype('Font.ttc', 18)
 
         statusUpdates = json.load(open(os.path.join(logFolder, 'statusUpdates.json')))
-        latestStatusUpdate = statusUpdates[statusUpdates.length - 1]
+        #logging.info(statusUpdates)
+        latestStatusUpdate = statusUpdates[len(statusUpdates) - 1]
 
         latestStatusUpdate['hibernateMode'] = config['hibernateMode']
         latestStatusUpdate['monitoringMode'] = config['monitoringMode']
         latestStatusUpdate['supportMode'] = config['supportMode']
+        latestStatusUpdate['uptimeSeconds'] = int(time.clock_gettime(time.CLOCK_BOOTTIME))
 
         drawblack = ImageDraw.Draw(blackimage)
         drawred = ImageDraw.Draw(redimage)
 
-        yPosition = 12
+        yPosition = 0
         for key in latestStatusUpdate.keys():
-            drawblack.text((8, yPosition), key + ': ' + latestStatusUpdate[key], font = font, fill = 0)
-            yPosition = yPosition + 24
+            drawblack.text((8, yPosition), key + ': ' + str(latestStatusUpdate[key]), font = font, fill = 0)
+            yPosition = yPosition + fontSize
 
 
 
