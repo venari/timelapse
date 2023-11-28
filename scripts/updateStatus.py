@@ -46,7 +46,7 @@ try:
         blackimage = Image.open(imageMonitoringPreview)
 
     else:
-        fontSize = 12
+        fontSize = 14
         font = ImageFont.truetype('Font.ttc', fontSize)
         #font18 = ImageFont.truetype('Font.ttc', 18)
 
@@ -57,7 +57,8 @@ try:
         latestStatusUpdate['hibernateMode'] = config['hibernateMode']
         latestStatusUpdate['monitoringMode'] = config['monitoringMode']
         latestStatusUpdate['supportMode'] = config['supportMode']
-        latestStatusUpdate['uptimeSeconds'] = int(time.clock_gettime(time.CLOCK_BOOTTIME))
+        latestStatusUpdate['Uptime(s)'] = int(time.clock_gettime(time.CLOCK_BOOTTIME))
+        latestStatusUpdate['Last updated'] = time.strftime("%d/%m/%Y %H:%M:%S", time.localtime())
 
         drawblack = ImageDraw.Draw(blackimage)
         drawred = ImageDraw.Draw(redimage)
