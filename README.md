@@ -164,6 +164,14 @@ https://github.com/waveshareteam/e-Paper/blob/master/RaspberryPi_JetsonNano/pyth
     sudo apt-get install python3-pip
     sudo apt-get install python3-pil
     sudo pip3 install RPi.GPIO
+    sudo pip3 install waveshare-epaper
+```
+
+Onboard image resizing
+```
+sudo apt-get install imagemagick
+
+convert pic/image.org.jpg -resize 200x200 -background white -gravity center -extent 200x200 pic/image.jpg 
 ```
 
 - Enable Serial Communication
