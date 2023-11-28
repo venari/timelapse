@@ -12,6 +12,7 @@ import traceback
 import glob
 import subprocess
 import pijuice
+import socket
 
 logging.basicConfig(level=logging.DEBUG)
 
