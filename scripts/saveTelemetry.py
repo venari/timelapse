@@ -98,6 +98,8 @@ def scheduleShutdown():
         #     setAlarm = True
 
 
+        uptimeSeconds = int(time.clock_gettime(time.CLOCK_BOOTTIME))
+
         bCharging = False
         if (
             (pj.status.GetStatus()['data']['battery'] == 'CHARGING_FROM_IN' 
@@ -114,26 +116,28 @@ def scheduleShutdown():
                 logger.info("Night time - but we're charging/powered, so we'll stay on.")
 
 
+        # Hhibernate mode? Lets have 5 minutes to give it a chance to check again before hibernating.
         if config['hibernateMode']:
-            # print(str(datetime.datetime.now()) + ' scheduling regular shutdown')
-            logger.info('hibernate mode - sleeping for 6 hours...')
+            logger.info('hibernate mode - stay awke for 5 mins')
+            if uptimeSeconds > 300:
+                logger.info('hibernate mode - sleeping for 6 hours...')
 
-            hoursToWakeAfter = 6
-            hourToWakeAt = datetime.datetime.now().hour + hoursToWakeAfter
-            if hoursToWakeAfter >= 24:
-                hourToWakeAt = hourToWakeAt - 12
+                hoursToWakeAfter = 6
+                hourToWakeAt = datetime.datetime.utcnow().hour + hoursToWakeAfter
+                if hourToWakeAt >= 24:
+                    hourToWakeAt = hourToWakeAt - 24
 
 
-            alarmObj = {
-                'year': 'EVERY_YEAR',
-                'month': 'EVERY_MONTH',
-                'day': 'EVERY_DAY',
-                'hour': hourToWakeAt,
-                'minute': 0,
-                'second': 0,
-            }
+                alarmObj = {
+                    'year': 'EVERY_YEAR',
+                    'month': 'EVERY_MONTH',
+                    'day': 'EVERY_DAY',
+                    'hour': hourToWakeAt,
+                    'minute': 0,
+                    'second': 0,
+                }
 
-            setAlarm = True
+                setAlarm = True
 
         else:
 
@@ -162,7 +166,8 @@ def scheduleShutdown():
                 if config['sleep_at_battery_percent'] > 0 and config['hibernate_at_battery_percent'] > 0 \
                 and pj.status.GetChargeLevel()['data'] <= config['sleep_at_battery_percent'] \
                 and pj.status.GetChargeLevel()['data'] > config['hibernate_at_battery_percent'] \
-                and pj.status.GetStatus()['data']['battery'] != 'NOT_PRESENT':
+                and pj.status.GetStatus()['data']['battery'] != 'NOT_PRESENT' \
+                and bCharging == False:
                     logger.info('scheduling 10 minute sleep due to low battery')
                     logger.info(pj.status.GetChargeLevel())
                     logger.info(pj.status.GetStatus())
@@ -186,7 +191,6 @@ def scheduleShutdown():
                     # If we've been up for more than 2 modem cycles or 30 minutes, and the most recently captured image is older than 10 minutes, or the most recently uploaded image is older than 30 minutes, 
                     # either network is out, or we can't get a cellular signal, DNS is messing around, or camera isn't capturing.
                     # Let's shutdown, power down, and wake up again in 3 mins to see if that fixes it.
-                    uptimeSeconds = int(time.clock_gettime(time.CLOCK_BOOTTIME))
                     power_interval = config['modem.power_interval']
                     
                     if uptimeSeconds > power_interval * 2 and uptimeSeconds > 1800:
@@ -299,6 +303,15 @@ def scheduleShutdown():
             # # Ensure Wake up alarm is *not* enabled - or it will cause pi to reboot
             # status = pj.rtcAlarm.SetWakeupEnabled(False)
 
+            SetSafetyWakeup()
+
+    except Exception as e:
+        logger.error("scheduleShutdown() failed.")
+        logger.error(e)
+
+def SetSafetyWakeup():
+                
+    try:
             minsToWakeAfter = 10
 
             logger.debug('skipping shutdown - scheduling safety wakeup in ' + str(minsToWakeAfter) + ' minutes incase we crash...')
@@ -349,8 +362,10 @@ def scheduleShutdown():
                     wakeUpEnabled = True
 
     except Exception as e:
-        logger.error("scheduleShutdown() failed.")
+        logger.error("SetSafetyWakeup() failed.")
         logger.error(e)
+
+
 
 def saveTelemetry():
     try:
@@ -402,9 +417,13 @@ except Exception as e:
 
 try:
     logger.info('In saveTelemetry.py')
-    if config['shutdown']:
-        logger.info('Setting failsafe power off for 2 minutes 30 seconds from now.')
-        pj.power.SetPowerOff(150)   # Fail safe turn the thing off
+
+    # Set safety wakeup right up front incase modem causes us to fall over.
+    SetSafetyWakeup()
+
+    # if config['shutdown']:
+    #     logger.info('Setting failsafe power off for 2 minutes 30 seconds from now.')
+    #     pj.power.SetPowerOff(150)   # Fail safe turn the thing off
 
     while True:
         saveTelemetry()

@@ -14,13 +14,35 @@ sudo apt-get install python3-pil -y
 sudo pip3 install RPi.GPIO
 sudo pip3 install waveshare-epaper
 
+pip3 install pyserial
+
 byobu-enable
 
 echo Setting timezone...
 sudo timedatectl set-timezone Pacific/Auckland
 
 
+# Waveshare stuff
+
+# Enable Serial Communication
+sudo raspi-config nonint do_serial 2        # Disable serial login shell and enable serial port hardware
+
+#https://core-electronics.com.au/guides/raspberry-pi/raspberry-pi-4g-gps-hat/
+wget https://www.waveshare.com/w/upload/2/29/SIM7600X-4G-HAT-Demo.7z
+sudo apt-get install p7zip-full
+7z x SIM7600X-4G-HAT-Demo.7z -r -o/home/pi
+sudo chmod 777 -R /home/pi/SIM7600X-4G-HAT-Demo
+
+
+cd /home/pi/SIM7600X-4G-HAT-Demo/Raspberry/c/bcm2835
+chmod +x configure && ./configure && sudo make && sudo make install
+
+# sed -e '$i \sh /home/pi/SIM7600X-4G-HAT-Demo/Raspberry/c/sim7600_4G_hat_init\n' /etc/rc.local
+grep -qxF 'sh /home/pi/SIM7600X-4G-HAT-Demo/Raspberry/c/sim7600_4G_hat_init' /etc/rc.local || sudo sed -i -e '$i \sh /home/pi/SIM7600X-4G-HAT-Demo/Raspberry/c/sim7600_4G_hat_init\n' /etc/rc.local
+###################
+
 echo Cloning repo...
+cd /home/pi
 # Check if dev folder exists
 if [ ! -d "/home/pi/dev/timelapse" ]; then
     mkdir -p dev
@@ -47,11 +69,12 @@ echo Installing crontab entries...
 # (crontab -l 2>/dev/null; echo "@reboot /usr/bin/bash /home/pi/dev/timelapse/scripts/startup.sh")| crontab -
 (echo "@reboot /usr/bin/bash /home/pi/dev/timelapse/scripts/saveTelemetry.sh")| crontab -
 (crontab -l 2>/dev/null; echo "@reboot /usr/bin/bash /home/pi/dev/timelapse/scripts/savePhotos.sh")| crontab -
-# (crontab -l 2>/dev/null; echo "@reboot sleep 60 && /usr/bin/bash /home/pi/dev/timelapse/scripts/uploadPending.sh")| crontab -
 (crontab -l 2>/dev/null; echo "@reboot /usr/bin/bash /home/pi/dev/timelapse/scripts/uploadPending.sh")| crontab -
 (crontab -l 2>/dev/null; echo "@reboot /usr/bin/bash /home/pi/dev/timelapse/scripts/updateStatus.sh")| crontab -
 (crontab -l 2>/dev/null; echo "* * * * * /usr/bin/bash /home/pi/dev/timelapse/scripts/updateStatus.sh")| crontab -
 # (crontab -l 2>/dev/null; echo "*/5 * * * * /usr/bin/bash /home/pi/dev/timelapse/scripts/updateStatus.sh")| crontab -
+# (crontab -l 2>/dev/null; echo "@reboot sleep 120 && /usr/bin/bash /home/pi/dev/timelapse/scripts/handleSMS.sh")| crontab -
+(crontab -l 2>/dev/null; echo "*/5 * * * * /usr/bin/bash /home/pi/dev/timelapse/scripts/handleSMS.sh")| crontab -
 
 echo Overwriting pijuice config...
 sudo mv /var/lib/pijuice/pijuice_config.JSON /var/lib/pijuice/pijuice_config.JSON.bak
