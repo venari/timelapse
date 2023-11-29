@@ -67,7 +67,13 @@ try:
         font = ImageFont.truetype('Font.ttc', fontSize)
         #font18 = ImageFont.truetype('Font.ttc', 18)
 
-        statusUpdates = json.load(open(os.path.join(logFolder, 'statusUpdates.json')))
+        statusUpdates = [{}]
+
+        statusUpdatesJSONFilename = os.path.join(logFolder, 'statusUpdates.json')
+
+        if(os.stat(statusUpdatesJSONFilename).st_size != 0):
+            statusUpdates = json.load(open(statusUpdatesJSONFilename))
+
         #logging.info(statusUpdates)
         latestStatusUpdate = statusUpdates[len(statusUpdates) - 1]
 

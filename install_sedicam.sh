@@ -10,6 +10,9 @@ echo Installing...
 sudo apt-get install git pijuice-base python3-pip -y
 sudo apt install -y python3-picamera2 --no-install-recommends
 sudo apt-get install vim byobu -y
+sudo apt-get install python3-pil -y
+sudo pip3 install RPi.GPIO
+sudo pip3 install waveshare-epaper
 
 byobu-enable
 
@@ -46,6 +49,7 @@ echo Installing crontab entries...
 (crontab -l 2>/dev/null; echo "@reboot /usr/bin/bash /home/pi/dev/timelapse/scripts/savePhotos.sh")| crontab -
 # (crontab -l 2>/dev/null; echo "@reboot sleep 60 && /usr/bin/bash /home/pi/dev/timelapse/scripts/uploadPending.sh")| crontab -
 (crontab -l 2>/dev/null; echo "@reboot /usr/bin/bash /home/pi/dev/timelapse/scripts/uploadPending.sh")| crontab -
+(crontab -l 2>/dev/null; echo "@reboot /usr/bin/bash /home/pi/dev/timelapse/scripts/updateStatus.sh")| crontab -
 (crontab -l 2>/dev/null; echo "* * * * * /usr/bin/bash /home/pi/dev/timelapse/scripts/updateStatus.sh")| crontab -
 # (crontab -l 2>/dev/null; echo "*/5 * * * * /usr/bin/bash /home/pi/dev/timelapse/scripts/updateStatus.sh")| crontab -
 
