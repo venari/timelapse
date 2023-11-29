@@ -87,19 +87,28 @@ try:
         latestStatusUpdate['Internet'] = str(internet())
 
         pj = pijuice.PiJuice(1, 0x14)
-        latestStatusUpdate['sysVoltage'] = pj.status.GetBatteryVoltage()['data']
+        latestStatusUpdate['sysVoltage'] = pj.status.GetBatteryVoltage()['data'] + "mV"
         
         alarm = pj.rtcAlarm.GetAlarm()
+
+        if(alarm['data']['minute']=="EVERY_MINUTE"):
+            alarm['data']['minute']=="*"
+
+        if(alarm['data']['hour']=="EVERY_HOUR"):
+            alarm['data']['hour']=="*"
+
+        if(alarm['data']['day']=="EVERY_DAY"):
+            alarm['data']['day']=="*"
+
         latestStatusUpdate['alarm'] = "H " + str(alarm['data']['hour']) + " M " + str(alarm['data']['minute']) + " S " + str(alarm['data']['second']) + 'D' + str(alarm['data']['day'])
 
         controlStatus = pj.rtcAlarm.GetControlStatus()
-        latestStatusUpdate['controlStatus'] = "wakeup enabled " + str(controlStatus['data']['alarm_wakeup_enabled']) + " Flag " + str(controlStatus['data']['alarm_flag'])
+        latestStatusUpdate['controlStatus'] = "Wake " + str(controlStatus['data']['alarm_wakeup_enabled']) + " Flag " + str(controlStatus['data']['alarm_flag'])
 
-        latestStatusUpdate['batteryPercent'] = pj.status.GetChargeLevel()['data']
-        latestStatusUpdate['temperatureC'] = pj.status.GetBatteryTemperature()['data']
-
-        latestStatusUpdate['battery'] = pj.status.GetStatus()['data']['battery']
+        latestStatusUpdate['battery'] = pj.status.GetStatus()['data']['battery'] + " " + pj.status.GetChargeLevel()['data'] + "%"
         latestStatusUpdate['powerInput'] = pj.status.GetStatus()['data']['powerInput']
+        latestStatusUpdate['temp'] = pj.status.GetBatteryTemperature()['data'] + "C"
+
                     
         drawblack = ImageDraw.Draw(blackimage)
         drawred = ImageDraw.Draw(redimage)
