@@ -45,7 +45,7 @@ try:
     epd = epaper.epaper('epd1in54b').EPD()
     logging.info("init and Clear")
     epd.init()
-    #epd.Clear()
+    epd.Clear()
     #time.sleep(1)
     
     # Drawing on the image
