@@ -92,7 +92,7 @@ try:
         latestStatusUpdate['Internet'] = str(internet())
 
         pj = pijuice.PiJuice(1, 0x14)
-        latestStatusUpdate['sysVoltage'] = pj.status.GetBatteryVoltage()['data'] + "mV"
+        latestStatusUpdate['sysVoltage'] = str(pj.status.GetBatteryVoltage()['data']) + "mV"
         
         alarm = pj.rtcAlarm.GetAlarm()
 
