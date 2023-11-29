@@ -71,7 +71,7 @@ try:
 
         statusUpdatesJSONFilename = os.path.join(logFolder, 'statusUpdates.json')
 
-        if(os.stat(statusUpdatesJSONFilename).st_size != 0):
+        if(os.path.exists(statusUpdatesJSONFilename) and os.stat(statusUpdatesJSONFilename).st_size > 0):
             statusUpdates = json.load(open(statusUpdatesJSONFilename))
 
         #logging.info(statusUpdates)
