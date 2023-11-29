@@ -81,8 +81,14 @@ try:
         latestStatusUpdate['Internet'] = str(internet())
 
         pj = pijuice.PiJuice(1, 0x14)
-        latestStatusUpdate['syssVoltage'] = pj.status.GetBatteryVoltage()['data']
-        latestStatusUpdate['rtcAlarm'] = str(pj.rtcAlarm.GetAlarm())
+        latestStatusUpdate['sysVoltage'] = pj.status.GetBatteryVoltage()['data']
+        
+        alarm = pj.rtcAlarm.GetAlarm()
+        latestStatusUpdate['alarm'] = "H " + str(alarm['data']['hour']) + " M " + str(alarm['data']['minute']) + " S " + str(alarm['data']['second']) + 'D' + str(alarm['data']['day'])
+
+        controlStatus = pj.rtcAlarm.GetControlStatus()
+        latestStatusUpdate['controlStatus'] = "wakeup enabled " + str(controlStatus['data']['alarm_wakeup_enabled']) + " Flag " + str(controlStatus['data']['alarm_flag'])
+
         latestStatusUpdate['batteryPercent'] = pj.status.GetChargeLevel()['data']
         latestStatusUpdate['temperatureC'] = pj.status.GetBatteryTemperature()['data']
                     
