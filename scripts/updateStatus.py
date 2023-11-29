@@ -18,10 +18,11 @@ import socket
 
 
 outputImageFolder = '../output/images/'
-imageMonitoringPreview = '../output/images/monitoringPreview.jpg'
-mostRecentUploadedImage = '../output/images/monitoringPreviewMostRecentUploaded.jpg'
-mostRecentPendingImage = '../output/images/monitoringPreviewMostRecentPending.jpg'
+imageMonitoringPreview = outputImageFolder + 'monitoringPreview.jpg'
+mostRecentUploadedImage = outputImageFolder + 'monitoringPreviewMostRecentUploaded.jpg'
+mostRecentPendingImage = outputImageFolder + 'monitoringPreviewMostRecentPending.jpg'
 pendingImageFolder = outputImageFolder + 'pending/'
+uploadedImageFolder = outputImageFolder + 'uploaded/'
 
 config = json.load(open('config.json'))
 
