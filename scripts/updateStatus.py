@@ -7,6 +7,7 @@ import json
 import logging
 import epaper
 import time
+import datetime
 from PIL import Image,ImageDraw,ImageFont
 import traceback
 import glob
