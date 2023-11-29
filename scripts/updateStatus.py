@@ -97,13 +97,13 @@ try:
         alarm = pj.rtcAlarm.GetAlarm()
 
         if(alarm['data']['minute']=="EVERY_MINUTE"):
-            alarm['data']['minute']=="*"
+            alarm['data']['minute']="*"
 
         if(alarm['data']['hour']=="EVERY_HOUR"):
-            alarm['data']['hour']=="*"
+            alarm['data']['hour']="*"
 
         if(alarm['data']['day']=="EVERY_DAY"):
-            alarm['data']['day']=="*"
+            alarm['data']['day']="*"
 
         latestStatusUpdate['alarm'] = "H " + str(alarm['data']['hour']) + " M " + str(alarm['data']['minute']) + " S " + str(alarm['data']['second']) + 'D' + str(alarm['data']['day'])
 
