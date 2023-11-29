@@ -110,7 +110,7 @@ try:
         controlStatus = pj.rtcAlarm.GetControlStatus()
         latestStatusUpdate['status'] = "W: " + str(controlStatus['data']['alarm_wakeup_enabled']) + " F: " + str(controlStatus['data']['alarm_flag'])
 
-        latestStatusUpdate['battery'] = pj.status.GetStatus()['data']['battery'] + " " + str(pj.status.GetChargeLevel()['data']) + "%"
+        latestStatusUpdate['battery'] = str(pj.status.GetChargeLevel()['data']) + "%"  + " " + pj.status.GetStatus()['data']['battery']
         latestStatusUpdate['power'] = pj.status.GetStatus()['data']['powerInput']
         latestStatusUpdate['temp'] = str(pj.status.GetBatteryTemperature()['data']) + "C"
 

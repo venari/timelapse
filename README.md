@@ -205,6 +205,14 @@ Issues in Bullseye on Zero2? https://www.raspberrypi.com/news/bullseye-camera-sy
 - related - possibly not - https://github.com/raspberrypi/libcamera-apps/issues/278
 - 
 
+# Access Hauwei thumb stick web interface (password is fiddly)
+```
+ssh -D 8080 pi@sediment-pi-[machine name]
+```
+
+Use FoxyProxy and setup proxy to localhost:8080
+
+Browse to http://192.168.1.1/html/index.html or http://192.168.8.1/html/index.html
 
 # On board timelapse generation
 
