@@ -15,7 +15,7 @@ import glob
 import subprocess
 import pijuice
 import socket
-
+import shutil
 
 outputImageFolder = '../output/images/'
 imageMonitoringPreview = outputImageFolder + 'monitoringPreview.jpg'
