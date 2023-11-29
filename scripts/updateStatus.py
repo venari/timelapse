@@ -83,6 +83,7 @@ try:
 
     if config['monitoringMode']:
     
+        logger.info("Getting most recent uploaded and pending files...")
         mostRecentUploadedFiles = sorted(glob.iglob(uploadedImageFolder + "/*.*"), key=os.path.getctime, reverse=True)
         mostRecentPendingFiles = sorted(glob.iglob(pendingImageFolder + "/*.*"), key=os.path.getctime, reverse=True)
 
@@ -91,19 +92,25 @@ try:
 
         if len(mostRecentPendingFiles) > 0:
             shutil.copy(mostRecentPendingFiles[0], mostRecentPendingImage)
-        
+
+        logger.info("Copied most recent uploaded and pending files")
+
         # Determine the most recent of the two above files
         # Check each file exists
         # If not, use the other file.
         if os.path.exists(mostRecentUploadedImage) and os.path.exists(mostRecentPendingImage):
             if os.stat(mostRecentUploadedImage).st_size > os.stat(mostRecentPendingImage).st_size:
                 mostRecentImage = mostRecentUploadedImage
+                logger.info('Using most recent uploaded image')
             else:
                 mostRecentImage = mostRecentPendingImage
+                logger.info('Using most recent pending image')
         elif os.path.exists(mostRecentUploadedImage):
             mostRecentImage = mostRecentUploadedImage
+            logger.info('Using most recent uploaded image')
         elif os.path.exists(mostRecentPendingImage):
             mostRecentImage = mostRecentPendingImage
+            logger.info('Using most recent pending image')
         else:
             logger.error('Couldn\'t find any images to display.')
         
@@ -111,10 +118,12 @@ try:
 
         if(os.path.exists(mostRecentImage)):
             # resize image
+            logger.info("Resizing image...")
             cmd = 'convert ' + mostRecentPendingFiles[0] + ' -resize 200x200 -background white -gravity center -extent 200x200 ' + imageMonitoringPreview
             subprocess.call(cmd, shell=True)
-            
+            logger.info("Resized image")
             blackimage = Image.open(imageMonitoringPreview)
+            logger.info("Opened image")
 
     else:
         fontSize = 14
@@ -173,7 +182,7 @@ try:
             yPosition = yPosition + fontSize
 
 
-
+    logger.info("Displaying buffer")
     epd.display(epd.getbuffer(blackimage),epd.getbuffer(redimage))
     
     logger.info("Goto Sleep...")
