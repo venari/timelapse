@@ -85,11 +85,11 @@ try:
         latestStatusUpdate['hibernateMode'] = config['hibernateMode']
         latestStatusUpdate['monitoringMode'] = config['monitoringMode']
         latestStatusUpdate['supportMode'] = config['supportMode']
-        latestStatusUpdate['Uptime(s)'] = int(time.clock_gettime(time.CLOCK_BOOTTIME))
-        latestStatusUpdate['Date'] = time.strftime("%d/%m/%Y", time.localtime())
-        latestStatusUpdate['Time'] = time.strftime("%H:%M:%S", time.localtime())
+        latestStatusUpdate['uptime(s)'] = int(time.clock_gettime(time.CLOCK_BOOTTIME))
+        latestStatusUpdate['date'] = time.strftime("%d/%m/%Y", time.localtime())
+        latestStatusUpdate['time'] = time.strftime("%H:%M:%S", time.localtime())
 
-        latestStatusUpdate['Internet'] = str(internet())
+        latestStatusUpdate['internet'] = str(internet())
 
         pj = pijuice.PiJuice(1, 0x14)
         latestStatusUpdate['sysVoltage'] = str(pj.status.GetBatteryVoltage()['data']) + "mV"
@@ -105,13 +105,13 @@ try:
         if(alarm['data']['day']=="EVERY_DAY"):
             alarm['data']['day']="*"
 
-        latestStatusUpdate['alarm'] = "H " + str(alarm['data']['hour']) + " M " + str(alarm['data']['minute']) + " S " + str(alarm['data']['second']) + 'D' + str(alarm['data']['day'])
+        latestStatusUpdate['alarm'] = "H " + str(alarm['data']['hour']) + " M " + str(alarm['data']['minute']) + " S " + str(alarm['data']['second']) + ' D ' + str(alarm['data']['day'])
 
         controlStatus = pj.rtcAlarm.GetControlStatus()
-        latestStatusUpdate['controlStatus'] = "Wake " + str(controlStatus['data']['alarm_wakeup_enabled']) + " Flag " + str(controlStatus['data']['alarm_flag'])
+        latestStatusUpdate['status'] = "W: " + str(controlStatus['data']['alarm_wakeup_enabled']) + " F: " + str(controlStatus['data']['alarm_flag'])
 
         latestStatusUpdate['battery'] = pj.status.GetStatus()['data']['battery'] + " " + str(pj.status.GetChargeLevel()['data']) + "%"
-        latestStatusUpdate['powerInput'] = pj.status.GetStatus()['data']['powerInput']
+        latestStatusUpdate['power'] = pj.status.GetStatus()['data']['powerInput']
         latestStatusUpdate['temp'] = str(pj.status.GetBatteryTemperature()['data']) + "C"
 
                     
