@@ -286,8 +286,8 @@ def scheduleShutdown():
                 logger.info('Restart scheduled for ' + str(minsToWakeAfter) + ' minutes from now')
                 logger.info("So we'll skip the power off.")
             else:
-                logger.info('Power off scheduled for 30s from now')
-                pj.power.SetPowerOff(30)
+                logger.info('Power off scheduled for 1 min from now')
+                pj.power.SetPowerOff(60)
         
             logger.info('Setting System Power Switch to Off:')
             pj.power.SetSystemPowerSwitch(0)
