@@ -97,6 +97,9 @@ try:
 
         latestStatusUpdate['batteryPercent'] = pj.status.GetChargeLevel()['data']
         latestStatusUpdate['temperatureC'] = pj.status.GetBatteryTemperature()['data']
+
+        latestStatusUpdate['battery'] = pj.status.GetStatus()['data']['battery']
+        latestStatusUpdate['powerInput'] = pj.status.GetStatus()['data']['powerInput']
                     
         drawblack = ImageDraw.Draw(blackimage)
         drawred = ImageDraw.Draw(redimage)
