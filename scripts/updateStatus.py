@@ -45,7 +45,11 @@ try:
     epd = epaper.epaper('epd1in54b').EPD()
     logging.info("init and Clear")
     epd.init()
-    epd.Clear()
+    
+    # Clear paper every 5 minutes in case it gets corrupted.
+    if(datetime.datetime.now().minute % 5 == 0):
+        epd.Clear()
+
     #time.sleep(1)
     
     # Drawing on the image
