@@ -110,9 +110,9 @@ try:
         controlStatus = pj.rtcAlarm.GetControlStatus()
         latestStatusUpdate['controlStatus'] = "Wake " + str(controlStatus['data']['alarm_wakeup_enabled']) + " Flag " + str(controlStatus['data']['alarm_flag'])
 
-        latestStatusUpdate['battery'] = pj.status.GetStatus()['data']['battery'] + " " + pj.status.GetChargeLevel()['data'] + "%"
+        latestStatusUpdate['battery'] = pj.status.GetStatus()['data']['battery'] + " " + str(pj.status.GetChargeLevel()['data']) + "%"
         latestStatusUpdate['powerInput'] = pj.status.GetStatus()['data']['powerInput']
-        latestStatusUpdate['temp'] = pj.status.GetBatteryTemperature()['data'] + "C"
+        latestStatusUpdate['temp'] = str(pj.status.GetBatteryTemperature()['data']) + "C"
 
                     
         drawblack = ImageDraw.Draw(blackimage)
