@@ -1,5 +1,6 @@
 #!/usr/bin/python
 # -*- coding:utf-8 -*-
+from logging.handlers import TimedRotatingFileHandler
 import sys
 import os
 import json
@@ -15,15 +16,30 @@ import subprocess
 import pijuice
 import socket
 
-logging.basicConfig(level=logging.DEBUG)
 
 outputImageFolder = '../output/images/'
 imageMonitoringPreview = '../output/images/monitoringPreview.jpg'
+mostRecentUploadedImage = '../output/images/monitoringPreviewMostRecentUploaded.jpg'
+mostRecentPendingImage = '../output/images/monitoringPreviewMostRecentPending.jpg'
 pendingImageFolder = outputImageFolder + 'pending/'
-mostRecentPendingFiles = sorted(glob.iglob(pendingImageFolder + "/*.*"), key=os.path.getctime, reverse=True)
+
 config = json.load(open('config.json'))
 
-logFolder = os.path.dirname(config["logFilePath"])
+logFilePath = config["logFilePath"]
+
+logFolder = os.path.dirname(logFilePath)
+
+formatter = logging.Formatter('%(asctime)s %(name)s %(levelname)s %(message)s')
+handler = TimedRotatingFileHandler(logFilePath, 
+                                   when='midnight',
+                                   backupCount=10)
+handler.setFormatter(formatter)
+logger = logging.getLogger("updateStatus")
+logger.addHandler(handler)
+logger.setLevel(logging.DEBUG)
+
+logger.info("Starting up updateStatus.py...")
+os.chmod(logFilePath, 0o777) # Make sure pijuice user script can write to log file.
 
 
 def internet(host="8.8.8.8", port=53, timeout=3):
@@ -49,7 +65,7 @@ try:
 
     #epd = epd1in54b_V2.EPD()
     epd = epaper.epaper('epd1in54b').EPD()
-    logging.info("init and Clear")
+    logger.info("init and Clear")
     epd.init()
     epd.Clear()
     
@@ -60,18 +76,44 @@ try:
     #time.sleep(1)
     
     # Drawing on the image
-    logging.info("1.Drawing on the image...")
+    logger.info("1.Drawing on the image...")
     blackimage = Image.new('1', (epd.width, epd.height), 255)  # 255: clear the frame
     redimage = Image.new('1', (epd.width, epd.height), 255)  # 255: clear the frame
 
-    if config['monitoringMode'] and len(mostRecentPendingFiles) > 0:
-        
+    if config['monitoringMode']:
+    
+        mostRecentUploadedFiles = sorted(glob.iglob(uploadedImageFolder + "/*.*"), key=os.path.getctime, reverse=True)
+        mostRecentPendingFiles = sorted(glob.iglob(pendingImageFolder + "/*.*"), key=os.path.getctime, reverse=True)
 
-        # resize image
-        cmd = 'convert ' + mostRecentPendingFiles[0] + ' -resize 200x200 -background white -gravity center -extent 200x200 ' + imageMonitoringPreview
-        subprocess.call(cmd, shell=True)
+        if len(mostRecentUploadedFiles) > 0:
+            shutil.copy(mostRecentUploadedFiles[0], mostRecentUploadedImage)
+
+        if len(mostRecentPendingFiles) > 0:
+            shutil.copy(mostRecentPendingFiles[0], mostRecentPendingImage)
         
-        blackimage = Image.open(imageMonitoringPreview)
+        # Determine the most recent of the two above files
+        # Check each file exists
+        # If not, use the other file.
+        if os.path.exists(mostRecentUploadedImage) and os.path.exists(mostRecentPendingImage):
+            if os.stat(mostRecentUploadedImage).st_size > os.stat(mostRecentPendingImage).st_size:
+                mostRecentImage = mostRecentUploadedImage
+            else:
+                mostRecentImage = mostRecentPendingImage
+        elif os.path.exists(mostRecentUploadedImage):
+            mostRecentImage = mostRecentUploadedImage
+        elif os.path.exists(mostRecentPendingImage):
+            mostRecentImage = mostRecentPendingImage
+        else:
+            logger.error('Couldn\'t find any images to display.')
+        
+        mostRecentImage = mostRecentUploadedImage
+
+        if(os.path.exists(mostRecentImage)):
+            # resize image
+            cmd = 'convert ' + mostRecentPendingFiles[0] + ' -resize 200x200 -background white -gravity center -extent 200x200 ' + imageMonitoringPreview
+            subprocess.call(cmd, shell=True)
+            
+            blackimage = Image.open(imageMonitoringPreview)
 
     else:
         fontSize = 14
@@ -85,7 +127,7 @@ try:
         if(os.path.exists(statusUpdatesJSONFilename) and os.stat(statusUpdatesJSONFilename).st_size > 0):
             statusUpdates = json.load(open(statusUpdatesJSONFilename))
 
-        #logging.info(statusUpdates)
+        #logger.info(statusUpdates)
         latestStatusUpdate = statusUpdates[len(statusUpdates) - 1]
 
         latestStatusUpdate['hibernateMode'] = config['hibernateMode']
@@ -133,11 +175,11 @@ try:
 
     epd.display(epd.getbuffer(blackimage),epd.getbuffer(redimage))
     
-    logging.info("Goto Sleep...")
+    logger.info("Goto Sleep...")
     epd.sleep()
         
 except IOError as e:
-    logging.info(e)
+    logger.error(e)
     
 # except KeyboardInterrupt:    
 #     logging.info("ctrl + c:")
