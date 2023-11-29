@@ -42,14 +42,20 @@ def internet(host="8.8.8.8", port=53, timeout=3):
 
 try:
     
+
+    if config['supportMode'] == False:
+        # Let's not update e-paper if we're not in Support mode.
+        exit()
+
     #epd = epd1in54b_V2.EPD()
     epd = epaper.epaper('epd1in54b').EPD()
     logging.info("init and Clear")
     epd.init()
+    epd.Clear()
     
-    # Clear paper every 5 minutes in case it gets corrupted.
-    if(datetime.datetime.now().minute % 5 == 0):
-        epd.Clear()
+    # # Clear paper every 5 minutes in case it gets corrupted.
+    # if(datetime.datetime.now().minute % 5 == 0):
+        # epd.Clear()
 
     #time.sleep(1)
     
