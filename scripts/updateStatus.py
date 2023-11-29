@@ -62,6 +62,7 @@ try:
 
     if config['supportMode'] == False:
         # Let's not update e-paper if we're not in Support mode.
+        logger.info("Not in support mode - exiting")
         exit()
 
     #epd = epd1in54b_V2.EPD()
@@ -81,7 +82,13 @@ try:
     blackimage = Image.new('1', (epd.width, epd.height), 255)  # 255: clear the frame
     redimage = Image.new('1', (epd.width, epd.height), 255)  # 255: clear the frame
 
-    if config['monitoringMode']:
+    if config['monitoringMode'] and False:  # This is too slow to run every minute, and a bit slow to run every 5 minutes - move to bluetooth app I think?
+
+        # Init and Clear 15s
+        # Work out right file to use, copy it, 1s
+        # Resize image - 40s
+        # open and display buffer - 15s
+
     
         logger.info("Getting most recent uploaded and pending files...")
         mostRecentUploadedFiles = sorted(glob.iglob(uploadedImageFolder + "/*.*"), key=os.path.getctime, reverse=True)
