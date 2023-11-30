@@ -172,6 +172,8 @@ def updateEInkDisplay():
             latestStatusUpdate['monitoringMode'] = config['monitoringMode']
             latestStatusUpdate['supportMode'] = config['supportMode']
             latestStatusUpdate['uptime(s)'] = int(time.clock_gettime(time.CLOCK_BOOTTIME))
+            latestStatusUpdate['pendingImages'] = str(len(os.listdir(pendingImageFolder)))
+
             latestStatusUpdate['date'] = time.strftime("%d/%m/%Y", time.localtime())
             latestStatusUpdate['time'] = time.strftime("%H:%M:%S", time.localtime())
 
@@ -230,6 +232,6 @@ else:
     logger.info("No internet")
     flashLED('D2', 255, 0, 0, 1, 2)
 
-# Only update eink every 5 minutes 
-if(datetime.datetime.now().minute % 5 == 0):
+# Only update eink every 5 minutes, or every minute in first 5
+if(datetime.datetime.now().minute % 5 == 0 or time.clock_gettime(time.CLOCK_BOOTTIME) <= 300):
     updateEInkDisplay()

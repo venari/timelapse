@@ -79,6 +79,8 @@ def uploadPendingPhotos():
 
         mostRecentPendingFiles = sorted(glob.iglob(pendingImageFolder + "/*.*"), key=os.path.getctime, reverse=True)
 
+        connectToInternet()
+
         pendingFilesProcessed=0
         for IMAGEFILENAME in mostRecentPendingFiles:
             
@@ -161,7 +163,7 @@ def uploadPendingPhotos():
                 # or config['supportMode'] == True
                 if ((datetime.datetime.now().hour == 9 or datetime.datetime.now().hour == 12 or datetime.datetime.now().hour == 17) and datetime.datetime.now().minute < 15) or config['supportMode']==True:
                     if not bInSupportWindow:
-                        logger.info('Opening minute support window...')
+                        logger.info('Opening support window...')
                         bInSupportWindow = True
 
                 else:
@@ -171,7 +173,6 @@ def uploadPendingPhotos():
                     disconnectFromInternet()
                     logger.info('Sleeping for ' + str(power_interval) + ' seconds...')
                     time.sleep(power_interval)
-                    connectToInternet()
 
     except Exception as e:
         logger.error(str(datetime.datetime.now()) + " uploadPendingPhotos() failed.")
@@ -199,6 +200,10 @@ def internet(host="8.8.8.8", port=53, timeout=config['upload.telemetry.timeout']
 
 def connectToInternet(retries = 3):
     try:
+        if(internet()):
+            logger.info('Already connected to internet.')
+            return
+        
         logger.info('Connecting to internet...')
         if(config['modem.type']=="thumb"):
             turnOnSystemPowerSwitch()
