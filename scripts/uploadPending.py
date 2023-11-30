@@ -13,6 +13,8 @@ import glob
 import pathlib
 import socket
 
+from updateStatus import flashLED
+
 from SIM7600X import powerUpSIM7600X, powerDownSIM7600X, turnOnNDIS
 
 config = json.load(open('config.json'))
@@ -116,10 +118,12 @@ def uploadPendingPhotos():
 
             logger.debug(f'Response code: {response.status_code}')
             if response.status_code == 200:
+                flashLED('D2', 0, 0, 255, 1, .5)
                 logger.debug(f'Image uploaded successfully')
                 shutil.move(IMAGEFILENAME, uploadedImageFolder + pathlib.Path(IMAGEFILENAME).name)
 
             else:
+                flashLED('D2', 255, 0, 0, 1, 1)
                 logger.error(f'Image upload failed')
 
             logger.debug(f'Response text:')
@@ -318,9 +322,13 @@ def uploadPendingTelemetry():
             #requests.post(config['apiUrl'] + '/Telemetry', json=api_data)
 
             if response.status_code == 200:
+                flashLED('D2', 0, 0, 255, 1, .1)
                 logger.debug(f'Telemetry uploaded successfully')
                 shutil.move(telemetryFilename, uploadedTelemetryFolder + pathlib.Path(telemetryFilename).name)
                 logger.debug('Logged to API.')
+            else:
+                flashLED('D2', 255, 0, 0, 1, 1)
+                logger.error(f'Telemetry upload failed')
 
             try:
                 logger.debug(json.dumps(json.loads(response.text), indent = 4))
@@ -342,13 +350,16 @@ def uploadPendingTelemetry():
 
                    
             except json.decoder.JSONDecodeError:
+                flashLED('D2', 255, 0, 255, 1, 1)
                 logger.debug(response.text)
 
 
     except requests.exceptions.ConnectionError as e:
+        flashLED('D2', 255, 0, 255, 1, 1)
         logger.error(str(datetime.datetime.now()) + " uploadPendingTelemetry() failed - connection error. Leave in place.")
         logger.error(e)
     except Exception as e:
+        flashLED('D2', 255, 0, 255, 1, 1)
         logger.error(str(datetime.datetime.now()) + " uploadPendingTelemetry() failed.")
         logger.error(e)
         if lastAttemptedFilename!="":          
