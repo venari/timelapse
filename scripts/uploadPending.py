@@ -200,11 +200,12 @@ def internet(host="8.8.8.8", port=53, timeout=config['upload.telemetry.timeout']
 
 def connectToInternet(retries = 3):
     try:
+        logger.info('Connecting to internet...')
+
         if(internet()):
             logger.info('Already connected to internet.')
             return
         
-        logger.info('Connecting to internet...')
         if(config['modem.type']=="thumb"):
             turnOnSystemPowerSwitch()
         else:

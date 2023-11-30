@@ -232,6 +232,6 @@ else:
     logger.info("No internet")
     flashLED('D2', 255, 0, 0, 1, 2)
 
-# Only update eink every 5 minutes, or every minute in first 5
-if(datetime.datetime.now().minute % 5 == 0 or time.clock_gettime(time.CLOCK_BOOTTIME) <= 300):
+# Only update eink every 5 minutes
+if(datetime.datetime.now().minute % 5 == 0):
     updateEInkDisplay()
