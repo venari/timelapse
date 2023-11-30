@@ -218,14 +218,15 @@ def connectToInternet(retries = 3):
             logger.info('Still waiting for network....')
             waitCounter=waitCounter+1
         
-        if waitCounter < 120:
+        if internet():
             logger.info('Network connection established.')
        
         else:
             logger.warning('Could not establish network connection after 2 minutes.')
 
-            logger.info('Turning on NDIS...')
-            turnOnNDIS()
+            if(config['modem.type']=="SIM7600X"):
+                logger.info('Attempting to turn on NDIS...')
+                turnOnNDIS()
 
             if retries > 0:
                 logger.info('Retrying to establish network connection...')
