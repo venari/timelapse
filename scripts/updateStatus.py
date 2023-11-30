@@ -222,7 +222,7 @@ def updateEInkDisplay():
 
 
 
-flashLED('D2', 0, 0, 255, 5, 0.5)   # Flash blue - we're on
+flashLED('D2', 0, 0, 255, 5, 0.1)   # Flash blue - we're on
 if internet():
     logger.info("We've got internet")
     flashLED('D2', 0, 255, 0, 1, 2)
