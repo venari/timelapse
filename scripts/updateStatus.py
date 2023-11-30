@@ -72,19 +72,22 @@ def flashLED(led='D2', R=0, G=0, B=255, flashCount=3, flashDelay=0.5):
 def updateEInkDisplay():
 
     try:
-        
+
+        logger.info("updateEInkDisplay()")
+
         if(config['eink.DisplayType'] == "" or config['eink.DisplayType'] == None):
             logger.info("eink.DisplayType not configured. updateEInkDisplay exiting")
             exit()
-
 
         if config['supportMode'] == False:
             # Let's not update e-paper if we're not in Support mode.
             logger.info("Not in support mode - updateEInkDisplay exiting")
             exit()
 
+        logger.info("updateEInkDisplay - we're going to update the e-ink display")
+
         #epd = epd1in54b_V2.EPD()
-        epd = epaper.epaper(config['einkDisplayType']).EPD()
+        epd = epaper.epaper(config['eink.DisplayType']).EPD()
         logger.info("init and Clear")
         epd.init()
         epd.Clear()
