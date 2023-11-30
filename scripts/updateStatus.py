@@ -175,6 +175,8 @@ def updateEInkDisplay():
             latestStatusUpdate['date'] = time.strftime("%d/%m/%Y", time.localtime())
             latestStatusUpdate['time'] = time.strftime("%H:%M:%S", time.localtime())
 
+            latestStatusUpdate['internet'] = str(internet())
+
             latestStatusUpdate['sysVoltage'] = str(pj.status.GetBatteryVoltage()['data']) + "mV"
             
             alarm = pj.rtcAlarm.GetAlarm()
