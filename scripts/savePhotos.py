@@ -109,7 +109,7 @@ def savePhotos():
                     
                 camera.options["quality"] = config['camera.quality']
 
-                flashLED('D2', 255, 255, 255, 1, 0.2)
+                flashLED('D2', 255, 255, 255, 1, 0.5)
                 logger.debug('beginning capture')
                 #camera.start_preview(Preview.DRM)
                 camera.start()
