@@ -35,7 +35,7 @@ logger.setLevel(logging.DEBUG)
 
 handlerIntent = logging.FileHandler(intentLogFilePath)
 handlerIntent.setFormatter(formatter)
-loggerIntent = logging.getLogger("uploadPending")
+loggerIntent = logging.getLogger("intent")
 loggerIntent.addHandler(handlerIntent)
 loggerIntent.setLevel(logging.DEBUG)
 
