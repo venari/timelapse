@@ -29,7 +29,14 @@ logger = logging.getLogger("saveTelemetry")
 logger.addHandler(handler)
 logger.setLevel(logging.DEBUG)
 
+handlerIntent = logging.FileHandler(intentLogFilePath)
+handlerIntent.setFormatter(formatter)
+loggerIntent = logging.getLogger("uploadPending")
+loggerIntent.addHandler(handlerIntent)
+loggerIntent.setLevel(logging.DEBUG)
+
 logger.info("Starting up saveTelemetry.py...")
+loggerIntent.info("Starting up saveTelemetry.py...")
 os.chmod(logFilePath, 0o777) # Make sure pijuice user script can write to log file.
 
 # clock
@@ -119,8 +126,10 @@ def scheduleShutdown():
         # Hhibernate mode? Lets have 5 minutes to give it a chance to check again before hibernating.
         if config['hibernateMode']:
             logger.info('hibernate mode - stay awke for 5 mins')
+            loggerIntent.info('hibernate mode - stay awke for 5 mins')
             if uptimeSeconds > 300:
                 logger.info('hibernate mode - sleeping for 6 hours...')
+                loggerIntent.info('hibernate mode - sleeping for 6 hours...')
 
                 hoursToWakeAfter = 6
                 hourToWakeAt = datetime.datetime.utcnow().hour + hoursToWakeAfter
@@ -143,6 +152,7 @@ def scheduleShutdown():
 
             if config['sleep_during_night'] == True and (datetime.datetime.now().hour >= config['daytime_ends_at_h'] or datetime.datetime.now().hour < config['daytime_starts_at_h']) and config['supportMode'] == False and bCharging == False:
                 logger.info("Night time so we're scheduling shutdown")
+                loggerIntent.info("Night time so we're scheduling shutdown")
 
                 alarmObj = {
                     'year': 'EVERY_YEAR',
@@ -169,6 +179,7 @@ def scheduleShutdown():
                 and pj.status.GetStatus()['data']['battery'] != 'NOT_PRESENT' \
                 and bCharging == False:
                     logger.info('scheduling 10 minute sleep due to low battery')
+                    loggerIntent.info('scheduling 10 minute sleep due to low battery')
                     logger.info(pj.status.GetChargeLevel())
                     logger.info(pj.status.GetStatus())
                     DELTA_MIN=10
@@ -217,14 +228,17 @@ def scheduleShutdown():
                         # Most recent image captured (may also be in uploaded folder) is older than 10 minutes
                         if secondsSinceLastImageCapture > 600 and secondsSinceLastUpload > 600:
                             logger.warning('Most recent captured image is ' + str(secondsSinceLastImageCapture) + 'seconds old, and uploaded image is ' + str(secondsSinceLastUpload) + ' seconds old - restarting...')
+                            loggerIntent.warning('Most recent captured image is ' + str(secondsSinceLastImageCapture) + 'seconds old, and uploaded image is ' + str(secondsSinceLastUpload) + ' seconds old - restarting...')
                             triggerRestart = True
 
                         if secondsSinceLastUpload > 1800:
                             logger.warning('Most recent uploaded image is ' + str(secondsSinceLastUpload) + ' seconds old - restarting...')
+                            loggerIntent.warning('Most recent uploaded image is ' + str(secondsSinceLastUpload) + ' seconds old - restarting...')
                             triggerRestart = True
 
                         if len(mostRecentPendingFiles) == 0 and len(mostRecentUploadedFiles) == 0:
                             logger.debug("No uploaded or captured images found - restarting...")
+                            loggerIntent.debug("No uploaded or captured images found - restarting...")
                             triggerRestart = True
 
                         if triggerRestart:
@@ -247,6 +261,7 @@ def scheduleShutdown():
 
         if setAlarm == True:
             logger.info("scheduleShutdown - we're setting the shutdown...")
+            loggerIntent.info("scheduleShutdown - we're setting the shutdown...")
 
             alarmSet = False
             while alarmSet == False:
@@ -291,12 +306,14 @@ def scheduleShutdown():
                 logger.info("So we'll skip the power off.")
             else:
                 logger.info('Power off scheduled for 1 min from now')
+                loggerIntent.info('Power off scheduled for 1 min from now')
                 pj.power.SetPowerOff(60)
         
             logger.info('Setting System Power Switch to Off:')
             pj.power.SetSystemPowerSwitch(0)
             powerDownSIM7600X()
             logger.info('Shutting down now...')
+            loggerIntent.info('Shutting down now...')
             subprocess.call(['sudo', 'shutdown', '-h', 'now'])
         else:
             # logger.debug('skipping shutdown scheduling because of config.json')
@@ -408,6 +425,7 @@ try:
         subprocess.call(['sudo', 'modprobe', 'rtc_ds1307'])
 
     logger.debug('setting sys clock from RTC...')
+    loggerIntent.debug('setting sys clock from RTC...')
     subprocess.call(['sudo', 'hwclock', '--hctosys'])
     logger.debug("sudo hwclock --hctosys succeeded")
 except Exception as e:

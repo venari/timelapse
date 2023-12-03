@@ -19,6 +19,7 @@ from SIM7600X import powerUpSIM7600X, powerDownSIM7600X, turnOnNDIS
 
 config = json.load(open('config.json'))
 logFilePath = config["logFilePath"]
+intentLogFilePath = logFilePath.replace(".log", ".intent.log")
 # logFilePath = logFilePath.replace(".log", ".uploadTelemetry.log")
 os.makedirs(os.path.dirname(logFilePath), exist_ok=True)
 # os.chmod(os.path.dirname(logFilePath), 0o777) # Make sure pijuice user scrip can write to log file.
@@ -32,12 +33,20 @@ logger = logging.getLogger("uploadPending")
 logger.addHandler(handler)
 logger.setLevel(logging.DEBUG)
 
+handlerIntent = logging.FileHandler(intentLogFilePath)
+handlerIntent.setFormatter(formatter)
+loggerIntent = logging.getLogger("uploadPending")
+loggerIntent.addHandler(handlerIntent)
+loggerIntent.setLevel(logging.DEBUG)
+
 logger.info("******************************************************************************")
 logger.info("")
 logger.info("Starting up uploadPending.py...")
 logger.info("")
 logger.info("******************************************************************************")
 os.chmod(logFilePath, 0o777) # Make sure pijuice user script can write to log file.
+
+loggerIntent.info("Starting up uploadPending.py...")
 
 outputImageFolder = '../output/images/'
 pendingImageFolder = outputImageFolder + 'pending/'
@@ -201,6 +210,7 @@ def internet(host="8.8.8.8", port=53, timeout=config['upload.telemetry.timeout']
 def connectToInternet(retries = 3):
     try:
         logger.info('Connecting to internet...')
+        loggerIntent.info('Connecting to internet...')
 
         if(internet()):
             logger.info('Already connected to internet.')
@@ -244,6 +254,7 @@ def connectToInternet(retries = 3):
 def disconnectFromInternet():
     try:
         logger.info('Disconnecting from internet...')
+        loggerIntent.info('Disconnecting from internet...')
         if(config['modem.type']=="thumb"):
             logger.info('Current System Power Switch:')
             logger.info(pj.power.GetSystemPowerSwitch())
