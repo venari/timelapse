@@ -73,6 +73,8 @@ def savePhotos():
                 config = json.load(open('config.json'))
                 #camera_config = camera.create_preview_configuration()
                 camera_config = camera.create_still_configuration()
+                
+                camera.set_logging(Picamera2.ERROR) # Stop stderr/stdoutput getting filled with camera logging messages
 
                 # # Use sensor mode 2 to give greater max exposure time.
                 # camera_config = camera.create_still_configuration(raw = picam2.sensor_modes[2])

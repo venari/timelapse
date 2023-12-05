@@ -3,6 +3,6 @@ set -x
 
 echo `date` >> startup.sh.out
 echo "Starting savePhotos..." >> startup.sh.out
-/usr/bin/python3 savePhotos.py 2>> startup.sh.out
+/usr/bin/python3 savePhotos.py 2>> savePhotos.sh.out
 
 popd
