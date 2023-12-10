@@ -123,20 +123,33 @@ def scheduleShutdown():
             if bCharging:
                 logger.info("Night time - but we're charging/powered, so we'll stay on.")
 
-
-        # Hhibernate mode? Lets have 5 minutes to give it a chance to check again before hibernating.
+        # Hibernate mode? 
         if config['hibernateMode']:
-            logger.info('hibernate mode - stay awke for 5 mins')
-            loggerIntent.info('hibernate mode - stay awke for 5 mins')
+            # If we've awoken from hibernate - let's check it's within 5 minutes of the hour.
+            # If not, user may have pressed button - let's switch out of hibernate mode.
+            # 
+            if uptimeSeconds < 300 and pj.rtcAlarm.GetTime().minute > 5:
+                logger.info('hibernate mode - but looks like we have been woken by user - switching out of hibernate mode.')
+                loggerIntent.info('hibernate mode - but looks like we have been woken by user - switching out of hibernate mode.')
+                config['hibernateMode'] = False
+                json.dump(config, open('config.json', 'w'), indent=4)
+
+
+        # Hibernate mode? Lets have 5 minutes to give it a chance to check again before hibernating.
+        if config['hibernateMode']:
+            logger.info('hibernate mode - stay awake for 5 mins')
+            loggerIntent.info('hibernate mode - stay awake for 5 mins')
             if uptimeSeconds > 300:
                 logger.info('hibernate mode - sleeping for 6 hours...')
                 loggerIntent.info('hibernate mode - sleeping for 6 hours...')
 
-                hoursToWakeAfter = 6
+                # wake up at next 6 hourly interval
+                # e.g. midnight, 6am, 12pm, 6pm
+                hoursToWakeAfter = 6 - (datetime.datetime.utcnow().hour % 6)
                 hourToWakeAt = datetime.datetime.utcnow().hour + hoursToWakeAfter
+
                 if hourToWakeAt >= 24:
                     hourToWakeAt = hourToWakeAt - 24
-
 
                 alarmObj = {
                     'year': 'EVERY_YEAR',

@@ -516,6 +516,12 @@ Note - Wake up should be automatically enabled in `saveTelemetry.py`, but you wi
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 ```
 
+## Troubleshooting PiJuice wakeup:
+
+```
+python3 /usr/bin/pijuice_log.py --enable WAKEUP_EVT
+```
+
 ## Troubleshooting indicateStatus script:
 ```
 sudo -u pijuice /home/pi/dev/timelapse/scripts/indicateStatus.sh
