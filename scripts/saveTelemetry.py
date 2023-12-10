@@ -128,7 +128,7 @@ def scheduleShutdown():
             # If we've awoken from hibernate - let's check it's within 5 minutes of the hour.
             # If not, user may have pressed button - let's switch out of hibernate mode.
             # 
-            if uptimeSeconds < 300 and pj.rtcAlarm.GetTime().minute > 5:
+            if uptimeSeconds < 300 and pj.rtcAlarm.GetTime()['data']['minute'] > 5:
                 logger.info('hibernate mode - but looks like we have been woken by user - switching out of hibernate mode.')
                 loggerIntent.info('hibernate mode - but looks like we have been woken by user - switching out of hibernate mode.')
                 config['hibernateMode'] = False
