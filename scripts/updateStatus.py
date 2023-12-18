@@ -222,7 +222,10 @@ def updateEInkDisplay():
     
 
 
-
+if config['supportMode'] == False:
+    logger.debug("Not in support mode - not updating Status")
+    pj.status.SetLedState('D2', [0, 0, 0])
+    exit()
 
 flashLED('D2', 0, 0, 255, 5, 0.1)   # Flash blue - we're on
 if internet():
