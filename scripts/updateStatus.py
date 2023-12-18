@@ -214,7 +214,7 @@ def updateEInkDisplay():
         logger.info("Displaying buffer")
         epd.display(epd.getbuffer(blackimage),epd.getbuffer(redimage))
         
-        logger.info("Goto Sleep...")
+        logger.info("eink display going to Sleep...")
         epd.sleep()
             
     except IOError as e:
