@@ -131,12 +131,9 @@ def scheduleShutdown():
             if uptimeSeconds < 300 and (pj.rtcAlarm.GetTime()['data']['minute'] > 5 or pj.rtcAlarm.GetTime()['data']['hour'] % 6 != 0):
                 logger.info('hibernate mode - but looks like we have been woken by user - switching out of hibernate mode.')
                 loggerIntent.info('hibernate mode - but looks like we have been woken by user - switching out of hibernate mode, and into support mode.')
-                pj.status.SetLedState('D2', [255, 0, 0])
-                time.sleep(1)
-                pj.status.SetLedState('D2', [0, 255, 0])
-                time.sleep(1)
-                pj.status.SetLedState('D2', [0, 0, 255])
-                time.sleep(1)
+                flashLED('D2', 255, 0, 0, 2, 1)
+                flashLED('D2', 0, 255, 0, 2, 1)
+                flashLED('D2', 0, 0, 255, 2, 1)
                 pj.status.SetLedState('D2', [0, 0, 0])
                 config['hibernateMode'] = False
                 config['supportMode'] = True
