@@ -11,6 +11,8 @@ from logging.handlers import TimedRotatingFileHandler
 import pathlib
 import glob
 
+from updateStatus import flashLED
+
 from SIM7600X import powerUpSIM7600X, powerDownSIM7600X
 
 config = json.load(open('config.json'))
