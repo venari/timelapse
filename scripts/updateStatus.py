@@ -77,12 +77,12 @@ def updateEInkDisplay():
 
         if(config['eink.DisplayType'] == "" or config['eink.DisplayType'] == None):
             logger.info("eink.DisplayType not configured. updateEInkDisplay exiting")
-            exit()
+            return
 
         if config['supportMode'] == False:
             # Let's not update e-paper if we're not in Support mode.
             logger.info("Not in support mode - updateEInkDisplay exiting")
-            exit()
+            return
 
         logger.info("updateEInkDisplay - we're going to update the e-ink display")
 
@@ -225,16 +225,17 @@ def updateEInkDisplay():
 if config['supportMode'] == False:
     logger.debug("Not in support mode - not updating Status")
     pj.status.SetLedState('D2', [0, 0, 0])
-    exit()
 
-flashLED('D2', 0, 0, 255, 5, 0.1)   # Flash blue - we're on
-if internet():
-    logger.info("We've got internet")
-    flashLED('D2', 0, 255, 0, 1, 2)
 else:
-    logger.info("No internet")
-    flashLED('D2', 255, 0, 0, 1, 2)
 
-# Only update eink every 5 minutes
-if(datetime.datetime.now().minute % 5 == 0):
-    updateEInkDisplay()
+    flashLED('D2', 0, 0, 255, 5, 0.1)   # Flash blue - we're on
+    if internet():
+        logger.info("We've got internet")
+        flashLED('D2', 0, 255, 0, 1, 2)
+    else:
+        logger.info("No internet")
+        flashLED('D2', 255, 0, 0, 1, 2)
+
+    # Only update eink every 5 minutes
+    if(datetime.datetime.now().minute % 5 == 0):
+        updateEInkDisplay()
