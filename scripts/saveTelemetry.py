@@ -125,13 +125,21 @@ def scheduleShutdown():
 
         # Hibernate mode? 
         if config['hibernateMode']:
-            # If we've awoken from hibernate - let's check it's within 5 minutes of the hour.
+            # If we've awoken from hibernate - let's check it's within 5 minutes of the hour, or if hour is other than 0, 6, 12, or 18.
             # If not, user may have pressed button - let's switch out of hibernate mode.
             # 
-            if uptimeSeconds < 300 and pj.rtcAlarm.GetTime()['data']['minute'] > 5:
+            if uptimeSeconds < 300 and (pj.rtcAlarm.GetTime()['data']['minute'] > 5 or pj.rtcAlarm.GetTime()['data']['hour'] % 6 != 0):
                 logger.info('hibernate mode - but looks like we have been woken by user - switching out of hibernate mode.')
-                loggerIntent.info('hibernate mode - but looks like we have been woken by user - switching out of hibernate mode.')
+                loggerIntent.info('hibernate mode - but looks like we have been woken by user - switching out of hibernate mode, and into support mode.')
+                pj.status.SetLedState('D2', [255, 0, 0])
+                time.sleep(1)
+                pj.status.SetLedState('D2', [0, 255, 0])
+                time.sleep(1)
+                pj.status.SetLedState('D2', [0, 0, 255])
+                time.sleep(1)
+                pj.status.SetLedState('D2', [0, 0, 0])
                 config['hibernateMode'] = False
+                config['supportMode'] = True
                 json.dump(config, open('config.json', 'w'), indent=4)
 
 
@@ -144,7 +152,7 @@ def scheduleShutdown():
                 loggerIntent.info('hibernate mode - sleeping for 6 hours...')
 
                 # wake up at next 6 hourly interval
-                # e.g. midnight, 6am, 12pm, 6pm
+                # e.g. midnight, 6am, 12pm, 6pm (UTC)
                 hoursToWakeAfter = 6 - (datetime.datetime.utcnow().hour % 6)
                 hourToWakeAt = datetime.datetime.utcnow().hour + hoursToWakeAfter
 
