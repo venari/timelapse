@@ -54,6 +54,11 @@ Update config and code to existing install
 bash <(curl -fsSL "https://raw.githubusercontent.com/venari/timelapse/deployment/sedicam_v2/update_sedicam.sh?$RANDOM")
 ```
 
+Update config and code to existing install for LiFePO4 install
+```
+bash <(curl -fsSL "https://raw.githubusercontent.com/venari/timelapse/deployment/sedicam_v2_LiFePO4/update_sedicam_v2_LiFePO4.sh?$RANDOM")
+```
+
 ## Install software, (LiFePO4, sedicam v1 cofiguration) config & code to new Pi
 ```
 bash <(curl -fsSL "https://raw.githubusercontent.com/venari/timelapse/main/install.sh?$RANDOM")
@@ -154,6 +159,39 @@ Nope - prevents camera from working...
 ```
 dtoverlay=imx708
 ``` -->
+
+# Waveshare 1.54" e-Paper Module
+
+https://github.com/waveshareteam/e-Paper/blob/master/RaspberryPi_JetsonNano/python/examples/epd_1in54b_V2_test.py
+
+```
+    sudo apt-get update
+    sudo apt-get install python3-pip
+    sudo apt-get install python3-pil
+    sudo pip3 install RPi.GPIO
+    sudo pip3 install waveshare-epaper
+```
+
+Onboard image resizing
+```
+sudo apt-get install imagemagick
+
+convert pic/image.org.jpg -resize 200x200 -background white -gravity center -extent 200x200 pic/image.jpg 
+```
+
+- Enable Serial Communication
+```
+sudo raspi-config nonint do_spi 0        
+sudo reboot
+```
+
+# Uptimed service
+
+```
+sudo apt-get install uptimed
+sudo systemctl enable uptimed
+```
+
 # preview image over VNC
 https://www.youtube.com/watch?v=dbBWyeHbGs0&ab_channel=WillyKjellstrom
 
@@ -172,6 +210,14 @@ Issues in Bullseye on Zero2? https://www.raspberrypi.com/news/bullseye-camera-sy
 - related - possibly not - https://github.com/raspberrypi/libcamera-apps/issues/278
 - 
 
+# Access Hauwei thumb stick web interface (password is fiddly)
+```
+ssh -D 8080 pi@sediment-pi-[machine name]
+```
+
+Use FoxyProxy and setup proxy to localhost:8080
+
+Browse to http://192.168.1.1/html/index.html or http://192.168.8.1/html/index.html
 
 # On board timelapse generation
 
@@ -468,6 +514,12 @@ Note - Wake up should be automatically enabled in `saveTelemetry.py`, but you wi
 ░░░░░└──────────────────────────────────────────────────────────────┘░░░░
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+```
+
+## Troubleshooting PiJuice wakeup:
+
+```
+python3 /usr/bin/pijuice_log.py --enable WAKEUP_EVT
 ```
 
 ## Troubleshooting indicateStatus script:

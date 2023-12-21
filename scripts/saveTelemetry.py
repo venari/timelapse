@@ -11,10 +11,13 @@ from logging.handlers import TimedRotatingFileHandler
 import pathlib
 import glob
 
+from updateStatus import flashLED
+
 from SIM7600X import powerUpSIM7600X, powerDownSIM7600X
 
 config = json.load(open('config.json'))
 logFilePath = config["logFilePath"]
+intentLogFilePath = logFilePath.replace("timelapse.log", "intent.log")
 # logFilePath = logFilePath.replace(".log", ".saveTelemetry.log")
 os.makedirs(os.path.dirname(logFilePath), exist_ok=True)
 # os.chmod(os.path.dirname(logFilePath), 0o777) # Make sure pijuice user scrip can write to log file.
@@ -29,7 +32,14 @@ logger = logging.getLogger("saveTelemetry")
 logger.addHandler(handler)
 logger.setLevel(logging.DEBUG)
 
+handlerIntent = logging.FileHandler(intentLogFilePath)
+handlerIntent.setFormatter(formatter)
+loggerIntent = logging.getLogger("intent")
+loggerIntent.addHandler(handlerIntent)
+loggerIntent.setLevel(logging.DEBUG)
+
 logger.info("Starting up saveTelemetry.py...")
+loggerIntent.info("Starting up saveTelemetry.py...")
 os.chmod(logFilePath, 0o777) # Make sure pijuice user script can write to log file.
 
 # clock
@@ -115,18 +125,45 @@ def scheduleShutdown():
             if bCharging:
                 logger.info("Night time - but we're charging/powered, so we'll stay on.")
 
-
-        # Hhibernate mode? Lets have 5 minutes to give it a chance to check again before hibernating.
+        # Hibernate mode? 
         if config['hibernateMode']:
-            logger.info('hibernate mode - stay awke for 5 mins')
-            if uptimeSeconds > 300:
-                logger.info('hibernate mode - sleeping for 6 hours...')
+            # If we've awoken from hibernate - let's check it's within 5 minutes of the hour, or if hour is other than 0, 6, 12, or 18.
+            # If not, user may have pressed button - let's switch out of hibernate mode.
+            # 
+            if uptimeSeconds < 300 and (pj.rtcAlarm.GetTime()['data']['minute'] > 5 or pj.rtcAlarm.GetTime()['data']['hour'] % 6 != 0):
+                logger.info('hibernate mode - but looks like we have been woken by user - switching out of hibernate mode.')
+                loggerIntent.info('hibernate mode - but looks like we have been woken by user - switching out of hibernate mode, and into support mode.')
+                flashLED('D2', 255, 0, 0, 2, 1)
+                flashLED('D2', 0, 255, 0, 2, 1)
+                flashLED('D2', 0, 0, 255, 2, 1)
+                pj.status.SetLedState('D2', [0, 0, 0])
+                config['hibernateMode'] = False
+                config['supportMode'] = True
+                json.dump(config, open('config.json', 'w'), indent=4)
 
-                hoursToWakeAfter = 6
+
+        # Hibernate mode? Lets have 10 minutes to give it a chance to check again before hibernating.
+        if config['hibernateMode']:
+            logger.info('hibernate mode - stay awake for 10 mins')
+            loggerIntent.info('hibernate mode - stay awake for 10 mins')
+            if uptimeSeconds > 600:
+                logger.info('hibernate mode - sleeping for 6 hours...')
+                loggerIntent.info('hibernate mode - sleeping for 6 hours...')
+
+                # wake up at next 6 hourly interval
+                # e.g. midnight, 6am, 12pm, 6pm (UTC)
+                hoursToWakeAfter = 6 - (datetime.datetime.utcnow().hour % 6)
                 hourToWakeAt = datetime.datetime.utcnow().hour + hoursToWakeAfter
+
+                loggerIntent.info('datetime.datetime.utcnow().hour')
+                loggerIntent.info(datetime.datetime.utcnow().hour)
+                loggerIntent.info('hoursToWakeAfter')
+                loggerIntent.info(hoursToWakeAfter)
+                loggerIntent.info('hourToWakeAt')
+                loggerIntent.info(hourToWakeAt)
+
                 if hourToWakeAt >= 24:
                     hourToWakeAt = hourToWakeAt - 24
-
 
                 alarmObj = {
                     'year': 'EVERY_YEAR',
@@ -143,6 +180,7 @@ def scheduleShutdown():
 
             if config['sleep_during_night'] == True and (datetime.datetime.now().hour >= config['daytime_ends_at_h'] or datetime.datetime.now().hour < config['daytime_starts_at_h']) and config['supportMode'] == False and bCharging == False:
                 logger.info("Night time so we're scheduling shutdown")
+                loggerIntent.info("Night time so we're scheduling shutdown")
 
                 alarmObj = {
                     'year': 'EVERY_YEAR',
@@ -166,8 +204,10 @@ def scheduleShutdown():
                 if config['sleep_at_battery_percent'] > 0 and config['hibernate_at_battery_percent'] > 0 \
                 and pj.status.GetChargeLevel()['data'] <= config['sleep_at_battery_percent'] \
                 and pj.status.GetChargeLevel()['data'] > config['hibernate_at_battery_percent'] \
-                and pj.status.GetStatus()['data']['battery'] != 'NOT_PRESENT':
+                and pj.status.GetStatus()['data']['battery'] != 'NOT_PRESENT' \
+                and bCharging == False:
                     logger.info('scheduling 10 minute sleep due to low battery')
+                    loggerIntent.info('scheduling 10 minute sleep due to low battery')
                     logger.info(pj.status.GetChargeLevel())
                     logger.info(pj.status.GetStatus())
                     DELTA_MIN=10
@@ -216,14 +256,17 @@ def scheduleShutdown():
                         # Most recent image captured (may also be in uploaded folder) is older than 10 minutes
                         if secondsSinceLastImageCapture > 600 and secondsSinceLastUpload > 600:
                             logger.warning('Most recent captured image is ' + str(secondsSinceLastImageCapture) + 'seconds old, and uploaded image is ' + str(secondsSinceLastUpload) + ' seconds old - restarting...')
+                            loggerIntent.warning('Most recent captured image is ' + str(secondsSinceLastImageCapture) + 'seconds old, and uploaded image is ' + str(secondsSinceLastUpload) + ' seconds old - restarting...')
                             triggerRestart = True
 
                         if secondsSinceLastUpload > 1800:
                             logger.warning('Most recent uploaded image is ' + str(secondsSinceLastUpload) + ' seconds old - restarting...')
+                            loggerIntent.warning('Most recent uploaded image is ' + str(secondsSinceLastUpload) + ' seconds old - restarting...')
                             triggerRestart = True
 
                         if len(mostRecentPendingFiles) == 0 and len(mostRecentUploadedFiles) == 0:
                             logger.debug("No uploaded or captured images found - restarting...")
+                            loggerIntent.debug("No uploaded or captured images found - restarting...")
                             triggerRestart = True
 
                         if triggerRestart:
@@ -246,6 +289,7 @@ def scheduleShutdown():
 
         if setAlarm == True:
             logger.info("scheduleShutdown - we're setting the shutdown...")
+            loggerIntent.info("scheduleShutdown - we're setting the shutdown...")
 
             alarmSet = False
             while alarmSet == False:
@@ -259,6 +303,7 @@ def scheduleShutdown():
                     time.sleep(10)
                 else:
                     logger.debug('Alarm set for ' + str(pj.rtcAlarm.GetAlarm()))
+                    loggerIntent.debug('Alarm set for ' + str(pj.rtcAlarm.GetAlarm()))
                     alarmSet = True
 
             # Ensure Wake up alarm is actually enabled!
@@ -275,6 +320,7 @@ def scheduleShutdown():
                     time.sleep(10)
                 else:
                     logger.debug('Wakeup enabled')
+                    loggerIntent.debug('Wakeup enabled')
                     wakeUpEnabled = True
 
             logger.debug('rtcAlarm.GetControlStatus(): ' + str(pj.rtcAlarm.GetControlStatus()))
@@ -284,18 +330,22 @@ def scheduleShutdown():
             pj.rtcAlarm.ClearAlarmFlag()
             logger.debug('rtcAlarm.GetControlStatus(): ' + str(pj.rtcAlarm.GetControlStatus()))
             logger.debug('rtcAlarm.GetTime(): ' + str(pj.rtcAlarm.GetTime()))
+            loggerIntent.debug('rtcAlarm.GetControlStatus(): ' + str(pj.rtcAlarm.GetControlStatus()))
+            loggerIntent.debug('rtcAlarm.GetTime(): ' + str(pj.rtcAlarm.GetTime()))
 
             if triggerRestart:
                 logger.info('Restart scheduled for ' + str(minsToWakeAfter) + ' minutes from now')
                 logger.info("So we'll skip the power off.")
             else:
-                logger.info('Power off scheduled for 30s from now')
-                pj.power.SetPowerOff(30)
+                logger.info('Power off scheduled for 1 min from now')
+                loggerIntent.info('Power off scheduled for 1 min from now')
+                pj.power.SetPowerOff(60)
         
             logger.info('Setting System Power Switch to Off:')
             pj.power.SetSystemPowerSwitch(0)
             powerDownSIM7600X()
             logger.info('Shutting down now...')
+            loggerIntent.info('Shutting down now...')
             subprocess.call(['sudo', 'shutdown', '-h', 'now'])
         else:
             # logger.debug('skipping shutdown scheduling because of config.json')
@@ -407,6 +457,7 @@ try:
         subprocess.call(['sudo', 'modprobe', 'rtc_ds1307'])
 
     logger.debug('setting sys clock from RTC...')
+    loggerIntent.debug('setting sys clock from RTC...')
     subprocess.call(['sudo', 'hwclock', '--hctosys'])
     logger.debug("sudo hwclock --hctosys succeeded")
 except Exception as e:

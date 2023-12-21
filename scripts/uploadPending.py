@@ -13,10 +13,13 @@ import glob
 import pathlib
 import socket
 
+from updateStatus import flashLED
+
 from SIM7600X import powerUpSIM7600X, powerDownSIM7600X, turnOnNDIS
 
 config = json.load(open('config.json'))
 logFilePath = config["logFilePath"]
+intentLogFilePath = logFilePath.replace("timelapse.log", "intent.log")
 # logFilePath = logFilePath.replace(".log", ".uploadTelemetry.log")
 os.makedirs(os.path.dirname(logFilePath), exist_ok=True)
 # os.chmod(os.path.dirname(logFilePath), 0o777) # Make sure pijuice user scrip can write to log file.
@@ -30,12 +33,20 @@ logger = logging.getLogger("uploadPending")
 logger.addHandler(handler)
 logger.setLevel(logging.DEBUG)
 
+handlerIntent = logging.FileHandler(intentLogFilePath)
+handlerIntent.setFormatter(formatter)
+loggerIntent = logging.getLogger("intent")
+loggerIntent.addHandler(handlerIntent)
+loggerIntent.setLevel(logging.DEBUG)
+
 logger.info("******************************************************************************")
 logger.info("")
 logger.info("Starting up uploadPending.py...")
 logger.info("")
 logger.info("******************************************************************************")
 os.chmod(logFilePath, 0o777) # Make sure pijuice user script can write to log file.
+
+loggerIntent.info("Starting up uploadPending.py...")
 
 outputImageFolder = '../output/images/'
 pendingImageFolder = outputImageFolder + 'pending/'
@@ -77,6 +88,8 @@ def uploadPendingPhotos():
 
         mostRecentPendingFiles = sorted(glob.iglob(pendingImageFolder + "/*.*"), key=os.path.getctime, reverse=True)
 
+        connectToInternet()
+
         pendingFilesProcessed=0
         for IMAGEFILENAME in mostRecentPendingFiles:
             
@@ -116,10 +129,12 @@ def uploadPendingPhotos():
 
             logger.debug(f'Response code: {response.status_code}')
             if response.status_code == 200:
+                flashLED('D2', 0, 0, 255, 1, .5)
                 logger.debug(f'Image uploaded successfully')
                 shutil.move(IMAGEFILENAME, uploadedImageFolder + pathlib.Path(IMAGEFILENAME).name)
 
             else:
+                flashLED('D2', 255, 0, 0, 1, 1)
                 logger.error(f'Image upload failed')
 
             logger.debug(f'Response text:')
@@ -157,7 +172,7 @@ def uploadPendingPhotos():
                 # or config['supportMode'] == True
                 if ((datetime.datetime.now().hour == 9 or datetime.datetime.now().hour == 12 or datetime.datetime.now().hour == 17) and datetime.datetime.now().minute < 15) or config['supportMode']==True:
                     if not bInSupportWindow:
-                        logger.info('Opening minute support window...')
+                        logger.info('Opening support window...')
                         bInSupportWindow = True
 
                 else:
@@ -167,7 +182,6 @@ def uploadPendingPhotos():
                     disconnectFromInternet()
                     logger.info('Sleeping for ' + str(power_interval) + ' seconds...')
                     time.sleep(power_interval)
-                    connectToInternet()
 
     except Exception as e:
         logger.error(str(datetime.datetime.now()) + " uploadPendingPhotos() failed.")
@@ -196,6 +210,13 @@ def internet(host="8.8.8.8", port=53, timeout=config['upload.telemetry.timeout']
 def connectToInternet(retries = 3):
     try:
         logger.info('Connecting to internet...')
+
+        if(internet()):
+            logger.info('Already connected to internet.')
+            return
+
+        loggerIntent.info('Connecting to internet...')
+
         if(config['modem.type']=="thumb"):
             turnOnSystemPowerSwitch()
         else:
@@ -209,14 +230,15 @@ def connectToInternet(retries = 3):
             logger.info('Still waiting for network....')
             waitCounter=waitCounter+1
         
-        if waitCounter < 120:
+        if internet():
             logger.info('Network connection established.')
        
         else:
             logger.warning('Could not establish network connection after 2 minutes.')
 
-            logger.info('Turning on NDIS...')
-            turnOnNDIS()
+            if(config['modem.type']=="SIM7600X"):
+                logger.info('Attempting to turn on NDIS...')
+                turnOnNDIS()
 
             if retries > 0:
                 logger.info('Retrying to establish network connection...')
@@ -233,6 +255,7 @@ def connectToInternet(retries = 3):
 def disconnectFromInternet():
     try:
         logger.info('Disconnecting from internet...')
+        loggerIntent.info('Disconnecting from internet...')
         if(config['modem.type']=="thumb"):
             logger.info('Current System Power Switch:')
             logger.info(pj.power.GetSystemPowerSwitch())
@@ -318,9 +341,13 @@ def uploadPendingTelemetry():
             #requests.post(config['apiUrl'] + '/Telemetry', json=api_data)
 
             if response.status_code == 200:
+                flashLED('D2', 0, 0, 255, 1, .1)
                 logger.debug(f'Telemetry uploaded successfully')
                 shutil.move(telemetryFilename, uploadedTelemetryFolder + pathlib.Path(telemetryFilename).name)
                 logger.debug('Logged to API.')
+            else:
+                flashLED('D2', 255, 0, 0, 1, 1)
+                logger.error(f'Telemetry upload failed')
 
             try:
                 logger.debug(json.dumps(json.loads(response.text), indent = 4))
@@ -342,13 +369,16 @@ def uploadPendingTelemetry():
 
                    
             except json.decoder.JSONDecodeError:
+                flashLED('D2', 255, 0, 255, 1, 1)
                 logger.debug(response.text)
 
 
     except requests.exceptions.ConnectionError as e:
+        flashLED('D2', 255, 0, 255, 1, 1)
         logger.error(str(datetime.datetime.now()) + " uploadPendingTelemetry() failed - connection error. Leave in place.")
         logger.error(e)
     except Exception as e:
+        flashLED('D2', 255, 0, 255, 1, 1)
         logger.error(str(datetime.datetime.now()) + " uploadPendingTelemetry() failed.")
         logger.error(e)
         if lastAttemptedFilename!="":          

@@ -10,6 +10,9 @@ echo Installing...
 sudo apt-get install git pijuice-base python3-pip -y
 sudo apt install -y python3-picamera2 --no-install-recommends
 sudo apt-get install vim byobu -y
+sudo apt-get install python3-pil -y
+sudo pip3 install RPi.GPIO
+sudo pip3 install waveshare-epaper
 
 pip3 install pyserial
 
@@ -63,11 +66,13 @@ echo Checking static domain_name_servers entry etc/dhcpcd.conf
 grep -qxF 'static domain_name_servers=8.8.4.4 8.8.8.8' /etc/dhcpcd.conf || echo 'static domain_name_servers=8.8.4.4 8.8.8.8' | sudo tee -a /etc/dhcpcd.conf
 
 echo Installing crontab entries...
-# (crontab -l 2>/dev/null; echo "@reboot /usr/bin/bash /home/pi/dev/timelapse/scripts/startup.sh")| crontab -
+
 (echo "@reboot /usr/bin/bash /home/pi/dev/timelapse/scripts/saveTelemetry.sh")| crontab -
-(crontab -l 2>/dev/null; echo "@reboot /usr/bin/bash /home/pi/dev/timelapse/scripts/savePhotos.sh")| crontab -
-(crontab -l 2>/dev/null; echo "@reboot /usr/bin/bash /home/pi/dev/timelapse/scripts/uploadPending.sh")| crontab -
-(crontab -l 2>/dev/null; echo "@reboot sleep 120 && /usr/bin/bash /home/pi/dev/timelapse/scripts/handleSMS.sh")| crontab -
+(crontab -l 2>/dev/null; echo "@reboot sleep 10 && /usr/bin/bash /home/pi/dev/timelapse/scripts/savePhotos.sh")| crontab -
+
+(crontab -l 2>/dev/null; echo "@reboot sleep 60 && /usr/bin/bash /home/pi/dev/timelapse/scripts/uploadPending.sh")| crontab -
+
+(crontab -l 2>/dev/null; echo "* * * * * /usr/bin/bash /home/pi/dev/timelapse/scripts/updateStatus.sh")| crontab -
 (crontab -l 2>/dev/null; echo "*/5 * * * * /usr/bin/bash /home/pi/dev/timelapse/scripts/handleSMS.sh")| crontab -
 
 echo Overwriting pijuice config...
