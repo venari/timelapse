@@ -64,6 +64,10 @@ Update config and code to existing install
 bash <(curl -fsSL "https://raw.githubusercontent.com/venari/timelapse/deployment/sedicam_v2/update_sedicam.sh?$RANDOM")
 ```
 
+# Install software, (LiFePO4, sedicam v2 configuration) config & code to new Pi
+```
+bash <(curl -fsSL "https://raw.githubusercontent.com/venari/timelapse/deployment/sedicam_v2_LiFePO4/install_sedicam_v2_LiFePO4.sh?$RANDOM")
+```
 # Update software, (LiFePO4, sedicam v2 configuration) config & code to new Pi
 Update config and code to existing install for LiFePO4 install
 ```
