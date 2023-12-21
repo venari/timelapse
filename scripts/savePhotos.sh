@@ -1,8 +1,8 @@
 pushd /home/pi/dev/timelapse/scripts
 set -x
 
-echo `date` >> savePhotos.sh.out
-echo "Starting savePhotos..." >> savePhotos.sh.out
-/usr/bin/python3 savePhotos.py
+echo `date` >> startup.sh.out
+echo "Starting savePhotos..." >> startup.sh.out
+LIBCAMERA_LOG_LEVELS=WARN /usr/bin/python3 savePhotos.py 2>> savePhotos.sh.out
 
 popd

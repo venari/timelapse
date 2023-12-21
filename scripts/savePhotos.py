@@ -12,6 +12,8 @@ import logging
 from logging.handlers import TimedRotatingFileHandler
 import pathlib
 
+from updateStatus import flashLED
+
 config = json.load(open('config.json'))
 logFilePath = config["logFilePath"]
 # logFilePath = logFilePath.replace(".log", ".savePhotos.log")
@@ -71,6 +73,8 @@ def savePhotos():
                 config = json.load(open('config.json'))
                 #camera_config = camera.create_preview_configuration()
                 camera_config = camera.create_still_configuration()
+                
+                camera.set_logging(Picamera2.ERROR) # Stop stderr/stdoutput getting filled with camera logging messages
 
                 # # Use sensor mode 2 to give greater max exposure time.
                 # camera_config = camera.create_still_configuration(raw = picam2.sensor_modes[2])
@@ -107,6 +111,7 @@ def savePhotos():
                     
                 camera.options["quality"] = config['camera.quality']
 
+                flashLED('D2', 200, 255, 255, 1, 0.5)
                 logger.debug('beginning capture')
                 #camera.start_preview(Preview.DRM)
                 camera.start()
