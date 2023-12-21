@@ -142,11 +142,11 @@ def scheduleShutdown():
                 json.dump(config, open('config.json', 'w'), indent=4)
 
 
-        # Hibernate mode? Lets have 5 minutes to give it a chance to check again before hibernating.
+        # Hibernate mode? Lets have 10 minutes to give it a chance to check again before hibernating.
         if config['hibernateMode']:
-            logger.info('hibernate mode - stay awake for 5 mins')
-            loggerIntent.info('hibernate mode - stay awake for 5 mins')
-            if uptimeSeconds > 300:
+            logger.info('hibernate mode - stay awake for 10 mins')
+            loggerIntent.info('hibernate mode - stay awake for 10 mins')
+            if uptimeSeconds > 600:
                 logger.info('hibernate mode - sleeping for 6 hours...')
                 loggerIntent.info('hibernate mode - sleeping for 6 hours...')
 
@@ -154,6 +154,13 @@ def scheduleShutdown():
                 # e.g. midnight, 6am, 12pm, 6pm (UTC)
                 hoursToWakeAfter = 6 - (datetime.datetime.utcnow().hour % 6)
                 hourToWakeAt = datetime.datetime.utcnow().hour + hoursToWakeAfter
+
+                loggerIntent.info('datetime.datetime.utcnow().hour')
+                loggerIntent.info(datetime.datetime.utcnow().hour)
+                loggerIntent.info('hoursToWakeAfter')
+                loggerIntent.info(hoursToWakeAfter)
+                loggerIntent.info('hourToWakeAt')
+                loggerIntent.info(hourToWakeAt)
 
                 if hourToWakeAt >= 24:
                     hourToWakeAt = hourToWakeAt - 24
@@ -296,6 +303,7 @@ def scheduleShutdown():
                     time.sleep(10)
                 else:
                     logger.debug('Alarm set for ' + str(pj.rtcAlarm.GetAlarm()))
+                    loggerIntent.debug('Alarm set for ' + str(pj.rtcAlarm.GetAlarm()))
                     alarmSet = True
 
             # Ensure Wake up alarm is actually enabled!
@@ -312,6 +320,7 @@ def scheduleShutdown():
                     time.sleep(10)
                 else:
                     logger.debug('Wakeup enabled')
+                    loggerIntent.debug('Wakeup enabled')
                     wakeUpEnabled = True
 
             logger.debug('rtcAlarm.GetControlStatus(): ' + str(pj.rtcAlarm.GetControlStatus()))
@@ -321,6 +330,8 @@ def scheduleShutdown():
             pj.rtcAlarm.ClearAlarmFlag()
             logger.debug('rtcAlarm.GetControlStatus(): ' + str(pj.rtcAlarm.GetControlStatus()))
             logger.debug('rtcAlarm.GetTime(): ' + str(pj.rtcAlarm.GetTime()))
+            loggerIntent.debug('rtcAlarm.GetControlStatus(): ' + str(pj.rtcAlarm.GetControlStatus()))
+            loggerIntent.debug('rtcAlarm.GetTime(): ' + str(pj.rtcAlarm.GetTime()))
 
             if triggerRestart:
                 logger.info('Restart scheduled for ' + str(minsToWakeAfter) + ' minutes from now')
