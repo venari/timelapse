@@ -27,6 +27,7 @@ uploadedImageFolder = outputImageFolder + 'uploaded/'
 config = json.load(open('config.json'))
 
 logFilePath = config["logFilePath"]
+os.makedirs(os.path.dirname(logFilePath), exist_ok=True)
 
 logFolder = os.path.dirname(logFilePath)
 
