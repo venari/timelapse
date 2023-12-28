@@ -5,9 +5,23 @@ import logging
 import logging.handlers
 import struct
 import socket
+import json
 
+# this logic taken from saveTelemetry.py
+config = json.load(open('config.json'))
+logFilePath = config["logFilePath"]
+
+logger = logging.getLogger(__name__)
+handler = logging.handlers.TimedRotatingFileHandler(logFilePath,
+                                                    when='midnight',
+                                                    backupCount=10)
 
 formatter = logging.Formatter('%(asctime)s %(name)s %(levelname)s %(message)s')
+handler.setFormatter(formatter)
+
+logger.addHandler(handler)
+
+
 
 def handle(conn):
     """
@@ -15,16 +29,23 @@ def handle(conn):
     followed by the LogRecord in pickle format. Logs the record
     according to whatever policy is configured locally.
     """
+    print('handling connection')
     while 1:
+        print('recv chunk')
         chunk = conn.recv(4)
         if len(chunk) < 4:
             break
+        print('recv slen')
         slen = struct.unpack(">L", chunk)[0]
+        print('build chunk')
         chunk = conn.recv(slen)
         while len(chunk) < slen:
             chunk = chunk + conn.recv(slen - len(chunk))
+        print('unPickle(chunk)')
         obj = unPickle(chunk)
         record = logging.makeLogRecord(obj)
+        print('handleRecord')
+        print(record)
         handleLogRecord(record)
 
 def unPickle(data):
@@ -37,8 +58,7 @@ def handleLogRecord(record):
     #     name = self.server.logname
     # else:
         # name = record.name
-    name = record.name
-    logger = logging.getLogger(name)
+    # logger = logging.getLogger(name)
     # N.B. EVERY record gets logged. This is because Logger.handle
     # is normally called AFTER logger-level filtering. If you want
     # to do filtering, do it at the client end to save wasting
