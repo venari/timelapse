@@ -35,7 +35,7 @@ formatter = logging.Formatter('%(asctime)s %(name)s %(levelname)s %(message)s')
 # handler = TimedRotatingFileHandler(logFilePath, 
 #                                    when='midnight',
 #                                    backupCount=10)
-handler = SocketHandler('localhost, 8000')
+handler = SocketHandler('localhost', 8000)
 handler.setFormatter(formatter)
 logger = logging.getLogger("updateStatus")
 logger.addHandler(handler)
