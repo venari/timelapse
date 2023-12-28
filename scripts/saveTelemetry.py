@@ -7,7 +7,8 @@ import shutil
 import datetime
 import sys
 import logging
-from logging.handlers import TimedRotatingFileHandler
+# from logging.handlers import TimedRotatingFileHandler
+from logging.handlers import SocketHandler
 import pathlib
 import glob
 
@@ -24,9 +25,10 @@ os.makedirs(os.path.dirname(logFilePath), exist_ok=True)
 
 
 formatter = logging.Formatter('%(asctime)s %(name)s %(levelname)s %(message)s')
-handler = TimedRotatingFileHandler(logFilePath, 
-                                   when='midnight',
-                                   backupCount=10)
+# handler = TimedRotatingFileHandler(logFilePath, 
+#                                    when='midnight',
+#                                    backupCount=10)
+handler = SocketHandler('localhost', 8000)
 handler.setFormatter(formatter)
 logger = logging.getLogger("saveTelemetry")
 logger.addHandler(handler)
