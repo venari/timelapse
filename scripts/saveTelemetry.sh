@@ -3,6 +3,6 @@ set -x
 
 echo `date` >> startup.sh.out
 echo "Starting saveTelemetry..." >> startup.sh.out
-/usr/bin/python3 saveTelemetry.py 2>> saveTelemetry.sh.out
+/usr/bin/python3 saveTelemetry.py &>> startup.sh.out
 
 popd

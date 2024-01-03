@@ -2,6 +2,6 @@ pushd /home/pi/dev/timelapse/scripts
 set -x
 #echo `date` >> startup.sh.out
 #echo "Uploading telemetry and images..." >> startup.sh.out
-/usr/bin/python3 updateStatus.py 2>> startup.sh.out
+/usr/bin/python3 updateStatus.py &>> startup.sh.out
 
 popd
