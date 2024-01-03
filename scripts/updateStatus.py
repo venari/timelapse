@@ -18,6 +18,8 @@ import pijuice
 import socket
 import shutil
 
+from helpers import internet, flashLED
+
 outputImageFolder = '../output/images/'
 imageMonitoringPreview = outputImageFolder + 'monitoringPreview.jpg'
 mostRecentUploadedImage = outputImageFolder + 'monitoringPreviewMostRecentUploaded.jpg'
@@ -47,28 +49,6 @@ os.chmod(logFilePath, 0o777) # Make sure pijuice user script can write to log fi
 
 pj = pijuice.PiJuice(1, 0x14)
 
-def internet(host="8.8.8.8", port=53, timeout=3):
-    """
-    Host: 8.8.8.8 (google-public-dns-a.google.com)
-    OpenPort: 53/tcp
-    Service: domain (DNS/TCP)
-    """
-    try:
-        socket.setdefaulttimeout(timeout)
-        socket.socket(socket.AF_INET, socket.SOCK_STREAM).connect((host, port))
-        return True
-    except socket.error as ex:
-        return False
-
-
-
-
-def flashLED(led='D2', R=0, G=0, B=255, flashCount=3, flashDelay=0.5):
-    for i in range(0, flashCount):
-        pj.status.SetLedState(led, [R, G, B])
-        time.sleep(flashDelay)
-        pj.status.SetLedState(led, [0, 0, 0])
-        time.sleep(flashDelay)
 
 
 
@@ -231,13 +211,13 @@ if config['supportMode'] == False:
 
 else:
 
-    flashLED('D2', 0, 0, 255, 5, 0.1)   # Flash blue - we're on
+    flashLED(pj, 'D2', 0, 0, 255, 5, 0.1)   # Flash blue - we're on
     if internet():
         logger.info("We've got internet")
-        flashLED('D2', 0, 255, 0, 1, 2)
+        flashLED(pj, 'D2', 0, 255, 0, 1, 2)
     else:
         logger.info("No internet")
-        flashLED('D2', 255, 0, 0, 1, 2)
+        flashLED(pj, 'D2', 255, 0, 0, 1, 2)
 
     # Only update eink every 5 minutes
     if(datetime.datetime.now().minute % 5 == 0):
