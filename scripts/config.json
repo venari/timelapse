@@ -5,7 +5,7 @@
     "logFilePath": "/home/pi/logs/timelapse.log",
     "shutdown": false,
     "tempWarning": 50,
-    "sleep_during_night": true,
+    "sleep_during_night": false,
     "sleep_at_battery_percent": 25,
     "hibernate_at_battery_percent": 2,
     "daytime_starts_at_h": 6,
@@ -31,6 +31,6 @@
     "camera.quality": 30,
     "camera.focus_m": 100,
     "hibernateMode": false,
-    "supportMode": false,
+    "supportMode": true,
     "monitoringMode": false
 }

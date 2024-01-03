@@ -2,7 +2,8 @@ import pijuice
 import time
 import socket
 import logging
-from logging.handlers import TimedRotatingFileHandler
+# from logging.handlers import TimedRotatingFileHandler
+from logging.handlers import SocketHandler
 import pathlib
 import json
 
@@ -12,7 +13,8 @@ config = json.load(open('config.json'))
 logFilePath = config["logFilePath"]
 
 formatter = logging.Formatter('%(asctime)s %(name)s %(levelname)s %(message)s')
-handler = TimedRotatingFileHandler(logFilePath, when='midnight', backupCount=10)
+# handler = TimedRotatingFileHandler(logFilePath, when='midnight', backupCount=10)
+handler = SocketHandler('localhost', 8000)
 handler.setFormatter(formatter)
 logger = logging.getLogger("indicateStatus")
 logger.addHandler(handler)
