@@ -23,7 +23,7 @@ logger.addHandler(handler)
 
 
 
-def handle(conn):
+def handle(conn: socket.socket):
     """
     Handle multiple requests - each expected to be a 4-byte length,
     followed by the LogRecord in pickle format. Logs the record
@@ -48,10 +48,10 @@ def handle(conn):
         print(record)
         handleLogRecord(record)
 
-def unPickle(data):
+def unPickle(data: bytes):
     return pickle.loads(data)
 
-def handleLogRecord(record):
+def handleLogRecord(record: logging.LogRecord):
     # # if a name is specified, we use the named logger rather than the one
     # # implied by the record.
     # if self.server.logname is not None:
