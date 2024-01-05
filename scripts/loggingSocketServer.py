@@ -6,6 +6,7 @@ import logging.handlers
 import struct
 import socket
 import json
+import threading
 
 # this logic taken from saveTelemetry.py
 config = json.load(open('config.json'))
@@ -30,23 +31,28 @@ def handle(conn: socket.socket):
     according to whatever policy is configured locally.
     """
     print('handling connection')
-    while 1:
-        print('recv chunk')
-        chunk = conn.recv(4)
-        if len(chunk) < 4:
-            break
-        print('recv slen')
-        slen = struct.unpack(">L", chunk)[0]
-        print('build chunk')
-        chunk = conn.recv(slen)
-        while len(chunk) < slen:
-            chunk = chunk + conn.recv(slen - len(chunk))
-        print('unPickle(chunk)')
-        obj = unPickle(chunk)
-        record = logging.makeLogRecord(obj)
-        print('handleRecord')
-        print(record)
-        handleLogRecord(record)
+    try:
+        while 1:
+            print('recv chunk')
+            chunk = conn.recv(4)
+            if len(chunk) < 4:
+                break
+            print('recv slen')
+            slen = struct.unpack(">L", chunk)[0]
+            print('build chunk')
+            chunk = conn.recv(slen)
+            while len(chunk) < slen:
+                chunk = chunk + conn.recv(slen - len(chunk))
+            print('unPickle(chunk)')
+            obj = unPickle(chunk)
+            record = logging.makeLogRecord(obj)
+            print('handleRecord')
+            print(record)
+            handleLogRecord(record)
+            
+    except Exception as e:
+        logger.error(e)
+        # fails softly
 
 def unPickle(data: bytes):
     return pickle.loads(data)
@@ -74,8 +80,13 @@ def serve_until_stopped():
     s.bind(('localhost', 8000))
     s.listen(10) # 10 is arbitrary
     while 1:
-        conn, addr = s.accept()
-        handle(conn)
+        try:
+            conn, addr = s.accept()
+            handle(conn)
+            
+        except Exception as e:
+            logger.exception(e)
+            # fails softly
 
 
 serve_until_stopped()
