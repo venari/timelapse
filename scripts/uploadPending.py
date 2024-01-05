@@ -14,7 +14,7 @@ import glob
 import pathlib
 import socket
 
-from updateStatus import flashLED
+from helpers import flashLED, internet
 
 from SIM7600X import powerUpSIM7600X, powerDownSIM7600X, turnOnNDIS
 
@@ -131,12 +131,12 @@ def uploadPendingPhotos():
 
             logger.debug(f'Response code: {response.status_code}')
             if response.status_code == 200:
-                flashLED('D2', 0, 0, 255, 1, .5)
+                flashLED(pj, 'D2', 0, 0, 255, 1, .5)
                 logger.debug(f'Image uploaded successfully')
                 shutil.move(IMAGEFILENAME, uploadedImageFolder + pathlib.Path(IMAGEFILENAME).name)
 
             else:
-                flashLED('D2', 255, 0, 0, 1, 1)
+                flashLED(pj, 'D2', 255, 0, 0, 1, 1)
                 logger.error(f'Image upload failed')
 
             logger.debug(f'Response text:')
@@ -188,26 +188,6 @@ def uploadPendingPhotos():
     except Exception as e:
         logger.error(str(datetime.datetime.now()) + " uploadPendingPhotos() failed.")
         logger.error(e)
-
-# https://stackoverflow.com/questions/3764291/how-can-i-see-if-theres-an-available-and-active-network-connection-in-python
-def internet(host="8.8.8.8", port=53, timeout=config['upload.telemetry.timeout']):
-    """
-    Host: 8.8.8.8 (google-public-dns-a.google.com)
-    OpenPort: 53/tcp
-    Service: domain (DNS/TCP)
-    """
-    try:
-        # logger.info('In internet() 1')
-        socket.setdefaulttimeout(timeout)
-        # logger.info('In internet() 2')
-        socket.socket(socket.AF_INET, socket.SOCK_STREAM).connect((host, port))
-        # logger.info('In internet() 3')
-        return True
-    except socket.error as ex:
-        # logger.warning('In internet() 4')
-        logger.warning(ex)
-        # logger.warning('In internet() 5')
-        return False
 
 def connectToInternet(retries = 3):
     try:
@@ -343,12 +323,12 @@ def uploadPendingTelemetry():
             #requests.post(config['apiUrl'] + '/Telemetry', json=api_data)
 
             if response.status_code == 200:
-                flashLED('D2', 0, 0, 255, 1, .1)
+                flashLED(pj, 'D2', 0, 0, 255, 1, .1)
                 logger.debug(f'Telemetry uploaded successfully')
                 shutil.move(telemetryFilename, uploadedTelemetryFolder + pathlib.Path(telemetryFilename).name)
                 logger.debug('Logged to API.')
             else:
-                flashLED('D2', 255, 0, 0, 1, 1)
+                flashLED(pj, 'D2', 255, 0, 0, 1, 1)
                 logger.error(f'Telemetry upload failed')
 
             try:
@@ -371,16 +351,16 @@ def uploadPendingTelemetry():
 
                    
             except json.decoder.JSONDecodeError:
-                flashLED('D2', 255, 0, 255, 1, 1)
+                flashLED(pj, 'D2', 255, 0, 255, 1, 1)
                 logger.debug(response.text)
 
 
     except requests.exceptions.ConnectionError as e:
-        flashLED('D2', 255, 0, 255, 1, 1)
+        flashLED(pj, 'D2', 255, 0, 255, 1, 1)
         logger.error(str(datetime.datetime.now()) + " uploadPendingTelemetry() failed - connection error. Leave in place.")
         logger.error(e)
     except Exception as e:
-        flashLED('D2', 255, 0, 255, 1, 1)
+        flashLED(pj, 'D2', 255, 0, 255, 1, 1)
         logger.error(str(datetime.datetime.now()) + " uploadPendingTelemetry() failed.")
         logger.error(e)
         if lastAttemptedFilename!="":          

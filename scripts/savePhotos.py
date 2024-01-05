@@ -13,7 +13,7 @@ import logging
 from logging.handlers import SocketHandler
 import pathlib
 
-from updateStatus import flashLED
+# from helpers import flashLED
 
 config = json.load(open('config.json'))
 logFilePath = config["logFilePath"]
@@ -113,7 +113,7 @@ def savePhotos():
                     
                 camera.options["quality"] = config['camera.quality']
 
-                flashLED('D2', 200, 255, 255, 1, 0.5)
+                # flashLED(pj, 'D2', 200, 255, 255, 1, 0.5)
                 logger.debug('beginning capture')
                 #camera.start_preview(Preview.DRM)
                 camera.start()
