@@ -35,21 +35,16 @@ def handle(conn: socket.socket):
     logger.debug('handling connection')
     try:
         while 1:
-            logger.debug('recv chunk')
             chunk = conn.recv(4)
             if len(chunk) < 4:
                 logger.debug('end conn handler')
                 break
-            logger.debug('recv slen')
             slen = struct.unpack(">L", chunk)[0]
-            logger.debug('build chunk')
             chunk = conn.recv(slen)
             while len(chunk) < slen:
                 chunk = chunk + conn.recv(slen - len(chunk))
-            logger.debug('unPickle(chunk)')
             obj = unPickle(chunk)
             record = logging.makeLogRecord(obj)
-            logger.debug('handleRecord')
             logger.debug(record)
             handleLogRecord(record)
             
