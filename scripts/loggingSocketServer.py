@@ -45,7 +45,6 @@ def handle(conn: socket.socket):
                 chunk = chunk + conn.recv(slen - len(chunk))
             obj = unPickle(chunk)
             record = logging.makeLogRecord(obj)
-            logger.debug(record)
             handleLogRecord(record)
             
     except Exception as e:
