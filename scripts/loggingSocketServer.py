@@ -30,24 +30,25 @@ def handle(conn: socket.socket):
     followed by the LogRecord in pickle format. Logs the record
     according to whatever policy is configured locally.
     """
-    print('handling connection')
+    logger.debug('handling connection')
     try:
         while 1:
-            print('recv chunk')
+            logger.debug('recv chunk')
             chunk = conn.recv(4)
             if len(chunk) < 4:
+                logger.debug('end conn handler')
                 break
-            print('recv slen')
+            logger.debug('recv slen')
             slen = struct.unpack(">L", chunk)[0]
-            print('build chunk')
+            logger.debug('build chunk')
             chunk = conn.recv(slen)
             while len(chunk) < slen:
                 chunk = chunk + conn.recv(slen - len(chunk))
-            print('unPickle(chunk)')
+            logger.debug('unPickle(chunk)')
             obj = unPickle(chunk)
             record = logging.makeLogRecord(obj)
-            print('handleRecord')
-            print(record)
+            logger.debug('handleRecord')
+            logger.debug(record)
             handleLogRecord(record)
             
     except Exception as e:
@@ -79,6 +80,7 @@ def serve_until_stopped():
     s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     s.bind(('localhost', 8000))
     s.listen(10) # 10 is arbitrary
+    logger.debug('listening on port 8000')
     while 1:
         try:
             conn, addr = s.accept()
