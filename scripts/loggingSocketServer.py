@@ -12,7 +12,7 @@ import threading
 config = json.load(open('config.json'))
 logFilePath = config["logFilePath"]
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger('loggingSocketServer')
 handler = logging.handlers.TimedRotatingFileHandler(logFilePath,
                                                     when='midnight',
                                                     backupCount=10)
