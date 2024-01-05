@@ -52,7 +52,7 @@ def handle(conn: socket.socket):
             handleLogRecord(record)
             
     except Exception as e:
-        logger.error(e)
+        logger.exception(e)
         # fails softly
 
 def unPickle(data: bytes):
