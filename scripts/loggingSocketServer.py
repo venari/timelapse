@@ -27,25 +27,30 @@ logger.setLevel(logging.DEBUG)
 
 
 def handle(conn: socket.socket):
-    """
-    Handle multiple requests - each expected to be a 4-byte length,
-    followed by the LogRecord in pickle format. Logs the record
-    according to whatever policy is configured locally.
-    """
-    logger.debug('handling connection')
+    # """
+    # Handle multiple requests - each expected to be a 4-byte length,
+    # followed by the LogRecord in pickle format. Logs the record
+    # according to whatever policy is configured locally.
+    # """
+    # ^ not what we're doing now
+    # logger.debug('handling connection') # excessive now that we're disconnecting after each log record is sent
     try:
-        while 1:
-            chunk = conn.recv(4)
-            if len(chunk) < 4:
-                logger.debug('end conn handler')
-                break
-            slen = struct.unpack(">L", chunk)[0]
-            chunk = conn.recv(slen)
-            while len(chunk) < slen:
-                chunk = chunk + conn.recv(slen - len(chunk))
-            obj = unPickle(chunk)
-            record = logging.makeLogRecord(obj)
-            handleLogRecord(record)
+        chunk = conn.recv(4)
+        if len(chunk) < 4:
+            logger.debug('conn gave empty chunk, maybe disconnected socket?')
+            conn.close()
+            return
+        
+        slen = struct.unpack(">L", chunk)[0]
+        chunk = conn.recv(slen)
+        while len(chunk) < slen:
+            chunk = chunk + conn.recv(slen - len(chunk))
+            
+        obj = unPickle(chunk)
+        record = logging.makeLogRecord(obj)
+        handleLogRecord(record)
+        # logger.debug('end connection (no error)') # excessive now that we're disconnectting after each log record is sent
+        conn.close()
             
     except Exception as e:
         logger.exception(e)
