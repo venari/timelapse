@@ -22,6 +22,8 @@ handler.setFormatter(formatter)
 
 logger.addHandler(handler)
 
+logger.setLevel(logging.DEBUG)
+
 
 
 def handle(conn: socket.socket):
