@@ -35,22 +35,29 @@ def handle(conn: socket.socket):
     # ^ not what we're doing now
     # logger.debug('handling connection') # excessive now that we're disconnecting after each log record is sent
     try:
-        chunk = conn.recv(4)
-        if len(chunk) < 4:
-            logger.debug('conn gave empty chunk, maybe disconnected socket?')
-            conn.close()
-            return
-        
-        slen = struct.unpack(">L", chunk)[0]
-        chunk = conn.recv(slen)
-        while len(chunk) < slen:
-            chunk = chunk + conn.recv(slen - len(chunk))
+        while 1:
+            chunk = conn.recv(4)
+            if len(chunk) < 4:
+                logger.debug('conn gave empty chunk, maybe disconnected socket?')
+                conn.close()
+                return
             
-        obj = unPickle(chunk)
-        record = logging.makeLogRecord(obj)
-        handleLogRecord(record)
-        # logger.debug('end connection (no error)') # excessive now that we're disconnectting after each log record is sent
-        conn.close()
+            slen = struct.unpack(">L", chunk)[0]
+            chunk = conn.recv(slen)
+            while len(chunk) < slen:
+                chunk = chunk + conn.recv(slen - len(chunk))
+                
+            obj = unPickle(chunk)
+            record = logging.makeLogRecord(obj)
+            handleLogRecord(record)
+            # logger.debug('end connection (no error)') # excessive now that we're disconnectting after each log record is sent
+            conn.settimeout(1.00) # if connection goes more than 1 second without log record, throw a timeout error and wait for the next connection
+
+    except socket.timeout:
+        pass
+        # socket.timeout is intentionally caused by the connection timeout
+        # if the socket times out, we want to move on to the next connection
+        # and because it happens a lot we don't want to clutter the logs
             
     except Exception as e:
         logger.exception(e)
@@ -85,6 +92,7 @@ def serve_until_stopped():
     while 1:
         try:
             conn, addr = s.accept()
+            conn.settimeout
             handle(conn)
             
         except Exception as e:
