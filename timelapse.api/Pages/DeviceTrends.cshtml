@@ -159,8 +159,10 @@
         <thead>
             <th>Device</th>
 
-            @{foreach(var date in Enumerable.Range(0, 1 + Model.EndDate.Subtract(Model.StartDate).Days).Select(offset => Model.StartDate.AddDays(offset)).ToList()){
-                <th>@(date.ToString("ddd dd"))</th>
+            @* @{foreach(var date in Enumerable.Range(0, 1 + Model.EndDate.Subtract(Model.StartDate).Days).Select(offset => Model.StartDate.AddDays(offset)).ToList()){ *@
+            @* @{foreach(var date in Enumerable.Range(0, 1 + Model.EndDate.Subtract(Model.StartDate).Hours).Select(offset => Model.StartDate.AddHours(offset)).ToList()){ *@
+            @{foreach(var date in Model.DateRange){
+                <th>@(date.ToString("ddd dd HH"))</th>
             }}
             @* @{foreach(var details in Model.PerformanceSummaries[0].PerformanceDetails){
                 <th>@(details.Date.ToString("ddd"))</th>

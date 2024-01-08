@@ -37,8 +37,10 @@ public class DeviceTrendsModel : PageModel
     [BindProperty]
     public DateTime EndDate {get; set;}
 
+    public List<DateTime> DateRange {get; set;}
+
     public class PerformanceDetail{
-        public DateTime Date {get; set;}
+        public DateTime Timestamp {get; set;}
         public int TotalImages {get; set;}
     }
 
@@ -48,7 +50,7 @@ public class DeviceTrendsModel : PageModel
         public List<PerformanceDetail> PerformanceDetails {get; set;} = new List<PerformanceDetail>();
     }
 
-    public List<PerformanceSummary> PerformanceSummaries {get; set;} = new List<PerformanceSummary>();
+    public List<PerformanceSummary> PerformanceSummaries {get; set;} = new List<PerformanceSummary>();        
 
     public IActionResult OnGet(int? numberOfHoursToDisplay = null)
     {
@@ -58,17 +60,21 @@ public class DeviceTrendsModel : PageModel
 
         EndDate = DateTime.UtcNow;
         StartDate = EndDate.AddHours(-1 * NumberOfHoursToDisplay);
-
-        // Set to midnight for performance counts below
-        StartDate = StartDate.AddHours(-1 * StartDate.Hour);
+        var StartDateOnTheHour = StartDate.RoundDownToNearestHour(); //.AddMinutes(-1 * StartDate.Minute).AddSeconds(-1 * StartDate.Second).AddMilliseconds(-1 * StartDate.Millisecond);
+        DateRange = Enumerable.Range(0, 1 + NumberOfHoursToDisplay)
+            .Select(offset => 
+                StartDateOnTheHour.AddHours(offset)
+            )
+            .ToList();
+        // DateRange = Enumerable.Range(0, 1 + (int)EndDate.Subtract(StartDate).TotalHours).Select(offset => 
+        //     StartDate.AddHours(offset)
+        // ).ToList();
 
         if(_appDbContext.Telemetry.Any(t => t.Device.Retired == false && t.Timestamp >= StartDate && t.Timestamp <= EndDate) == false){
             return RedirectToPage("/NotFound");
         }
     
-
         var devices = _appDbContext.Devices
-            // .Include(d => d.Telemetries.Where(t => t.Timestamp >= StartDate && t.Timestamp <= EndDate).OrderBy(t => t.Timestamp))
             .Include(d => d.Images.Where(i => i.Timestamp >= StartDate && i.Timestamp <= EndDate).OrderBy(i => i.Timestamp))
             .Where(d => d.Retired == false)
             .AsSplitQuery();
@@ -78,8 +84,10 @@ public class DeviceTrendsModel : PageModel
                 DeviceId = d.Id,
                 DeviceName = d.Name,
                 PerformanceDetails = d.Images
-                    .GroupBy(i => i.Timestamp.Date)
-                    .Select(g => new PerformanceDetail{Date = g.Key, TotalImages = g.Count()})
+                    // .GroupBy(i => new {DateUTC = i.Timestamp.Date, HourUTC = i.Timestamp.Hour})
+                    // .Select(g => new PerformanceDetail{Timestamp = g.Key.DateUTC.AddHours(g.Key.HourUTC), TotalImages = g.Count()})
+                    .GroupBy(i => i.Timestamp.RoundDownToNearestHour())
+                    .Select(g => new PerformanceDetail{Timestamp = g.Key, TotalImages = g.Count()})
                     .ToList()
             });
             // var imagesPerDay = d.Images
@@ -92,15 +100,15 @@ public class DeviceTrendsModel : PageModel
             if(ps.PerformanceDetails.Count() == 0){
                 continue;
             }
-            var imagesPerDay = ps.PerformanceDetails;
-            var startDate = imagesPerDay.Min(i => i.Date);
-            var endDate = imagesPerDay.Max(i => i.Date);
-            var dateRange = Enumerable.Range(0, 1 + endDate.Subtract(startDate).Days).Select(offset => startDate.AddDays(offset)).ToList();
-            var missingDates = dateRange.Except(imagesPerDay.Select(i => i.Date));
-            foreach(var missingDate in missingDates){
-                ps.PerformanceDetails.Add(new PerformanceDetail{Date = missingDate, TotalImages = 0});
+            var imagesPerHour = ps.PerformanceDetails;
+            var startDate = imagesPerHour.Min(i => i.Timestamp);
+            var endDate = imagesPerHour.Max(i => i.Timestamp);
+            // var missingTimestamps = DateRange.Except(imagesPerHour.Select(i => i.Timestamp.RoundDownToNearestHour())).ToList();
+            var missingTimestamps = DateRange.Except(imagesPerHour.Select(i => i.Timestamp)).ToList();
+            foreach(var missingTimestamp in missingTimestamps){
+                ps.PerformanceDetails.Add(new PerformanceDetail{Timestamp = missingTimestamp, TotalImages = 0});
             }
-            ps.PerformanceDetails = ps.PerformanceDetails.OrderBy(i => i.Date).ToList();
+            ps.PerformanceDetails = ps.PerformanceDetails.OrderBy(i => i.Timestamp).ToList();
         }
 
 
