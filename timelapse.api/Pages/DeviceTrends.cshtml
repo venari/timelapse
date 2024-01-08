@@ -51,13 +51,13 @@
                 borderColor: 'rgb(99, 99, 255)',
                 yAxisID: 'y',
                 data: data.map(d => ({x: new Date(d.timestamp), y: d.batteryPercent})),
-            }, {
+            @* }, {
                 label: deviceLabel + " Temperature",
                 backgroundColor: 'rgb(255, 99, 132)',
                 borderColor: 'rgb(255, 99, 132)',
                 yAxisID: 'y',
-                data: data.map(d => ({x: new Date(d.timestamp), y: d.temperatureC})),
-            }, {
+                data: data.map(d => ({x: new Date(d.timestamp), y: d.temperatureC})), *@
+            @* }, {
                 label: deviceLabel + " Pending Images",
                 backgroundColor: 'rgb(30, 185, 00)',
                 borderColor: 'rgb(30, 185, 00)',
@@ -70,7 +70,7 @@
                 borderColor: 'rgb(00, 00, 00)',
                 hidden: true,
                 yAxisID: 'y',
-                data: data.map(d => ({x: new Date(d.timestamp), y: d.uptimeSeconds/60}))
+                data: data.map(d => ({x: new Date(d.timestamp), y: d.uptimeSeconds/60})) *@
             }]
         };
 
@@ -96,7 +96,7 @@
                                 plugins: {
                                     legend: {
                                         @* display: false, *@
-                                        position: 'right'
+                                        position: 'bottom'
                                     }
                                 },
                                 scales: {
@@ -142,7 +142,7 @@
                             config
                         );
 
-                        @{foreach(var device in Model.devices){
+                        @{foreach(var device in Model.Devices){
                             <text>
                                 getTelemetry(@(device.Id), '@(Model.StartDate.ToUniversalTime().ToString("o"))', '@(Model.EndDate.ToUniversalTime().ToString("o"))', myChart, "@(device.Name)");
                             </text>
@@ -150,6 +150,31 @@
                     </script>
                 </td>
             </tr>
+        </tbody>
+    </table>
+</div>
+
+<div>
+    <table class="table">
+        <thead>
+            <th>Device</th>
+
+            @{foreach(var date in Enumerable.Range(0, 1 + Model.EndDate.Subtract(Model.StartDate).Days).Select(offset => Model.StartDate.AddDays(offset)).ToList()){
+                <th>@(date.ToString("ddd dd"))</th>
+            }}
+            @* @{foreach(var details in Model.PerformanceSummaries[0].PerformanceDetails){
+                <th>@(details.Date.ToString("ddd"))</th>
+            }} *@
+        </thead>
+        <tbody>
+            @{foreach(var summary in Model.PerformanceSummaries){
+            <tr>
+                <td><a href="/TelemetryGraph/@(summary.DeviceId)/@(Model.NumberOfHoursToDisplay)">@(summary.DeviceName)</a></td>
+                @{foreach(var details in summary.PerformanceDetails){
+                    <th>@(details.TotalImages)</th>
+                }}
+            </tr>
+            }}
         </tbody>
     </table>
 </div>
