@@ -77,6 +77,68 @@
         chart.config.data.datasets = chart.config.data.datasets.concat(data.datasets)
         chart.update();
     }
+
+    const shortDayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+
+    function localizeDateTimeToShortDayAndNumber(t)
+    {
+        if(t && t!='---'){
+            if(t.indexOf('Z')==-1){
+                t+='Z'
+            }
+            var d=new Date(t);
+            return shortDayNames[d.getDay()] + ' ' + d.getDate();
+        } else {
+            return '---';
+        }
+    }
+
+
+    function localizeDateTimeToHourAndAmPm(t)
+    {
+        if(t && t!='---'){
+            if(t.indexOf('Z')==-1){
+                t+='Z'
+            }
+            var d=new Date(t);
+            if(d.getHours()<12){
+                if(d.getHours()==0){
+                    return "12AM"
+                } else {
+                    return d.getHours() + "AM"
+                }
+            } else {
+                if(d.getHours()==12){
+                    return d.getHours() + "PM"
+                } else {
+                    return d.getHours() - 12 + "PM"
+                }
+            }
+            //return d.getHours() + (d.getHours()<12?"AM":"PM");
+        } else {
+            return '---';
+        }
+    }
+
+    function localizeDateTimeIsBetween6And6(t)
+    {
+        if(t && t!='---'){
+            if(t.indexOf('Z')==-1){
+                t+='Z'
+            }
+            var d=new Date(t);
+
+            if(d.getHours()>=6 && d.getHours()<18){
+                return 'Day';
+            } else {
+                return 'Night';
+            }
+        } else {
+            return '---';
+        }
+    }
+
+    var daytimeColumns = ['Device'];
 </script>
 
 <div>
@@ -155,28 +217,69 @@
 </div>
 
 <div>
-    <table class="table">
+    <table class="table" id="devicePerformance">
         <thead>
             <th>Device</th>
 
-            @* @{foreach(var date in Enumerable.Range(0, 1 + Model.EndDate.Subtract(Model.StartDate).Days).Select(offset => Model.StartDate.AddDays(offset)).ToList()){ *@
-            @* @{foreach(var date in Enumerable.Range(0, 1 + Model.EndDate.Subtract(Model.StartDate).Hours).Select(offset => Model.StartDate.AddHours(offset)).ToList()){ *@
             @{foreach(var date in Model.DateRange){
-                <th>@(date.ToString("ddd dd HH"))</th>
+                <th><script type="text/javascript">document.write(localizeDateTimeToShortDayAndNumber('@(date.ToString("s"))')); daytimeColumns.push(localizeDateTimeIsBetween6And6('@(date.ToString("s"))'));</script></th>
+                @* <th>@(date.ToString("ddd dd HH"))</th> *@
             }}
-            @* @{foreach(var details in Model.PerformanceSummaries[0].PerformanceDetails){
-                <th>@(details.Date.ToString("ddd"))</th>
-            }} *@
+        </thead>
+        <thead>
+            <th></th>
+
+            @{foreach(var date in Model.DateRange){
+                <th><script type="text/javascript">document.write(localizeDateTimeToHourAndAmPm('@(date.ToString("s"))'));</script></th>
+            }}
         </thead>
         <tbody>
             @{foreach(var summary in Model.PerformanceSummaries){
             <tr>
                 <td><a href="/TelemetryGraph/@(summary.DeviceId)/@(Model.NumberOfHoursToDisplay)">@(summary.DeviceName)</a></td>
                 @{foreach(var details in summary.PerformanceDetails){
-                    <th>@(details.TotalImages)</th>
+                    if(details.TotalImages<30){
+                        <td style="background-color: #ff0000;">@(details.TotalImages)</td>
+                    } else {
+                        if(details.TotalImages<45){
+                            <td style="background-color: #ffcc00;">@(details.TotalImages)</td>
+                        } else {
+                            <td>@(details.TotalImages)</td>
+                        }
+                    }                    
                 }}
             </tr>
             }}
         </tbody>
     </table>
 </div>
+
+<script>
+
+    
+    var rows = document.getElementById('devicePerformance').getElementsByTagName('tr');
+
+    // Header rows
+    for (var i = 0; i < 2; i++) {
+
+        // check daytimeColumns and for all columns that are 'Night', remove cell
+        var cells = rows[i].getElementsByTagName('th');
+        for (var j = 1; j < cells.length; j++) {
+            if(daytimeColumns[j]=='Night'){
+                cells[j].style.display = 'none';
+            }
+        }
+    }
+
+    // Device rows
+    for (var i = 2; i < rows.length; i++) {
+
+        // check daytimeColumns and for all columns that are 'Night', remove cell
+        var cells = rows[i].getElementsByTagName('td');
+        for (var j = 1; j < cells.length; j++) {
+            if(daytimeColumns[j]=='Night'){
+                cells[j].style.display = 'none';
+            }
+        }
+    }
+</script>

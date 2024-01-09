@@ -42,6 +42,7 @@ public class DeviceTrendsModel : PageModel
     public class PerformanceDetail{
         public DateTime Timestamp {get; set;}
         public int TotalImages {get; set;}
+        public int MaxPendingImages {get; set;}
     }
 
     public class PerformanceSummary{
@@ -76,11 +77,12 @@ public class DeviceTrendsModel : PageModel
     
         var devices = _appDbContext.Devices
             .Include(d => d.Images.Where(i => i.Timestamp >= StartDate && i.Timestamp <= EndDate).OrderBy(i => i.Timestamp))
+            .Include(d => d.Telemetries.Where(t => t.Timestamp >= StartDate && t.Timestamp <= EndDate).OrderBy(t => t.Timestamp))
             .Where(d => d.Retired == false)
             .AsSplitQuery();
 
         foreach(var d in devices){
-            PerformanceSummaries.Add(new PerformanceSummary{
+            var devicePerformanceSummary = new PerformanceSummary{
                 DeviceId = d.Id,
                 DeviceName = d.Name,
                 PerformanceDetails = d.Images
@@ -89,7 +91,22 @@ public class DeviceTrendsModel : PageModel
                     .GroupBy(i => i.Timestamp.RoundDownToNearestHour())
                     .Select(g => new PerformanceDetail{Timestamp = g.Key, TotalImages = g.Count()})
                     .ToList()
-            });
+            };
+
+            var pendingImagesByHour = d.Telemetries
+                .GroupBy(t => t.Timestamp.RoundDownToNearestHour())
+                .Select(g => new {Timestamp = g.Key, PendingImages = g.Max(t => t.PendingImages)})
+                .ToList();
+
+            foreach(var pendingImages in pendingImagesByHour){
+                var performanceDetail = devicePerformanceSummary.PerformanceDetails.FirstOrDefault(pd => pd.Timestamp == pendingImages.Timestamp);
+                if(performanceDetail!=null){
+                    performanceDetail.MaxPendingImages = pendingImages.PendingImages??0;
+                }
+            }
+
+            PerformanceSummaries.Add(devicePerformanceSummary);
+
             // var imagesPerDay = d.Images
             //     .GroupBy(i => new {deviceId = i.DeviceId, date = i.Timestamp.Date})
             //     .Select(g => new {Date = g.Key.date, Count = g.Count()}).ToList();
@@ -106,7 +123,7 @@ public class DeviceTrendsModel : PageModel
             // var missingTimestamps = DateRange.Except(imagesPerHour.Select(i => i.Timestamp.RoundDownToNearestHour())).ToList();
             var missingTimestamps = DateRange.Except(imagesPerHour.Select(i => i.Timestamp)).ToList();
             foreach(var missingTimestamp in missingTimestamps){
-                ps.PerformanceDetails.Add(new PerformanceDetail{Timestamp = missingTimestamp, TotalImages = 0});
+                ps.PerformanceDetails.Add(new PerformanceDetail{Timestamp = missingTimestamp, TotalImages = 0, MaxPendingImages = 0});
             }
             ps.PerformanceDetails = ps.PerformanceDetails.OrderBy(i => i.Timestamp).ToList();
         }
