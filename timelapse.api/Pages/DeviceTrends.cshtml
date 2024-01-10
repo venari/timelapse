@@ -224,7 +224,7 @@
             <th nowrap="nowrap">Description</th>
 
             @{foreach(var date in Model.DateRange){
-                <th><script type="text/javascript">
+                <th nowrap="nowrap"><script type="text/javascript">
                     document.write(localizeDateTimeToShortDayAndNumber('@(date.ToString("s"))')); 
                     daytimeColumns.push(localizeDateTimeIsBetween6And6('@(date.ToString("s"))'));
                 </script></th>
@@ -236,7 +236,7 @@
             <th nowrap="nowrap"></th>
 
             @{foreach(var date in Model.DateRange){
-                <th><script type="text/javascript">document.write(localizeDateTimeToHourAndAmPm('@(date.ToString("s"))'));</script></th>
+                <th nowrap="nowrap"><script type="text/javascript">document.write(localizeDateTimeToHourAndAmPm('@(date.ToString("s"))'));</script></th>
             }}
         </thead>
         <tbody>
@@ -246,13 +246,13 @@
                 @* <td><a href="/TelemetryGraph/@(summary.DeviceId)/@(Model.NumberOfHoursToDisplay)">@(summary.DeviceName)</a></td> *@
                 <td nowrap="nowrap">@(summary.DeviceDescription)</td>
                 @{foreach(var details in summary.PerformanceDetails){
-                    if(details.TotalImages<30){
-                        <td style="background-color: #ff0000;">@(details.TotalImages)</td>
+                    if(details.TotalImages<30 || details.MaxPendingImages > 60){
+                        <td nowrap="nowrap" style="background-color: #ff0000;">@(details.TotalImages) P@(details.MaxPendingImages)</td>
                     } else {
-                        if(details.TotalImages<45){
-                            <td style="background-color: #ffcc00;">@(details.TotalImages)</td>
+                        if(details.TotalImages<45 || details.MaxPendingImages > 45){
+                            <td nowrap="nowrap" style="background-color: #ffcc00;">@(details.TotalImages) P@(details.MaxPendingImages)</td>
                         } else {
-                            <td>@(details.TotalImages)</td>
+                            <td nowrap="nowrap">@(details.TotalImages)</td>
                         }
                     }                    
                 }}
