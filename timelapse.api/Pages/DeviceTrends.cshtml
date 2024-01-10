@@ -138,7 +138,8 @@
         }
     }
 
-    var daytimeColumns = ['Device'];
+    var daytimeColumns = ['Device Name', 'Device Description'];
+    var previousDateString = null;
 </script>
 
 <div>
@@ -219,15 +220,20 @@
 <div>
     <table class="table" id="devicePerformance">
         <thead>
-            <th>Device</th>
+            <th nowrap="nowrap">Device Name</th>
+            <th nowrap="nowrap">Description</th>
 
             @{foreach(var date in Model.DateRange){
-                <th><script type="text/javascript">document.write(localizeDateTimeToShortDayAndNumber('@(date.ToString("s"))')); daytimeColumns.push(localizeDateTimeIsBetween6And6('@(date.ToString("s"))'));</script></th>
+                <th><script type="text/javascript">
+                    document.write(localizeDateTimeToShortDayAndNumber('@(date.ToString("s"))')); 
+                    daytimeColumns.push(localizeDateTimeIsBetween6And6('@(date.ToString("s"))'));
+                </script></th>
                 @* <th>@(date.ToString("ddd dd HH"))</th> *@
             }}
         </thead>
         <thead>
-            <th></th>
+            <th nowrap="nowrap"></th>
+            <th nowrap="nowrap"></th>
 
             @{foreach(var date in Model.DateRange){
                 <th><script type="text/javascript">document.write(localizeDateTimeToHourAndAmPm('@(date.ToString("s"))'));</script></th>
@@ -236,7 +242,9 @@
         <tbody>
             @{foreach(var summary in Model.PerformanceSummaries){
             <tr>
-                <td><a href="/TelemetryGraph/@(summary.DeviceId)/@(Model.NumberOfHoursToDisplay)">@(summary.DeviceName)</a></td>
+                <td nowrap="nowrap"><a href="/TelemetryGraph/@(summary.DeviceId)/@(Model.NumberOfHoursToDisplay)">@(summary.DeviceName)</a></td>
+                @* <td><a href="/TelemetryGraph/@(summary.DeviceId)/@(Model.NumberOfHoursToDisplay)">@(summary.DeviceName)</a></td> *@
+                <td nowrap="nowrap">@(summary.DeviceDescription)</td>
                 @{foreach(var details in summary.PerformanceDetails){
                     if(details.TotalImages<30){
                         <td style="background-color: #ff0000;">@(details.TotalImages)</td>
@@ -264,9 +272,17 @@
 
         // check daytimeColumns and for all columns that are 'Night', remove cell
         var cells = rows[i].getElementsByTagName('th');
-        for (var j = 1; j < cells.length; j++) {
+        for (var j = 2; j < cells.length; j++) {
             if(daytimeColumns[j]=='Night'){
                 cells[j].style.display = 'none';
+            } else {
+                // Also clear out cells that show same day as previous
+                var dateString = cells[j].innerText;
+                if(previousDateString==dateString){
+                    cells[j].innerText='';
+                } else {
+                    previousDateString=dateString;
+                }
             }
         }
     }
@@ -276,7 +292,7 @@
 
         // check daytimeColumns and for all columns that are 'Night', remove cell
         var cells = rows[i].getElementsByTagName('td');
-        for (var j = 1; j < cells.length; j++) {
+        for (var j = 2; j < cells.length; j++) {
             if(daytimeColumns[j]=='Night'){
                 cells[j].style.display = 'none';
             }

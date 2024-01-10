@@ -48,6 +48,7 @@ public class DeviceTrendsModel : PageModel
     public class PerformanceSummary{
         public int DeviceId {get; set;}
         public string DeviceName {get; set;}
+        public string DeviceDescription {get; set;}
         public List<PerformanceDetail> PerformanceDetails {get; set;} = new List<PerformanceDetail>();
     }
 
@@ -85,6 +86,7 @@ public class DeviceTrendsModel : PageModel
             var devicePerformanceSummary = new PerformanceSummary{
                 DeviceId = d.Id,
                 DeviceName = d.Name,
+                DeviceDescription = d.Description,
                 PerformanceDetails = d.Images
                     // .GroupBy(i => new {DateUTC = i.Timestamp.Date, HourUTC = i.Timestamp.Hour})
                     // .Select(g => new PerformanceDetail{Timestamp = g.Key.DateUTC.AddHours(g.Key.HourUTC), TotalImages = g.Count()})
