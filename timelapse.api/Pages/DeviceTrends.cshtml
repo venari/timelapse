@@ -51,26 +51,6 @@
                 borderColor: 'rgb(99, 99, 255)',
                 yAxisID: 'y',
                 data: data.map(d => ({x: new Date(d.timestamp), y: d.batteryPercent})),
-            @* }, {
-                label: deviceLabel + " Temperature",
-                backgroundColor: 'rgb(255, 99, 132)',
-                borderColor: 'rgb(255, 99, 132)',
-                yAxisID: 'y',
-                data: data.map(d => ({x: new Date(d.timestamp), y: d.temperatureC})), *@
-            @* }, {
-                label: deviceLabel + " Pending Images",
-                backgroundColor: 'rgb(30, 185, 00)',
-                borderColor: 'rgb(30, 185, 00)',
-                hidden: true,
-                yAxisID: 'y',
-                data: data.map(d => ({x: new Date(d.timestamp), y: d.pendingImages})),
-            }, {
-                label: deviceLabel + " Uptime (minutes)",
-                backgroundColor: 'rgb(00, 00, 00)',
-                borderColor: 'rgb(00, 00, 00)',
-                hidden: true,
-                yAxisID: 'y',
-                data: data.map(d => ({x: new Date(d.timestamp), y: d.uptimeSeconds/60})) *@
             }]
         };
 
@@ -228,7 +208,6 @@
                     document.write(localizeDateTimeToShortDayAndNumber('@(date.ToString("s"))')); 
                     daytimeColumns.push(localizeDateTimeIsBetween6And6('@(date.ToString("s"))'));
                 </script></th>
-                @* <th>@(date.ToString("ddd dd HH"))</th> *@
             }}
         </thead>
         <thead>
@@ -258,10 +237,6 @@
                 }}
             </tr>
             }}
-            @* <tr>
-                <td nowrap="nowrap"></td>
-                <td nowrap="nowrap">Number of images only</td>
-            </tr> *@
             <thead>
                 <th nowrap="nowrap"></th>
                 <th nowrap="nowrap">Number of images only</th>
@@ -302,34 +277,6 @@
                 }}
             </tr>
             }}
-            @* <tr>
-                <td nowrap="nowrap"></td>
-                <td nowrap="nowrap">Images</td>
-            </tr> *@
-            @* <thead>
-                <th nowrap="nowrap"></th>
-                <th nowrap="nowrap">Images</th>
-
-                @{foreach(var date in Model.DateRange){
-                    <th nowrap="nowrap"><script type="text/javascript">document.write(localizeDateTimeToHourAndAmPm('@(date.ToString("s"))'));</script></th>
-                }}
-            </thead> *@
-            @* @{foreach(var summary in Model.PerformanceSummaries){
-            <tr>
-                <td nowrap="nowrap"><a href="/TelemetryGraph/@(summary.DeviceId)/@(Model.NumberOfHoursToDisplay)">@(summary.DeviceName)</a></td>
-                <td nowrap="nowrap">@(summary.DeviceDescription)</td>
-                @{foreach(var details in summary.PerformanceDetails){
-
-                    @if(details.FirstImage!=null){
-                        <td>
-                            <a href="ImageView/@(summary.DeviceId)/1/@(details.FirstImage.Timestamp.ToUniversalTime().ToString("o"))"><img src="@(details.FirstImage.BlobUri + Model.SasToken)" width=100 height=60></img></a>
-                        </td>
-                    } else {
-                        <td></td>
-                    }
-                }}
-            </tr>
-            }} *@
         </tbody>
     </table>
 </div>
@@ -338,38 +285,6 @@
 
     
     var rows = document.getElementById('devicePerformance').getElementsByTagName('tr');
-
-    @* // Header rows
-    for (var i = 0; i < 2; i++) {
-
-        // check daytimeColumns and for all columns that are 'Night', remove cell
-        var cells = rows[i].getElementsByTagName('th');
-        for (var j = 2; j < cells.length; j++) {
-            if(daytimeColumns[j]=='Night'){
-                cells[j].style.display = 'none';
-            } else {
-                // Also clear out cells that show same day as previous
-                var dateString = cells[j].innerText;
-                if(previousDateString==dateString){
-                    cells[j].innerText='';
-                } else {
-                    previousDateString=dateString;
-                }
-            }
-        }
-    }
-
-    // Device rows
-    for (var i = 2; i < rows.length; i++) {
-
-        // check daytimeColumns and for all columns that are 'Night', remove cell
-        var cells = rows[i].getElementsByTagName('td');
-        for (var j = 2; j < cells.length; j++) {
-            if(daytimeColumns[j]=='Night'){
-                cells[j].style.display = 'none';
-            }
-        }
-    } *@
 
     for (var i = 0; i < rows.length; i++) {
 
