@@ -233,7 +233,7 @@
         </thead>
         <thead>
             <th nowrap="nowrap"></th>
-            <th nowrap="nowrap"></th>
+            <th nowrap="nowrap">Number of images and pending images</th>
 
             @{foreach(var date in Model.DateRange){
                 <th nowrap="nowrap"><script type="text/javascript">document.write(localizeDateTimeToHourAndAmPm('@(date.ToString("s"))'));</script></th>
@@ -258,6 +258,78 @@
                 }}
             </tr>
             }}
+            @* <tr>
+                <td nowrap="nowrap"></td>
+                <td nowrap="nowrap">Number of images only</td>
+            </tr> *@
+            <thead>
+                <th nowrap="nowrap"></th>
+                <th nowrap="nowrap">Number of images only</th>
+
+                @{foreach(var date in Model.DateRange){
+                    <th nowrap="nowrap"><script type="text/javascript">document.write(localizeDateTimeToHourAndAmPm('@(date.ToString("s"))'));</script></th>
+                }}
+            </thead>
+            @{foreach(var summary in Model.PerformanceSummaries){
+            <tr>
+                <td nowrap="nowrap"><a href="/TelemetryGraph/@(summary.DeviceId)/@(Model.NumberOfHoursToDisplay)">@(summary.DeviceName)</a></td>
+                @* <td><a href="/TelemetryGraph/@(summary.DeviceId)/@(Model.NumberOfHoursToDisplay)">@(summary.DeviceName)</a></td> *@
+                <td nowrap="nowrap">@(summary.DeviceDescription)</td>
+                @{foreach(var details in summary.PerformanceDetails){
+                    if(details.TotalImages<30){
+                        <td nowrap="nowrap" style="background-color: #ff0000;">@(details.TotalImages)</td>
+                    } else {
+                        if(details.TotalImages<45){
+                            <td nowrap="nowrap" style="background-color: #ffcc00;">@(details.TotalImages)</td>
+                        } else {
+                            <td nowrap="nowrap">@(details.TotalImages)</td>
+                        }
+                    }                    
+                }}
+            </tr>
+            <tr>
+                <td nowrap="nowrap"></td>
+                <td nowrap="nowrap"></td>
+                @{foreach(var details in summary.PerformanceDetails){
+
+                    @if(details.FirstImage!=null){
+                        <td>
+                            <a href="ImageView/@(summary.DeviceId)/1/@(details.FirstImage.Timestamp.ToUniversalTime().ToString("o"))"><img src="@(details.FirstImage.BlobUri + Model.SasToken)" width=100 height=60></img></a>
+                        </td>
+                    } else {
+                        <td></td>
+                    }
+                }}
+            </tr>
+            }}
+            @* <tr>
+                <td nowrap="nowrap"></td>
+                <td nowrap="nowrap">Images</td>
+            </tr> *@
+            @* <thead>
+                <th nowrap="nowrap"></th>
+                <th nowrap="nowrap">Images</th>
+
+                @{foreach(var date in Model.DateRange){
+                    <th nowrap="nowrap"><script type="text/javascript">document.write(localizeDateTimeToHourAndAmPm('@(date.ToString("s"))'));</script></th>
+                }}
+            </thead> *@
+            @* @{foreach(var summary in Model.PerformanceSummaries){
+            <tr>
+                <td nowrap="nowrap"><a href="/TelemetryGraph/@(summary.DeviceId)/@(Model.NumberOfHoursToDisplay)">@(summary.DeviceName)</a></td>
+                <td nowrap="nowrap">@(summary.DeviceDescription)</td>
+                @{foreach(var details in summary.PerformanceDetails){
+
+                    @if(details.FirstImage!=null){
+                        <td>
+                            <a href="ImageView/@(summary.DeviceId)/1/@(details.FirstImage.Timestamp.ToUniversalTime().ToString("o"))"><img src="@(details.FirstImage.BlobUri + Model.SasToken)" width=100 height=60></img></a>
+                        </td>
+                    } else {
+                        <td></td>
+                    }
+                }}
+            </tr>
+            }} *@
         </tbody>
     </table>
 </div>
@@ -267,7 +339,7 @@
     
     var rows = document.getElementById('devicePerformance').getElementsByTagName('tr');
 
-    // Header rows
+    @* // Header rows
     for (var i = 0; i < 2; i++) {
 
         // check daytimeColumns and for all columns that are 'Night', remove cell
@@ -295,6 +367,29 @@
         for (var j = 2; j < cells.length; j++) {
             if(daytimeColumns[j]=='Night'){
                 cells[j].style.display = 'none';
+            }
+        }
+    } *@
+
+    for (var i = 0; i < rows.length; i++) {
+
+        var cells = rows[i].getElementsByTagName('th');
+        for (var j = 2; j < cells.length; j++) {
+            // Also clear out cells that show same day as previous
+            var dateString = cells[j].innerText;
+            if(previousDateString==dateString){
+                cells[j].innerText='';
+            } else {
+                previousDateString=dateString;
+            }
+        }
+
+        // check daytimeColumns and for all columns that are 'Night', remove cell highlighting
+        var cells = rows[i].getElementsByTagName('td');
+        for (var j = 2; j < cells.length; j++) {
+            if(daytimeColumns[j]=='Night'){
+                @* cells[j].style.display = 'none'; *@
+                cells[j].style.backgroundColor= '#ffffff';
             }
         }
     }

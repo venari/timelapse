@@ -41,6 +41,7 @@ public class DeviceTrendsModel : PageModel
 
     public class PerformanceDetail{
         public DateTime Timestamp {get; set;}
+        public Image FirstImage {get; set;}
         public int TotalImages {get; set;}
         public int MaxPendingImages {get; set;}
     }
@@ -91,7 +92,7 @@ public class DeviceTrendsModel : PageModel
                     // .GroupBy(i => new {DateUTC = i.Timestamp.Date, HourUTC = i.Timestamp.Hour})
                     // .Select(g => new PerformanceDetail{Timestamp = g.Key.DateUTC.AddHours(g.Key.HourUTC), TotalImages = g.Count()})
                     .GroupBy(i => i.Timestamp.RoundDownToNearestHour())
-                    .Select(g => new PerformanceDetail{Timestamp = g.Key, TotalImages = g.Count()})
+                    .Select(g => new PerformanceDetail{Timestamp = g.Key, TotalImages = g.Count(), FirstImage = g.OrderBy(i => i.Timestamp).FirstOrDefault()})
                     .ToList()
             };
 
