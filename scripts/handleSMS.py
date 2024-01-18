@@ -1,50 +1,25 @@
 import json
 import logging
-from logging.handlers import TimedRotatingFileHandler
+# from logging.handlers import TimedRotatingFileHandler
+from logging.handlers import SocketHandler
 import socket
 from SIM7600X import turnOnNDIS, sendSMS, receiveSMS, deleteAllSMS, powerUpSIM7600X
 import time
 import pijuice
 import os
 
+from helpers import internet
+
 config = json.load(open('config.json'))
 logFilePath = config["logFilePath"]
 
 formatter = logging.Formatter('%(asctime)s %(name)s %(levelname)s %(message)s')
-handler = TimedRotatingFileHandler(logFilePath, when='midnight', backupCount=10)
+# handler = TimedRotatingFileHandler(logFilePath, when='midnight', backupCount=10)
+handler = SocketHandler('localhost', 8000)
 handler.setFormatter(formatter)
 logger = logging.getLogger("handleSMS")
 logger.addHandler(handler)
 logger.setLevel(logging.DEBUG)
-
-
-
-
-
-
-# https://stackoverflow.com/questions/3764291/how-can-i-see-if-theres-an-available-and-active-network-connection-in-python
-def internet(host="8.8.8.8", port=53, timeout=config['upload.telemetry.timeout']):
-    """
-    Host: 8.8.8.8 (google-public-dns-a.google.com)
-    OpenPort: 53/tcp
-    Service: domain (DNS/TCP)
-    """
-    try:
-        socket.setdefaulttimeout(timeout)
-        socket.socket(socket.AF_INET, socket.SOCK_STREAM).connect((host, port))
-        return True
-    except socket.error as ex:
-        logger.warning(ex)
-        return False
-
-
-
-
-
-
-
-
-
 
 
 #try:
