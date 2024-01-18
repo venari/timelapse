@@ -15,7 +15,7 @@ logFilePath = config["logFilePath"]
 logger = logging.getLogger('loggingSocketServer')
 handler = logging.handlers.TimedRotatingFileHandler(logFilePath,
                                                     when='midnight',
-                                                    backupCount=10)
+                                                    backupCount=30)
 
 formatter = logging.Formatter('%(asctime)s %(name)s %(levelname)s %(message)s')
 handler.setFormatter(formatter)
