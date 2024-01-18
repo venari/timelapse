@@ -178,6 +178,9 @@ def scheduleShutdown():
 
                 setAlarm = True
 
+                # Switch off watchdog
+                SetWatchdog(0, False)
+
         else:
 
             if config['sleep_during_night'] == True and (datetime.datetime.now().hour >= config['daytime_ends_at_h'] or datetime.datetime.now().hour < config['daytime_starts_at_h']) and config['supportMode'] == False and bCharging == False:
@@ -196,6 +199,9 @@ def scheduleShutdown():
                 }
 
                 setAlarm = True
+
+                # Set Watchdog to 1 hour
+                SetWatchdog(3600, False)
 
             else:
 
@@ -334,6 +340,7 @@ def scheduleShutdown():
             logger.debug('rtcAlarm.GetTime(): ' + str(pj.rtcAlarm.GetTime()))
             loggerIntent.debug('rtcAlarm.GetControlStatus(): ' + str(pj.rtcAlarm.GetControlStatus()))
             loggerIntent.debug('rtcAlarm.GetTime(): ' + str(pj.rtcAlarm.GetTime()))
+            loggerIntent.debug('power.GetWatchdog(): ' + str(pj.power.GetWatchdog()))
 
             if triggerRestart:
                 logger.info('Restart scheduled for ' + str(minsToWakeAfter) + ' minutes from now')
@@ -349,72 +356,99 @@ def scheduleShutdown():
             logger.info('Shutting down now...')
             loggerIntent.info('Shutting down now...')
             subprocess.call(['sudo', 'shutdown', '-h', 'now'])
-        else:
-            # logger.debug('skipping shutdown scheduling because of config.json')
-            # # Ensure Wake up alarm is *not* enabled - or it will cause pi to reboot
-            # status = pj.rtcAlarm.SetWakeupEnabled(False)
+        # else:
+        #     # logger.debug('skipping shutdown scheduling because of config.json')
+        #     # # Ensure Wake up alarm is *not* enabled - or it will cause pi to reboot
+        #     # status = pj.rtcAlarm.SetWakeupEnabled(False)
 
-            SetSafetyWakeup()
+        #     SetSafetyWakeup()
 
     except Exception as e:
         logger.error("scheduleShutdown() failed.")
         logger.error(e)
 
-def SetSafetyWakeup():
-                
+def SetWatchdog(timeout = 10, non_volatile = True):
     try:
-            minsToWakeAfter = 10
+        if(pj.power.GetWatchdog()['data'] == timeout and pj.power.GetWatchdog()['non_volatile'] == non_volatile):
+            return
+        
+        logger.debug('Setting Watchdog...')
+        loggerIntent.debug('Setting Watchdog...')
 
-            logger.debug('skipping shutdown - scheduling safety wakeup in ' + str(minsToWakeAfter) + ' minutes incase we crash...')
-            # Set wake up for near period in future in case we crash.
+        watchdogSet = False
+        while watchdogSet == False:
+            status = pj.power.SetWatchdog(timeout, non_volatile)
 
-            minToWakeAt = datetime.datetime.now().minute + minsToWakeAfter
-            if minToWakeAt >= 60:
-                minToWakeAt = minToWakeAt - 60
-
-            alarmObj = {
-                    'year': 'EVERY_YEAR',
-                    'month': 'EVERY_MONTH',
-                    'day': 'EVERY_DAY',
-                    'hour': 'EVERY_HOUR',
-                    # 'minute_period': DELTA_MIN,
-                    'minute': minToWakeAt,
-                    'second': 0,
-            }
-
-            alarmSet = False
-            while alarmSet == False:
-                status = pj.rtcAlarm.SetAlarm(alarmObj)
-
-                if status['error'] != 'NO_ERROR':
-                    logger.error('Cannot set alarm\n')
-                    # sys.exit()
-                    alarmSet = False
-                    logger.info('Sleeping and retrying...\n')
-                    time.sleep(10)
-                else:
-                    logger.debug('Safety Alarm set for ' + str(pj.rtcAlarm.GetAlarm()))
-                    alarmSet = True
-
-            # Ensure Wake up alarm is actually enabled!
-            wakeUpEnabled = False
-            while wakeUpEnabled == False:
-
-                status = pj.rtcAlarm.SetWakeupEnabled(True)
-
-                if status['error'] != 'NO_ERROR':
-                    logger.error('Cannot enable wakeup\n')
-                    # sys.exit()
-                    wakeUpEnabled = False
-                    logger.info('Sleeping and retrying for wakeup...\n')
-                    time.sleep(10)
-                else:
-                    logger.debug('Safety Wakeup enabled')
-                    wakeUpEnabled = True
+            if status['error'] != 'NO_ERROR':
+                logger.error('Cannot set watchdog\n')
+                watchdogSet = False
+                logger.info('Sleeping and retrying...\n')
+                time.sleep(10)
+            else:
+                logger.debug('Watchdog set for ' + str(pj.power.GetWatchdog()))
+                loggerIntent.debug('Watchdog set for ' + str(pj.power.GetWatchdog()))
+                watchdogSet = True
 
     except Exception as e:
-        logger.error("SetSafetyWakeup() failed.")
+        logger.error("SetWatchdog() failed.")
         logger.error(e)
+
+
+# def SetSafetyWakeup():
+                
+#     try:
+#             minsToWakeAfter = 10
+
+#             logger.debug('skipping shutdown - scheduling safety wakeup in ' + str(minsToWakeAfter) + ' minutes incase we crash...')
+#             # Set wake up for near period in future in case we crash.
+
+#             minToWakeAt = datetime.datetime.now().minute + minsToWakeAfter
+#             if minToWakeAt >= 60:
+#                 minToWakeAt = minToWakeAt - 60
+
+#             alarmObj = {
+#                     'year': 'EVERY_YEAR',
+#                     'month': 'EVERY_MONTH',
+#                     'day': 'EVERY_DAY',
+#                     'hour': 'EVERY_HOUR',
+#                     # 'minute_period': DELTA_MIN,
+#                     'minute': minToWakeAt,
+#                     'second': 0,
+#             }
+
+#             alarmSet = False
+#             while alarmSet == False:
+#                 status = pj.rtcAlarm.SetAlarm(alarmObj)
+
+#                 if status['error'] != 'NO_ERROR':
+#                     logger.error('Cannot set alarm\n')
+#                     # sys.exit()
+#                     alarmSet = False
+#                     logger.info('Sleeping and retrying...\n')
+#                     time.sleep(10)
+#                 else:
+#                     logger.debug('Safety Alarm set for ' + str(pj.rtcAlarm.GetAlarm()))
+#                     alarmSet = True
+
+#             # Ensure Wake up alarm is actually enabled!
+#             wakeUpEnabled = False
+#             while wakeUpEnabled == False:
+
+#                 status = pj.rtcAlarm.SetWakeupEnabled(True)
+
+#                 if status['error'] != 'NO_ERROR':
+#                     logger.error('Cannot enable wakeup\n')
+#                     # sys.exit()
+#                     wakeUpEnabled = False
+#                     logger.info('Sleeping and retrying for wakeup...\n')
+#                     time.sleep(10)
+#                 else:
+#                     logger.debug('Safety Wakeup enabled')
+#                     wakeUpEnabled = True
+
+#     except Exception as e:
+#         logger.error("SetSafetyWakeup() failed.")
+#         logger.error(e)
 
 
 
@@ -471,7 +505,8 @@ try:
     logger.info('In saveTelemetry.py')
 
     # Set safety wakeup right up front incase modem causes us to fall over.
-    SetSafetyWakeup()
+    # SetSafetyWakeup()
+    SetWatchdog()
 
     # if config['shutdown']:
     #     logger.info('Setting failsafe power off for 2 minutes 30 seconds from now.')
