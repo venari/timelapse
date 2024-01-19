@@ -179,7 +179,7 @@ def scheduleShutdown():
                 setAlarm = True
 
                 # Switch off watchdog
-                SetWatchdog(0, False)
+                SetWatchdog(0)
 
         else:
 
@@ -201,7 +201,7 @@ def scheduleShutdown():
                 setAlarm = True
 
                 # Set Watchdog to 1 hour
-                SetWatchdog(3600, False)
+                SetWatchdog(3600)
 
             else:
 
@@ -367,7 +367,7 @@ def scheduleShutdown():
         logger.error("scheduleShutdown() failed.")
         logger.error(e)
 
-def SetWatchdog(timeout = 10, non_volatile = True):
+def SetWatchdog(timeout = 10, non_volatile = False):
     try:
         if(pj.power.GetWatchdog()['data'] == timeout and pj.power.GetWatchdog()['non_volatile'] == non_volatile):
             return
