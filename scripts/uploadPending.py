@@ -197,7 +197,7 @@ def connectToInternet(retries = 3):
             logger.info('Already connected to internet.')
             return
 
-        loggerIntent.info('Connecting to internet...')
+        # loggerIntent.info('Connecting to internet...')
 
         if(config['modem.type']=="thumb"):
             turnOnSystemPowerSwitch()
@@ -237,7 +237,7 @@ def connectToInternet(retries = 3):
 def disconnectFromInternet():
     try:
         logger.info('Disconnecting from internet...')
-        loggerIntent.info('Disconnecting from internet...')
+        # loggerIntent.info('Disconnecting from internet...')
         if(config['modem.type']=="thumb"):
             logger.info('Current System Power Switch:')
             logger.info(pj.power.GetSystemPowerSwitch())
