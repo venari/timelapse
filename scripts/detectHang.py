@@ -31,8 +31,8 @@ loggerIntent = logging.getLogger("intent")
 loggerIntent.addHandler(handlerIntent)
 loggerIntent.setLevel(logging.DEBUG)
 
-logger.info("Starting up detectHang.py...")
-loggerIntent.info("Starting up detectHang.py...")
+# logger.info("Starting up detectHang.py...")
+# loggerIntent.info("Starting up detectHang.py...")
 os.chmod(logFilePath, 0o777) # Make sure pijuice user script can write to log file.
 
 outputImageFolder = '../output/images/'
@@ -125,7 +125,7 @@ def detectHang():
 # Called by Cron every 15 minutes.
 
 try:
-    logger.info('In detectHang.py')
+    # logger.info('In detectHang.py')
 
     detectHang()
 except Exception as e:
