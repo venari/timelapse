@@ -79,6 +79,7 @@ echo Installing crontab entries...
 
 (crontab -l 2>/dev/null; echo "* * * * * /usr/bin/bash /home/pi/dev/timelapse/scripts/updateStatus.sh")| crontab -
 (crontab -l 2>/dev/null; echo "*/5 * * * * /usr/bin/bash /home/pi/dev/timelapse/scripts/handleSMS.sh")| crontab -
+(crontab -l 2>/dev/null; echo "*/15 * * * * /usr/bin/bash /home/pi/dev/timelapse/scripts/detectHang.sh")| crontab -
 
 echo Overwriting pijuice config...
 sudo mv /var/lib/pijuice/pijuice_config.JSON /var/lib/pijuice/pijuice_config.JSON.bak
