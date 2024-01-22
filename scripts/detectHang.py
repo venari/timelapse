@@ -21,7 +21,7 @@ formatter = logging.Formatter('%(asctime)s %(name)s %(levelname)s %(message)s')
 #                                    backupCount=10)
 handler = SocketHandler('localhost', 8000)
 handler.setFormatter(formatter)
-logger = logging.getLogger("saveTelemetry")
+logger = logging.getLogger("detectHang")
 logger.addHandler(handler)
 logger.setLevel(logging.DEBUG)
 
@@ -31,8 +31,8 @@ loggerIntent = logging.getLogger("intent")
 loggerIntent.addHandler(handlerIntent)
 loggerIntent.setLevel(logging.DEBUG)
 
-logger.info("Starting up saveTelemetry.py...")
-loggerIntent.info("Starting up saveTelemetry.py...")
+logger.info("Starting up detectHang.py...")
+loggerIntent.info("Starting up detectHang.py...")
 os.chmod(logFilePath, 0o777) # Make sure pijuice user script can write to log file.
 
 outputImageFolder = '../output/images/'
