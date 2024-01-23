@@ -1,5 +1,6 @@
 import subprocess
 import json
+import pijuice
 import os
 import time
 import datetime
@@ -43,6 +44,10 @@ uploadedImageFolder = outputImageFolder + 'uploaded/'
 outputTelemetryFolder = '../output/telemetry/'
 pendingTelemetryFolder = outputTelemetryFolder + 'pending/'
 uploadedTelemetryFolder = outputTelemetryFolder + 'uploaded/'
+
+# pijuice
+time.sleep(10)
+pj = pijuice.PiJuice(1, 0x14)
 
 def detectHang():
     try:
