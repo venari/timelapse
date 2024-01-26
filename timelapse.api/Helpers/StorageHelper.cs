@@ -86,8 +86,8 @@ namespace timelapse.api.Helpers
 
                 Uri sasUri;
                 if(!_memoryCache.TryGetValue("SasUri", out sasUri)){
-                    sasUri = blobContainerClient.GenerateSasUri(Azure.Storage.Sas.BlobContainerSasPermissions.Read, DateTimeOffset.UtcNow.AddHours(1));
-                    _memoryCache.Set("SasUri", sasUri, TimeSpan.FromHours(1));
+                    sasUri = blobContainerClient.GenerateSasUri(Azure.Storage.Sas.BlobContainerSasPermissions.Read, DateTimeOffset.UtcNow.AddHours(48));
+                    _memoryCache.Set("SasUri", sasUri, TimeSpan.FromHours(48));
                 } 
 
                 return sasUri;
