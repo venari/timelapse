@@ -25,6 +25,7 @@
             <a href="/ImageView/@(Model.device.Id)/24@(HttpContext.Request.QueryString)" type="button" class="btn btn-secondary">Last 24 hours</a>
             <a href="/ImageView/@(Model.device.Id)/48@(HttpContext.Request.QueryString)" type="button" class="btn btn-secondary">Last 48 hours</a>
             <a href="/ImageView/@(Model.device.Id)/168@(HttpContext.Request.QueryString)" type="button" class="btn btn-secondary">Last week</a>
+            <a href="/ImageHistory/@(Model.device.Id)/168@(HttpContext.Request.QueryString)" type="button" class="btn btn-secondary">History</a>
             <button class="btn btn-secondary" onclick="navToCreateEvent()">Create Event</button>
         }
     </div>
