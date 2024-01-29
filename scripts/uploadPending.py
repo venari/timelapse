@@ -46,7 +46,7 @@ logger.info("")
 logger.info("Starting up uploadPending.py...")
 logger.info("")
 logger.info("******************************************************************************")
-os.chmod(logFilePath, 0o777) # Make sure pijuice user script can write to log file.
+# os.chmod(logFilePath, 0o777) # Make sure pijuice user script can write to log file.
 
 loggerIntent.info("Starting up uploadPending.py...")
 

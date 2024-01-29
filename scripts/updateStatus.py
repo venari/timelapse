@@ -45,7 +45,7 @@ logger.addHandler(handler)
 logger.setLevel(logging.DEBUG)
 
 logger.info("Starting up updateStatus.py...")
-os.chmod(logFilePath, 0o777) # Make sure pijuice user script can write to log file.
+# os.chmod(logFilePath, 0o777) # Make sure pijuice user script can write to log file.
 
 pj = pijuice.PiJuice(1, 0x14)
 

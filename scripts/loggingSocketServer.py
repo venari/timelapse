@@ -7,10 +7,12 @@ import struct
 import socket
 import json
 import threading
+import os
 
 # this logic taken from saveTelemetry.py
 config = json.load(open('config.json'))
 logFilePath = config["logFilePath"]
+os.makedirs(os.path.dirname(logFilePath), exist_ok=True)
 
 logger = logging.getLogger('loggingSocketServer')
 handler = logging.handlers.TimedRotatingFileHandler(logFilePath,
@@ -23,6 +25,9 @@ handler.setFormatter(formatter)
 logger.addHandler(handler)
 
 logger.setLevel(logging.DEBUG)
+
+logger.debug('Starting up loggingSocketServer.py...')
+os.chmod(logFilePath, 0o777) # Make sure pijuice user script can write to log file.
 
 
 
