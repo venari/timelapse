@@ -46,7 +46,7 @@ logger.info("")
 logger.info("Starting up uploadPending.py...")
 logger.info("")
 logger.info("******************************************************************************")
-os.chmod(logFilePath, 0o777) # Make sure pijuice user script can write to log file.
+# os.chmod(logFilePath, 0o777) # Make sure pijuice user script can write to log file.
 
 loggerIntent.info("Starting up uploadPending.py...")
 
@@ -339,16 +339,19 @@ def uploadPendingTelemetry():
 
                 if json.loads(response.text)['device']['supportMode'] != config['supportMode']:
                     logger.info('Support mode changed to ' + str(json.loads(response.text)['device']['supportMode']))
+                    loggerIntent.info('Support mode changed to ' + str(json.loads(response.text)['device']['supportMode']))
                     config['supportMode'] = json.loads(response.text)['device']['supportMode']
                     json.dump(config, open('config.json', 'w'), indent=4)
 
                 if json.loads(response.text)['device']['monitoringMode'] != config['monitoringMode']:
                     logger.info('Monitoring mode changed to ' + str(json.loads(response.text)['device']['monitoringMode']))
+                    loggerIntent.info('Monitoring mode changed to ' + str(json.loads(response.text)['device']['monitoringMode']))
                     config['monitoringMode'] = json.loads(response.text)['device']['monitoringMode']
                     json.dump(config, open('config.json', 'w'), indent=4)
 
                 if json.loads(response.text)['device']['hibernateMode'] != config['hibernateMode']:
                     logger.info('Hibernate mode changed to ' + str(json.loads(response.text)['device']['hibernateMode']))
+                    loggerIntent.info('Hibernate mode changed to ' + str(json.loads(response.text)['device']['hibernateMode']))
                     config['hibernateMode'] = json.loads(response.text)['device']['hibernateMode']
                     json.dump(config, open('config.json', 'w'), indent=4)
 

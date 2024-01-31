@@ -11,6 +11,7 @@ if [ ! -d "/home/pi/dev/timelapse" ]; then
     git checkout deployment/sedicam_v2
 else
     cd dev/timelapse
+    git fetch
     # git checkout development
     git checkout deployment/sedicam_v2
     git pull

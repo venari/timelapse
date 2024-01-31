@@ -34,7 +34,7 @@ loggerIntent.setLevel(logging.DEBUG)
 
 # logger.info("Starting up detectHang.py...")
 # loggerIntent.info("Starting up detectHang.py...")
-os.chmod(logFilePath, 0o777) # Make sure pijuice user script can write to log file.
+# os.chmod(logFilePath, 0o777) # Make sure pijuice user script can write to log file.
 
 outputImageFolder = '../output/images/'
 workingImageFolder = outputImageFolder + 'working/'

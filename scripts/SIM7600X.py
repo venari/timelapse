@@ -33,7 +33,7 @@ logger.addHandler(handler)
 logger.setLevel(logging.DEBUG)
 
 # logger.info("Starting up SIM7600X.py...")
-os.chmod(logFilePath, 0o777) # Make sure pijuice user script can write to log file.
+# os.chmod(logFilePath, 0o777) # Make sure pijuice user script can write to log file.
 
 
 def powerUpSIM7600X():
