@@ -33,7 +33,7 @@ def handle(conn: socket.socket):
     # according to whatever policy is configured locally.
     # """
     # ^ not what we're doing now
-    # logger.debug('handling connection') # excessive now that we're disconnecting after each log record is sent
+    logger.debug('handling connection')
     try:
         while 1:
             chunk = conn.recv(4)
@@ -50,14 +50,6 @@ def handle(conn: socket.socket):
             obj = unPickle(chunk)
             record = logging.makeLogRecord(obj)
             handleLogRecord(record)
-            # logger.debug('end connection (no error)') # excessive now that we're disconnectting after each log record is sent
-            conn.settimeout(1.00) # if connection goes more than 1 second without log record, throw a timeout error and wait for the next connection
-
-    except socket.timeout:
-        pass
-        # socket.timeout is intentionally caused by the connection timeout
-        # if the socket times out, we want to move on to the next connection
-        # and because it happens a lot we don't want to clutter the logs
             
     except Exception as e:
         logger.exception(e)
@@ -78,6 +70,8 @@ def handleLogRecord(record: logging.LogRecord):
     # is normally called AFTER logger-level filtering. If you want
     # to do filtering, do it at the client end to save wasting
     # cycles and network bandwidth!
+    
+    # below code prints name of originating file in the logs (all that we need it to do)
     logger.handle(record)
 
 
@@ -87,13 +81,12 @@ def serve_until_stopped():
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     s.bind(('localhost', 8000))
-    s.listen(10) # 10 is arbitrary
+    s.listen(10) # 10 is arbitrary, increase it if there will be more than 10 sockets connecting to the logger at once
     logger.debug('listening on port 8000')
     while 1:
         try:
             conn, addr = s.accept()
-            conn.settimeout
-            handle(conn)
+            threading.Thread(target=handle, args=[conn], daemon=True).start() # daemon so that keyboard interrupt stops all threads
             
         except Exception as e:
             logger.exception(e)
