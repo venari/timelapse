@@ -499,6 +499,19 @@ sudo tailscale up
 ```
 
 
+# To access modem/SMS messages
+
+Use SSH to establish a dynamic port forwarding session to the pi.
+
+```
+ssh -D 8080 pi@<device name>
+```
+
+Use FoxyProxy to route local traffic on port 8080 through the SSH tunnel.
+
+![Alt text](images/FoxyProxySettings.png)
+
+Then browse to the modem's IP address (e.g. http://192.168.1.1)
 
 
 # Credits
