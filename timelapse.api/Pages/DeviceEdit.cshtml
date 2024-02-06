@@ -182,6 +182,10 @@
         var lat = document.getElementById("Latitude").value;
         var lon = document.getElementById("Longitude").value;
 
+        if(lat=="" || lon==""){
+            return;
+        }
+
         console.log("You updated the Latitude to: " + lat + " and Longitude to: " + lon);
 
         // Clear any old markers
