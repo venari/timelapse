@@ -123,11 +123,11 @@
     var map = L.map('map');
 
     var aerial = L.tileLayer('@(Model.BasemapURL)', {
-        maxZoom: 19
+        maxZoom: 21
     });//.addTo(map);
 
     var osm = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        maxZoom: 19,
+        maxZoom: 21,
         attribution: '© OpenStreetMap'
     }).addTo(map);
 
@@ -215,21 +215,11 @@
             lat = parseFloat(lat);
             lon = parseFloat(lon);            
 
-            @* var angles = [-45, 0, -45]; *@
-            @* var angles = [-45, 0, -45]; *@
-            @* var angles = [45, 180, 315];
-            angles = [0, 120, 240];
-            angles = [0, 150, 210];
-            angles = [315, 45];
-            angles = [315, 45]; *@
-
             var wide = false;
             var fov = 75;
 
             if(wide){
                 fov = 120;
-                @* angles = [-60, 0, 60];
-                angles = [300, 60]; *@
             }
 
             var angles = [-(fov/2), fov/2];
@@ -238,9 +228,6 @@
 
             // Calculate the coordinates of the three vertices of the triangle
             var vertices = angles.map(angle => {
-            @* var vertices = [-60, 60, 180].map(angle => { *@
-            @* var vertices = [-30, 0, 30].map(angle => { *@
-            @* var vertices = [0, 120, 240].map(angle => { *@
                 // Convert angle to radians and add to heading
                 var rad = (angle + heading) * Math.PI / 180;
 
@@ -273,18 +260,6 @@
         map.panTo([lat, lon]);
     }
 </script>
-
-@* @if(Model.Latitude!=null && Model.Longitude!=null){
-    <script>
-        map.setView([@(Model.Latitude), @(Model.Longitude)], 15);
-    </script>
-} else {
-    <script>
-        map.setView([-41.288889, 174.777222], 5);
-    </script>
-} *@
-
-
 
 @section Scripts {
     @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}

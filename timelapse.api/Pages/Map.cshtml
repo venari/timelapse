@@ -1,0 +1,185 @@
+﻿@page
+@using Humanizer
+@model MapModel
+@{
+    ViewData["Title"] = "Map";
+}
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+
+<script src="https://unpkg.com/leaflet@1.9.2/dist/leaflet.js"
+    integrity="sha256-o9N1jGDZrf5tS+Ft4gbIK7mYMipq9lqpVJ91xHSyKhg="
+    crossorigin=""></script>
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.2/leaflet.css"
+
+@* <script>
+    const latest24HoursTelemetryUri = 'api/Telemetry/GetLatest24HoursTelemetry'
+
+    function getTelemetry(deviceId, chart) {
+        fetch(latest24HoursTelemetryUri + '?deviceId=' + deviceId)
+            .then(response => response.json())
+            .then(data => showTelemetry(chart, data))
+            .catch(error => console.error('Unable to get telemetry.', error));
+    }
+
+    function showTelemetry(chart, data){
+        console.log("showTelemtery");
+        console.log(data)
+        chart.config.data.datasets[0].data = data.map(d => ({x: new Date(d.timestamp), y: d.batteryPercent}));
+        chart.config.data.datasets[1].data = data.map(d => ({x: new Date(d.timestamp), y: d.temperatureC}));
+        chart.config.data.datasets[2].data = data.map(d => ({x: new Date(d.timestamp), y: d.diskSpaceFree}));        
+        chart.update();
+    }
+</script> *@
+
+<div>
+    <div id="map"></div>
+</div>
+
+<script>
+    var map = L.map('map');
+
+    var aerial = L.tileLayer('@(Model.BasemapURL)', {
+        maxZoom: 21
+    });//.addTo(map);
+
+    var osm = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 21,
+        attribution: '© OpenStreetMap'
+    }).addTo(map);
+
+    var baseMaps = {
+        "OpenStreetMap": osm,
+        "Aerial": aerial
+    };
+
+    var layerControl = L.control.layers(baseMaps).addTo(map);
+    var marker = null;
+    @* var bounds = null; *@
+    var bounds = L.latLngBounds()
+
+    // add each device to map
+    @foreach (var device in Model.devices)
+    {
+        var location = device.CurrentLocation;
+        string imageURL = "";
+        var imageAgeMinutes = 0.0;
+        @* var orangeMarker = false;
+        var redMarker = false; *@
+        var markerColour = "blue";
+
+        string imageAnchorHTML = "";
+        if(device.LatestImageTimestamp!=null){
+            imageURL = device.LatestImage.BlobUri + Model.SasToken;
+
+            imageAgeMinutes = (DateTime.UtcNow - device.LatestImage.Timestamp).TotalMinutes;
+        } else {
+            markerColour = "red";
+            imageURL = "/images/bg-404.jpg";
+        }
+
+        imageAnchorHTML = $"<a href='ImageView/{device.Id}'><img src='{imageURL}' width=200 height=120></img></a>";
+
+        if(imageAgeMinutes > 24*60*60){
+            markerColour = "red";
+            imageAnchorHTML += $"<span class='badge bg-danger'>No image for {(DateTime.UtcNow - device.LatestImage.Timestamp).Humanize()}!</span>";
+        } else {
+            if(imageAgeMinutes > 60) {
+                markerColour = "orange";
+                imageAnchorHTML += $"<span class='badge bg-warning text-dark'>{(DateTime.UtcNow - device.LatestImage.Timestamp).Humanize()} old</span>";
+            }
+        }
+
+        if(location != null) {
+            <text>
+                marker = L.marker([@(location.Latitude), @(location.Longitude)]).addTo(map);
+                @* marker.bindPopup("@device.Name"); *@
+                marker.bindPopup("@Html.Raw(imageAnchorHTML)");
+
+                bounds.extend([@(location.Latitude), @(location.Longitude)]);
+
+                // Make marker orange if data older than 1 hour
+
+                if("@(markerColour)" == "red") {
+                    marker.setIcon(L.icon({
+                        iconUrl: 'https://cdn.rawgit.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
+                        shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.3.1/images/marker-shadow.png',
+                        iconSize: [25, 41],
+                        iconAnchor: [12, 41],
+                        popupAnchor: [1, -34],
+                        shadowSize: [41, 41]
+                    }));
+                } else {
+                    if("@(markerColour)" == "orange")
+                    {
+                        marker.setIcon(L.icon({
+                            iconUrl: 'https://cdn.rawgit.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-orange.png',
+                            shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.3.1/images/marker-shadow.png',
+                            iconSize: [25, 41],
+                            iconAnchor: [12, 41],
+                            popupAnchor: [1, -34],
+                            shadowSize: [41, 41]
+                        }));
+                    }
+                }
+
+                var heading = "@(location.Heading)";
+                if(heading!=""){
+
+                    // Convert heading to radians
+
+                    heading = parseFloat(heading);
+                    var headingRad = heading * Math.PI / 180;
+
+                    // Define the radius of the circle that would circumscribe the triangle
+                    var radius = 0.00001; // This can be any value
+                    lat = parseFloat(@(location.Latitude));
+                    lon = parseFloat(@(location.Longitude));            
+
+                    var wide = false;
+                    var fov = 75;
+
+                    if(wide){
+                        fov = 120;
+                    }
+
+                    var angles = [-(fov/2), fov/2];
+
+                    console.log(heading)
+
+                    // Calculate the coordinates of the three vertices of the triangle
+                    var vertices = angles.map(angle => {
+                        // Convert angle to radians and add to heading
+                        var rad = (angle + heading) * Math.PI / 180;
+
+                        // Calculate change in coordinates
+                        var dLat = radius * Math.cos(rad);
+                        var dLon = radius * Math.sin(rad) / Math.cos(lat * Math.PI / 180);
+
+                        // Convert to degrees and add to original coordinates
+                        return [lat + dLat * 180 / Math.PI, lon + dLon * 180 / Math.PI];
+                    });
+
+                    // Finish the triangle at original point
+                    vertices.push([lat, lon])
+
+                    var triangle = L.polygon(vertices).addTo(map);
+
+                    // vertices now contains the coordinates of the three vertices of the triangle
+                    
+                    triangle.setStyle({
+                        color: 'red',
+                        fillColor: 'red',
+                        fillOpacity: 0.5
+                    });
+
+                }
+            </text>
+        }
+    }
+
+    map.fitBounds(bounds);
+
+</script>
