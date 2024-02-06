@@ -105,6 +105,8 @@ namespace timelapse.api.Pages
             device.SupportMode = Device.SupportMode;
             device.MonitoringMode = Device.MonitoringMode;
             device.HibernateMode = Device.HibernateMode;
+            device.Service = Device.Service;
+            device.WideAngle = Device.WideAngle;
             device.Retired = Device.Retired;
 
             if(Latitude.HasValue && Longitude.HasValue){

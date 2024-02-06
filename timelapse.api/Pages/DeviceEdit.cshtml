@@ -55,6 +55,18 @@
                 </label>
             </div>
             <div class="form-check" class="col-md-12">
+                <input asp-for="Device.WideAngle" class="form-check-input" type="checkbox">
+                <label class="form-check-label" asp-for="Device.WideAngle">
+                    WideAngle
+                </label>
+            </div>
+            <div class="form-check" class="col-md-12">
+                <input asp-for="Device.Service" class="form-check-input" type="checkbox">
+                <label class="form-check-label" asp-for="Device.Service">
+                    Service
+                </label>
+            </div>
+            <div class="form-check" class="col-md-12">
                 <input asp-for="Device.Retired" class="form-check-input" type="checkbox">
                 <label class="form-check-label" asp-for="Device.Retired">
                     Retired
@@ -182,10 +194,12 @@
     document.getElementById("Latitude").addEventListener("input", updateMapPin);
     document.getElementById("Longitude").addEventListener("input", updateMapPin);
     document.getElementById("Heading").addEventListener("input", updateMapPin);
+    document.getElementById("Device_WideAngle").addEventListener("input", updateMapPin);
 
     function updateMapPin() {
         var lat = document.getElementById("Latitude").value;
         var lon = document.getElementById("Longitude").value;
+        var wide = document.getElementById("Device_WideAngle").checked;
 
         if(lat=="" || lon==""){
             return;
@@ -220,7 +234,6 @@
             lat = parseFloat(lat);
             lon = parseFloat(lon);            
 
-            var wide = false;
             var fov = 75;
 
             if(wide){

@@ -95,6 +95,10 @@
             }
         }
 
+        if(device.Service){
+            markerColour = "grey";
+        }
+
         if(location != null) {
             <text>
                 marker = L.marker([@(location.Latitude), @(location.Longitude)]).addTo(map);
@@ -125,11 +129,25 @@
                             popupAnchor: [1, -34],
                             shadowSize: [41, 41]
                         }));
+                    } else {
+                        if("@(markerColour)" == "grey")
+                        {
+                            marker.setIcon(L.icon({
+                                iconUrl: 'https://cdn.rawgit.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-grey.png',
+                                shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.3.1/images/marker-shadow.png',
+                                iconSize: [25, 41],
+                                iconAnchor: [12, 41],
+                                popupAnchor: [1, -34],
+                                shadowSize: [41, 41]
+                            }));
+                        }
                     }
                 }
 
                 var heading = "@(location.Heading)";
                 if(heading!=""){
+
+                    var wide = "@(device.WideAngle)"=="True";
 
                     // Convert heading to radians
 
@@ -141,7 +159,6 @@
                     lat = parseFloat(@(location.Latitude));
                     lon = parseFloat(@(location.Longitude));            
 
-                    var wide = false;
                     var fov = 75;
 
                     if(wide){

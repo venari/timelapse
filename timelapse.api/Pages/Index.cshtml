@@ -41,6 +41,7 @@
             <th scope="col">Description</th>
             <th scope="col"><i class="fa fa-cog" data-toggle="tooltip" title="Support Mode"></i></th>
             <th scope="col"><i class="fa fa-eye" data-toggle="tooltip" title="Monitoring Mode"></i></th>
+            <th scope="col"><i class="fa fa-wrench" data-toggle="tooltip" title="Service"></i></th>
             <th scope="col"><i class="fa fa-moon" data-toggle="tooltip" title="Hibernate Mode"></i></th>
             <th scope="col">Telemetry</th>
             <th scope="col" colspan="3">Battery</th>
@@ -72,6 +73,11 @@
                         <td>
                             @if(device.MonitoringMode){
                                 <i class="fa fa-eye" data-toggle="tooltip" title="Monitoring Mode"></i>
+                            }
+                        </td>
+                        <td>
+                            @if(device.Service){
+                                <i class="fa fa-wrench" data-toggle="tooltip" title="Service"></i>
                             }
                         </td>
                         <td>
