@@ -175,10 +175,12 @@ fi
 az webapp config appsettings set --name $AZURE_APP_NAME --resource-group $AZURE_RESOURCE_GROUP --settings STORAGE_CONNECTION_STRING=$STORAGE_CONNECTION_STRING --output none
 az webapp config appsettings set --name $AZURE_APP_NAME --resource-group $AZURE_RESOURCE_GROUP --settings STORAGE_CONTAINER_NAME=$STORAGE_CONTAINER_NAME --output none
 az webapp config appsettings set --name $AZURE_APP_NAME --resource-group $AZURE_RESOURCE_GROUP --settings SendgridAPIKey=$SendgridAPIKey --output none
+az webapp config appsettings set --name $AZURE_APP_NAME --resource-group $AZURE_RESOURCE_GROUP --settings LINZApiKey=$LINZApiKey --output none
 az webapp config appsettings set --name $AZURE_APP_NAME --resource-group $AZURE_RESOURCE_GROUP --settings ThirdParty_ApiKey=$ThirdParty_ApiKey --output none
 dotnet user-secrets --project timelapse.api set "STORAGE_CONNECTION_STRING" $STORAGE_CONNECTION_STRING
 dotnet user-secrets --project timelapse.api set "SendgridAPIKey" "$SendgridAPIKey"
 dotnet user-secrets --project timelapse.api set "ThirdParty_ApiKey" "$ThirdParty_ApiKey"
+dotnet user-secrets --project timelapse.api set "LINZApiKey" "$LINZApiKey"
 # az webapp config appsettings set --name $AZURE_APP_NAME --resource-group $AZURE_RESOURCE_GROUP --settings STORAGE_ACCOUNT_NAME=$STORAGE_ACCOUNT_NAME
 # az webapp config appsettings set --name $AZURE_APP_NAME --resource-group $AZURE_RESOURCE_GROUP --settings STORAGE_CONTAINER_NAME=$STORAGE_CONTAINER_NAME
 # az webapp config appsettings set --name $AZURE_APP_NAME --resource-group $AZURE_RESOURCE_GROUP --settings STORAGE_KEY1=$STORAGE_KEY1

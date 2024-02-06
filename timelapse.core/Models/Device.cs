@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace timelapse.core.models;
 
@@ -109,5 +110,21 @@ public class Device
     
     [System.Text.Json.Serialization.JsonIgnore]
     public List<DeviceProjectContract> DeviceProjectContracts { get; } = new List<DeviceProjectContract>();
+
+    [System.Text.Json.Serialization.JsonIgnore]
+    public List<DeviceLocation> DeviceLocations { get; } = new List<DeviceLocation>();
+
+    [NotMapped]
+    [System.Text.Json.Serialization.JsonIgnore]
+    public DeviceLocation? CurrentLocation {
+        get {
+            var currentLocation = DeviceLocations.OrderByDescending(l => l.Timestamp).FirstOrDefault();
+            return currentLocation;
+        }
+
+        // set {
+        //     DeviceLocations.Add(value);
+        // }
+    }
 }
 
