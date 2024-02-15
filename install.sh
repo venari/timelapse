@@ -57,6 +57,7 @@ if [ $waveshare == "y" ]; then
     # sed -e '$i \sh /home/pi/SIM7600X-4G-HAT-Demo/Raspberry/c/sim7600_4G_hat_init\n' /etc/rc.local
     grep -qxF 'sh /home/pi/SIM7600X-4G-HAT-Demo/Raspberry/c/sim7600_4G_hat_init' /etc/rc.local || sudo sed -i -e '$i \sh /home/pi/SIM7600X-4G-HAT-Demo/Raspberry/c/sim7600_4G_hat_init\n' /etc/rc.local
     ###################
+fi
 
 echo Cloning repo...
 cd /home/pi
