@@ -43,9 +43,15 @@ public class TelemetryGraphModel : PageModel
 
     public IActionResult OnGet(int id, int? numberOfHoursToDisplay = null)
     {
+        _logger.LogInformation("TelemetryGraph.OnGet");
+        System.Diagnostics.Stopwatch stopwatch = new System.Diagnostics.Stopwatch();
+        stopwatch.Start();
+
         if(numberOfHoursToDisplay!=null){
             NumberOfHoursToDisplay = numberOfHoursToDisplay.Value;
         }
+
+        _logger.LogInformation($"About to query latest telemetry.... {stopwatch.ElapsedMilliseconds}ms");
 
         LatestTelemetryDateTime = _appDbContext.Telemetry
             .Where(t => t.DeviceId == id)
@@ -58,12 +64,16 @@ public class TelemetryGraphModel : PageModel
         }
 
         DateTime cutOff = LatestTelemetryDateTime.Value.AddHours(-1 * NumberOfHoursToDisplay);
-        
+
+        _logger.LogInformation($"About to get device info, including telemetry and latest image.... {stopwatch.ElapsedMilliseconds}ms");
+
         var d = _appDbContext.Devices
             .Include(d => d.Telemetries.Where(t => t.Timestamp >= cutOff))
-            .Include(d => d.Images.OrderByDescending(i => i.Timestamp).Take(1))
+            .Include(d => d.Images.Where(i => i.Timestamp >= cutOff).OrderByDescending(i => i.Timestamp).Take(1))
             .AsSplitQuery()
             .FirstOrDefault(d => d.Id == id);
+
+        _logger.LogInformation($"Retrieved get device info. {stopwatch.ElapsedMilliseconds}ms");
 
         if(d==null){
             return RedirectToPage("/NotFound");
@@ -75,10 +85,14 @@ public class TelemetryGraphModel : PageModel
             return RedirectToPage("/NotFound");
         }
 
+        _logger.LogInformation($"About to get latest telemetry data... {stopwatch.ElapsedMilliseconds}ms");
+
         EarliestTelemetryDateTime = d.Telemetries
             .OrderBy(t => t.Timestamp)
             .Select(t => t.Timestamp)
             .FirstOrDefault();
+
+        _logger.LogInformation($"Retrieved latest telemetry data. {stopwatch.ElapsedMilliseconds}ms");
 
         return Page();
 
