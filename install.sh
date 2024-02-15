@@ -57,10 +57,10 @@ if [ $waveshare == "y" ]; then
     ###################
 fi
 
-echo Cloning repo...
 cd /home/pi
 # Check if dev folder exists
 if [ ! -d "/home/pi/dev/timelapse" ]; then
+    echo Cloning repo...
     mkdir -p dev
     cd dev
     git clone https://github.com/venari/timelapse.git
@@ -69,6 +69,7 @@ if [ ! -d "/home/pi/dev/timelapse" ]; then
     # git checkout development
     git checkout deployment/sedicam_v2
 else
+    echo Updating repo...
     cd dev/timelapse
     # git checkout development
     git fetch
