@@ -268,9 +268,21 @@
                 @{foreach(var details in summary.PerformanceDetails){
 
                     @if(details.FirstImage!=null){
-                        <td>
-                            <a href="ImageView/@(summary.DeviceId)/1/@(details.FirstImage.Timestamp.ToUniversalTime().ToString("o"))"><img src="@(details.FirstImage.BlobUri + Model.SasToken)" width=100 height=60></img></a>
-                        </td>
+                        if(details.TotalImages<30){
+                            <td style="background-color: #ff0000;">
+                                <a href="ImageView/@(summary.DeviceId)/1/@(details.FirstImage.Timestamp.ToUniversalTime().ToString("o"))"><img src="@(details.FirstImage.BlobUri + Model.SasToken)" width=100 height=60></img></a>
+                            </td>
+                        } else {
+                            if(details.TotalImages<45){
+                                <td style="background-color: #ffcc00;">
+                                    <a href="ImageView/@(summary.DeviceId)/1/@(details.FirstImage.Timestamp.ToUniversalTime().ToString("o"))"><img src="@(details.FirstImage.BlobUri + Model.SasToken)" width=100 height=60></img></a>
+                                </td>
+                            } else {
+                                <td>
+                                    <a href="ImageView/@(summary.DeviceId)/1/@(details.FirstImage.Timestamp.ToUniversalTime().ToString("o"))"><img src="@(details.FirstImage.BlobUri + Model.SasToken)" width=100 height=60></img></a>
+                                </td>
+                            }
+                        }
                     } else {
                         <td></td>
                     }
