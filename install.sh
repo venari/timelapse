@@ -72,8 +72,10 @@ else
     cd dev/timelapse
     # git checkout development
     git fetch
+    git stash
     git checkout deployment/sedicam_v2
     git pull
+    git stash pop
 fi
 
 # If using thumbdrive, not waveshare modem, update 'modem.type' in dev/timelapse/scripts/config.json to 'thumb'
@@ -112,6 +114,7 @@ fi
 # If not waveshare, we can't access SMS messages
 if [ $waveshare == "y" ]; then
     (crontab -l 2>/dev/null; echo "*/5 * * * * /usr/bin/bash /home/pi/dev/timelapse/scripts/handleSMS.sh")| crontab -
+fi
 
 (crontab -l 2>/dev/null; echo "*/15 * * * * /usr/bin/bash /home/pi/dev/timelapse/scripts/detectHang.sh")| crontab -
 
