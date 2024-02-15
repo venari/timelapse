@@ -81,8 +81,9 @@ fi
 
 # If using thumbdrive, not waveshare modem, update 'modem.type' in dev/timelapse/scripts/config.json to 'thumb'
 if [ $waveshare == "n" ]; then
-    echo "Updating modem.type to thumb"
-    sed -i 's/"modem.type": "waveshare"/"modem.type": "thumb"/g' /home/pi/dev/timelapse/scripts/config.json
+    sed -i 's/"modem.type": "SIM7600X"/"modem.type": "thumb"/g' /home/pi/dev/timelapse/scripts/config.json
+else
+    sed -i 's/"modem.type": "thumb"/"modem.type": "SIM7600X"/g' /home/pi/dev/timelapse/scripts/config.json
 fi
 
 echo Checking RTC module is enabled in config.txt
