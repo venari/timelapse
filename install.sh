@@ -143,9 +143,9 @@ esac
 echo We need to reboot to kick off cron jobs
 echo "Press any key to reboot"
 
-echo ********************************************
-echo "Please check battery profile in pijuice_cli
-echo ********************************************
+echo ===========================================
+echo Please check battery profile in pijuice_cli
+echo ===========================================
 
 read -n 1 -s
 sudo reboot
