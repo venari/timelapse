@@ -10,15 +10,13 @@ echo Upgrading...
 sudo apt-get upgrade -y
 
 echo Installing...
-sudo apt-get install git pijuice-base python3-pip -y
-sudo apt install -y python3-picamera2 --no-install-recommends
-sudo apt-get install vim byobu -y
-sudo apt-get install python3-pil -y
-# sudo pip3 install RPi.GPIO
-sudo apt-get install python3-RPi.GPIO -y
-# pip3 install pyserial
-sudo apt-get install python3-serial -y
-
+sudo apt-get install -y git pijuice-base python3-pip
+sudo apt-get install -y python3-picamera2 --no-install-recommends
+sudo apt-get install -y vim\
+                        byobu\
+                        python3-pil\
+                        python3-RPi.GPIO\
+                        python3-serial\
 
 # If not bookworm - install waveshare-epaper library with pip3
 # sudo pip3 install waveshare-epaper
