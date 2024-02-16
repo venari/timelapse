@@ -13,10 +13,9 @@
     <div class="col">
         <h4>Displaying @(Model.NumberOfHoursToDisplay) hours imagery.</h4>
         @{
-            <a href="/ImageHistory/1" type="button" class="btn btn-secondary">Last hour</a>
-            <a href="/ImageHistory/24" type="button" class="btn btn-secondary">Last 24 hours</a>
-            <a href="/ImageHistory/48" type="button" class="btn btn-secondary">Last 48 hours</a>
-            <a href="/ImageHistory/168" type="button" class="btn btn-secondary">Last week</a>
+            <a href="/ImageHistory/@(Model.DeviceId)/48@(HttpContext.Request.QueryString)" type="button" class="btn btn-secondary">Last 48 hours</a>
+            <a href="/ImageHistory/@(Model.DeviceId)/168@(HttpContext.Request.QueryString)" type="button" class="btn btn-secondary">Last week</a>
+            <a href="/ImageHistory/@(Model.DeviceId)/336@(HttpContext.Request.QueryString)" type="button" class="btn btn-secondary">Last fortnight</a>
         }
     </div>
   </div>

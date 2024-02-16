@@ -68,8 +68,8 @@ public class TelemetryGraphModel : PageModel
         _logger.LogInformation($"About to get device info, including telemetry and latest image.... {stopwatch.ElapsedMilliseconds}ms");
 
         var d = _appDbContext.Devices
-            .Include(d => d.Telemetries.Where(t => t.Timestamp >= cutOff))
-            .Include(d => d.Images.Where(i => i.Timestamp >= cutOff).OrderByDescending(i => i.Timestamp).Take(1))
+            .Include(d => d.Telemetries.Where(t => t.Timestamp >= cutOff && t.DeviceId == id))
+            .Include(d => d.Images.Where(i => i.Timestamp >= cutOff && i.DeviceId == id).OrderByDescending(i => i.Timestamp).Take(1))
             .AsSplitQuery()
             .FirstOrDefault(d => d.Id == id);
 
