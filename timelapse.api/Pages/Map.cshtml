@@ -107,6 +107,15 @@
 
                 bounds.extend([@(location.Latitude), @(location.Longitude)]);
 
+                if("@(device.ShortDescription)"!=""){
+                    marker.bindTooltip("@(device.ShortDescription)", {
+                        permanent: true, 
+                        direction: 'center', 
+                        className: 'leaflet-tooltip-no-border'
+                    });
+                }
+
+
                 // Make marker orange if data older than 1 hour
 
                 if("@(markerColour)" == "red") {

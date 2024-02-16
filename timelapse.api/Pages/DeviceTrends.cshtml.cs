@@ -81,13 +81,14 @@ public class DeviceTrendsModel : PageModel
             .Include(d => d.Images.Where(i => i.Timestamp >= StartDate && i.Timestamp <= EndDate).OrderBy(i => i.Timestamp))
             .Include(d => d.Telemetries.Where(t => t.Timestamp >= StartDate && t.Timestamp <= EndDate).OrderBy(t => t.Timestamp))
             .Where(d => d.Retired == false)
-            .AsSplitQuery();
+            .AsSplitQuery()
+            .OrderBy(d => d.ShortDescription);
 
         foreach(var d in devices){
             var devicePerformanceSummary = new PerformanceSummary{
                 DeviceId = d.Id,
                 DeviceName = d.Name,
-                DeviceDescription = d.Description,
+                DeviceDescription = d.ShortDescription,
                 PerformanceDetails = d.Images
                     // .GroupBy(i => new {DateUTC = i.Timestamp.Date, HourUTC = i.Timestamp.Hour})
                     // .Select(g => new PerformanceDetail{Timestamp = g.Key.DateUTC.AddHours(g.Key.HourUTC), TotalImages = g.Count()})

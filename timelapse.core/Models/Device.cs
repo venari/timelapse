@@ -10,6 +10,7 @@ public class Device
     public string SerialNumber {get; set;}
     [Required]
     public string Name {get; set;}
+    public string ShortDescription {get; set;}
     public string Description {get; set;}
 
     public bool SupportMode {get; set;} = false;
