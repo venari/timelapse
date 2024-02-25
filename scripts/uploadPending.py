@@ -162,6 +162,12 @@ def uploadPendingPhotos():
                     json.dump(config, open('config.json', 'w'), indent=4)
 
                    
+                if json.loads(response.text)['device']['powerOff'] != config['powerOff']:
+                    logger.info('Power Off changed to ' + str(json.loads(response.text)['device']['powerOff']))
+                    loggerIntent.info('Power Off changed to ' + str(json.loads(response.text)['device']['powerOff']))
+                    config['powerOff'] = json.loads(response.text)['device']['powerOff']
+                    json.dump(config, open('config.json', 'w'), indent=4)
+
             except json.decoder.JSONDecodeError:
                 logger.debug(response.text)
 
@@ -356,6 +362,12 @@ def uploadPendingTelemetry():
                     json.dump(config, open('config.json', 'w'), indent=4)
 
                    
+                if json.loads(response.text)['device']['powerOff'] != config['powerOff']:
+                    logger.info('Power Off changed to ' + str(json.loads(response.text)['device']['powerOff']))
+                    loggerIntent.info('Power Off changed to ' + str(json.loads(response.text)['device']['powerOff']))
+                    config['powerOff'] = json.loads(response.text)['device']['powerOff']
+                    json.dump(config, open('config.json', 'w'), indent=4)
+
             except json.decoder.JSONDecodeError:
                 flashLED(pj, 'D2', 255, 0, 255, 1, 1)
                 logger.debug(response.text)
