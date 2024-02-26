@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace timelapse.core.models;
 
@@ -9,12 +10,16 @@ public class Device
     public string SerialNumber {get; set;}
     [Required]
     public string Name {get; set;}
+    public string ShortDescription {get; set;}
     public string Description {get; set;}
 
     public bool SupportMode {get; set;} = false;
     public bool MonitoringMode {get; set;} = false;
     public bool Retired {get; set;} = false;
     public bool HibernateMode {get; set;} = false;
+    public bool PowerOff {get; set;} = false;
+    public bool Service {get; set;} = false;
+    public bool WideAngle {get; set;} = false;
 
     [System.Text.Json.Serialization.JsonIgnore]
     public List<Telemetry> Telemetries {get;} = new List<Telemetry>();
@@ -109,5 +114,21 @@ public class Device
     
     [System.Text.Json.Serialization.JsonIgnore]
     public List<DeviceProjectContract> DeviceProjectContracts { get; } = new List<DeviceProjectContract>();
+
+    [System.Text.Json.Serialization.JsonIgnore]
+    public List<DeviceLocation> DeviceLocations { get; } = new List<DeviceLocation>();
+
+    [NotMapped]
+    [System.Text.Json.Serialization.JsonIgnore]
+    public DeviceLocation? CurrentLocation {
+        get {
+            var currentLocation = DeviceLocations.OrderByDescending(l => l.Timestamp).FirstOrDefault();
+            return currentLocation;
+        }
+
+        // set {
+        //     DeviceLocations.Add(value);
+        // }
+    }
 }
 

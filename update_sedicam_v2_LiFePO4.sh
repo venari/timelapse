@@ -19,8 +19,15 @@ fi
 
 pip3 install pyserial
 
-echo Checking RTC module is enabled in boot/config.txt
-grep -qxF 'dtoverlay=i2c-rtc,ds1307=1' /boot/config.txt || echo 'dtoverlay=i2c-rtc,ds1307=1' | sudo tee -a /boot/config.txt
+echo Checking RTC module is enabled in config.txt
+if [ -e /boot/firmware/config.txt ] ; then
+  FIRMWARE=/firmware
+else
+  FIRMWARE=
+fi
+CONFIG=/boot${FIRMWARE}/config.txt
+
+grep -qxF 'dtoverlay=i2c-rtc,ds1307=1' $CONFIG || echo 'dtoverlay=i2c-rtc,ds1307=1' | sudo tee -a $CONFIG
 
 echo Checking static domain_name_servers entry etc/dhcpcd.conf
 grep -qxF 'static domain_name_servers=8.8.4.4 8.8.8.8' /etc/dhcpcd.conf || echo 'static domain_name_servers=8.8.4.4 8.8.8.8' | sudo tee -a /etc/dhcpcd.conf

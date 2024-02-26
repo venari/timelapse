@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using timelapse.infrastructure;
@@ -11,9 +12,10 @@ using timelapse.infrastructure;
 namespace timelapse.api.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20240225223729_DevicePowerOff")]
+    partial class DevicePowerOff
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -329,78 +331,14 @@ namespace timelapse.api.Migrations
                         .HasColumnType("text")
                         .HasColumnName("serial_number");
 
-                    b.Property<bool>("Service")
-                        .HasColumnType("boolean")
-                        .HasColumnName("service");
-
-                    b.Property<string>("ShortDescription")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("short_description");
-
                     b.Property<bool>("SupportMode")
                         .HasColumnType("boolean")
                         .HasColumnName("support_mode");
-
-                    b.Property<bool>("WideAngle")
-                        .HasColumnType("boolean")
-                        .HasColumnName("wide_angle");
 
                     b.HasKey("Id")
                         .HasName("pk_devices");
 
                     b.ToTable("devices", (string)null);
-                });
-
-            modelBuilder.Entity("timelapse.core.models.DeviceLocation", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
-                        .HasColumnName("id");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<string>("Description")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("description");
-
-                    b.Property<int>("DeviceId")
-                        .HasColumnType("integer")
-                        .HasColumnName("device_id");
-
-                    b.Property<int?>("Heading")
-                        .HasColumnType("integer")
-                        .HasColumnName("heading");
-
-                    b.Property<int?>("HeightMM")
-                        .HasColumnType("integer")
-                        .HasColumnName("height_mm");
-
-                    b.Property<double>("Latitude")
-                        .HasColumnType("double precision")
-                        .HasColumnName("latitude");
-
-                    b.Property<double>("Longitude")
-                        .HasColumnType("double precision")
-                        .HasColumnName("longitude");
-
-                    b.Property<int?>("Pitch")
-                        .HasColumnType("integer")
-                        .HasColumnName("pitch");
-
-                    b.Property<DateTime>("Timestamp")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("timestamp");
-
-                    b.HasKey("Id")
-                        .HasName("pk_device_location");
-
-                    b.HasIndex("DeviceId")
-                        .HasDatabaseName("ix_device_location_device_id");
-
-                    b.ToTable("device_location", (string)null);
                 });
 
             modelBuilder.Entity("timelapse.core.models.DeviceProjectContract", b =>
@@ -845,18 +783,6 @@ namespace timelapse.api.Migrations
                         .HasConstraintName("fk_asp_net_user_tokens_asp_net_users_user_id");
                 });
 
-            modelBuilder.Entity("timelapse.core.models.DeviceLocation", b =>
-                {
-                    b.HasOne("timelapse.core.models.Device", "Device")
-                        .WithMany("DeviceLocations")
-                        .HasForeignKey("DeviceId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired()
-                        .HasConstraintName("fk_device_location_devices_device_id");
-
-                    b.Navigation("Device");
-                });
-
             modelBuilder.Entity("timelapse.core.models.DeviceProjectContract", b =>
                 {
                     b.HasOne("timelapse.core.models.Device", "Device")
@@ -970,8 +896,6 @@ namespace timelapse.api.Migrations
 
             modelBuilder.Entity("timelapse.core.models.Device", b =>
                 {
-                    b.Navigation("DeviceLocations");
-
                     b.Navigation("DeviceProjectContracts");
 
                     b.Navigation("Events");

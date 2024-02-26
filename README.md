@@ -54,6 +54,16 @@ raspberrypi.lan (192.168.86.32) at b8:27:eb:94:ac:b1 on en0 ifscope [ethernet]
 
 ```
 
+# Install software, config & code to new Pi:
+```
+sudo apt-get install byobu -y
+byobu-enable
+byobu
+```
+```
+bash <(curl -fsSL "https://raw.githubusercontent.com/venari/timelapse/deployment/sedicam_v2/install.sh?$RANDOM")
+```
+
 # Install software, (LiPo, sedicam v2 configuration) config & code to new Pi
 ```
 bash <(curl -fsSL "https://raw.githubusercontent.com/venari/timelapse/deployment/sedicam_v2/install_sedicam.sh?$RANDOM")
@@ -176,6 +186,7 @@ dtoverlay=imx708
 ``` -->
 
 # Waveshare 1.54" e-Paper Module
+## Not may not work on Bookworm
 
 https://github.com/waveshareteam/e-Paper/blob/master/RaspberryPi_JetsonNano/python/examples/epd_1in54b_V2_test.py
 
@@ -566,6 +577,19 @@ sudo tailscale up
 ```
 
 
+# To access modem/SMS messages
+
+Use SSH to establish a dynamic port forwarding session to the pi.
+
+```
+ssh -D 8080 pi@<device name>
+```
+
+Use FoxyProxy to route local traffic on port 8080 through the SSH tunnel.
+
+![Alt text](images/FoxyProxySettings.png)
+
+Then browse to the modem's IP address (e.g. http://192.168.1.1)
 
 
 # Credits

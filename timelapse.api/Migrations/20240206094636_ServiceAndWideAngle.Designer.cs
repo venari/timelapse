@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using timelapse.infrastructure;
@@ -11,9 +12,10 @@ using timelapse.infrastructure;
 namespace timelapse.api.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20240206094636_ServiceAndWideAngle")]
+    partial class ServiceAndWideAngle
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -316,10 +318,6 @@ namespace timelapse.api.Migrations
                         .HasColumnType("text")
                         .HasColumnName("name");
 
-                    b.Property<bool>("PowerOff")
-                        .HasColumnType("boolean")
-                        .HasColumnName("power_off");
-
                     b.Property<bool>("Retired")
                         .HasColumnType("boolean")
                         .HasColumnName("retired");
@@ -332,11 +330,6 @@ namespace timelapse.api.Migrations
                     b.Property<bool>("Service")
                         .HasColumnType("boolean")
                         .HasColumnName("service");
-
-                    b.Property<string>("ShortDescription")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("short_description");
 
                     b.Property<bool>("SupportMode")
                         .HasColumnType("boolean")
