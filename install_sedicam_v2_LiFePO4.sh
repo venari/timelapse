@@ -11,10 +11,18 @@ sudo apt-get install git pijuice-base python3-pip -y
 sudo apt install -y python3-picamera2 --no-install-recommends
 sudo apt-get install vim byobu -y
 sudo apt-get install python3-pil -y
-sudo pip3 install RPi.GPIO
-sudo pip3 install waveshare-epaper
+# sudo pip3 install RPi.GPIO
+sudo apt-get install python3-RPi.GPIO -y
+# pip3 install pyserial
+sudo apt-get install python3-serial -y
 
-pip3 install pyserial
+
+# If not bookworm - install waveshare-epaper library with pip3
+# sudo pip3 install waveshare-epaper
+# sudo apt-get install python3-waveshare-epaper -y
+if ! grep -q "bookworm" /etc/os-release; then
+    pip3 install waveshare-epaper
+fi
 
 byobu-enable
 
@@ -64,8 +72,16 @@ else
     git pull
 fi
 
-echo Checking RTC module is enabled in boot/config.txt
-grep -qxF 'dtoverlay=i2c-rtc,ds1307=1' /boot/config.txt || echo 'dtoverlay=i2c-rtc,ds1307=1' | sudo tee -a /boot/config.txt
+echo Checking RTC module is enabled in config.txt
+if [ -e /boot/firmware/config.txt ] ; then
+  FIRMWARE=/firmware
+else
+  FIRMWARE=
+fi
+CONFIG=/boot${FIRMWARE}/config.txt
+
+grep -qxF 'dtoverlay=i2c-rtc,ds1307=1' $CONFIG || echo 'dtoverlay=i2c-rtc,ds1307=1' | sudo tee -a $CONFIG
+grep -qxF 'dtparam=i2c_arm=on' $CONFIG || echo 'dtparam=i2c_arm=on' | sudo tee -a $CONFIG
 
 echo Checking static domain_name_servers entry etc/dhcpcd.conf
 grep -qxF 'static domain_name_servers=8.8.4.4 8.8.8.8' /etc/dhcpcd.conf || echo 'static domain_name_servers=8.8.4.4 8.8.8.8' | sudo tee -a /etc/dhcpcd.conf
@@ -78,7 +94,11 @@ echo Installing crontab entries...
 
 (crontab -l 2>/dev/null; echo "@reboot sleep 60 && /usr/bin/bash /home/pi/dev/timelapse/scripts/uploadPending.sh")| crontab -
 
-(crontab -l 2>/dev/null; echo "* * * * * /usr/bin/bash /home/pi/dev/timelapse/scripts/updateStatus.sh")| crontab -
+# If not bookworm - don't have epaper library yet
+if ! grep -q "bookworm" /etc/os-release; then
+    (crontab -l 2>/dev/null; echo "* * * * * /usr/bin/bash /home/pi/dev/timelapse/scripts/updateStatus.sh")| crontab -
+fi
+
 # (crontab -l 2>/dev/null; echo "*/5 * * * * /usr/bin/bash /home/pi/dev/timelapse/scripts/handleSMS.sh")| crontab -
 
 (crontab -l 2>/dev/null; echo "*/15 * * * * /usr/bin/bash /home/pi/dev/timelapse/scripts/detectHang.sh")| crontab -

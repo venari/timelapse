@@ -17,6 +17,8 @@ body {
   margin-bottom: 60px;
 }
 
+#map { height: 600px; }
+
 /* button.multiselect {
   background-color: initial;
   border: 1px solid #ced4da;

@@ -1,0 +1,144 @@
+﻿@page "{id:int}/{numberOfHoursToDisplay:int?}"
+@using Humanizer
+@model ImageHistoryModel
+@{
+    ViewData["Title"] = "Device Trends";
+}
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+
+<div class="container">
+  <div class="row">
+    <div class="col">
+        <h4>Displaying @(Model.NumberOfHoursToDisplay) hours imagery.</h4>
+        @{
+            <a href="/ImageHistory/@(Model.DeviceId)/48@(HttpContext.Request.QueryString)" type="button" class="btn btn-secondary">Last 48 hours</a>
+            <a href="/ImageHistory/@(Model.DeviceId)/168@(HttpContext.Request.QueryString)" type="button" class="btn btn-secondary">Last week</a>
+            <a href="/ImageHistory/@(Model.DeviceId)/336@(HttpContext.Request.QueryString)" type="button" class="btn btn-secondary">Last fortnight</a>
+        }
+    </div>
+  </div>
+</div>
+
+
+@* 
+<script>
+
+    const shortDayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+
+    function localizeDateTimeToShortDayAndNumber(t)
+    {
+        if(t && t!='---'){
+            if(t.indexOf('Z')==-1){
+                t+='Z'
+            }
+            var d=new Date(t);
+            return shortDayNames[d.getDay()] + ' ' + d.getDate();
+        } else {
+            return '---';
+        }
+    }
+
+
+    function localizeDateTimeToHourAndAmPm(t)
+    {
+        if(t && t!='---'){
+            if(t.indexOf('Z')==-1){
+                t+='Z'
+            }
+            var d=new Date(t);
+            if(d.getHours()<12){
+                if(d.getHours()==0){
+                    return "12AM"
+                } else {
+                    return d.getHours() + "AM"
+                }
+            } else {
+                if(d.getHours()==12){
+                    return d.getHours() + "PM"
+                } else {
+                    return d.getHours() - 12 + "PM"
+                }
+            }
+            //return d.getHours() + (d.getHours()<12?"AM":"PM");
+        } else {
+            return '---';
+        }
+    }
+
+    function localizeDateTimeIsBetween6And6(t)
+    {
+        if(t && t!='---'){
+            if(t.indexOf('Z')==-1){
+                t+='Z'
+            }
+            var d=new Date(t);
+
+            if(d.getHours()>=6 && d.getHours()<18){
+                return 'Day';
+            } else {
+                return 'Night';
+            }
+        } else {
+            return '---';
+        }
+    }
+
+    var daytimeColumns = ['Device Name', 'Device Description'];
+    var previousDateString = null;
+</script> *@
+
+<div>
+    <table class="table" id="images">
+        <thead>
+            @{for(var hour = 0; hour <24; ++hour){
+                <th>@(hour)</th>
+            }}
+        </thead>
+        <tbody>
+        </tbody>
+    </table>
+</div>
+
+<script>
+
+    var images = @Html.Raw(Json.Serialize(Model.Images));
+
+    var imagesTable = document.getElementById('images');
+    var row = imagesTable.insertRow(0);
+
+    console.log(images);
+
+    @* var firstImage = true; *@
+    var row = null;
+    var prevHour = 99; // Will trigger on first image as well
+
+    images.forEach(function(image){
+        var imageDate = new Date(image.timestamp);
+        var hour = imageDate.getHours();
+
+        // Detect day change
+        if(hour<prevHour){
+            row = imagesTable.insertRow();
+            for(var i = 0; i < hour; ++i){
+                row.insertCell();
+            }
+        }
+
+        // Detect missing hour
+        if(hour>prevHour+1){
+            for(var i = prevHour+1; i < hour; ++i){
+                row.insertCell();
+            }
+        }
+
+        var cell = row.insertCell();
+        var imageBlobUri = image.blobUri + '@(Model.SasToken)'.replace(/&amp;/g, '&');
+        var imageViewURL = "/ImageView/@(Model.DeviceId)/1/" + image.timestamp + window.location.search;   
+        var cellInnerHTML = '<a href="' + imageViewURL + '"><img src="' + imageBlobUri + '" width=100 height=60></img></a>'
+        cell.innerHTML = cellInnerHTML;
+        prevHour = hour;
+    });
+    
+</script>

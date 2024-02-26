@@ -144,6 +144,41 @@ def scheduleShutdown():
                 json.dump(config, open('config.json', 'w'), indent=4)
 
 
+        # Power Off mode? 
+        if config['powerOff']:
+            # If we've awoken from Power Off, let's switch out of Power Off 
+            # 
+            if uptimeSeconds < 300 :
+                logger.info('Power Off - but looks like we have been woken by user - switching out of Power Off.')
+                loggerIntent.info('Power Off - but looks like we have been woken by user - switching out of Power Off.')
+                flashLED(pj, 'D2', 255, 0, 0, 2, 1)
+                flashLED(pj, 'D2', 0, 255, 0, 2, 1)
+                flashLED(pj, 'D2', 0, 0, 255, 2, 1)
+                pj.status.SetLedState('D2', [0, 0, 0])
+                config['hibernateMode'] = False
+                config['powerOff'] = False
+                config['supportMode'] = True
+                json.dump(config, open('config.json', 'w'), indent=4)
+
+            else:
+
+                # Otherwise, let's cancel wake up alarms, watchdog, and power down.
+                logger.info('Power Off - cancelling wake up alarms, watchdog, and power down.')
+                loggerIntent.info('Power Off - cancelling wake up alarms, watchdog, and power down.')
+                pj.rtcAlarm.SetWakeupEnabled(False)
+                SetWatchdog(0)
+                
+                loggerIntent.info('Power off scheduled for 1 min from now')
+                pj.power.SetPowerOff(60)
+                logger.info('Setting System Power Switch to Off:')
+                pj.power.SetSystemPowerSwitch(0)
+                powerDownSIM7600X()
+                logger.info('Shutting down now...')
+                loggerIntent.info('Shutting down now...')
+                subprocess.call(['sudo', 'shutdown', '-h', 'now'])
+
+
+
         # Hibernate mode? Lets have 10 minutes to give it a chance to check again before hibernating.
         if config['hibernateMode']:
             logger.info('hibernate mode - stay awake for 10 mins')
