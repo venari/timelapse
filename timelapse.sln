@@ -3,9 +3,9 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.5.002.0
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "timelapse.api", "timelapse.api\timelapse.api.csproj", "{4BB8D975-1511-463C-82D0-B0C7CE669A98}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "timelapse.api", "timelapse.api\timelapse.api.csproj", "{D9E11A4E-4CE6-4682-8888-89FBBC93D276}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "timelapse.core", "timelapse.core\timelapse.core.csproj", "{9A725ACC-6BAE-49FF-907F-76E9F7CDD741}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "timelapse.core", "timelapse.core\timelapse.core.csproj", "{546921A5-4740-4C70-8691-5BB19A4AE7AE}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -13,19 +13,19 @@ Global
 		Release|Any CPU = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{4BB8D975-1511-463C-82D0-B0C7CE669A98}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{4BB8D975-1511-463C-82D0-B0C7CE669A98}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{4BB8D975-1511-463C-82D0-B0C7CE669A98}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{4BB8D975-1511-463C-82D0-B0C7CE669A98}.Release|Any CPU.Build.0 = Release|Any CPU
-		{9A725ACC-6BAE-49FF-907F-76E9F7CDD741}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{9A725ACC-6BAE-49FF-907F-76E9F7CDD741}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{9A725ACC-6BAE-49FF-907F-76E9F7CDD741}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{9A725ACC-6BAE-49FF-907F-76E9F7CDD741}.Release|Any CPU.Build.0 = Release|Any CPU
+		{D9E11A4E-4CE6-4682-8888-89FBBC93D276}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D9E11A4E-4CE6-4682-8888-89FBBC93D276}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D9E11A4E-4CE6-4682-8888-89FBBC93D276}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D9E11A4E-4CE6-4682-8888-89FBBC93D276}.Release|Any CPU.Build.0 = Release|Any CPU
+		{546921A5-4740-4C70-8691-5BB19A4AE7AE}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{546921A5-4740-4C70-8691-5BB19A4AE7AE}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{546921A5-4740-4C70-8691-5BB19A4AE7AE}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{546921A5-4740-4C70-8691-5BB19A4AE7AE}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
-		SolutionGuid = {7EB458BC-9589-4B8C-825E-78C78E34C9B7}
+		SolutionGuid = {CD3FDDA4-E69D-44E9-A65A-1F262D9247CF}
 	EndGlobalSection
 EndGlobal
