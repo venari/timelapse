@@ -17,6 +17,7 @@ public class Device
     public bool MonitoringMode {get; set;} = false;
     public bool Retired {get; set;} = false;
     public bool HibernateMode {get; set;} = false;
+    public bool PowerOff {get; set;} = false;
     public bool Service {get; set;} = false;
     public bool WideAngle {get; set;} = false;
 

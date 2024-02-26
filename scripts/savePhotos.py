@@ -9,8 +9,11 @@ import datetime
 import sys
 import requests
 import logging
-from logging.handlers import TimedRotatingFileHandler
+# from logging.handlers import TimedRotatingFileHandler
+from logging.handlers import SocketHandler
 import pathlib
+
+# from helpers import flashLED
 
 config = json.load(open('config.json'))
 logFilePath = config["logFilePath"]
@@ -19,14 +22,15 @@ os.makedirs(os.path.dirname(logFilePath), exist_ok=True)
 # os.chmod(os.path.dirname(logFilePath), 0o777) # Make sure pijuice user scrip can write to log file.
 
 formatter = logging.Formatter('%(asctime)s %(name)s %(levelname)s %(message)s')
-handler = TimedRotatingFileHandler(logFilePath, when='midnight', backupCount=10)
+# handler = TimedRotatingFileHandler(logFilePath, when='midnight', backupCount=10)
+handler = SocketHandler('localhost', 8000)
 handler.setFormatter(formatter)
 logger = logging.getLogger("savePhotos")
 logger.addHandler(handler)
 logger.setLevel(logging.DEBUG)
 
 logger.info("Starting up savePhotos.py...")
-os.chmod(logFilePath, 0o777) # Make sure pijuice user script can write to log file.
+# os.chmod(logFilePath, 0o777) # Make sure pijuice user script can write to log file.
 
 # clock
 while not os.path.exists('/dev/i2c-1'):
@@ -71,6 +75,8 @@ def savePhotos():
                 config = json.load(open('config.json'))
                 #camera_config = camera.create_preview_configuration()
                 camera_config = camera.create_still_configuration()
+                
+                camera.set_logging(Picamera2.ERROR) # Stop stderr/stdoutput getting filled with camera logging messages
 
                 # # Use sensor mode 2 to give greater max exposure time.
                 # camera_config = camera.create_still_configuration(raw = picam2.sensor_modes[2])
@@ -107,6 +113,7 @@ def savePhotos():
                     
                 camera.options["quality"] = config['camera.quality']
 
+                # flashLED(pj, 'D2', 200, 255, 255, 1, 0.5)
                 logger.debug('beginning capture')
                 #camera.start_preview(Preview.DRM)
                 camera.start()

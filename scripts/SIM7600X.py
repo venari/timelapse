@@ -1,15 +1,9 @@
-import subprocess
 import json
-import pijuice
 import os
 import time
-import shutil
-import datetime
-import sys
 import logging
-from logging.handlers import TimedRotatingFileHandler
-import pathlib
-import glob
+# from logging.handlers import TimedRotatingFileHandler
+from logging.handlers import SocketHandler
 import serial
 
 import RPi.GPIO as GPIO
@@ -29,16 +23,17 @@ os.makedirs(os.path.dirname(logFilePath), exist_ok=True)
 
 
 formatter = logging.Formatter('%(asctime)s %(name)s %(levelname)s %(message)s')
-handler = TimedRotatingFileHandler(logFilePath, 
-                                   when='midnight',
-                                   backupCount=10)
+# handler = TimedRotatingFileHandler(logFilePath, 
+#                                    when='midnight',
+#                                    backupCount=10)
+handler = SocketHandler('localhost', 8000)
 handler.setFormatter(formatter)
 logger = logging.getLogger("SIM7600X")
 logger.addHandler(handler)
 logger.setLevel(logging.DEBUG)
 
 # logger.info("Starting up SIM7600X.py...")
-os.chmod(logFilePath, 0o777) # Make sure pijuice user script can write to log file.
+# os.chmod(logFilePath, 0o777) # Make sure pijuice user script can write to log file.
 
 
 def powerUpSIM7600X():
@@ -135,18 +130,9 @@ def receiveSMS():
     # answer = send_at('AT+CMGL="REC UNREAD"','+CMGL:',2)
     answer = send_at('AT+CMGL="ALL"','+CMGL:',2)
     if 1 != answer:
-        # answer = 0
-        # print('A')
-        # print(rec_buff)
-        # print('B')
-        # if 'OK' in rec_buff.decode():
-        #     answer = 1
-        #     # print(rec_buff)
-    # else:
         print('error%d'%answer)
         return 'error%d'%answer
-        # return False
-    return rec_buff.decode()
+    return rec_buff
 
 def deleteAllSMS():
     global ser, rec_buff

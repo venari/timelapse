@@ -86,6 +86,11 @@
                             }
                         </td>
                         <td>
+                            @if(device.PowerOff){
+                                <i class="fa fa-power-off" data-toggle="tooltip" title="Power Off"></i>
+                            }
+                        </td>
+                        <td>
                             @* @(device.LatestTelemetry!=null?device.LatestTelemetry.Timestamp:"---") *@
                             @* <script type="text/javascript">localize('@(device.LatestTelemetryTimestamp.HasValue?device.LatestTelemetryTimestamp.Value.ToString("s"):"---")')</script> *@
                             @if (device.LatestTelemetry!=null && DateTime.UtcNow - device.LatestTelemetry.Timestamp > TimeSpan.FromMinutes(60)){

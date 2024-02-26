@@ -1,6 +1,16 @@
 # timelapse
 A set of tools/scripts to automate the taking and creation of timelapse videos and videos with a Raspberry Pi
 
+# Current issues with PiJuice
+> [!warning]
+> At present (November 2023), I cannot recommend using PiJuice as the BMS provider.
+> 
+> I am having a number of PiJuice reliability issues even when using PiSupply's own batteries.
+> 
+> Since their merger with or aquisition by Nebra, I've found attempts to purchase batteries from PiSupply to be unsuccessful as their payment options are not working. Attempts to contact them on Twitter go unanswered.
+> 
+> If this situation changes, I will update this warning. Last updated 23 November 2023.
+
 # PI Setup
 
 Raspberry Pi OS Lite (32 bit - Pi Zero W)
@@ -44,6 +54,16 @@ raspberrypi.lan (192.168.86.32) at b8:27:eb:94:ac:b1 on en0 ifscope [ethernet]
 
 ```
 
+# Install software, config & code to new Pi:
+```
+sudo apt-get install byobu -y
+byobu-enable
+byobu
+```
+```
+bash <(curl -fsSL "https://raw.githubusercontent.com/venari/timelapse/deployment/sedicam_v2/install.sh?$RANDOM")
+```
+
 # Install software, (LiPo, sedicam v2 configuration) config & code to new Pi
 ```
 bash <(curl -fsSL "https://raw.githubusercontent.com/venari/timelapse/deployment/sedicam_v2/install_sedicam.sh?$RANDOM")
@@ -52,6 +72,16 @@ bash <(curl -fsSL "https://raw.githubusercontent.com/venari/timelapse/deployment
 Update config and code to existing install
 ```
 bash <(curl -fsSL "https://raw.githubusercontent.com/venari/timelapse/deployment/sedicam_v2/update_sedicam.sh?$RANDOM")
+```
+
+# Install software, (LiFePO4, sedicam v2 configuration) config & code to new Pi
+```
+bash <(curl -fsSL "https://raw.githubusercontent.com/venari/timelapse/deployment/sedicam_v2_LiFePO4/install_sedicam_v2_LiFePO4.sh?$RANDOM")
+```
+# Update software, (LiFePO4, sedicam v2 configuration) config & code to new Pi
+Update config and code to existing install for LiFePO4 install
+```
+bash <(curl -fsSL "https://raw.githubusercontent.com/venari/timelapse/main/update_sedicam_v2_LiFePO4.sh?$RANDOM")
 ```
 
 ## Install software, (LiFePO4, sedicam v1 cofiguration) config & code to new Pi
@@ -154,6 +184,40 @@ Nope - prevents camera from working...
 ```
 dtoverlay=imx708
 ``` -->
+
+# Waveshare 1.54" e-Paper Module
+## Not may not work on Bookworm
+
+https://github.com/waveshareteam/e-Paper/blob/master/RaspberryPi_JetsonNano/python/examples/epd_1in54b_V2_test.py
+
+```
+    sudo apt-get update
+    sudo apt-get install python3-pip
+    sudo apt-get install python3-pil
+    sudo pip3 install RPi.GPIO
+    sudo pip3 install waveshare-epaper
+```
+
+Onboard image resizing
+```
+sudo apt-get install imagemagick
+
+convert pic/image.org.jpg -resize 200x200 -background white -gravity center -extent 200x200 pic/image.jpg 
+```
+
+- Enable Serial Communication
+```
+sudo raspi-config nonint do_spi 0        
+sudo reboot
+```
+
+# Uptimed service
+
+```
+sudo apt-get install uptimed
+sudo systemctl enable uptimed
+```
+
 # preview image over VNC
 https://www.youtube.com/watch?v=dbBWyeHbGs0&ab_channel=WillyKjellstrom
 
@@ -172,6 +236,14 @@ Issues in Bullseye on Zero2? https://www.raspberrypi.com/news/bullseye-camera-sy
 - related - possibly not - https://github.com/raspberrypi/libcamera-apps/issues/278
 - 
 
+# Access Hauwei thumb stick web interface (password is fiddly)
+```
+ssh -D 8080 pi@sediment-pi-[machine name]
+```
+
+Use FoxyProxy and setup proxy to localhost:8080
+
+Browse to http://192.168.1.1/html/index.html or http://192.168.8.1/html/index.html
 
 # On board timelapse generation
 
@@ -468,6 +540,12 @@ Note - Wake up should be automatically enabled in `saveTelemetry.py`, but you wi
 ░░░░░└──────────────────────────────────────────────────────────────┘░░░░
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+```
+
+## Troubleshooting PiJuice wakeup:
+
+```
+python3 /usr/bin/pijuice_log.py --enable WAKEUP_EVT
 ```
 
 ## Troubleshooting indicateStatus script:

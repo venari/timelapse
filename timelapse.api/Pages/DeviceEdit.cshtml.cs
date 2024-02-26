@@ -30,7 +30,7 @@ namespace timelapse.api.Pages
         public bool LocationMoved {get; set;}
 
         [BindProperty]
-        public string LocationDescription {get; set;}
+        public string? LocationDescription {get; set;}
 
         [BindProperty]
         public double? Longitude {get; set;}
@@ -91,6 +91,11 @@ namespace timelapse.api.Pages
         // To protect from overposting attacks, see https://aka.ms/RazorPagesCRUD
         public async Task<IActionResult> OnPostAsync(int id)
         {
+
+            if(Latitude.HasValue && Longitude.HasValue && LocationDescription==null){
+                ModelState.AddModelError("LocationDescription", "Location Description is required");
+            }
+
             if (!ModelState.IsValid)
             {
                 return Page();
@@ -106,6 +111,7 @@ namespace timelapse.api.Pages
             device.SupportMode = Device.SupportMode;
             device.MonitoringMode = Device.MonitoringMode;
             device.HibernateMode = Device.HibernateMode;
+            device.PowerOff = Device.PowerOff;
             device.Service = Device.Service;
             device.WideAngle = Device.WideAngle;
             device.Retired = Device.Retired;

@@ -316,6 +316,10 @@ namespace timelapse.api.Migrations
                         .HasColumnType("text")
                         .HasColumnName("name");
 
+                    b.Property<bool>("PowerOff")
+                        .HasColumnType("boolean")
+                        .HasColumnName("power_off");
+
                     b.Property<bool>("Retired")
                         .HasColumnType("boolean")
                         .HasColumnName("retired");

@@ -2,7 +2,7 @@
 @model DeviceEditModel
 
 @{
-    ViewData["Title"] = "Edit";
+ViewData["Title"] = "Edit";
 }
 
 <script src="https://unpkg.com/leaflet@1.9.2/dist/leaflet.js"
@@ -57,6 +57,12 @@
                 <input asp-for="Device.HibernateMode" class="form-check-input" type="checkbox">
                 <label class="form-check-label" asp-for="Device.HibernateMode">
                     Hibernate Mode
+                </label>
+            </div>
+            <div class="form-check" class="col-md-12">
+                <input id="powerOff" asp-for="Device.PowerOff" class="form-check-input" type="checkbox" data-bs-toggle="modal" data-bs-target="#powerOffModal">
+                <label class="form-check-label" asp-for="Device.PowerOff">
+                    Power Off
                 </label>
             </div>
             <div class="form-check" class="col-md-12">
@@ -132,6 +138,24 @@
                 <input type="submit" value="Update" class="btn btn-primary" />
             </div>
         </form>
+        <!-- Modal -->
+        <div class="modal fade" id="powerOffModal" tabindex="-1" aria-labelledby="powerOffModal" aria-hidden="true">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="exampleModalLabel">Warning</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        Powering off device will remain powered down until it is physically switched on again. This should not be done for devices in the field.
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" onclick="document.getElementById('powerOff').checked=false;">Close</button>
+                        <button type="button" class="btn btn-primary" data-bs-dismiss="modal" onclick="document.getElementById('powerOff').checked=true;">Power Off</button>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -191,6 +215,7 @@
         console.log("You clicked the map at LAT: " + lat + " and LONG: " + lon);
         document.getElementById("Latitude").value = lat.toFixed(6);
         document.getElementById("Longitude").value = lon.toFixed(6);
+        document.getElementById("LocationMoved").checked = true;
         updateMapPin();
 
     });
@@ -285,5 +310,5 @@
 </script>
 
 @section Scripts {
-    @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
+@{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
 }
