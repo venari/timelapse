@@ -215,6 +215,7 @@ ViewData["Title"] = "Edit";
         console.log("You clicked the map at LAT: " + lat + " and LONG: " + lon);
         document.getElementById("Latitude").value = lat.toFixed(6);
         document.getElementById("Longitude").value = lon.toFixed(6);
+        document.getElementById("LocationMoved").checked = true;
         updateMapPin();
 
     });
