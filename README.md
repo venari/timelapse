@@ -54,17 +54,12 @@ raspberrypi.lan (192.168.86.32) at b8:27:eb:94:ac:b1 on en0 ifscope [ethernet]
 
 ```
 
-# Install software, config & code to new Pi:
+# Install (or update) software, (LiPo and LiFePO4, sedicam v2 configuration) config & code to new Pi:
 ```
 sudo apt-get install byobu -y
 byobu-enable
 byobu
 ```
-```
-bash <(curl -fsSL "https://raw.githubusercontent.com/venari/timelapse/deployment/sedicam_v2/install.sh?$RANDOM")
-```
-
-# Install (or update) software, (LiPo and LiFePO4, sedicam v2 configuration) config & code to new Pi
 ```
 bash <(curl -fsSL "https://github.com/venari/timelapse/raw/main/install.sh?$RANDOM")
 ```
