@@ -1,5 +1,8 @@
 #!/bin/bash
 
+# Ask user if we have a waveshare modem
+read -p "Does this camera have a waveshare SIM7600X modem? (y/n)" waveshare
+
 echo Updating....
 sudo apt-get update
 
@@ -7,9 +10,20 @@ echo Upgrading...
 sudo apt-get upgrade -y
 
 echo Installing...
-sudo apt-get install git pijuice-base python3-pip -y
-sudo apt install -y python3-picamera2 --no-install-recommends
-sudo apt-get install vim byobu -y
+sudo apt-get install -y git pijuice-base python3-pip
+sudo apt-get install -y python3-picamera2 --no-install-recommends
+sudo apt-get install -y vim\
+                        byobu\
+                        python3-pil\
+                        python3-RPi.GPIO\
+                        python3-serial\
+
+# If not bookworm - install waveshare-epaper library with pip3
+# sudo pip3 install waveshare-epaper
+# sudo apt-get install python3-waveshare-epaper -y
+if ! grep -q "bookworm" /etc/os-release; then
+    pip3 install waveshare-epaper
+fi
 
 byobu-enable
 
@@ -17,32 +31,94 @@ echo Setting timezone...
 sudo timedatectl set-timezone Pacific/Auckland
 
 
-echo Cloning repo...
+if [ $waveshare == "y" ]; then
+    echo "Installing waveshare modem"
+    # Waveshare stuff
+    
+    # Enable Serial Communication
+    sudo raspi-config nonint do_serial 2        # Disable serial login shell and enable serial port hardware
+
+    # Check if folder SIM7600X-4G-HAT-Demo exists:
+    if [ ! -d "/home/pi/SIM7600X-4G-HAT-Demo" ]; then
+        #https://core-electronics.com.au/guides/raspberry-pi/raspberry-pi-4g-gps-hat/
+        wget https://www.waveshare.com/w/upload/2/29/SIM7600X-4G-HAT-Demo.7z
+        sudo apt-get install p7zip-full
+        7z x SIM7600X-4G-HAT-Demo.7z -r -o/home/pi
+        sudo chmod 777 -R /home/pi/SIM7600X-4G-HAT-Demo
+
+
+        cd /home/pi/SIM7600X-4G-HAT-Demo/Raspberry/c/bcm2835
+        chmod +x configure && ./configure && sudo make && sudo make install
+    fi
+
+
+    # sed -e '$i \sh /home/pi/SIM7600X-4G-HAT-Demo/Raspberry/c/sim7600_4G_hat_init\n' /etc/rc.local
+    grep -qxF 'sh /home/pi/SIM7600X-4G-HAT-Demo/Raspberry/c/sim7600_4G_hat_init' /etc/rc.local || sudo sed -i -e '$i \sh /home/pi/SIM7600X-4G-HAT-Demo/Raspberry/c/sim7600_4G_hat_init\n' /etc/rc.local
+    ###################
+fi
+
+cd /home/pi
 # Check if dev folder exists
 if [ ! -d "/home/pi/dev/timelapse" ]; then
+    echo Cloning repo...
     mkdir -p dev
     cd dev
     git clone https://github.com/venari/timelapse.git
     cd timelapse
     git config pull.rebase false
-    git checkout development
+    # git checkout development
+    git checkout deployment/sedicam_v2
 else
+    echo Updating repo...
     cd dev/timelapse
-    git checkout development
+    # git checkout development
+    git fetch
+    git stash
+    git checkout deployment/sedicam_v2
     git pull
+    git stash pop
 fi
 
-echo Checking RTC module is enabled in boot/config.txt
-grep -qxF 'dtoverlay=i2c-rtc,ds1307=1' /boot/config.txt || echo 'dtoverlay=i2c-rtc,ds1307=1' | sudo tee -a /boot/config.txt
+# If using thumbdrive, not waveshare modem, update 'modem.type' in dev/timelapse/scripts/config.json to 'thumb'
+if [ $waveshare == "n" ]; then
+    sed -i 's/"modem.type": "SIM7600X"/"modem.type": "thumb"/g' /home/pi/dev/timelapse/scripts/config.json
+else
+    sed -i 's/"modem.type": "thumb"/"modem.type": "SIM7600X"/g' /home/pi/dev/timelapse/scripts/config.json
+fi
+
+echo Checking RTC module is enabled in config.txt
+if [ -e /boot/firmware/config.txt ] ; then
+  FIRMWARE=/firmware
+else
+  FIRMWARE=
+fi
+CONFIG=/boot${FIRMWARE}/config.txt
+
+grep -qxF 'dtoverlay=i2c-rtc,ds1307=1' $CONFIG || echo 'dtoverlay=i2c-rtc,ds1307=1' | sudo tee -a $CONFIG
+grep -qxF 'dtparam=i2c_arm=on' $CONFIG || echo 'dtparam=i2c_arm=on' | sudo tee -a $CONFIG
 
 echo Checking static domain_name_servers entry etc/dhcpcd.conf
 grep -qxF 'static domain_name_servers=8.8.4.4 8.8.8.8' /etc/dhcpcd.conf || echo 'static domain_name_servers=8.8.4.4 8.8.8.8' | sudo tee -a /etc/dhcpcd.conf
 
 echo Installing crontab entries...
-# (crontab -l 2>/dev/null; echo "@reboot /usr/bin/bash /home/pi/dev/timelapse/scripts/startup.sh")| crontab -
-(echo "@reboot /usr/bin/bash /home/pi/dev/timelapse/scripts/saveTelemetry.sh")| crontab -
-(crontab -l 2>/dev/null; echo "@reboot /usr/bin/bash /home/pi/dev/timelapse/scripts/savePhotos.sh")| crontab -
+
+(echo "@reboot /usr/bin/bash /home/pi/dev/timelapse/scripts/loggingSocketServer.sh")| crontab -
+(crontab -l 2>/dev/null; echo "@reboot sleep 10 && /usr/bin/bash /home/pi/dev/timelapse/scripts/saveTelemetry.sh")| crontab -
+(crontab -l 2>/dev/null; echo "@reboot sleep 20 && /usr/bin/bash /home/pi/dev/timelapse/scripts/savePhotos.sh")| crontab -
+
 (crontab -l 2>/dev/null; echo "@reboot sleep 60 && /usr/bin/bash /home/pi/dev/timelapse/scripts/uploadPending.sh")| crontab -
+
+# If not bookworm - don't have epaper library yet
+if ! grep -q "bookworm" /etc/os-release; then
+    (crontab -l 2>/dev/null; echo "* * * * * /usr/bin/bash /home/pi/dev/timelapse/scripts/updateStatus.sh")| crontab -
+fi
+
+# If not waveshare, we can't access SMS messages
+if [ $waveshare == "y" ]; then
+    (crontab -l 2>/dev/null; echo "*/5 * * * * /usr/bin/bash /home/pi/dev/timelapse/scripts/handleSMS.sh")| crontab -
+fi
+
+(crontab -l 2>/dev/null; echo "*/15 * * * * /usr/bin/bash /home/pi/dev/timelapse/scripts/detectHang.sh")| crontab -
 
 echo Overwriting pijuice config...
 sudo mv /var/lib/pijuice/pijuice_config.JSON /var/lib/pijuice/pijuice_config.JSON.bak
@@ -67,5 +143,10 @@ esac
 
 echo We need to reboot to kick off cron jobs
 echo "Press any key to reboot"
+
+echo ===========================================
+echo Please check battery profile in pijuice_cli
+echo ===========================================
+
 read -n 1 -s
 sudo reboot

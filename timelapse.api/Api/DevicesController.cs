@@ -30,6 +30,7 @@ namespace timelapse.api{
             Device device = new Device(){
                 Name = model.Name,
                 SerialNumber = model.SerialNumber,
+                ShortDescription = model.ShortDescription,
                 Description = model.Description
             };
             

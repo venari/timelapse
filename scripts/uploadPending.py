@@ -8,34 +8,47 @@ import datetime
 import sys
 import requests
 import logging
-from logging.handlers import TimedRotatingFileHandler
+# from logging.handlers import TimedRotatingFileHandler
+from logging.handlers import SocketHandler
 import glob
 import pathlib
 import socket
+
+from helpers import flashLED, internet
 
 from SIM7600X import powerUpSIM7600X, powerDownSIM7600X, turnOnNDIS
 
 config = json.load(open('config.json'))
 logFilePath = config["logFilePath"]
+intentLogFilePath = logFilePath.replace("timelapse.log", "intent.log")
 # logFilePath = logFilePath.replace(".log", ".uploadTelemetry.log")
 os.makedirs(os.path.dirname(logFilePath), exist_ok=True)
 # os.chmod(os.path.dirname(logFilePath), 0o777) # Make sure pijuice user scrip can write to log file.
 
 formatter = logging.Formatter('%(asctime)s %(name)s %(levelname)s %(message)s')
-handler = TimedRotatingFileHandler(logFilePath, 
-                                   when='midnight',
-                                   backupCount=10)
+# handler = TimedRotatingFileHandler(logFilePath, 
+#                                    when='midnight',
+#                                    backupCount=10)
+handler  = SocketHandler('localhost', 8000)
 handler.setFormatter(formatter)
 logger = logging.getLogger("uploadPending")
 logger.addHandler(handler)
 logger.setLevel(logging.DEBUG)
+
+handlerIntent = logging.FileHandler(intentLogFilePath)
+handlerIntent.setFormatter(formatter)
+loggerIntent = logging.getLogger("intent")
+loggerIntent.addHandler(handlerIntent)
+loggerIntent.setLevel(logging.DEBUG)
 
 logger.info("******************************************************************************")
 logger.info("")
 logger.info("Starting up uploadPending.py...")
 logger.info("")
 logger.info("******************************************************************************")
-os.chmod(logFilePath, 0o777) # Make sure pijuice user script can write to log file.
+# os.chmod(logFilePath, 0o777) # Make sure pijuice user script can write to log file.
+
+loggerIntent.info("Starting up uploadPending.py...")
 
 outputImageFolder = '../output/images/'
 pendingImageFolder = outputImageFolder + 'pending/'
@@ -77,6 +90,8 @@ def uploadPendingPhotos():
 
         mostRecentPendingFiles = sorted(glob.iglob(pendingImageFolder + "/*.*"), key=os.path.getctime, reverse=True)
 
+        connectToInternet()
+
         pendingFilesProcessed=0
         for IMAGEFILENAME in mostRecentPendingFiles:
             
@@ -116,10 +131,12 @@ def uploadPendingPhotos():
 
             logger.debug(f'Response code: {response.status_code}')
             if response.status_code == 200:
+                flashLED(pj, 'D2', 0, 0, 255, 1, .5)
                 logger.debug(f'Image uploaded successfully')
                 shutil.move(IMAGEFILENAME, uploadedImageFolder + pathlib.Path(IMAGEFILENAME).name)
 
             else:
+                flashLED(pj, 'D2', 255, 0, 0, 1, 1)
                 logger.error(f'Image upload failed')
 
             logger.debug(f'Response text:')
@@ -128,20 +145,29 @@ def uploadPendingPhotos():
 
                 if json.loads(response.text)['device']['supportMode'] != config['supportMode']:
                     logger.info('Support mode changed to ' + str(json.loads(response.text)['device']['supportMode']))
+                    loggerIntent.info('Support mode changed to ' + str(json.loads(response.text)['device']['supportMode']))
                     config['supportMode'] = json.loads(response.text)['device']['supportMode']
                     json.dump(config, open('config.json', 'w'), indent=4)
 
                 if json.loads(response.text)['device']['monitoringMode'] != config['monitoringMode']:
                     logger.info('Monitoring mode changed to ' + str(json.loads(response.text)['device']['monitoringMode']))
+                    loggerIntent.info('Monitoring mode changed to ' + str(json.loads(response.text)['device']['monitoringMode']))
                     config['monitoringMode'] = json.loads(response.text)['device']['monitoringMode']
                     json.dump(config, open('config.json', 'w'), indent=4)
 
                 if json.loads(response.text)['device']['hibernateMode'] != config['hibernateMode']:
                     logger.info('Hibernate mode changed to ' + str(json.loads(response.text)['device']['hibernateMode']))
+                    loggerIntent.info('Hibernate mode changed to ' + str(json.loads(response.text)['device']['hibernateMode']))
                     config['hibernateMode'] = json.loads(response.text)['device']['hibernateMode']
                     json.dump(config, open('config.json', 'w'), indent=4)
 
                    
+                if json.loads(response.text)['device']['powerOff'] != config['powerOff']:
+                    logger.info('Power Off changed to ' + str(json.loads(response.text)['device']['powerOff']))
+                    loggerIntent.info('Power Off changed to ' + str(json.loads(response.text)['device']['powerOff']))
+                    config['powerOff'] = json.loads(response.text)['device']['powerOff']
+                    json.dump(config, open('config.json', 'w'), indent=4)
+
             except json.decoder.JSONDecodeError:
                 logger.debug(response.text)
 
@@ -157,7 +183,7 @@ def uploadPendingPhotos():
                 # or config['supportMode'] == True
                 if ((datetime.datetime.now().hour == 9 or datetime.datetime.now().hour == 12 or datetime.datetime.now().hour == 17) and datetime.datetime.now().minute < 15) or config['supportMode']==True:
                     if not bInSupportWindow:
-                        logger.info('Opening minute support window...')
+                        logger.info('Opening support window...')
                         bInSupportWindow = True
 
                 else:
@@ -167,35 +193,21 @@ def uploadPendingPhotos():
                     disconnectFromInternet()
                     logger.info('Sleeping for ' + str(power_interval) + ' seconds...')
                     time.sleep(power_interval)
-                    connectToInternet()
 
     except Exception as e:
         logger.error(str(datetime.datetime.now()) + " uploadPendingPhotos() failed.")
         logger.error(e)
 
-# https://stackoverflow.com/questions/3764291/how-can-i-see-if-theres-an-available-and-active-network-connection-in-python
-def internet(host="8.8.8.8", port=53, timeout=config['upload.telemetry.timeout']):
-    """
-    Host: 8.8.8.8 (google-public-dns-a.google.com)
-    OpenPort: 53/tcp
-    Service: domain (DNS/TCP)
-    """
-    try:
-        # logger.info('In internet() 1')
-        socket.setdefaulttimeout(timeout)
-        # logger.info('In internet() 2')
-        socket.socket(socket.AF_INET, socket.SOCK_STREAM).connect((host, port))
-        # logger.info('In internet() 3')
-        return True
-    except socket.error as ex:
-        # logger.warning('In internet() 4')
-        logger.warning(ex)
-        # logger.warning('In internet() 5')
-        return False
-
 def connectToInternet(retries = 3):
     try:
         logger.info('Connecting to internet...')
+
+        if(internet()):
+            logger.info('Already connected to internet.')
+            return
+
+        # loggerIntent.info('Connecting to internet...')
+
         if(config['modem.type']=="thumb"):
             turnOnSystemPowerSwitch()
         else:
@@ -209,14 +221,15 @@ def connectToInternet(retries = 3):
             logger.info('Still waiting for network....')
             waitCounter=waitCounter+1
         
-        if waitCounter < 120:
+        if internet():
             logger.info('Network connection established.')
        
         else:
             logger.warning('Could not establish network connection after 2 minutes.')
 
-            logger.info('Turning on NDIS...')
-            turnOnNDIS()
+            if(config['modem.type']=="SIM7600X"):
+                logger.info('Attempting to turn on NDIS...')
+                turnOnNDIS()
 
             if retries > 0:
                 logger.info('Retrying to establish network connection...')
@@ -233,6 +246,7 @@ def connectToInternet(retries = 3):
 def disconnectFromInternet():
     try:
         logger.info('Disconnecting from internet...')
+        # loggerIntent.info('Disconnecting from internet...')
         if(config['modem.type']=="thumb"):
             logger.info('Current System Power Switch:')
             logger.info(pj.power.GetSystemPowerSwitch())
@@ -318,37 +332,53 @@ def uploadPendingTelemetry():
             #requests.post(config['apiUrl'] + '/Telemetry', json=api_data)
 
             if response.status_code == 200:
+                flashLED(pj, 'D2', 0, 0, 255, 1, .1)
                 logger.debug(f'Telemetry uploaded successfully')
                 shutil.move(telemetryFilename, uploadedTelemetryFolder + pathlib.Path(telemetryFilename).name)
                 logger.debug('Logged to API.')
+            else:
+                flashLED(pj, 'D2', 255, 0, 0, 1, 1)
+                logger.error(f'Telemetry upload failed')
 
             try:
                 logger.debug(json.dumps(json.loads(response.text), indent = 4))
 
                 if json.loads(response.text)['device']['supportMode'] != config['supportMode']:
                     logger.info('Support mode changed to ' + str(json.loads(response.text)['device']['supportMode']))
+                    loggerIntent.info('Support mode changed to ' + str(json.loads(response.text)['device']['supportMode']))
                     config['supportMode'] = json.loads(response.text)['device']['supportMode']
                     json.dump(config, open('config.json', 'w'), indent=4)
 
                 if json.loads(response.text)['device']['monitoringMode'] != config['monitoringMode']:
                     logger.info('Monitoring mode changed to ' + str(json.loads(response.text)['device']['monitoringMode']))
+                    loggerIntent.info('Monitoring mode changed to ' + str(json.loads(response.text)['device']['monitoringMode']))
                     config['monitoringMode'] = json.loads(response.text)['device']['monitoringMode']
                     json.dump(config, open('config.json', 'w'), indent=4)
 
                 if json.loads(response.text)['device']['hibernateMode'] != config['hibernateMode']:
                     logger.info('Hibernate mode changed to ' + str(json.loads(response.text)['device']['hibernateMode']))
+                    loggerIntent.info('Hibernate mode changed to ' + str(json.loads(response.text)['device']['hibernateMode']))
                     config['hibernateMode'] = json.loads(response.text)['device']['hibernateMode']
                     json.dump(config, open('config.json', 'w'), indent=4)
 
                    
+                if json.loads(response.text)['device']['powerOff'] != config['powerOff']:
+                    logger.info('Power Off changed to ' + str(json.loads(response.text)['device']['powerOff']))
+                    loggerIntent.info('Power Off changed to ' + str(json.loads(response.text)['device']['powerOff']))
+                    config['powerOff'] = json.loads(response.text)['device']['powerOff']
+                    json.dump(config, open('config.json', 'w'), indent=4)
+
             except json.decoder.JSONDecodeError:
+                flashLED(pj, 'D2', 255, 0, 255, 1, 1)
                 logger.debug(response.text)
 
 
     except requests.exceptions.ConnectionError as e:
+        flashLED(pj, 'D2', 255, 0, 255, 1, 1)
         logger.error(str(datetime.datetime.now()) + " uploadPendingTelemetry() failed - connection error. Leave in place.")
         logger.error(e)
     except Exception as e:
+        flashLED(pj, 'D2', 255, 0, 255, 1, 1)
         logger.error(str(datetime.datetime.now()) + " uploadPendingTelemetry() failed.")
         logger.error(e)
         if lastAttemptedFilename!="":          

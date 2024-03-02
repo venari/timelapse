@@ -8,6 +8,7 @@ namespace timelapse.api{
         public string Name {get; set;}
         [Required]
         public string SerialNumber {get; set;}
+        public string ShortDescription {get; set;}
         public string Description {get; set;}
     }
 }
