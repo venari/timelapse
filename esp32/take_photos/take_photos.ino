@@ -11,10 +11,42 @@ unsigned long lastCaptureTime = 0; // Last shooting time
 int imageCount = 1;                // File Counter
 bool camera_sign = false;          // Check camera status
 bool sd_sign = false;              // Check sd status
+const char *counterFilename = "/counter";
+
+void updateCounter(int count){
+  // Write the current count to the counter file
+  File file = SD.open(counterFilename, FILE_WRITE);
+  if(!file){
+    Serial.println("Failed to open counter file for writing");
+    return;
+  }
+  if(file.print(count)){
+    Serial.println("Counter updated");
+  } else {
+    Serial.println("Failed to update counter");
+  }
+}
+
+int getCounter(){
+  // Read the current count from the counter file
+  File file = SD.open(counterFilename);
+  if(!file){
+    Serial.println("Failed to open counter file for reading");
+    return 0;
+  }
+  int count = file.parseInt();
+  file.close();
+  return count;
+}
 
 // Save pictures to SD card
 void photo_save(const char * fileName) {
   // Take a photo
+  
+  Serial.println("Starting photo_save()");
+  digitalWrite(LED_BUILTIN, LOW); // XIAO ESP32S3 LOW = on
+  // delay(500);
+
   camera_fb_t *fb = esp_camera_fb_get();
   if (!fb) {
     Serial.println("Failed to get camera frame buffer");
@@ -25,6 +57,9 @@ void photo_save(const char * fileName) {
   
   // Release image buffer
   esp_camera_fb_return(fb);
+
+  digitalWrite(LED_BUILTIN, HIGH);
+  // delay(500);
 
   Serial.println("Photo saved to file");
 }
@@ -47,6 +82,9 @@ void writeFile(fs::FS &fs, const char * path, uint8_t * data, size_t len){
 }
 
 void setup() {
+
+  pinMode(LED_BUILTIN, OUTPUT);
+
   Serial.begin(115200);
   while(!Serial); // When the serial monitor is turned on, the program starts to execute
 
@@ -132,23 +170,29 @@ void setup() {
 
   sd_sign = true; // sd initialization check passes
 
-  Serial.println("Photos will begin in one minute, please be ready.");
+  imageCount = getCounter();
+  Serial.printf("imageCount = %d", imageCount);
+
 }
 
 void loop() {
   // Camera & SD available, start taking pictures
+
   if(camera_sign && sd_sign){
     // Get the current time
     unsigned long now = millis();
-  
+
+
     //If it has been more than 1 minute since the last shot, take a picture and save it to the SD card
-    if ((now - lastCaptureTime) >= 60000) {
+    // if ((now - lastCaptureTime) >= 60000) {
+    if ((now - lastCaptureTime) >= 10000) {
       char filename[32];
       sprintf(filename, "/image%d.jpg", imageCount);
       photo_save(filename);
       Serial.printf("Saved picture: %s\r\n", filename);
-      Serial.println("Photos will begin in one minute, please be ready.");
-      imageCount++;
+      // Serial.println("Photos will begin in one minute, please be ready.");
+      // imageCount++;
+      updateCounter(++imageCount);
       lastCaptureTime = now;
     }
   }
