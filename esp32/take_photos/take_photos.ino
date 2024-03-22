@@ -21,7 +21,7 @@ void updateCounter(int count){
     return;
   }
   if(file.print(count)){
-    Serial.println("Counter updated");
+    // Serial.println("Counter updated");
   } else {
     Serial.println("Failed to update counter");
   }
@@ -43,7 +43,7 @@ int getCounter(){
 void photo_save(const char * fileName) {
   // Take a photo
   
-  Serial.println("Starting photo_save()");
+  // Serial.println("Starting photo_save()");
   digitalWrite(LED_BUILTIN, LOW); // XIAO ESP32S3 LOW = on
   // delay(500);
 
@@ -61,12 +61,12 @@ void photo_save(const char * fileName) {
   digitalWrite(LED_BUILTIN, HIGH);
   // delay(500);
 
-  Serial.println("Photo saved to file");
+  // Serial.println("Photo saved to file");
 }
 
 // SD card write file
 void writeFile(fs::FS &fs, const char * path, uint8_t * data, size_t len){
-    Serial.printf("Writing file: %s\r\n", path);
+    // Serial.printf("Writing file: %s\r\n", path);
 
     File file = fs.open(path, FILE_WRITE);
     if(!file){
@@ -74,7 +74,7 @@ void writeFile(fs::FS &fs, const char * path, uint8_t * data, size_t len){
         return;
     }
     if(file.write(data, len) == len){
-        Serial.println("File written");
+        // Serial.println("File written");
     } else {
         Serial.println("Write failed");
     }
@@ -86,7 +86,7 @@ void setup() {
   pinMode(LED_BUILTIN, OUTPUT);
 
   Serial.begin(115200);
-  while(!Serial); // When the serial monitor is turned on, the program starts to execute
+  // while(!Serial); // When the serial monitor is turned on, the program starts to execute
 
   camera_config_t config;
   config.ledc_channel = LEDC_CHANNEL_0;
@@ -171,7 +171,7 @@ void setup() {
   sd_sign = true; // sd initialization check passes
 
   imageCount = getCounter();
-  Serial.printf("imageCount = %d", imageCount);
+  Serial.printf("imageCount = %d\r\n", imageCount);
 
 }
 
