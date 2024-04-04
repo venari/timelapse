@@ -1,0 +1,14 @@
+[Unit]
+Description=Envirocam Upload Service
+After=envirocam-logging-socket.service
+
+[Service]
+Type=idle
+User=pi
+
+ExecStart=/usr/bin/bash /home/pi/dev/timelapse/scripts/uploadPending.sh
+Restart=always
+RestartSec=60
+
+[Install]
+WantedBy=multi-user.target
