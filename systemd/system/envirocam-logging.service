@@ -1,0 +1,14 @@
+[Unit]
+Description=Envirocam logging server
+After=multi-user.target
+
+[Service]
+Type=idle
+User=pi
+
+ExecStart=/usr/bin/bash /home/pi/dev/timelapse/scripts/loggingSocketServer.sh
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
