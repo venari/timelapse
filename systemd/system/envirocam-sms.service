@@ -1,0 +1,11 @@
+[Unit]
+Description=Envirocam SMS Service
+After=envirocam-logging-socket.service
+
+[Service]
+Type=idle
+User=pi
+ExecStart=/usr/bin/bash /home/pi/dev/timelapse/scripts/handleSMS.sh
+
+[Install]
+WantedBy=timers.target

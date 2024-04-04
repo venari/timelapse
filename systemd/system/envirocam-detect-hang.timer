@@ -1,16 +1,8 @@
 [Unit]
 Description=Envirocam Hand Detection Service
-After=envirocam-logging-socket.service
-
-[Service]
-Type=idle
-User=pi
-
-ExecStart=/usr/bin/bash /home/pi/dev/timelapse/scripts/detectHang.sh
 
 [Timer]
-OnCalendar=*-*-* *:*/15:00
-
+OnCalendar=*:0/15
 
 [Install]
 WantedBy=timers.target
