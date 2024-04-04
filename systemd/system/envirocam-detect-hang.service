@@ -7,8 +7,5 @@ Type=idle
 User=pi
 ExecStart=/usr/bin/bash /home/pi/dev/timelapse/scripts/detectHang.sh
 
-[Timer]
-OnCalendar=*:0/15
-
 [Install]
 WantedBy=timers.target
