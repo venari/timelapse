@@ -109,6 +109,7 @@ grep -qxF 'static domain_name_servers=8.8.4.4 8.8.8.8' /etc/dhcpcd.conf || echo 
 
 echo Installing systemd services...
 sudo cp /home/pi/dev/timelapse/systemd/system/*.* /etc/systemd/system/
+sudo chmod u+x /etc/systemd/system/enviro*.*
 sudo systemctl enable envirocam-logging.service
 sudo systemctl enable envirocam-telemetry.service
 sudo systemctl enable envirocam-photos.service
