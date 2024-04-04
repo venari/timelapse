@@ -1,17 +1,9 @@
 [Unit]
 Description=Envirocam Status Service
-After=envirocam-logging-socket.service
-
-[Service]
-Type=idle
-User=pi
-
-ExecStart=/usr/bin/bash /home/pi/dev/timelapse/scripts/updateStatus.sh
 
 [Timer]
 OnBootSec=60
-OnCalendar=*-*-* *:*:00
-
+OnCalendar=*:0/15
 
 [Install]
 WantedBy=timers.target
