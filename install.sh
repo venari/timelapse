@@ -34,6 +34,14 @@ fi
 
 byobu-enable
 
+
+
+# sudo apt-get install locales
+# sudo locale-gen en_NZ.UTF-8
+# sudo update-locale LANG=en
+sudo dpkg-reconfigure locales
+
+
 echo Setting timezone...
 sudo timedatectl set-timezone Pacific/Auckland
 
@@ -108,7 +116,8 @@ echo Checking static domain_name_servers entry etc/dhcpcd.conf
 grep -qxF 'static domain_name_servers=8.8.4.4 8.8.8.8' /etc/dhcpcd.conf || echo 'static domain_name_servers=8.8.4.4 8.8.8.8' | sudo tee -a /etc/dhcpcd.conf
 
 
-
+# Clear out any old crontab entries
+(echo "@reboot /usr/bin/bash /home/pi/dev/timelapse/scripts/loggingSocketServer.sh")| crontab -
 
 echo Installing systemd services...
 sudo cp /home/pi/dev/timelapse/systemd/system/*.* /etc/systemd/system/
