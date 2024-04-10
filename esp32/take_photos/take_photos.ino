@@ -118,6 +118,7 @@ void photo_save(const char * fileName) {
   
   // Serial.println("Starting photo_save()");
   digitalWrite(LED_BUILTIN, LOW); // XIAO ESP32S3 LOW = on
+  logMessage("Taking photo... %5d", millis());
   // delay(500);
 
   camera_fb_t *fb = esp_camera_fb_get();
@@ -125,6 +126,8 @@ void photo_save(const char * fileName) {
     logError("Failed to get camera frame buffer");
     return;
   }
+
+  logMessage("Writing file... %5d", millis());
   // Save photo to file
   writeFile(SD, fileName, fb->buf, fb->len);
   
@@ -132,6 +135,7 @@ void photo_save(const char * fileName) {
   esp_camera_fb_return(fb);
 
   digitalWrite(LED_BUILTIN, HIGH);
+  logMessage("File written %5d", millis());
   // delay(500);
 
   // Serial.println("Photo saved to file");
@@ -234,6 +238,9 @@ void setup() {
   config.pin_reset = RESET_GPIO_NUM;
   config.xclk_freq_hz = 20000000;
   config.frame_size = FRAMESIZE_UXGA;
+  // config.frame_size = FRAMESIZE_QSXGA;
+  // config.frame_size = FRAMESIZE_QXGA;
+  
   config.pixel_format = PIXFORMAT_JPEG; // for streaming
   config.grab_mode = CAMERA_GRAB_WHEN_EMPTY;
   config.fb_location = CAMERA_FB_IN_PSRAM;
@@ -356,6 +363,12 @@ void setup() {
     // esp_sleep_enable_ext0_wakeup(GPIO_NUM_33,1); //1 = High, 0 = Low
 
 
+  logMessage("Staying awake for 15s to ease flashing");
+  delay(15000);  
+
+  digitalWrite(LED_BUILTIN, LOW); // XIAO ESP32S3 LOW = on
+  delay(500);
+  digitalWrite(LED_BUILTIN, HIGH); 
 
   logMessage("Going to sleep now");
   Serial.flush(); 
