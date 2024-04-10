@@ -55,39 +55,21 @@ void logMessage(const char *format, va_list args){
     return;
   }
   
-  // Serial.println("A");
-  // Write the current count to the counter file
   File file = SD.open(logFilename, FILE_APPEND);
-  // Serial.println("B");
   if(!file){
-      // Serial.println("C");
-
     Serial.println("Failed to open log file for writing");
-      // Serial.println("D");
-
     return;
   }
-  // Serial.println("E");
 
-  // file.seek(EOF);
-  // Serial.println("F");
   if(file.println(buf)){
       file.close();
-      // Serial.println("G");
-
-    // Serial.println("Counter updated");
   } else {
-      // Serial.println("H");
-
     Serial.println("Failed to append to log");
   }
-    // Serial.println("I");
-
 }
 
 
 void updateCounter(int count){
-  // Write the current count to the counter file
   File file = SD.open(counterFilename, FILE_WRITE);
   if(!file){
     logMessage("Failed to open counter file for writing");
@@ -101,7 +83,6 @@ void updateCounter(int count){
 }
 
 int getCounter(){
-  // Read the current count from the counter file
   File file = SD.open(counterFilename);
   if(!file){
     logMessage("Failed to open counter file for reading");
@@ -130,12 +111,14 @@ void photo_save(const char * fileName) {
   logMessage("Writing file... %5d", millis());
   // Save photo to file
   writeFile(SD, fileName, fb->buf, fb->len);
+  logMessage("File written %5d", millis());
   
   // Release image buffer
   esp_camera_fb_return(fb);
+  logMessage("image buffer released %5d", millis());
 
   digitalWrite(LED_BUILTIN, HIGH);
-  logMessage("File written %5d", millis());
+  logMessage("All done %5d", millis());
   // delay(500);
 
   // Serial.println("Photo saved to file");
@@ -214,7 +197,7 @@ void setup() {
   ++bootCount;
   logMessage("Boot number: %d", bootCount);
 
-
+  logMessage("Starting up %'d", millis());
 
 
   camera_config_t config;
@@ -267,21 +250,6 @@ void setup() {
 #endif
   }
 
-  // camera init
-  esp_err_t err = esp_camera_init(&config);
-  if (err != ESP_OK) {
-    logError("Camera init failed with error 0x%x", err);
-
-    logMessage("Going to sleep now");
-    Serial.flush(); 
-    esp_deep_sleep_start();
-
-
-    return;
-  }
-  
-  camera_sign = true; // Camera initialization check passes
-
   // Initialize SD card
   if(!SD.begin(21)){
     logError("Card Mount Failed");
@@ -290,6 +258,7 @@ void setup() {
     // Serial.flush(); 
     // esp_deep_sleep_start();
 
+    enableWakeupAndGoToSleep();
     return;
   }
   uint8_t cardType = SD.cardType();
@@ -302,6 +271,7 @@ void setup() {
     // Serial.flush(); 
     // esp_deep_sleep_start();
 
+    enableWakeupAndGoToSleep();
     return;
   }
 
@@ -317,10 +287,32 @@ void setup() {
   }
 
   sd_sign = true; // sd initialization check passes
+  logMessage("SD Card mounted %'d", millis());
+
+
+
+  // camera init
+  esp_err_t err = esp_camera_init(&config);
+  if (err != ESP_OK) {
+    logError("Camera init failed with error 0x%x", err);
+
+    enableWakeupAndGoToSleep();
+
+    return;
+  }
+  
+  camera_sign = true; // Camera initialization check passes
+  logMessage("Camera connected %'d", millis());
+
+
+
+
 
   imageCount = getCounter();
   logMessage("imageCount = %d\r\n", imageCount);
 
+  print_wakeup_reason();
+  print_wakeup_touchpad();
 
 
   char filename[32];
@@ -329,16 +321,14 @@ void setup() {
   logMessage("Saved picture: %s\r\n", filename);
   updateCounter(++imageCount);
   // lastCaptureTime = now;
+  
+  logMessage("Staying awake for 15s to ease flashing");
+  delay(15000);  
 
+  enableWakeupAndGoToSleep();
+}
 
-
-
-
-
-
-  //Print the wakeup reason for ESP32
-  print_wakeup_reason();
-  print_wakeup_touchpad();
+void enableWakeupAndGoToSleep(){
 
   #if CONFIG_IDF_TARGET_ESP32 
   //Setup sleep wakeup on Touch Pad 3 + 7 (GPIO15 + GPIO 27) 
@@ -363,19 +353,23 @@ void setup() {
     // esp_sleep_enable_ext0_wakeup(GPIO_NUM_33,1); //1 = High, 0 = Low
 
 
-  logMessage("Staying awake for 15s to ease flashing");
-  delay(15000);  
+  logMessage("Going to sleep now");
+  Serial.flush(); 
 
   digitalWrite(LED_BUILTIN, LOW); // XIAO ESP32S3 LOW = on
   delay(500);
   digitalWrite(LED_BUILTIN, HIGH); 
 
-  logMessage("Going to sleep now");
-  Serial.flush(); 
   esp_deep_sleep_start();
-
 
 }
 
+
 void loop() {
+  // Catch hang and shutdown
+    if (millis() >= 60000) {
+      logMessage("We've been awake for 60s - must have hung, going to sleep now");
+      Serial.flush();
+      esp_deep_sleep_start();
+    }
 }
