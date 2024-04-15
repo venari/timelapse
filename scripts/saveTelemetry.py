@@ -250,7 +250,8 @@ def scheduleShutdown():
                 and pj.status.GetChargeLevel()['data'] <= config['sleep_at_battery_percent'] \
                 and pj.status.GetChargeLevel()['data'] > config['hibernate_at_battery_percent'] \
                 and pj.status.GetStatus()['data']['battery'] != 'NOT_PRESENT' \
-                and datetime.datetime.now().minute < 10 \
+                and datetime.datetime.now().minute >= 10 \
+                and config['supportMode'] == False \
                 and bCharging == False:
                     logger.info('scheduling 10 minute sleep due to low battery')
                     loggerIntent.info('scheduling 10 minute sleep due to low battery')
