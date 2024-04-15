@@ -2,10 +2,19 @@
 #include "FS.h"
 #include "SD.h"
 #include "SPI.h"
+#include <U8x8lib.h>
+#include <Wire.h>
 
 #define CAMERA_MODEL_XIAO_ESP32S3 // Has PSRAM
 
 #include "camera_pins.h"
+
+
+
+#define PIN_WIRE_SDA        (4u)
+#define PIN_WIRE_SCL        (5u)
+
+U8X8_SSD1306_128X64_NONAME_HW_I2C u8x8(/* clock=*/ PIN_WIRE_SCL, /* data=*/ PIN_WIRE_SDA, /* reset=*/ U8X8_PIN_NONE);   // OLEDs without Reset of the Display
 
 
 #define uS_TO_S_FACTOR 1000000ULL  /* Conversion factor for micro seconds to seconds */
@@ -21,6 +30,7 @@
 RTC_DATA_ATTR int bootCount = 0;
 touch_pad_t touchPin;
 
+const bool enableSleep = false;
 
 unsigned long lastCaptureTime = 0; // Last shooting time
 int imageCount = 1;                // File Counter
@@ -28,6 +38,44 @@ bool camera_sign = false;          // Check camera status
 bool sd_sign = false;              // Check sd status
 const char *counterFilename = "/counter";
 const char *logFilename = "/log.txt";
+
+// define 2 dimensional char array to use as message stack
+char messageStack[6][32] = {
+  "Hello, World!",
+  "This is a test message",
+  "This is a test message",
+  "This is a test message",
+  "This is a test message",
+  "This is a test message"
+};
+
+void displayStatus(const char* status){
+  u8x8.setFont(u8x8_font_chroma48medium8_r);
+  u8x8.setCursor(0, 0);
+  u8x8.print(status);
+}
+
+void displayMessage(const char* message){
+  // u8x8.setFont(u8x8_font_chroma48medium8_r);
+  // u8x8.setCursor(0, 10);
+  // u8x8.print(message);
+
+  // // rotate stack
+  // for(int i = 4; i > 0; i++){
+  //   strcpy(messageStack[i+1], messageStack[i]);
+  // }
+
+  strcpy(messageStack[0], message);
+
+  u8x8.setCursor(0, 1);
+
+  for(int i = 0; i < 5; i++){
+    u8x8.setCursor(0, 1+i+1);
+    u8x8.print(messageStack[i]);
+  }
+
+}
+
 
 void logError(const char *format, ...){
   va_list args; // Create a variable argument list
@@ -49,6 +97,7 @@ void logMessage(const char *format, va_list args){
   char buf[128]; // Allocate a buffer to store the message
   vsnprintf(buf, sizeof(buf), format, args); // Write the formatted string to the buffer
   Serial.println(buf); // Print the buffer to the serial port
+  displayMessage(buf);
 
   if(sd_sign == false){
     Serial.println("SD Card not mounted yet.");
@@ -99,7 +148,7 @@ void photo_save(const char * fileName) {
   
   // Serial.println("Starting photo_save()");
   digitalWrite(LED_BUILTIN, LOW); // XIAO ESP32S3 LOW = on
-  logMessage("Taking photo... %5d", millis());
+  // logMessage("Taking photo... %5d", millis());
   // delay(500);
 
   camera_fb_t *fb = esp_camera_fb_get();
@@ -111,14 +160,14 @@ void photo_save(const char * fileName) {
   logMessage("Writing file... %5d", millis());
   // Save photo to file
   writeFile(SD, fileName, fb->buf, fb->len);
-  logMessage("File written %5d", millis());
+  // logMessage("File written %5d", millis());
   
   // Release image buffer
   esp_camera_fb_return(fb);
-  logMessage("image buffer released %5d", millis());
+  // logMessage("image buffer released %5d", millis());
 
   digitalWrite(LED_BUILTIN, HIGH);
-  logMessage("All done %5d", millis());
+  // logMessage("All done %5d", millis());
   // delay(500);
 
   // Serial.println("Photo saved to file");
@@ -194,10 +243,16 @@ void setup() {
   Serial.begin(115200);
   // while(!Serial); // When the serial monitor is turned on, the program starts to execute
 
+  u8x8.begin();
+  u8x8.setFlipMode(1);   // set number from 1 to 3, the screen word will rotary 180
+
+  displayStatus("Camera startup");
+
+
   ++bootCount;
   logMessage("Boot number: %d", bootCount);
 
-  logMessage("Starting up %'d", millis());
+  // logMessage("Starting up %'d", millis());
 
 
   camera_config_t config;
@@ -303,7 +358,7 @@ void setup() {
   
   camera_sign = true; // Camera initialization check passes
   logMessage("Camera connected %'d", millis());
-
+  displayStatus("Camera ready");
 
 
 
@@ -321,7 +376,8 @@ void setup() {
   logMessage("Saved picture: %s\r\n", filename);
   updateCounter(++imageCount);
   // lastCaptureTime = now;
-  
+
+  displayStatus("Image saved");  
   logMessage("Staying awake for 15s to ease flashing");
   delay(15000);  
 
@@ -360,16 +416,20 @@ void enableWakeupAndGoToSleep(){
   delay(500);
   digitalWrite(LED_BUILTIN, HIGH); 
 
-  esp_deep_sleep_start();
+  if(enableSleep){
+    esp_deep_sleep_start();
+  } else {
+    logMessage("enableSleep = false - not sleeping");
+  }
 
 }
 
 
 void loop() {
   // Catch hang and shutdown
-    if (millis() >= 60000) {
-      logMessage("We've been awake for 60s - must have hung, going to sleep now");
-      Serial.flush();
-      esp_deep_sleep_start();
-    }
+    // if (millis() >= 60000) {
+    //   logMessage("We've been awake for 60s - must have hung, going to sleep now");
+    //   Serial.flush();
+    //   enableWakeupAndGoToSleep();
+    // }
 }
