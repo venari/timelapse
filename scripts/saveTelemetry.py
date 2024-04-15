@@ -221,6 +221,7 @@ def scheduleShutdown():
             if config['sleep_during_night'] == True \
                 and (datetime.datetime.now().hour >= config['daytime_ends_at_h'] or datetime.datetime.now().hour < config['daytime_starts_at_h']) \
                 and config['supportMode'] == False \
+                and datetime.datetime.now().minute >= 10 \
                 and bCharging == False:
                 logger.info("Night time so we're scheduling shutdown")
                 loggerIntent.info("Night time so we're scheduling shutdown")
