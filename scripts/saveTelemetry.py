@@ -244,10 +244,13 @@ def scheduleShutdown():
                 # hibernate_at_battery_percent - at this battery percentage, the pi_juice min_charge setting puts us to sleep until battery gets to wakeup_on_charge value,
                 # so we let this setting take precedence via the pijuice_config.JSON file and don't set an alarm here.
 
+                # Also let's give it a chance to upload once an hour to catch up and avoid anxiety that camera has been stolen
+
                 if config['sleep_at_battery_percent'] > 0 and config['hibernate_at_battery_percent'] > 0 \
                 and pj.status.GetChargeLevel()['data'] <= config['sleep_at_battery_percent'] \
                 and pj.status.GetChargeLevel()['data'] > config['hibernate_at_battery_percent'] \
                 and pj.status.GetStatus()['data']['battery'] != 'NOT_PRESENT' \
+                and datetime.datetime.now().minute < 10 \
                 and bCharging == False:
                     logger.info('scheduling 10 minute sleep due to low battery')
                     loggerIntent.info('scheduling 10 minute sleep due to low battery')
