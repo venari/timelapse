@@ -3,13 +3,17 @@
 # Ask user if we have a waveshare modem
 read -p "Does this camera have a waveshare SIM7600X modem? (y/n)" waveshare
 
-echo Updating....
-sudo apt-get update
+read -p "Would you like to update the operating system software using apt-get update/upgrade? (y/n)" updateApt
 
-echo Upgrading...
-sudo apt-get upgrade -y
+if [ $updateApt == "y" ]; then
+    echo Updating....
+    sudo apt-get update
 
-echo Installing...
+    echo Upgrading...
+    sudo apt-get upgrade -y
+fi
+
+echo Installing packages...
 sudo apt-get install -y git pijuice-base python3-pip
 sudo apt-get install -y python3-picamera2 --no-install-recommends
 sudo apt-get install -y vim\
@@ -67,14 +71,14 @@ if [ ! -d "/home/pi/dev/timelapse" ]; then
     cd timelapse
     git config pull.rebase false
     # git checkout development
-    git checkout deployment/sedicam_v2
+    git checkout main
 else
     echo Updating repo...
     cd dev/timelapse
     # git checkout development
     git fetch
     git stash
-    git checkout deployment/sedicam_v2
+    git checkout main
     git pull
     git stash pop
 fi

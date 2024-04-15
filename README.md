@@ -54,44 +54,14 @@ raspberrypi.lan (192.168.86.32) at b8:27:eb:94:ac:b1 on en0 ifscope [ethernet]
 
 ```
 
-# Install software, config & code to new Pi:
+# Install (or update) software, (LiPo and LiFePO4, sedicam v2 configuration) config & code to new Pi:
 ```
 sudo apt-get install byobu -y
 byobu-enable
 byobu
 ```
 ```
-bash <(curl -fsSL "https://raw.githubusercontent.com/venari/timelapse/deployment/sedicam_v2/install.sh?$RANDOM")
-```
-
-# Install software, (LiPo, sedicam v2 configuration) config & code to new Pi
-```
-bash <(curl -fsSL "https://raw.githubusercontent.com/venari/timelapse/deployment/sedicam_v2/install_sedicam.sh?$RANDOM")
-```
-
-Update config and code to existing install
-```
-bash <(curl -fsSL "https://raw.githubusercontent.com/venari/timelapse/deployment/sedicam_v2/update_sedicam.sh?$RANDOM")
-```
-
-# Install software, (LiFePO4, sedicam v2 configuration) config & code to new Pi
-```
-bash <(curl -fsSL "https://raw.githubusercontent.com/venari/timelapse/deployment/sedicam_v2_LiFePO4/install_sedicam_v2_LiFePO4.sh?$RANDOM")
-```
-# Update software, (LiFePO4, sedicam v2 configuration) config & code to new Pi
-Update config and code to existing install for LiFePO4 install
-```
-bash <(curl -fsSL "https://raw.githubusercontent.com/venari/timelapse/main/update_sedicam_v2_LiFePO4.sh?$RANDOM")
-```
-
-## Install software, (LiFePO4, sedicam v1 cofiguration) config & code to new Pi
-```
-bash <(curl -fsSL "https://raw.githubusercontent.com/venari/timelapse/main/install.sh?$RANDOM")
-```
-
-Update config and code to existing install
-```
-bash <(curl -fsSL "https://raw.githubusercontent.com/venari/timelapse/main/update.sh?$RANDOM")
+bash <(curl -fsSL "https://github.com/venari/timelapse/raw/main/install.sh?$RANDOM")
 ```
 
 # Connect to intermitently connected Pi and tail log:
