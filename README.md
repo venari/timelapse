@@ -566,6 +566,7 @@ Then browse to the modem's IP address (e.g. http://192.168.1.1)
 ```
 pssh --hosts ~/dev/venari/timelapse/hosts.txt -t 900 -i 'cd dev/timelapse; git log -1'
 pssh --hosts ~/dev/venari/timelapse/hosts.txt -t 900 -x '-o ConnectTimeout=60 -o ConnectionAttempts=15' -i 'cd dev/timelapse; git log -1;git status'
+pssh --hosts ~/dev/venari/timelapse/hosts.txt -t 900 -x '-o ConnectTimeout=60 -o ConnectionAttempts=15' -i 'cd dev/timelapse; git diff'
 ```
 
 
