@@ -127,6 +127,14 @@ def scheduleShutdown():
             if bCharging:
                 logger.info("Night time - but we're charging/powered, so we'll stay on.")
 
+        # Has battery been disconnected, and RTC reset? Go into support mode until we connect and reset RTC.
+        if (pj.rtcAlarm.GetTime()['data']['year'] == 2000):
+                logger.warning('Looks like RTC has been reset - going into support mode until we reconnect.')
+                loggerIntent.warning('Looks like RTC has been reset - going into support mode until we reconnect.')
+                config['supportMode'] = True
+                json.dump(config, open('config.json', 'w'), indent=4)
+
+
         # Hibernate mode? 
         if config['hibernateMode']:
             # If we've awoken from hibernate - let's check it's within 5 minutes of the hour, or if hour is other than 0, 6, 12, or 18.
