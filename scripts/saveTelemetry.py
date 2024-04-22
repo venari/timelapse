@@ -184,6 +184,9 @@ def scheduleShutdown():
                 logger.info('Shutting down now...')
                 loggerIntent.info('Shutting down now...')
                 subprocess.call(['sudo', 'shutdown', '-h', 'now'])
+                
+                # Exit to make sure we don't than go and undo the power off!
+                return
 
 
 
