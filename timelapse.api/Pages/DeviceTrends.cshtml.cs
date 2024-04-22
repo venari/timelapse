@@ -50,6 +50,11 @@ public class DeviceTrendsModel : PageModel
         public int DeviceId {get; set;}
         public string DeviceName {get; set;}
         public string DeviceDescription {get; set;}
+        public bool DeviceSupportMode {get; set;}
+        public bool DeviceMonitoringMode {get; set;}
+        public bool DeviceService {get; set;}
+        public bool DeviceHibernateMode {get; set;}
+        public bool DevicePowerOff {get; set;}
         public List<PerformanceDetail> PerformanceDetails {get; set;} = new List<PerformanceDetail>();
     }
 
@@ -62,11 +67,11 @@ public class DeviceTrendsModel : PageModel
         }
 
         EndDate = DateTime.UtcNow;
-        StartDate = EndDate.AddHours(-1 * NumberOfHoursToDisplay);
-        var StartDateOnTheHour = StartDate.RoundDownToNearestHour(); //.AddMinutes(-1 * StartDate.Minute).AddSeconds(-1 * StartDate.Second).AddMilliseconds(-1 * StartDate.Millisecond);
+        StartDate = EndDate.AddHours(-1 * NumberOfHoursToDisplay).RoundDownToNearestHour();;
+        // var StartDateOnTheHour = StartDate.RoundDownToNearestHour(); //.AddMinutes(-1 * StartDate.Minute).AddSeconds(-1 * StartDate.Second).AddMilliseconds(-1 * StartDate.Millisecond);
         DateRange = Enumerable.Range(0, 1 + NumberOfHoursToDisplay)
             .Select(offset => 
-                StartDateOnTheHour.AddHours(offset)
+                StartDate.AddHours(offset)
             )
             .ToList();
         // DateRange = Enumerable.Range(0, 1 + (int)EndDate.Subtract(StartDate).TotalHours).Select(offset => 
@@ -89,6 +94,11 @@ public class DeviceTrendsModel : PageModel
                 DeviceId = d.Id,
                 DeviceName = d.Name,
                 DeviceDescription = d.ShortDescription,
+                DeviceSupportMode = d.SupportMode,
+                DeviceMonitoringMode = d.MonitoringMode,
+                DeviceService = d.Service,
+                DeviceHibernateMode = d.HibernateMode,
+                DevicePowerOff = d.PowerOff,
                 PerformanceDetails = d.Images
                     // .GroupBy(i => new {DateUTC = i.Timestamp.Date, HourUTC = i.Timestamp.Hour})
                     // .Select(g => new PerformanceDetail{Timestamp = g.Key.DateUTC.AddHours(g.Key.HourUTC), TotalImages = g.Count()})
