@@ -22,6 +22,9 @@ sudo apt-get install -y vim\
                         python3-RPi.GPIO\
                         python3-serial\
 
+# Enable wakeup logging.
+python3 /usr/bin/pijuice_log.py --enable WAKEUP_EVT
+
 # If not bookworm - install waveshare-epaper library with pip3
 # sudo pip3 install waveshare-epaper
 # sudo apt-get install python3-waveshare-epaper -y
