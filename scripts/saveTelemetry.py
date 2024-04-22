@@ -407,10 +407,23 @@ def scheduleShutdown():
             logger.info('Shutting down now...')
             loggerIntent.info('Shutting down now...')
             subprocess.call(['sudo', 'shutdown', '-h', 'now'])
-        # else:
-        #     # logger.debug('skipping shutdown scheduling because of config.json')
-        #     # # Ensure Wake up alarm is *not* enabled - or it will cause pi to reboot
-        #     # status = pj.rtcAlarm.SetWakeupEnabled(False)
+        else:
+            # Ensure Wake up alarm is *not* enabled - or it will cause pi to reboot
+            wakeUpCancelled = False
+            while wakeUpCancelled == False:
+
+                status = pj.rtcAlarm.SetWakeupEnabled(False)
+
+                if status['error'] != 'NO_ERROR':
+                    logger.error('Cannot cancel wakeup\n')
+                    # sys.exit()
+                    wakeUpCancelled = False
+                    logger.info('Sleeping and retrying to cancel wakeup...\n')
+                    time.sleep(10)
+                else:
+                    # logger.debug('Wakeup cancelled')
+                    # loggerIntent.debug('Wakeup cancelled')
+                    wakeUpCancelled = True
 
         #     SetSafetyWakeup()
 
