@@ -32,6 +32,8 @@ public class ImageHistoryModel : PageModel
     [BindProperty]
     public int NumberOfHoursToDisplay {get; set; }
 
+    public Device device {get; private set;}
+
     [BindProperty]
     public int DeviceId {get; set; }
 
@@ -115,7 +117,7 @@ public class ImageHistoryModel : PageModel
             return RedirectToPage("/NotFound");
         }
     
-        var device = _appDbContext.Devices
+        device = _appDbContext.Devices
             .Include(d => d.Images.Where(i => i.Timestamp >= StartDate && i.Timestamp <= EndDate).OrderBy(i => i.Timestamp))
             // .Include(d => d.Images.GroupBy(i => i.Timestamp.RoundDownToNearestHour()).Select(g => new {Timestamp = g.Key, FirstImage = g.OrderBy(i => i.Timestamp).FirstOrDefault()}))
             // .Include(d => d.Telemetries.Where(t => t.Timestamp >= StartDate && t.Timestamp <= EndDate).OrderBy(t => t.Timestamp))

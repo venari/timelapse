@@ -118,7 +118,8 @@
         }
     }
 
-    var daytimeColumns = ['Device Name', 'Device Description'];
+    var daytimeColumns = ['Device Name', 'Device Description', 'Device Support Mode', 'Device Monitoring Mode', 'Device Service', 'Device Hibernate Mode', 'Device Power Off'];
+
     var previousDateString = null;
 </script>
 
@@ -201,7 +202,13 @@
     <table class="table" id="devicePerformance">
         <thead>
             <th nowrap="nowrap">Device Name</th>
+            <th nowrap="nowrap"><i class="fa fa-cog" data-toggle="tooltip" title="Support Mode"></i></th>
+            <th nowrap="nowrap"><i class="fa fa-eye" data-toggle="tooltip" title="Monitoring Mode"></i></th>
+            <th nowrap="nowrap"><i class="fa fa-wrench" data-toggle="tooltip" title="Service"></i></th>
+            <th nowrap="nowrap"><i class="fa fa-moon" data-toggle="tooltip" title="Hibernate Mode"></i></th>
+            <th nowrap="nowrap"><i class="fa fa-power-off" data-toggle="tooltip" title="Power Off"></i></th>
             <th nowrap="nowrap">Description</th>
+            
 
             @{foreach(var date in Model.DateRange){
                 <th nowrap="nowrap"><script type="text/javascript">
@@ -211,6 +218,11 @@
             }}
         </thead>
         <thead>
+            <th nowrap="nowrap"></th>
+            <th nowrap="nowrap"></th>
+            <th nowrap="nowrap"></th>
+            <th nowrap="nowrap"></th>
+            <th nowrap="nowrap"></th>
             <th nowrap="nowrap"></th>
             <th nowrap="nowrap">Number of images and pending images</th>
 
@@ -222,22 +234,59 @@
             @{foreach(var summary in Model.PerformanceSummaries){
             <tr>
                 <td nowrap="nowrap"><a href="/TelemetryGraph/@(summary.DeviceId)/@(Model.NumberOfHoursToDisplay)">@(summary.DeviceName)</a></td>
+
+                <td nowrap="nowrap">
+                    @if(summary.DeviceSupportMode){
+                        <i class="fa fa-cog" data-toggle="tooltip" title="Support Mode"></i>
+                    }
+                </td>
+                <td>
+                    @if(summary.DeviceMonitoringMode){
+                        <i class="fa fa-eye" data-toggle="tooltip" title="Monitoring Mode"></i>
+                    }
+                </td>
+                <td>
+                    @if(summary.DeviceService){
+                        <i class="fa fa-wrench" data-toggle="tooltip" title="Service"></i>
+                    }
+                </td>
+                <td>
+                    @if(summary.DeviceHibernateMode){
+                        <i class="fa fa-moon" data-toggle="tooltip" title="Hibernate Mode"></i>
+                    }
+                </td>
+                <td>
+                    @if(summary.DevicePowerOff){
+                        <i class="fa fa-power-off" data-toggle="tooltip" title="Power Off"></i>
+                    }
+                </td>
+
+
                 @* <td><a href="/TelemetryGraph/@(summary.DeviceId)/@(Model.NumberOfHoursToDisplay)">@(summary.DeviceName)</a></td> *@
                 <td nowrap="nowrap">@(summary.DeviceDescription)</td>
                 @{foreach(var details in summary.PerformanceDetails){
-                    if(details.TotalImages<30 || details.MaxPendingImages > 60){
-                        <td nowrap="nowrap" style="background-color: #ff0000;">@(details.TotalImages) P@(details.MaxPendingImages)</td>
+                    if(summary.DeviceService || summary.DevicePowerOff || summary.DeviceHibernateMode){
+                        <td nowrap="nowrap" style="background-color: #999999;">@(details.TotalImages) P@(details.MaxPendingImages)</td>
                     } else {
-                        if(details.TotalImages<45 || details.MaxPendingImages > 45){
-                            <td nowrap="nowrap" style="background-color: #ffcc00;">@(details.TotalImages) P@(details.MaxPendingImages)</td>
+                        if(details.TotalImages<30 || details.MaxPendingImages > 60){
+                            <td nowrap="nowrap" style="background-color: #ff0000;">@(details.TotalImages) P@(details.MaxPendingImages)</td>
                         } else {
-                            <td nowrap="nowrap">@(details.TotalImages)</td>
-                        }
-                    }                    
+                            if(details.TotalImages<45 || details.MaxPendingImages > 45){
+                                <td nowrap="nowrap" style="background-color: #ffcc00;">@(details.TotalImages) P@(details.MaxPendingImages)</td>
+                            } else {
+                                <td nowrap="nowrap">@(details.TotalImages)</td>
+                            }
+                        }                    
+                    }
                 }}
             </tr>
             }}
             <thead>
+                <th nowrap="nowrap"></th>
+                <th nowrap="nowrap"></th>
+                <th nowrap="nowrap"></th>
+                <th nowrap="nowrap"></th>
+                <th nowrap="nowrap"></th>
                 <th nowrap="nowrap"></th>
                 <th nowrap="nowrap">Number of images only</th>
 
@@ -248,39 +297,82 @@
             @{foreach(var summary in Model.PerformanceSummaries){
             <tr>
                 <td nowrap="nowrap"><a href="/TelemetryGraph/@(summary.DeviceId)/@(Model.NumberOfHoursToDisplay)">@(summary.DeviceName)</a></td>
+
+                <td nowrap="nowrap">
+                    @if(summary.DeviceSupportMode){
+                        <i class="fa fa-cog" data-toggle="tooltip" title="Support Mode"></i>
+                    }
+                </td>
+                <td>
+                    @if(summary.DeviceMonitoringMode){
+                        <i class="fa fa-eye" data-toggle="tooltip" title="Monitoring Mode"></i>
+                    }
+                </td>
+                <td>
+                    @if(summary.DeviceService){
+                        <i class="fa fa-wrench" data-toggle="tooltip" title="Service"></i>
+                    }
+                </td>
+                <td>
+                    @if(summary.DeviceHibernateMode){
+                        <i class="fa fa-moon" data-toggle="tooltip" title="Hibernate Mode"></i>
+                    }
+                </td>
+                <td>
+                    @if(summary.DevicePowerOff){
+                        <i class="fa fa-power-off" data-toggle="tooltip" title="Power Off"></i>
+                    }
+                </td>
+
+
                 @* <td><a href="/TelemetryGraph/@(summary.DeviceId)/@(Model.NumberOfHoursToDisplay)">@(summary.DeviceName)</a></td> *@
                 <td nowrap="nowrap">@(summary.DeviceDescription)</td>
                 @{foreach(var details in summary.PerformanceDetails){
-                    if(details.TotalImages<30){
-                        <td nowrap="nowrap" style="background-color: #ff0000;">@(details.TotalImages)</td>
+                    if(summary.DeviceService || summary.DevicePowerOff || summary.DeviceHibernateMode){
+                        <td nowrap="nowrap" style="background-color: #999999;">@(details.TotalImages)</td>
                     } else {
-                        if(details.TotalImages<45){
-                            <td nowrap="nowrap" style="background-color: #ffcc00;">@(details.TotalImages)</td>
+                        if(details.TotalImages<30){
+                            <td nowrap="nowrap" style="background-color: #ff0000;">@(details.TotalImages)</td>
                         } else {
-                            <td nowrap="nowrap">@(details.TotalImages)</td>
-                        }
-                    }                    
+                            if(details.TotalImages<45){
+                                <td nowrap="nowrap" style="background-color: #ffcc00;">@(details.TotalImages)</td>
+                            } else {
+                                <td nowrap="nowrap">@(details.TotalImages)</td>
+                            }
+                        }                    
+                    }
                 }}
             </tr>
             <tr>
                 <td nowrap="nowrap"></td>
                 <td nowrap="nowrap"></td>
+                <td nowrap="nowrap"></td>
+                <td nowrap="nowrap"></td>
+                <td nowrap="nowrap"></td>
+                <td nowrap="nowrap"></td>
+                <td nowrap="nowrap"></td>
                 @{foreach(var details in summary.PerformanceDetails){
 
                     @if(details.FirstImage!=null){
-                        if(details.TotalImages<30){
-                            <td style="background-color: #ff0000;">
-                                <a href="ImageView/@(summary.DeviceId)/1/@(details.FirstImage.Timestamp.ToUniversalTime().ToString("o"))"><img src="@(details.FirstImage.BlobUri + Model.SasToken)" width=100 height=60></img></a>
+                        if(summary.DeviceService || summary.DevicePowerOff || summary.DeviceHibernateMode){
+                            <td nowrap="nowrap" style="background-color: #999999;">
+                                <a href="/ImageView/@(summary.DeviceId)/1/@(details.FirstImage.Timestamp.ToUniversalTime().ToString("o"))"><img src="@(details.FirstImage.BlobUri + Model.SasToken)" width=100 height=60></img></a>
                             </td>
                         } else {
-                            if(details.TotalImages<45){
-                                <td style="background-color: #ffcc00;">
-                                    <a href="ImageView/@(summary.DeviceId)/1/@(details.FirstImage.Timestamp.ToUniversalTime().ToString("o"))"><img src="@(details.FirstImage.BlobUri + Model.SasToken)" width=100 height=60></img></a>
+                            if(details.TotalImages<30){
+                                <td style="background-color: #ff0000;">
+                                    <a href="/ImageView/@(summary.DeviceId)/1/@(details.FirstImage.Timestamp.ToUniversalTime().ToString("o"))"><img src="@(details.FirstImage.BlobUri + Model.SasToken)" width=100 height=60></img></a>
                                 </td>
                             } else {
-                                <td>
-                                    <a href="ImageView/@(summary.DeviceId)/1/@(details.FirstImage.Timestamp.ToUniversalTime().ToString("o"))"><img src="@(details.FirstImage.BlobUri + Model.SasToken)" width=100 height=60></img></a>
-                                </td>
+                                if(details.TotalImages<45){
+                                    <td style="background-color: #ffcc00;">
+                                        <a href="/ImageView/@(summary.DeviceId)/1/@(details.FirstImage.Timestamp.ToUniversalTime().ToString("o"))"><img src="@(details.FirstImage.BlobUri + Model.SasToken)" width=100 height=60></img></a>
+                                    </td>
+                                } else {
+                                    <td>
+                                        <a href="/ImageView/@(summary.DeviceId)/1/@(details.FirstImage.Timestamp.ToUniversalTime().ToString("o"))"><img src="@(details.FirstImage.BlobUri + Model.SasToken)" width=100 height=60></img></a>
+                                    </td>
+                                }
                             }
                         }
                     } else {
@@ -301,7 +393,7 @@
     for (var i = 0; i < rows.length; i++) {
 
         var cells = rows[i].getElementsByTagName('th');
-        for (var j = 2; j < cells.length; j++) {
+        for (var j = 7; j < cells.length; j++) {
             // Also clear out cells that show same day as previous
             var dateString = cells[j].innerText;
             if(previousDateString==dateString){
@@ -313,9 +405,14 @@
 
         // check daytimeColumns and for all columns that are 'Night', remove cell highlighting
         var cells = rows[i].getElementsByTagName('td');
-        for (var j = 2; j < cells.length; j++) {
+        for (var j = 7; j < cells.length; j++) {
             if(daytimeColumns[j]=='Night'){
                 @* cells[j].style.display = 'none'; *@
+                cells[j].style.backgroundColor= '#ffffff';
+            }
+
+            // We will likely not have a full hour's worth of data for latest hour - no point highlighting
+            if(j==cells.length-1){
                 cells[j].style.backgroundColor= '#ffffff';
             }
         }
