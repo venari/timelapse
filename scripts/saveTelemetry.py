@@ -127,6 +127,14 @@ def scheduleShutdown():
             if bCharging:
                 logger.info("Night time - but we're charging/powered, so we'll stay on.")
 
+        # Has battery been disconnected, and RTC reset? Go into support mode until we connect and reset RTC.
+        if (pj.rtcAlarm.GetTime()['data']['year'] == 2000):
+                logger.warning('Looks like RTC has been reset - going into support mode until we reconnect.')
+                loggerIntent.warning('Looks like RTC has been reset - going into support mode until we reconnect.')
+                config['supportMode'] = True
+                json.dump(config, open('config.json', 'w'), indent=4)
+
+
         # Hibernate mode? 
         if config['hibernateMode']:
             # If we've awoken from hibernate - let's check it's within 5 minutes of the hour, or if hour is other than 0, 6, 12, or 18.
@@ -176,6 +184,9 @@ def scheduleShutdown():
                 logger.info('Shutting down now...')
                 loggerIntent.info('Shutting down now...')
                 subprocess.call(['sudo', 'shutdown', '-h', 'now'])
+                
+                # Exit to make sure we don't than go and undo the power off!
+                return
 
 
 
@@ -218,7 +229,11 @@ def scheduleShutdown():
 
         else:
 
-            if config['sleep_during_night'] == True and (datetime.datetime.now().hour >= config['daytime_ends_at_h'] or datetime.datetime.now().hour < config['daytime_starts_at_h']) and config['supportMode'] == False and bCharging == False:
+            if config['sleep_during_night'] == True \
+                and (datetime.datetime.now().hour >= config['daytime_ends_at_h'] or datetime.datetime.now().hour < config['daytime_starts_at_h']) \
+                and config['supportMode'] == False \
+                and datetime.datetime.now().minute >= 10 \
+                and bCharging == False:
                 logger.info("Night time so we're scheduling shutdown")
                 loggerIntent.info("Night time so we're scheduling shutdown")
 
@@ -244,10 +259,14 @@ def scheduleShutdown():
                 # hibernate_at_battery_percent - at this battery percentage, the pi_juice min_charge setting puts us to sleep until battery gets to wakeup_on_charge value,
                 # so we let this setting take precedence via the pijuice_config.JSON file and don't set an alarm here.
 
+                # Also let's give it a chance to upload once an hour to catch up and avoid anxiety that camera has been stolen
+
                 if config['sleep_at_battery_percent'] > 0 and config['hibernate_at_battery_percent'] > 0 \
                 and pj.status.GetChargeLevel()['data'] <= config['sleep_at_battery_percent'] \
                 and pj.status.GetChargeLevel()['data'] > config['hibernate_at_battery_percent'] \
                 and pj.status.GetStatus()['data']['battery'] != 'NOT_PRESENT' \
+                and datetime.datetime.now().minute >= 10 \
+                and config['supportMode'] == False \
                 and bCharging == False:
                     logger.info('scheduling 10 minute sleep due to low battery')
                     loggerIntent.info('scheduling 10 minute sleep due to low battery')
@@ -391,10 +410,23 @@ def scheduleShutdown():
             logger.info('Shutting down now...')
             loggerIntent.info('Shutting down now...')
             subprocess.call(['sudo', 'shutdown', '-h', 'now'])
-        # else:
-        #     # logger.debug('skipping shutdown scheduling because of config.json')
-        #     # # Ensure Wake up alarm is *not* enabled - or it will cause pi to reboot
-        #     # status = pj.rtcAlarm.SetWakeupEnabled(False)
+        else:
+            # Ensure Wake up alarm is *not* enabled - or it will cause pi to reboot
+            wakeUpCancelled = False
+            while wakeUpCancelled == False:
+
+                status = pj.rtcAlarm.SetWakeupEnabled(False)
+
+                if status['error'] != 'NO_ERROR':
+                    logger.error('Cannot cancel wakeup\n')
+                    # sys.exit()
+                    wakeUpCancelled = False
+                    logger.info('Sleeping and retrying to cancel wakeup...\n')
+                    time.sleep(10)
+                else:
+                    # logger.debug('Wakeup cancelled')
+                    # loggerIntent.debug('Wakeup cancelled')
+                    wakeUpCancelled = True
 
         #     SetSafetyWakeup()
 
