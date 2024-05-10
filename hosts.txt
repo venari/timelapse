@@ -13,4 +13,4 @@ pi@sediment-pi-zero-w-v1-j
 pi@envirocam-k
 pi@sediment-pi-zero-w-v1-l
 pi@sediment-pi-zero-w-v1-m
-pi@sediment-pi-zero-w-v1-n
+pi@envirocam-n
