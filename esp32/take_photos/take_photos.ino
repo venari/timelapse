@@ -14,7 +14,13 @@
 #define PIN_WIRE_SDA        (4u)
 #define PIN_WIRE_SCL        (5u)
 
-U8X8_SSD1306_128X64_NONAME_HW_I2C u8x8(/* clock=*/ PIN_WIRE_SCL, /* data=*/ PIN_WIRE_SDA, /* reset=*/ U8X8_PIN_NONE);   // OLEDs without Reset of the Display
+// U8X8_SSD1306_128X64_NONAME_HW_I2C u8x8(/* clock=*/ PIN_WIRE_SCL, /* data=*/ PIN_WIRE_SDA, /* reset=*/ U8X8_PIN_NONE);   // OLEDs without Reset of the Display
+U8X8_SSD1306_128X64_NONAME_HW_I2C u8x8(/* reset=*/ U8X8_PIN_NONE); 	      
+
+#define U8LOG_WIDTH 16
+#define U8LOG_HEIGHT 8
+uint8_t u8log_buffer[U8LOG_WIDTH*U8LOG_HEIGHT];
+U8X8LOG u8x8log;
 
 
 #define uS_TO_S_FACTOR 1000000ULL  /* Conversion factor for micro seconds to seconds */
@@ -39,43 +45,10 @@ bool sd_sign = false;              // Check sd status
 const char *counterFilename = "/counter";
 const char *logFilename = "/log.txt";
 
-// define 2 dimensional char array to use as message stack
-char messageStack[6][32] = {
-  "Hello, World!",
-  "This is a test message",
-  "This is a test message",
-  "This is a test message",
-  "This is a test message",
-  "This is a test message"
-};
-
-void displayStatus(const char* status){
-  u8x8.setFont(u8x8_font_chroma48medium8_r);
-  u8x8.setCursor(0, 0);
-  u8x8.print(status);
-}
-
 void displayMessage(const char* message){
-  // u8x8.setFont(u8x8_font_chroma48medium8_r);
-  // u8x8.setCursor(0, 10);
-  // u8x8.print(message);
-
-  // // rotate stack
-  // for(int i = 4; i > 0; i++){
-  //   strcpy(messageStack[i+1], messageStack[i]);
-  // }
-
-  strcpy(messageStack[0], message);
-
-  u8x8.setCursor(0, 1);
-
-  for(int i = 0; i < 5; i++){
-    u8x8.setCursor(0, 1+i+1);
-    u8x8.print(messageStack[i]);
-  }
-
+  u8x8log.print(message);
+  u8x8log.print("\n");
 }
-
 
 void logError(const char *format, ...){
   va_list args; // Create a variable argument list
@@ -157,7 +130,8 @@ void photo_save(const char * fileName) {
     return;
   }
 
-  logMessage("Writing file... %5d", millis());
+  // logMessage("Writing file... %5d", millis());
+  logMessage("Writing file...", millis());
   // Save photo to file
   writeFile(SD, fileName, fb->buf, fb->len);
   // logMessage("File written %5d", millis());
@@ -244,9 +218,16 @@ void setup() {
   // while(!Serial); // When the serial monitor is turned on, the program starts to execute
 
   u8x8.begin();
-  u8x8.setFlipMode(1);   // set number from 1 to 3, the screen word will rotary 180
+  // u8x8.setFlipMode(1);   // set number from 1 to 3, the screen word will rotary 180
 
-  displayStatus("Camera startup");
+  u8x8.setFont(u8x8_font_chroma48medium8_r);
+  // u8x8.setFont(u8x8_font_);
+  
+  u8x8log.begin(u8x8, U8LOG_WIDTH, U8LOG_HEIGHT, u8log_buffer);
+  // u8x8log.setRedrawMode(0);		// 0: Update screen with newline, 1: Update screen for every char  
+  u8x8log.setRedrawMode(1);		// 0: Update screen with newline, 1: Update screen for every char  
+
+  displayMessage("Camera startup");
 
 
   ++bootCount;
@@ -275,11 +256,13 @@ void setup() {
   config.pin_pwdn = PWDN_GPIO_NUM;
   config.pin_reset = RESET_GPIO_NUM;
   config.xclk_freq_hz = 20000000;
+  // config.xclk_freq_hz = 5000000; // Clock too high resulting in grainy/noisy image? https://github.com/espressif/esp32-camera/issues/172
   config.frame_size = FRAMESIZE_UXGA;
   // config.frame_size = FRAMESIZE_QSXGA;
   // config.frame_size = FRAMESIZE_QXGA;
   
   config.pixel_format = PIXFORMAT_JPEG; // for streaming
+  // config.pixel_format = PIXFORMAT_RAW; // Nope - didn't like that
   config.grab_mode = CAMERA_GRAB_WHEN_EMPTY;
   config.fb_location = CAMERA_FB_IN_PSRAM;
   config.jpeg_quality = 12;
@@ -358,7 +341,7 @@ void setup() {
   
   camera_sign = true; // Camera initialization check passes
   logMessage("Camera connected %'d", millis());
-  displayStatus("Camera ready");
+  displayMessage("Camera ready");
 
 
 
@@ -377,7 +360,7 @@ void setup() {
   updateCounter(++imageCount);
   // lastCaptureTime = now;
 
-  displayStatus("Image saved");  
+  displayMessage("Image saved");  
   logMessage("Staying awake for 15s to ease flashing");
   delay(15000);  
 
