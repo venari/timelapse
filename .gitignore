@@ -137,3 +137,4 @@ output/
 logs
 *.swp
 Untitled-2.sh
+arduino_secrets.h

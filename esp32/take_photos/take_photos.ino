@@ -4,10 +4,14 @@
 #include "SPI.h"
 #include <U8x8lib.h>
 #include <Wire.h>
+#include <WiFi.h>
+#include <NTPClient.h>
+#include <WiFiUdp.h>
 
 #define CAMERA_MODEL_XIAO_ESP32S3 // Has PSRAM
 
 #include "camera_pins.h"
+#include "arduino_secrets.h"
 
 
 
@@ -22,6 +26,11 @@ U8X8_SSD1306_128X64_NONAME_HW_I2C u8x8(/* reset=*/ U8X8_PIN_NONE);
 uint8_t u8log_buffer[U8LOG_WIDTH*U8LOG_HEIGHT];
 U8X8LOG u8x8log;
 
+const char *ssid = SECRET_SSID;
+const char *password = SECRET_PASS;
+
+WiFiUDP ntpUDP;
+NTPClient timeClient(ntpUDP, "pool.ntp.org");
 
 #define uS_TO_S_FACTOR 1000000ULL  /* Conversion factor for micro seconds to seconds */
 #define TIME_TO_SLEEP  10        /* Time ESP32 will go to sleep (in seconds) */
@@ -48,6 +57,10 @@ const char *logFilename = "/log.txt";
 void displayMessage(const char* message){
   u8x8log.print(message);
   u8x8log.print("\n");
+}
+
+void displayMessageNoNewline(const char* message){
+  u8x8log.print(message);
 }
 
 void logError(const char *format, ...){
@@ -210,6 +223,58 @@ void print_wakeup_touchpad(){
   #endif
 }
 
+void wifiConnect() {
+  displayMessage("WiFi connecting");
+  displayMessage(ssid);
+
+  int wifiConnectTries = 0;
+
+  WiFi.begin(ssid, password);
+  while (WiFi.status() != WL_CONNECTED && wifiConnectTries++ < 30) {
+    delay(1000);
+    displayMessageNoNewline(".");
+  }
+
+  if(WiFi.status() != WL_CONNECTED){
+    logError("WiFi connection failed");
+  } else {
+    displayMessage("WiFi connected");
+  }
+}
+
+void getTime(){
+
+  timeClient.begin();
+  // timeClient.setTimeOffset(19800);
+  timeClient.update();
+  logMessage("Time: %s", timeClient.getFormattedTime());
+
+  time_t epochTime = timeClient.getEpochTime();
+
+  // logMessage("Time: %d", timeClient.getEpochTime());
+
+  struct tm *ptm = gmtime(&epochTime);
+  int monthDay = ptm->tm_mday;
+  int currentMonth = ptm->tm_mon + 1;
+  // String currentMonthName = months[currentMonth - 1];
+  int currentYear = ptm->tm_year + 1900;
+
+  char isoTime[25];
+  sprintf(isoTime, "%04d-%02d-%02dT%02d:%02d:%02dZ", currentYear, currentMonth, monthDay, ptm->tm_hour, ptm->tm_min, ptm->tm_sec);
+  // logMessage("ISO8601 Time: %s", isoTime);
+  logMessage(isoTime);
+
+
+  // logMessage("Date: %s", timeClient.getFormattedDate());
+
+  if(timeClient.isTimeSet()){
+    logMessage("Time is set");
+  } else {
+    logError("Time is not set");
+  }
+
+}
+
 void setup() {
 
   pinMode(LED_BUILTIN, OUTPUT);
@@ -226,6 +291,8 @@ void setup() {
   u8x8log.begin(u8x8, U8LOG_WIDTH, U8LOG_HEIGHT, u8log_buffer);
   // u8x8log.setRedrawMode(0);		// 0: Update screen with newline, 1: Update screen for every char  
   u8x8log.setRedrawMode(1);		// 0: Update screen with newline, 1: Update screen for every char  
+
+
 
   displayMessage("Camera startup");
 
@@ -325,8 +392,12 @@ void setup() {
   }
 
   sd_sign = true; // sd initialization check passes
-  logMessage("SD Card mounted %'d", millis());
+  // logMessage("SD Card mounted %'d", millis());
+  logMessage("SD Card mounted");
 
+
+  wifiConnect();
+  getTime();
 
 
   // camera init
@@ -340,10 +411,8 @@ void setup() {
   }
   
   camera_sign = true; // Camera initialization check passes
-  logMessage("Camera connected %'d", millis());
+  // logMessage("Camera connected %'d", millis());
   displayMessage("Camera ready");
-
-
 
 
   imageCount = getCounter();
