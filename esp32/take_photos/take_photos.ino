@@ -34,7 +34,7 @@ WiFiUDP ntpUDP;
 NTPClient timeClient(ntpUDP, "pool.ntp.org");
 
 #define uS_TO_S_FACTOR 1000000ULL /* Conversion factor for micro seconds to seconds */
-#define TIME_TO_SLEEP 10          /* Time ESP32 will go to sleep (in seconds) */
+#define TIME_TO_SLEEP 300          /* Time ESP32 will go to sleep (in seconds) */
 
 #if CONFIG_IDF_TARGET_ESP32
 #define THRESHOLD 40   /* Greater the value, more the sensitivity */
@@ -48,7 +48,7 @@ RTC_PCF8563 rtc;
 RTC_DATA_ATTR int bootCount = 0;
 touch_pad_t touchPin;
 
-const bool enableSleep = false;
+const bool enableSleep = true;
 
 unsigned long lastCaptureTime = 0;  // Last shooting time
 int imageCount = 1;                 // File Counter
@@ -383,6 +383,7 @@ void setup() {
 
   sd_sign = true;  // sd initialization check passes
   // logMessage("SD Card mounted %'d", millis());
+  logRTC();
   logMessage("SD Card mounted");
 
 
@@ -392,7 +393,7 @@ void setup() {
 
 
   ++bootCount;
-  logMessage("Boot number: %d", bootCount++);
+  logMessage("Boot number: %d", bootCount);
 
   // logMessage("Starting up %'d", millis());
 
@@ -513,16 +514,14 @@ void enableWakeupAndGoToSleep() {
 
 
   // Timer Sleep:
-  // esp_sleep_enable_timer_wakeup(TIME_TO_SLEEP * uS_TO_S_FACTOR);
-  // Serial.println("Setup ESP32 to sleep for every " + String(TIME_TO_SLEEP) +
-  // " Seconds");
-
+  esp_sleep_enable_timer_wakeup(TIME_TO_SLEEP * uS_TO_S_FACTOR);
+  // logMessage("Setup ESP32 to sleep for  " + String(TIME_TO_SLEEP) + " Seconds");
 
   // External wakeup - RTC:
-  // esp_sleep_enable_ext0_wakeup(GPIO_NUM_33,1); //1 = High, 0 = Low
-
+  esp_sleep_enable_ext0_wakeup(GPIO_NUM_33,1); //1 = High, 0 = Low
 
   logMessage("Going to sleep now");
+  logRTC();
   Serial.flush();
 
   digitalWrite(LED_BUILTIN, LOW);  // XIAO ESP32S3 LOW = on
