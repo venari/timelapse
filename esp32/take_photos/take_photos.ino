@@ -477,7 +477,7 @@ void setup() {
   print_wakeup_touchpad();
 
 
-  char filename[32];
+  char filename[40];
 
   DateTime now = rtc.now();
   char rtcTime[25];
