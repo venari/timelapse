@@ -32,8 +32,7 @@ U8X8LOG u8x8log;
 
 const char *ssid = SECRET_SSID;
 const char *password = SECRET_PASS;
-
-char sID[7] = "ESP321";
+char MACAddress[25] = "Not set";
 
 WiFiUDP ntpUDP;
 NTPClient timeClient(ntpUDP, "pool.ntp.org");
@@ -51,19 +50,20 @@ NTPClient timeClient(ntpUDP, "pool.ntp.org");
 RTC_PCF8563 rtc;
 
 RTC_DATA_ATTR int bootCount = 0;
+bool rtcPresent=true;
 touch_pad_t touchPin;
 
 const bool enableSleep = true;
 
 unsigned long lastCaptureTime = 0;  // Last shooting time
-int imageCount = 1;                 // File Counter
+int imageCounter = 1;                 // File Counter
 bool camera_sign = false;           // Check camera status
 bool sd_sign = false;               // Check sd status
 const char *counterFilename = "/counter";
 const char *logFilename = "/log.txt";
 
 const char *uploadedFolder = "/uploaded";
-const char *pendingFolder = "/pending";
+const char *pendingFolder = "/pending2";
 
 const char *apiPostImageURL = "https://timelapse-dev.azurewebsites.net/api/Image";
 
@@ -249,23 +249,24 @@ void print_wakeup_touchpad() {
 }
 
 bool wifiConnect() {
-  displayMessage("WiFi connecting");
-  displayMessage(ssid);
-  displayMessage(password);
+  logMessage("WiFi connecting");
+  logMessage(ssid);
+  // logMessage(password);
 
   int wifiConnectTries = 0;
 
   WiFi.begin(ssid, password);
   while (WiFi.status() != WL_CONNECTED && wifiConnectTries++ < 30) {
-    delay(1000);
+    delay(3000);
     displayMessageNoNewline(".");
+    Serial.print(".");
   }
 
   if (WiFi.status() != WL_CONNECTED) {
     logError("WiFi connection failed");
     return false;
   } else {
-    displayMessage("WiFi connected");
+    logMessage("WiFi connected");
     return true;
   }
 }
@@ -278,7 +279,7 @@ void getNTPTime() {
   timeClient.update();
 
   // Get NTP time....
-  if (timeClient.isTimeSet()) {
+  if (timeClient.isTimeSet() && rtcPresent) {
 
     // Do all of this without logging/displaying to avoid introducing a few seconds delay.
     time_t epochTime = timeClient.getEpochTime();
@@ -342,24 +343,35 @@ void uploadPending(){
       // JsonDocument data;
       // data["SerialNumber"] = sID;
 
-      logMessage("SerialNumber: %s", sID);
+      logMessage("SerialNumber/MAC Address: %s", MACAddress);
       // convert string in form YYYY-mm-dd_HHMMSS to ISO8601 string
       // YYYY-mm-dd_HHMMSS
       // YYYY-mm-ddTHH:MM:SSZ
 
       // Convert string in form YYYY-mm-dd_HHMMSS to ISO8601 string
       logMessage("file.name(): %s", file.name());
-      String timestampString = String(file.name());
+      String timestampString = file.name();
       logMessage("Timestamp 1:");
-      displayMessage(timestampString);
+      Serial.println(timestampString);
       timestampString.replace("_", "T");
-      logMessage("Timestamp 2:");
-      displayMessage(timestampString);
-      timestampString = timestampString.substring(0, 13) + ":" + timestampString.substring(13, 15) + ":" + timestampString.substring(15) + "Z";
-      
-      logMessage("Timestamp 3:");
-      displayMessage(timestampString);
+      Serial.println(timestampString);
+      // image.00000000.2000-00-01_454902.jpg
+      // 01234567890123456789012345678901234567890123456789
+      // 0000000000111111111122222222223333333333
+      timestampString = timestampString.substring(15);
+      Serial.println(timestampString);
+      // 2000-00-01_454902.jpg
+      // 01234567890123456789012345678901234567890123456789
+      // 0000000000111111111122222222223333333333
+      timestampString = timestampString.substring(0, 13) + ":" + timestampString.substring(13, 15) + ":" + timestampString.substring(15, 17) + "Z";      
+      // 2000-00-01_45:49:02.jpg
+      // 01234567890123456789012345678901234567890123456789
+      // 0000000000111111111122222222223333333333
+      Serial.println(timestampString);
       // data["Timestamp"] = timestampString;
+
+      timestampString="2000-01-01T00:00:01Z";
+      Serial.println(timestampString);
 
       // https://forum.arduino.cc/t/sending-video-avi-and-audio-wav-files-with-arduino-script-from-esp32s3-via-http-post-multipart-form-data-to-server/1234706
 
@@ -367,7 +379,7 @@ void uploadPending(){
       
       String requestBody = "------" + boundary + "\r\n";
       requestBody += "Content-Disposition: form-data; name=\"SerialNumber\"\r\n\r\n";
-      requestBody += sID; 
+      requestBody += MACAddress; 
       requestBody += "\r\n";
       requestBody += "--" + boundary + "\r\n";
       requestBody += "Content-Disposition: form-data; name=\"Timestamp\"\r\n\r\n";
@@ -438,10 +450,12 @@ void uploadPending(){
 }
 
 void logRTC() {
-  DateTime now = rtc.now();
-  char rtcTime[25];
-  sprintf(rtcTime, ISO8061FormatString, now.year(), now.month(), now.day(), now.hour(), now.minute(), now.second());
-  logMessage("RTC Time: %s", rtcTime);
+  if(rtcPresent){
+    DateTime now = rtc.now();
+    char rtcTime[25];
+    sprintf(rtcTime, ISO8061FormatString, now.year(), now.month(), now.day(), now.hour(), now.minute(), now.second());
+    logMessage("RTC Time: %s", rtcTime);
+  }
 }
 
 void setup() {
@@ -462,37 +476,14 @@ void setup() {
   u8x8log.setRedrawMode(1);  // 0: Update screen with newline, 1: Update screen for every char
 
 
-  displayMessage("Checking RTC");
+  // displayMessage("Checking RTC");
   if (!rtc.begin()) {
-    logMessage("Couldn't find RTC");
-    while (1) delay(10);
+    rtcPresent=false;
+    logError("Couldn't find RTC");
+    // while (1) delay(10);
   }
 
   logRTC();
-
-  // DateTime now = rtc.now();
-  // char rtcTime[25];
-  // sprintf(rtcTime, "%04d-%02d-%02dT%02d:%02d:%02dZ", now.year(), now.month(), now.day(), now.hour(), now.minute(), now.second());
-  // logMessage("RTC Time: %s", getDateTimeAsIsoString(rtc.now()));
-
-  // No point setting time as below, as will be wrong timezone, and compile time.
-  // if (rtc.lostPower()) {
-  //   logMessage("RTC is NOT initialized, let's set the time - will be wrong timezone");
-  //   // When time needs to be set on a new device, or after a power loss, the
-  //   // following line sets the RTC to the date & time this sketch was compiled
-  //   rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
-  //   // This line sets the RTC with an explicit date & time, for example to set
-  //   // January 21, 2014 at 3am you would call:
-  //   // rtc.adjust(DateTime(2014, 1, 21, 3, 0, 0));
-  //   //
-  //   // Note: allow 2 seconds after inserting battery or applying external power
-  //   // without battery before calling adjust(). This gives the PCF8523's
-  //   // crystal oscillator time to stabilize. If you call adjust() very quickly
-  //   // after the RTC is powered, lostPower() may still return true.
-  // }
-
-
-
 
 
 
@@ -537,22 +528,17 @@ void setup() {
   logRTC();
   logMessage("SD Card mounted");
 
+  // logMessage("sID: %s", sID);
+  sprintf(MACAddress, "%012llx", ESP.getEfuseMac());
 
-  // if we've booted 5 times
-  if (bootCount % 5 == 0) {
+  if (bootCount % 5 == 1) {
     if(wifiConnect()){
       getNTPTime();
       uploadPending();
     }
   }
 
-
-
-  // for (int i=0; i<6; i++) {
-  //   sID[i] = EEPROM.read(i);
-  // }
-
-  logMessage("sID: %s", sID);
+  logMessage("MAC Address: %s", MACAddress);
 
 
   displayMessage("Camera startup");
@@ -632,24 +618,30 @@ void setup() {
   displayMessage("Camera ready");
 
 
-  imageCount = getCounter();
-  logMessage("imageCount = %d\r\n", imageCount);
+  imageCounter = getCounter();
+  logMessage("imageCounter = %d\r\n", imageCounter);
 
   print_wakeup_reason();
   print_wakeup_touchpad();
 
 
   char filename[50];
-
-  DateTime now = rtc.now();
   char rtcTime[25];
-  sprintf(rtcTime, YYYYMMDDHHMMSSFormatString, now.year(), now.month(), now.day(), now.hour(), now.minute(), now.second());
+  
+  if(rtcPresent){
+    DateTime now = rtc.now();
+    sprintf(rtcTime, YYYYMMDDHHMMSSFormatString, now.year(), now.month(), now.day(), now.hour(), now.minute(), now.second());
+  } else {
+    // Leave as blank, but valid.
+    sprintf(rtcTime, YYYYMMDDHHMMSSFormatString, 2000, 1, 1, 0, 0, 1);
+  }
 
-  sprintf(filename, "%s/image.%08d.%s.jpg", pendingFolder, imageCount, rtcTime);
+  sprintf(filename, "%s/image.%08d.%s.jpg", pendingFolder, imageCounter, rtcTime);
+  logMessage("Filename: %s", filename);
 
   photo_save(filename);
   logMessage("Saved picture: %s\r\n", filename);
-  updateCounter(++imageCount);
+  updateCounter(++imageCounter);
   // lastCaptureTime = now;
 
   displayMessage("Image saved");
@@ -698,6 +690,9 @@ void enableWakeupAndGoToSleep() {
 
 
 void loop() {
+  if(millis()%1000==0){
+    logMessage("Heartbeat");
+  }
   // Catch hang and shutdown
   // if (millis() >= 60000) {
   //   logMessage("We've been awake for 60s - must have hung, going to sleep now");
