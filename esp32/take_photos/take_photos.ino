@@ -8,6 +8,9 @@
 #include <NTPClient.h>
 #include <WiFiUdp.h>
 #include "RTClib.h"
+#include <EEPROM.h>
+#include <HTTPClient.h>
+// #include <ArduinoJson.h>
 
 #define CAMERA_MODEL_XIAO_ESP32S3  // Has PSRAM
 
@@ -30,11 +33,13 @@ U8X8LOG u8x8log;
 const char *ssid = SECRET_SSID;
 const char *password = SECRET_PASS;
 
+char sID[7] = "ESP321";
+
 WiFiUDP ntpUDP;
 NTPClient timeClient(ntpUDP, "pool.ntp.org");
 
 #define uS_TO_S_FACTOR 1000000ULL /* Conversion factor for micro seconds to seconds */
-#define TIME_TO_SLEEP 300          /* Time ESP32 will go to sleep (in seconds) */
+#define TIME_TO_SLEEP 30          /* Time ESP32 will go to sleep (in seconds) */
 
 #if CONFIG_IDF_TARGET_ESP32
 #define THRESHOLD 40   /* Greater the value, more the sensitivity */
@@ -56,6 +61,11 @@ bool camera_sign = false;           // Check camera status
 bool sd_sign = false;               // Check sd status
 const char *counterFilename = "/counter";
 const char *logFilename = "/log.txt";
+
+const char *uploadedFolder = "/uploaded";
+const char *pendingFolder = "/pending";
+
+const char *apiPostImageURL = "https://timelapse-dev.azurewebsites.net/api/Image";
 
 const char *ISO8061FormatString = "%04d-%02d-%02dT%02d:%02d:%02dZ";
 const char *YYYYMMDDHHMMSSFormatString = "%04d-%02d-%02d_%02d%02d%02d";
@@ -171,6 +181,19 @@ void photo_save(const char *fileName) {
 void writeFile(fs::FS &fs, const char *path, uint8_t *data, size_t len) {
   // Serial.printf("Writing file: %s\r\n", path);
 
+  if(!fs.exists(path)){
+    // Get folder name of file
+    char folder[50];
+    strcpy(folder, path);
+    char *lastSlash = strrchr(folder, '/');
+    if (lastSlash != NULL) {
+      *lastSlash = '\0';
+      if(!fs.exists(folder)){
+        fs.mkdir(folder);
+      }
+    }
+  }
+  
   File file = fs.open(path, FILE_WRITE);
   if (!file) {
     logError("Failed to open file for writing");
@@ -225,7 +248,7 @@ void print_wakeup_touchpad() {
 #endif
 }
 
-void wifiConnect() {
+bool wifiConnect() {
   displayMessage("WiFi connecting");
   displayMessage(ssid);
   displayMessage(password);
@@ -240,8 +263,10 @@ void wifiConnect() {
 
   if (WiFi.status() != WL_CONNECTED) {
     logError("WiFi connection failed");
+    return false;
   } else {
     displayMessage("WiFi connected");
+    return true;
   }
 }
 
@@ -284,6 +309,132 @@ void getNTPTime() {
   } else {
     logError("NTP Time is not set");
   }
+}
+
+void uploadPending(){
+
+  logMessage("uploadPending()....");
+  File root = SD.open(pendingFolder);
+  if (!root) {
+    logError("Failed to open pending folder");
+    return;
+  }
+
+  File file = root.openNextFile();
+  while (file) {
+    if (!file.isDirectory()) {
+
+      logMessage(file.name());
+      // HTTP POST request
+      HTTPClient http;
+      http.begin(apiPostImageURL);
+      http.addHeader("Content-Type", "multipart/form-data");
+      http.addHeader("Accept", "text/plain");
+
+      // // Open the file for reading
+      // File fileToUpload = SD.open(file.name(), FILE_READ);
+      // if (!fileToUpload) {
+      //   logError("Failed to open file for uploading");
+      //   file.close();
+      //   continue;
+      // }
+
+      // JsonDocument data;
+      // data["SerialNumber"] = sID;
+
+      logMessage("SerialNumber: %s", sID);
+      // convert string in form YYYY-mm-dd_HHMMSS to ISO8601 string
+      // YYYY-mm-dd_HHMMSS
+      // YYYY-mm-ddTHH:MM:SSZ
+
+      // Convert string in form YYYY-mm-dd_HHMMSS to ISO8601 string
+      logMessage("file.name(): %s", file.name());
+      String timestampString = String(file.name());
+      logMessage("Timestamp 1:");
+      displayMessage(timestampString);
+      timestampString.replace("_", "T");
+      logMessage("Timestamp 2:");
+      displayMessage(timestampString);
+      timestampString = timestampString.substring(0, 13) + ":" + timestampString.substring(13, 15) + ":" + timestampString.substring(15) + "Z";
+      
+      logMessage("Timestamp 3:");
+      displayMessage(timestampString);
+      // data["Timestamp"] = timestampString;
+
+      // https://forum.arduino.cc/t/sending-video-avi-and-audio-wav-files-with-arduino-script-from-esp32s3-via-http-post-multipart-form-data-to-server/1234706
+
+      String boundary = "----WebKitFormBoundary" + String(random(0xFFFFFF), HEX);
+      
+      String requestBody = "------" + boundary + "\r\n";
+      requestBody += "Content-Disposition: form-data; name=\"SerialNumber\"\r\n\r\n";
+      requestBody += sID; 
+      requestBody += "\r\n";
+      requestBody += "--" + boundary + "\r\n";
+      requestBody += "Content-Disposition: form-data; name=\"Timestamp\"\r\n\r\n";
+      requestBody += timestampString; 
+      requestBody += "\r\n";
+      requestBody += "--" + boundary + "\r\n";
+      requestBody += "Content-Disposition: form-data; name=\"file\"; filename=\"file.name\"\r\n";
+      requestBody += "Content-Type: image/png\r\n\r\n";
+      requestBody += file.readString();
+      requestBody += "\r\n";
+      requestBody += "--" + boundary + "--\r\n";
+
+      int contentLength = requestBody.length();
+
+      // Set the Content-Length header
+      http.addHeader("Content-Length", String(contentLength));
+      logMessage("Content-Length: %d", contentLength);
+
+      // Send the POST request
+     int httpResponseCode = http.sendRequest("POST", requestBody);
+     logMessage("httpResponseCode: %d", httpResponseCode);
+
+      if (httpResponseCode == HTTP_CODE_OK) {
+        displayMessage("Data sent successfully!");
+
+        // Move the file to the uploaded folder
+        String filename = file.name();
+        filename.replace(pendingFolder, uploadedFolder);
+        if (SD.rename(file.name(), filename)) {
+          logMessage("File moved to uploaded folder");
+        } else {
+          logError("Failed to move file to uploaded folder");
+        }
+
+      } else {
+        logMessage("Error sending data. HTTP code: %d", httpResponseCode);
+      }
+
+      file.close(); 
+
+      // // Send the file data in the HTTP request body
+      // http.POST(fileData, fileSize);
+
+      // // Check the HTTP response code
+      // int httpResponseCode = http.getResponseCode();
+      // if (httpResponseCode == HTTP_CODE_OK) {
+      //   logMessage("File uploaded successfully");
+      //   // Move the file to the uploaded folder
+      //   char filename[50];
+      //   sprintf(filename, "%s/%s", uploadedFolder, file.name() + strlen(pendingFolder) + 1);
+      //   if (SD.rename(file.name(), filename)) {
+      //     logMessage("File moved to uploaded folder");
+      //   } else {
+      //     logError("Failed to move file to uploaded folder");
+      //   }
+      // } else {
+      //   logError("Failed to upload file. HTTP response code: %d", httpResponseCode);
+      // }
+
+      // Clean up
+      // delete[] fileData;
+      http.end();
+    }
+    file = root.openNextFile();
+  }
+  root.close();
+
 }
 
 void logRTC() {
@@ -387,6 +538,21 @@ void setup() {
   logMessage("SD Card mounted");
 
 
+  // if we've booted 5 times
+  if (bootCount % 5 == 0) {
+    if(wifiConnect()){
+      getNTPTime();
+      uploadPending();
+    }
+  }
+
+
+
+  // for (int i=0; i<6; i++) {
+  //   sID[i] = EEPROM.read(i);
+  // }
+
+  logMessage("sID: %s", sID);
 
 
   displayMessage("Camera startup");
@@ -451,11 +617,6 @@ void setup() {
   }
 
 
-
-  wifiConnect();
-  getNTPTime();
-
-
   // camera init
   esp_err_t err = esp_camera_init(&config);
   if (err != ESP_OK) {
@@ -478,13 +639,13 @@ void setup() {
   print_wakeup_touchpad();
 
 
-  char filename[40];
+  char filename[50];
 
   DateTime now = rtc.now();
   char rtcTime[25];
   sprintf(rtcTime, YYYYMMDDHHMMSSFormatString, now.year(), now.month(), now.day(), now.hour(), now.minute(), now.second());
 
-  sprintf(filename, "/image.%08d.%s.jpg", imageCount, rtcTime);
+  sprintf(filename, "%s/image.%08d.%s.jpg", pendingFolder, imageCount, rtcTime);
 
   photo_save(filename);
   logMessage("Saved picture: %s\r\n", filename);
