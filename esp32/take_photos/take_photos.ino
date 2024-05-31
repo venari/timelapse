@@ -67,6 +67,7 @@ const char *pendingFolder = "/pending2";
 
 const char *apiPostImageURL = "https://timelapse-dev.azurewebsites.net/api/Image";
 // const char *apiPostImageURL = "https://webhook.site/fc3e2df5-bb36-48a5-8e04-148c41a03839";
+#define CHUNK_SIZE 4096 // Adjust this to a smaller size if needed
 
 const char *ISO8061FormatString = "%04d-%02d-%02dT%02d:%02d:%02dZ";
 const char *YYYYMMDDHHMMSSFormatString = "%04d-%02d-%02d_%02d%02d%02d";
@@ -393,66 +394,40 @@ void uploadPending(){
       http.addHeader("Content-Length", String(contentLength));
       logMessage("Content-Length: %d", contentLength);
 
-      // Serial.println("A1");
-      // Serial.println("A2");
-      // Serial.println("A3");
 
-      // String filePath = pendingFolder;
-      // filePath += "/";
-      // filePath += file.name();
+      // String requestBody = start_request;
+      // logMessage("requestBody.length(): %d", requestBody.length());
+      // requestBody += file.readString();
+      // logMessage("requestBody.length(): %d", requestBody.length());
+      // requestBody += end_request;
+      // logMessage("requestBody.length(): %d", requestBody.length());
+  
 
-      // Serial.println(filePath);
-      // File fileUpload = SD.open(filePath, FILE_READ);
-      // Serial.println("B");
+Serial.println("A");
+Serial.flush();
+      WiFiClient * client = http.getStreamPtr();
+Serial.println("B");
+Serial.flush();
+if(client) {
+      client->print(start_request);
+Serial.println("C");
+Serial.flush();
 
+      uint8_t buffer[CHUNK_SIZE];
+      while (file.available()) {
+        size_t len = file.read(buffer, sizeof(buffer));
+        client->write(buffer, len);
+      }
+Serial.println("D");
+Serial.flush();
 
-      // if(!fileUpload){
-      //   Serial.println("Failed to open file for reading");
-      //   return;
-      // }
+      client->print(end_request);
+Serial.println("E");
+Serial.flush();
 
-      // Serial.println("A4");
-      // Serial.print("C");
-      // Serial.println("A5");
-      // Serial.flush();
-
-      // WiFiClient * client = http.getStreamPtr();
-      // client->print(start_request);
-
-      // Serial.println("D");
-      // Serial.flush();
-
-      // uint8_t buffer[128] = { 0 };
-      // while(file.available()){
-      //         Serial.print("E");
-      // Serial.flush();
-
-      //   size_t len = file.read(buffer, sizeof(buffer));
-      //         Serial.print("F");
-      // Serial.flush();
-
-      //   client->write(buffer, len);
-      //         Serial.print("G");
-      // Serial.flush();
-
-      // }
-      // Serial.println("H");
-      // Serial.flush();
-
-      String requestBody = start_request;
-      logMessage("requestBody.length(): %d", requestBody.length());
-      // Serial.println("H1");
-      // Serial.flush();
-      requestBody += file.readString();
-      logMessage("requestBody.length(): %d", requestBody.length());
-      // Serial.println("H2");
-      // Serial.flush();
-      requestBody += end_request;
-      logMessage("requestBody.length(): %d", requestBody.length());
-      // Serial.println("H3");
-      // Serial.flush();
-
-
+      int httpResponseCode = http.POST("");
+Serial.println("F");
+Serial.flush();
 
       file.close();
       // Serial.println("I");
@@ -465,7 +440,7 @@ void uploadPending(){
 
       // Send the POST request
 
-      int httpResponseCode = http.sendRequest("POST", requestBody);
+      // int httpResponseCode = http.sendRequest("POST", requestBody);
       // int httpResponseCode = http.POST("");
       logMessage("httpResponseCode: %d", httpResponseCode);
 
@@ -492,6 +467,9 @@ void uploadPending(){
 
       file.close(); 
 
+} else {
+  Serial.println("Error: Failed to get stream pointer");
+}
       // // Send the file data in the HTTP request body
       // http.POST(fileData, fileSize);
 
