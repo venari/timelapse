@@ -66,6 +66,7 @@ const char *uploadedFolder = "/uploaded";
 const char *pendingFolder = "/pending2";
 
 const char *apiPostImageURL = "https://timelapse-dev.azurewebsites.net/api/Image";
+// const char *apiPostImageURL = "https://webhook.site/fc3e2df5-bb36-48a5-8e04-148c41a03839";
 
 const char *ISO8061FormatString = "%04d-%02d-%02dT%02d:%02d:%02dZ";
 const char *YYYYMMDDHHMMSSFormatString = "%04d-%02d-%02d_%02d%02d%02d";
@@ -327,34 +328,27 @@ void uploadPending(){
 
       logMessage(file.name());
       // HTTP POST request
+
+      String boundary = "----WebKitFormBoundary" + String(random(0xFFFFFF), HEX);
+
       HTTPClient http;
       http.begin(apiPostImageURL);
-      http.addHeader("Content-Type", "multipart/form-data");
+
+      String contentType = "multipart/form-data";
+      contentType += "; boundary=";
+      contentType += boundary;
+      http.addHeader("Content-Type", contentType);
+
+// boundary
+
       http.addHeader("Accept", "text/plain");
 
-      // // Open the file for reading
-      // File fileToUpload = SD.open(file.name(), FILE_READ);
-      // if (!fileToUpload) {
-      //   logError("Failed to open file for uploading");
-      //   file.close();
-      //   continue;
-      // }
-
-      // JsonDocument data;
-      // data["SerialNumber"] = sID;
-
       logMessage("SerialNumber/MAC Address: %s", MACAddress);
-      // convert string in form YYYY-mm-dd_HHMMSS to ISO8601 string
-      // YYYY-mm-dd_HHMMSS
-      // YYYY-mm-ddTHH:MM:SSZ
 
       // Convert string in form YYYY-mm-dd_HHMMSS to ISO8601 string
       logMessage("file.name(): %s", file.name());
       String timestampString = file.name();
-      logMessage("Timestamp 1:");
-      Serial.println(timestampString);
       timestampString.replace("_", "T");
-      Serial.println(timestampString);
       // image.00000000.2000-00-01_454902.jpg
       // 01234567890123456789012345678901234567890123456789
       // 0000000000111111111122222222223333333333
@@ -368,39 +362,112 @@ void uploadPending(){
       // 01234567890123456789012345678901234567890123456789
       // 0000000000111111111122222222223333333333
       Serial.println(timestampString);
-      // data["Timestamp"] = timestampString;
-
-      timestampString="2000-01-01T00:00:01Z";
-      Serial.println(timestampString);
 
       // https://forum.arduino.cc/t/sending-video-avi-and-audio-wav-files-with-arduino-script-from-esp32s3-via-http-post-multipart-form-data-to-server/1234706
 
-      String boundary = "----WebKitFormBoundary" + String(random(0xFFFFFF), HEX);
       
-      String requestBody = "------" + boundary + "\r\n";
-      requestBody += "Content-Disposition: form-data; name=\"SerialNumber\"\r\n\r\n";
-      requestBody += MACAddress; 
-      requestBody += "\r\n";
-      requestBody += "--" + boundary + "\r\n";
-      requestBody += "Content-Disposition: form-data; name=\"Timestamp\"\r\n\r\n";
-      requestBody += timestampString; 
-      requestBody += "\r\n";
-      requestBody += "--" + boundary + "\r\n";
-      requestBody += "Content-Disposition: form-data; name=\"file\"; filename=\"file.name\"\r\n";
-      requestBody += "Content-Type: image/png\r\n\r\n";
-      requestBody += file.readString();
-      requestBody += "\r\n";
-      requestBody += "--" + boundary + "--\r\n";
+      String start_request = "--" + boundary + "\r\n";
+      start_request += "Content-Disposition: form-data; name=\"SerialNumber\"\r\n\r\n";
+      start_request += MACAddress; 
+      start_request += "\r\n";
+      start_request += "--" + boundary + "\r\n";
+      start_request += "Content-Disposition: form-data; name=\"Timestamp\"\r\n\r\n";
+      start_request += timestampString; 
+      start_request += "\r\n";
+      start_request += "--" + boundary + "\r\n";
+      start_request += "Content-Disposition: form-data; name=\"File\"; filename=\"";
+      start_request += file.name();
+      start_request += "\"\r\n";
+      start_request += "Content-Type: image/png\r\n\r\n";
 
-      int contentLength = requestBody.length();
+      Serial.print(start_request);
+
+      // requestBody += file.readString();
+
+      String end_request = "\r\n--" + boundary + "--\r\n";
+
+      int fileLength = file.size();
+      int contentLength = start_request.length() + fileLength + end_request.length();
 
       // Set the Content-Length header
       http.addHeader("Content-Length", String(contentLength));
       logMessage("Content-Length: %d", contentLength);
 
+      // Serial.println("A1");
+      // Serial.println("A2");
+      // Serial.println("A3");
+
+      // String filePath = pendingFolder;
+      // filePath += "/";
+      // filePath += file.name();
+
+      // Serial.println(filePath);
+      // File fileUpload = SD.open(filePath, FILE_READ);
+      // Serial.println("B");
+
+
+      // if(!fileUpload){
+      //   Serial.println("Failed to open file for reading");
+      //   return;
+      // }
+
+      // Serial.println("A4");
+      // Serial.print("C");
+      // Serial.println("A5");
+      // Serial.flush();
+
+      // WiFiClient * client = http.getStreamPtr();
+      // client->print(start_request);
+
+      // Serial.println("D");
+      // Serial.flush();
+
+      // uint8_t buffer[128] = { 0 };
+      // while(file.available()){
+      //         Serial.print("E");
+      // Serial.flush();
+
+      //   size_t len = file.read(buffer, sizeof(buffer));
+      //         Serial.print("F");
+      // Serial.flush();
+
+      //   client->write(buffer, len);
+      //         Serial.print("G");
+      // Serial.flush();
+
+      // }
+      // Serial.println("H");
+      // Serial.flush();
+
+      String requestBody = start_request;
+      logMessage("requestBody.length(): %d", requestBody.length());
+      // Serial.println("H1");
+      // Serial.flush();
+      requestBody += file.readString();
+      logMessage("requestBody.length(): %d", requestBody.length());
+      // Serial.println("H2");
+      // Serial.flush();
+      requestBody += end_request;
+      logMessage("requestBody.length(): %d", requestBody.length());
+      // Serial.println("H3");
+      // Serial.flush();
+
+
+
+      file.close();
+      // Serial.println("I");
+      // Serial.flush();
+
+      // // client->print(end_request);
+      // Serial.println("J");
+      // Serial.flush();
+
+
       // Send the POST request
-     int httpResponseCode = http.sendRequest("POST", requestBody);
-     logMessage("httpResponseCode: %d", httpResponseCode);
+
+      int httpResponseCode = http.sendRequest("POST", requestBody);
+      // int httpResponseCode = http.POST("");
+      logMessage("httpResponseCode: %d", httpResponseCode);
 
       if (httpResponseCode == HTTP_CODE_OK) {
         displayMessage("Data sent successfully!");
@@ -417,6 +484,11 @@ void uploadPending(){
       } else {
         logMessage("Error sending data. HTTP code: %d", httpResponseCode);
       }
+
+      logMessage("http.getString()");
+      String result = http.getString();
+      Serial.print(result.length());
+      Serial.print(result);
 
       file.close(); 
 
@@ -531,7 +603,7 @@ void setup() {
   // logMessage("sID: %s", sID);
   sprintf(MACAddress, "%012llx", ESP.getEfuseMac());
 
-  if (bootCount % 5 == 1) {
+  if (bootCount % 5 == 0) {
     if(wifiConnect()){
       getNTPTime();
       uploadPending();
@@ -690,9 +762,6 @@ void enableWakeupAndGoToSleep() {
 
 
 void loop() {
-  if(millis()%1000==0){
-    logMessage("Heartbeat");
-  }
   // Catch hang and shutdown
   // if (millis() >= 60000) {
   //   logMessage("We've been awake for 60s - must have hung, going to sleep now");
