@@ -323,6 +323,10 @@ void uploadPending(){
     return;
   }
 
+  if(!SD.exists(uploadedFolder)){
+    SD.mkdir(uploadedFolder);
+  }
+
   File file = root.openNextFile();
   while (file) {
     if (!file.isDirectory()) {
@@ -383,8 +387,6 @@ void uploadPending(){
 
       Serial.print(start_request);
 
-      // requestBody += file.readString();
-
       String end_request = "\r\n--" + boundary + "--\r\n";
 
       int fileLength = file.size();
@@ -394,63 +396,38 @@ void uploadPending(){
       http.addHeader("Content-Length", String(contentLength));
       logMessage("Content-Length: %d", contentLength);
 
+      String body = start_request;
 
-      // String requestBody = start_request;
-      // logMessage("requestBody.length(): %d", requestBody.length());
-      // requestBody += file.readString();
-      // logMessage("requestBody.length(): %d", requestBody.length());
-      // requestBody += end_request;
-      // logMessage("requestBody.length(): %d", requestBody.length());
-  
-
-Serial.println("A");
-Serial.flush();
-      WiFiClient * client = http.getStreamPtr();
-Serial.println("B");
-Serial.flush();
-if(client) {
-      client->print(start_request);
-Serial.println("C");
-Serial.flush();
-
-      uint8_t buffer[CHUNK_SIZE];
-      while (file.available()) {
+      uint8_t buffer[128] = { 0 };
+      while(file.available()){
         size_t len = file.read(buffer, sizeof(buffer));
-        client->write(buffer, len);
+        body += String((char*)buffer).substring(0, len);
       }
-Serial.println("D");
-Serial.flush();
+      body += end_request;
 
-      client->print(end_request);
-Serial.println("E");
-Serial.flush();
+      Serial.println("body.length():");
+      Serial.println(body.length());
 
-      int httpResponseCode = http.POST("");
-Serial.println("F");
-Serial.flush();
-
+      String pendingFilename = pendingFolder;
+      pendingFilename += "/";
+      pendingFilename += file.name();
       file.close();
-      // Serial.println("I");
-      // Serial.flush();
-
-      // // client->print(end_request);
-      // Serial.println("J");
-      // Serial.flush();
-
 
       // Send the POST request
 
-      // int httpResponseCode = http.sendRequest("POST", requestBody);
-      // int httpResponseCode = http.POST("");
+      int httpResponseCode = http.POST(body);
       logMessage("httpResponseCode: %d", httpResponseCode);
 
       if (httpResponseCode == HTTP_CODE_OK) {
         displayMessage("Data sent successfully!");
 
         // Move the file to the uploaded folder
-        String filename = file.name();
-        filename.replace(pendingFolder, uploadedFolder);
-        if (SD.rename(file.name(), filename)) {
+        Serial.println("Moving file....");
+        Serial.println(pendingFilename);
+        String uploadedFilename = pendingFilename;
+        uploadedFilename.replace(pendingFolder, uploadedFolder);
+        Serial.println(uploadedFilename);
+        if (SD.rename(pendingFilename, uploadedFilename)) {
           logMessage("File moved to uploaded folder");
         } else {
           logError("Failed to move file to uploaded folder");
@@ -466,31 +443,6 @@ Serial.flush();
       Serial.print(result);
 
       file.close(); 
-
-} else {
-  Serial.println("Error: Failed to get stream pointer");
-}
-      // // Send the file data in the HTTP request body
-      // http.POST(fileData, fileSize);
-
-      // // Check the HTTP response code
-      // int httpResponseCode = http.getResponseCode();
-      // if (httpResponseCode == HTTP_CODE_OK) {
-      //   logMessage("File uploaded successfully");
-      //   // Move the file to the uploaded folder
-      //   char filename[50];
-      //   sprintf(filename, "%s/%s", uploadedFolder, file.name() + strlen(pendingFolder) + 1);
-      //   if (SD.rename(file.name(), filename)) {
-      //     logMessage("File moved to uploaded folder");
-      //   } else {
-      //     logError("Failed to move file to uploaded folder");
-      //   }
-      // } else {
-      //   logError("Failed to upload file. HTTP response code: %d", httpResponseCode);
-      // }
-
-      // Clean up
-      // delete[] fileData;
       http.end();
     }
     file = root.openNextFile();
