@@ -9,7 +9,8 @@
 #include <WiFiUdp.h>
 #include "RTClib.h"
 #include <EEPROM.h>
-#include <HTTPClient.h>
+// #include <HTTPClient.h>
+#include <WiFiClientSecure.h>
 // #include <ArduinoJson.h>
 
 #define CAMERA_MODEL_XIAO_ESP32S3  // Has PSRAM
@@ -65,7 +66,9 @@ const char *logFilename = "/log.txt";
 const char *uploadedFolder = "/uploaded";
 const char *pendingFolder = "/pending2";
 
-const char *apiPostImageURL = "https://timelapse-dev.azurewebsites.net/api/Image";
+const char *serverName = "timelapse-dev.azurewebsites.net";
+const int port = 443;
+const char *apiPostImageURL = "/api/Image";
 // const char *apiPostImageURL = "https://webhook.site/fc3e2df5-bb36-48a5-8e04-148c41a03839";
 #define CHUNK_SIZE 4096 // Adjust this to a smaller size if needed
 
@@ -336,17 +339,25 @@ void uploadPending(){
 
       String boundary = "----WebKitFormBoundary" + String(random(0xFFFFFF), HEX);
 
-      HTTPClient http;
-      http.begin(apiPostImageURL);
+      // HTTPClient http;
+      // http.begin(apiPostImageURL);
+      WiFiClientSecure client;
+      client.setInsecure(); // Disable SSL certificate verification
+      
+      if (!client.connect(serverName, port)) {
+        Serial.println("Connection failed!");
+        return;
+      }
+      
 
-      String contentType = "multipart/form-data";
-      contentType += "; boundary=";
-      contentType += boundary;
-      http.addHeader("Content-Type", contentType);
+      // String contentType = "multipart/form-data";
+      // contentType += "; boundary=";
+      // contentType += boundary;
+      // http.addHeader("Content-Type", contentType);
 
 // boundary
 
-      http.addHeader("Accept", "text/plain");
+      // http.addHeader("Accept", "text/plain");
 
       logMessage("SerialNumber/MAC Address: %s", MACAddress);
 
@@ -354,19 +365,9 @@ void uploadPending(){
       logMessage("file.name(): %s", file.name());
       String timestampString = file.name();
       timestampString.replace("_", "T");
-      // image.00000000.2000-00-01_454902.jpg
-      // 01234567890123456789012345678901234567890123456789
-      // 0000000000111111111122222222223333333333
       timestampString = timestampString.substring(15);
-      Serial.println(timestampString);
-      // 2000-00-01_454902.jpg
-      // 01234567890123456789012345678901234567890123456789
-      // 0000000000111111111122222222223333333333
       timestampString = timestampString.substring(0, 13) + ":" + timestampString.substring(13, 15) + ":" + timestampString.substring(15, 17) + "Z";      
-      // 2000-00-01_45:49:02.jpg
-      // 01234567890123456789012345678901234567890123456789
-      // 0000000000111111111122222222223333333333
-      Serial.println(timestampString);
+      // Serial.println(timestampString);
 
       // https://forum.arduino.cc/t/sending-video-avi-and-audio-wav-files-with-arduino-script-from-esp32s3-via-http-post-multipart-form-data-to-server/1234706
 
@@ -389,61 +390,80 @@ void uploadPending(){
 
       String end_request = "\r\n--" + boundary + "--\r\n";
 
+      // String body = start_request;
+
+      // uint8_t buffer[128] = { 0 };
+      // while(file.available()){
+      //   size_t len = file.read(buffer, sizeof(buffer));
+      //   body += String((char*)buffer).substring(0, len);
+      // }
+      // body += end_request;
+
+
       int fileLength = file.size();
       int contentLength = start_request.length() + fileLength + end_request.length();
 
-      // Set the Content-Length header
-      http.addHeader("Content-Length", String(contentLength));
-      logMessage("Content-Length: %d", contentLength);
+      client.printf("POST /api/Image HTTP/1.1\r\n");
+      client.printf("Host: %s\r\n", serverName);
+      client.printf("Content-Type: multipart/form-data; boundary=%s\r\n", boundary.c_str());
+      client.printf("Content-Length: %d\r\n", contentLength);
+      client.printf("Connection: close\r\n\r\n");
 
-      String body = start_request;
+      client.print(start_request);
 
-      uint8_t buffer[128] = { 0 };
-      while(file.available()){
+      uint8_t buffer[CHUNK_SIZE];
+      while (file.available()) {
         size_t len = file.read(buffer, sizeof(buffer));
-        body += String((char*)buffer).substring(0, len);
+        client.write(buffer, len);
       }
-      body += end_request;
-
-      Serial.println("body.length():");
-      Serial.println(body.length());
+      client.print(end_request);
 
       String pendingFilename = pendingFolder;
       pendingFilename += "/";
       pendingFilename += file.name();
       file.close();
 
+
+      // Read the response from the server
+      while (client.connected() || client.available()) {
+        if (client.available()) {
+          String line = client.readStringUntil('\n');
+          Serial.println(line);
+        }
+      }
+      client.stop();
+
       // Send the POST request
 
-      int httpResponseCode = http.POST(body);
-      logMessage("httpResponseCode: %d", httpResponseCode);
+      // int httpResponseCode = http.POST(body);
+      // logMessage("httpResponseCode: %d", httpResponseCode);
 
-      if (httpResponseCode == HTTP_CODE_OK) {
-        displayMessage("Data sent successfully!");
+      // if (httpResponseCode == HTTP_CODE_OK) {
+      //   displayMessage("Data sent successfully!");
 
-        // Move the file to the uploaded folder
-        Serial.println("Moving file....");
-        Serial.println(pendingFilename);
-        String uploadedFilename = pendingFilename;
-        uploadedFilename.replace(pendingFolder, uploadedFolder);
-        Serial.println(uploadedFilename);
-        if (SD.rename(pendingFilename, uploadedFilename)) {
-          logMessage("File moved to uploaded folder");
-        } else {
-          logError("Failed to move file to uploaded folder");
-        }
+      //   // Move the file to the uploaded folder
+      //   Serial.println("Moving file....");
+      //   Serial.println(pendingFilename);
+      //   String uploadedFilename = pendingFilename;
+      //   uploadedFilename.replace(pendingFolder, uploadedFolder);
+      //   Serial.println(uploadedFilename);
+      //   if (SD.rename(pendingFilename, uploadedFilename)) {
+      //     logMessage("File moved to uploaded folder");
+      //   } else {
+      //     logError("Failed to move file to uploaded folder");
+      //   }
 
-      } else {
-        logMessage("Error sending data. HTTP code: %d", httpResponseCode);
-      }
+      // } else {
+      //   logMessage("Error sending data. HTTP code: %d", httpResponseCode);
+      // }
 
-      logMessage("http.getString()");
-      String result = http.getString();
-      Serial.print(result.length());
-      Serial.print(result);
+      // logMessage("http.getString()");
+      // String result = http.getString();
+      // Serial.print(result.length());
+      // Serial.print(result);
 
-      file.close(); 
-      http.end();
+      // file.close(); 
+      // http.end();
     }
     file = root.openNextFile();
   }
