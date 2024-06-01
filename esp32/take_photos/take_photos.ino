@@ -9,7 +9,8 @@
 #include <WiFiUdp.h>
 #include "RTClib.h"
 #include <EEPROM.h>
-#include <HTTPClient.h>
+// #include <HTTPClient.h>
+#include <ArduinoHttpClient.h>
 // #include <ArduinoJson.h>
 
 #define CAMERA_MODEL_XIAO_ESP32S3  // Has PSRAM
@@ -65,9 +66,16 @@ const char *logFilename = "/log.txt";
 const char *uploadedFolder = "/uploaded";
 const char *pendingFolder = "/pending2";
 
-const char *apiPostImageURL = "https://timelapse-dev.azurewebsites.net/api/Image";
+// const char *apiPostImageURL = "https://timelapse-dev.azurewebsites.net/api/Image";
+// const char *apiURL = "timelapse-dev.azurewebsites.net";
 // const char *apiPostImageURL = "https://webhook.site/fc3e2df5-bb36-48a5-8e04-148c41a03839";
+const char *apiURL = "webhook.site";
+// const char *apiImagePostURL = "/api/Image/";
+const char *apiImagePostURL = "/fc3e2df5-bb36-48a5-8e04-148c41a03839";
 #define CHUNK_SIZE 4096 // Adjust this to a smaller size if needed
+
+WiFiClient wifi;
+HttpClient client = HttpClient(wifi, apiURL, 443);
 
 const char *ISO8061FormatString = "%04d-%02d-%02dT%02d:%02d:%02dZ";
 const char *YYYYMMDDHHMMSSFormatString = "%04d-%02d-%02d_%02d%02d%02d";
@@ -336,19 +344,18 @@ void uploadPending(){
 
       String boundary = "----WebKitFormBoundary" + String(random(0xFFFFFF), HEX);
 
-      HTTPClient http;
-      http.begin(apiPostImageURL);
+      // HTTPClient http;
+      // http.begin(apiPostImageURL);
 
       String contentType = "multipart/form-data";
       contentType += "; boundary=";
       contentType += boundary;
-      http.addHeader("Content-Type", contentType);
+      Serial.println(contentType);
 
 // boundary
 
-      http.addHeader("Accept", "text/plain");
 
-      logMessage("SerialNumber/MAC Address: %s", MACAddress);
+      // logMessage("SerialNumber/MAC Address: %s", MACAddress);
 
       // Convert string in form YYYY-mm-dd_HHMMSS to ISO8601 string
       logMessage("file.name(): %s", file.name());
@@ -379,46 +386,59 @@ void uploadPending(){
       start_request += "Content-Disposition: form-data; name=\"Timestamp\"\r\n\r\n";
       start_request += timestampString; 
       start_request += "\r\n";
-      start_request += "--" + boundary + "\r\n";
-      start_request += "Content-Disposition: form-data; name=\"File\"; filename=\"";
-      start_request += file.name();
-      start_request += "\"\r\n";
-      start_request += "Content-Type: image/png\r\n\r\n";
+      // start_request += "--" + boundary + "\r\n";
+      // start_request += "Content-Disposition: form-data; name=\"File\"; filename=\"";
+      // start_request += file.name();
+      // start_request += "\"\r\n";
+      // start_request += "Content-Type: image/png\r\n\r\n";
 
       Serial.print(start_request);
 
       String end_request = "\r\n--" + boundary + "--\r\n";
 
       int fileLength = file.size();
-      int contentLength = start_request.length() + fileLength + end_request.length();
-
-      // Set the Content-Length header
-      http.addHeader("Content-Length", String(contentLength));
+      // int contentLength = start_request.length() + fileLength + end_request.length();
+      int contentLength = start_request.length() + end_request.length();
       logMessage("Content-Length: %d", contentLength);
-
-      String body = start_request;
-
-      uint8_t buffer[128] = { 0 };
-      while(file.available()){
-        size_t len = file.read(buffer, sizeof(buffer));
-        body += String((char*)buffer).substring(0, len);
-      }
-      body += end_request;
-
-      Serial.println("body.length():");
-      Serial.println(body.length());
 
       String pendingFilename = pendingFolder;
       pendingFilename += "/";
       pendingFilename += file.name();
+
+
+      // Set the Content-Length header
+      client.beginRequest();
+      // client.post(apiImagePostURL);
+      // client.sendHeader("Host", apiURL);
+      client.sendHeader("Content-Length", String(contentLength));
+      client.sendHeader("Content-Type", contentType);
+      client.sendHeader("Accept", "text/plain");
+      
+      client.beginBody();
+      client.print(start_request);
+
+      // String body = start_request;
+
+      // uint8_t buffer[CHUNK_SIZE] = { 0 };
+      logMessage("Writing chunks...");
+      // while(file.available()){
+      //   size_t len = file.read(buffer, sizeof(buffer));
+      //   client.write(buffer, len);
+      // }
+      logMessage("Chunks written.");
       file.close();
 
-      // Send the POST request
+      client.print(end_request);
+      logMessage("About to end request...");
+      client.endRequest();
 
-      int httpResponseCode = http.POST(body);
-      logMessage("httpResponseCode: %d", httpResponseCode);
+      int httpResponseCode = client.responseStatusCode();
+      String response = client.responseBody();
 
-      if (httpResponseCode == HTTP_CODE_OK) {
+      // int httpResponseCode = http.POST(body);
+      logMessage("responseStatusCode: %d", httpResponseCode);
+
+      if (httpResponseCode == 200) {
         displayMessage("Data sent successfully!");
 
         // Move the file to the uploaded folder
@@ -437,13 +457,12 @@ void uploadPending(){
         logMessage("Error sending data. HTTP code: %d", httpResponseCode);
       }
 
-      logMessage("http.getString()");
-      String result = http.getString();
-      Serial.print(result.length());
-      Serial.print(result);
+      logMessage("client.responseBody();");
+      String responseBody = client.responseBody();
+      Serial.print(responseBody.length());
+      Serial.print(responseBody);
 
-      file.close(); 
-      http.end();
+      // http.end();
     }
     file = root.openNextFile();
   }
