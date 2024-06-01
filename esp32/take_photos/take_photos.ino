@@ -335,34 +335,17 @@ void uploadPending(){
     if (!file.isDirectory()) {
 
       logMessage(file.name());
-      // HTTP POST request
 
       String boundary = "----WebKitFormBoundary" + String(random(0xFFFFFF), HEX);
 
-      // HTTPClient http;
-      // http.begin(apiPostImageURL);
       WiFiClientSecure client;
       client.setInsecure(); // Disable SSL certificate verification
-      
+
       if (!client.connect(serverName, port)) {
         Serial.println("Connection failed!");
         return;
       }
       
-
-      // String contentType = "multipart/form-data";
-      // contentType += "; boundary=";
-      // contentType += boundary;
-      // http.addHeader("Content-Type", contentType);
-
-// boundary
-
-      // http.addHeader("Accept", "text/plain");
-
-      logMessage("SerialNumber/MAC Address: %s", MACAddress);
-
-      // Convert string in form YYYY-mm-dd_HHMMSS to ISO8601 string
-      logMessage("file.name(): %s", file.name());
       String timestampString = file.name();
       timestampString.replace("_", "T");
       timestampString = timestampString.substring(15);
@@ -370,7 +353,7 @@ void uploadPending(){
       // Serial.println(timestampString);
 
       // https://forum.arduino.cc/t/sending-video-avi-and-audio-wav-files-with-arduino-script-from-esp32s3-via-http-post-multipart-form-data-to-server/1234706
-
+      // https://stackoverflow.com/questions/53264373/try-to-send-image-file-to-php-with-httpclient
       
       String start_request = "--" + boundary + "\r\n";
       start_request += "Content-Disposition: form-data; name=\"SerialNumber\"\r\n\r\n";
@@ -386,19 +369,9 @@ void uploadPending(){
       start_request += "\"\r\n";
       start_request += "Content-Type: image/png\r\n\r\n";
 
-      Serial.print(start_request);
+      // Serial.print(start_request);
 
       String end_request = "\r\n--" + boundary + "--\r\n";
-
-      // String body = start_request;
-
-      // uint8_t buffer[128] = { 0 };
-      // while(file.available()){
-      //   size_t len = file.read(buffer, sizeof(buffer));
-      //   body += String((char*)buffer).substring(0, len);
-      // }
-      // body += end_request;
-
 
       int fileLength = file.size();
       int contentLength = start_request.length() + fileLength + end_request.length();
@@ -425,45 +398,35 @@ void uploadPending(){
 
 
       // Read the response from the server
+      bool okResponse = false;
       while (client.connected() || client.available()) {
         if (client.available()) {
           String line = client.readStringUntil('\n');
+          if(line.indexOf("HTTP/1.1 200 OK") != -1){
+            okResponse = true;
+            break;
+          }
           Serial.println(line);
         }
       }
       client.stop();
 
-      // Send the POST request
+      if(okResponse){
+        // Move the file to the uploaded folder
+        // Serial.println("Moving file....");
+        // Serial.println(pendingFilename);
+        String uploadedFilename = pendingFilename;
+        uploadedFilename.replace(pendingFolder, uploadedFolder);
+        // Serial.println(uploadedFilename);
+        if (SD.rename(pendingFilename, uploadedFilename)) {
+          logMessage("File moved to uploaded folder");
+        } else {
+          logError("Failed to move file to uploaded folder");
+        }
+      } else {
+        logMessage("Error sending data.");
+      }
 
-      // int httpResponseCode = http.POST(body);
-      // logMessage("httpResponseCode: %d", httpResponseCode);
-
-      // if (httpResponseCode == HTTP_CODE_OK) {
-      //   displayMessage("Data sent successfully!");
-
-      //   // Move the file to the uploaded folder
-      //   Serial.println("Moving file....");
-      //   Serial.println(pendingFilename);
-      //   String uploadedFilename = pendingFilename;
-      //   uploadedFilename.replace(pendingFolder, uploadedFolder);
-      //   Serial.println(uploadedFilename);
-      //   if (SD.rename(pendingFilename, uploadedFilename)) {
-      //     logMessage("File moved to uploaded folder");
-      //   } else {
-      //     logError("Failed to move file to uploaded folder");
-      //   }
-
-      // } else {
-      //   logMessage("Error sending data. HTTP code: %d", httpResponseCode);
-      // }
-
-      // logMessage("http.getString()");
-      // String result = http.getString();
-      // Serial.print(result.length());
-      // Serial.print(result);
-
-      // file.close(); 
-      // http.end();
     }
     file = root.openNextFile();
   }
