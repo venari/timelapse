@@ -51,6 +51,8 @@ NTPClient timeClient(ntpUDP, "pool.ntp.org");
 RTC_PCF8563 rtc;
 
 RTC_DATA_ATTR int bootCount = 0;
+RTC_DATA_ATTR time_t bootTime = 0;
+
 bool rtcPresent=true;
 touch_pad_t touchPin;
 
@@ -58,13 +60,17 @@ const bool enableSleep = true;
 
 unsigned long lastCaptureTime = 0;  // Last shooting time
 int imageCounter = 1;                 // File Counter
+
+// int epochPseudoRTC = 0;             // Save time of last sleep in case we don't have a real RTC.
+
 bool camera_sign = false;           // Check camera status
 bool sd_sign = false;               // Check sd status
 const char *counterFilename = "/counter";
+// const char *bootTimeFilename = "/bootTime";
 const char *logFilename = "/log.txt";
 
 const char *uploadedFolder = "/uploaded";
-const char *pendingFolder = "/pending2";
+const char *pendingFolder = "/pending3";
 
 const char *serverName = "timelapse-dev.azurewebsites.net";
 const int port = 443;
@@ -149,6 +155,68 @@ int getCounter() {
   file.close();
   return count;
 }
+
+// void updateBootTime(time_t booted) {
+//   logMessage("updateBootTime()");
+//   logMessage("booted: %s", booted);
+//   File file = SD.open(bootTimeFilename, FILE_WRITE);
+//   if (!file) {
+//     logMessage("Failed to open bootTime file for writing");
+//     return;
+//   }
+//   if (file.print(booted)) {
+//     // Serial.println("Counter updated");
+//   } else {
+//     logError("Failed to update boot time");
+//   }
+// }
+
+void setPseudoRTC(time_t timeNow){
+  // Update the time we booted from NTP
+  logMessage("setPseudoRTC()");
+  logMessage("timeNow: %d", timeNow);
+  logMessage("millis: %d", millis());
+  bootTime = timeNow - millis()/1000;
+  logMessage("bootTime: %d", bootTime);
+  // bootTime = booted;
+}
+
+time_t getPseudoRTC(){
+  // time_t bootTime = getBootTime();
+  logMessage("getPseudoRTC()");
+  logMessage("bootTime: %d", bootTime);
+  logMessage("millis(): %d", millis());
+  return bootTime + millis()/1000;
+}
+
+DateTime PRTCnow(){
+  if(rtcPresent){
+    return rtc.now();
+  } else {
+    return getPseudoRTCNow();
+  }
+}
+
+DateTime getPseudoRTCNow(){
+  time_t pseudoRTC = getPseudoRTC();
+  logMessage("pseudoRTC: %d", pseudoRTC);
+  DateTime pseudoRTCNow = DateTime(pseudoRTC);
+
+  return pseudoRTCNow;
+}
+
+
+
+// time_t getBootTime() {
+//   File file = SD.open(bootTimeFilename);
+//   if (!file) {
+//     logMessage("Failed to open bootTime file for reading");
+//     return 0;
+//   }
+//   time_t time = (time_t)file.parseInt();
+//   file.close();
+//   return time;
+// }
 
 // Save pictures to SD card
 void photo_save(const char *fileName) {
@@ -284,7 +352,7 @@ void getNTPTime() {
   timeClient.update();
 
   // Get NTP time....
-  if (timeClient.isTimeSet() && rtcPresent) {
+  if (timeClient.isTimeSet()) {
 
     // Do all of this without logging/displaying to avoid introducing a few seconds delay.
     time_t epochTime = timeClient.getEpochTime();
@@ -297,10 +365,16 @@ void getNTPTime() {
     // DateTime now = rtc.now();
 
     // Compare the time from the NTP server with the RTC time, and report the discrepancy in seconds.
-    int timeDiscrepancy = rtc.now().unixtime() - epochTime;
+    int timeDiscrepancy = PRTCnow().unixtime() - epochTime;
     if (abs(timeDiscrepancy) > 5) {
-      rtc.adjust(DateTime(currentYear, currentMonth, monthDay, ptm->tm_hour, ptm->tm_min, ptm->tm_sec));
-      logMessage("Adjusted RTC...");
+      if(rtcPresent){
+        rtc.adjust(DateTime(currentYear, currentMonth, monthDay, ptm->tm_hour, ptm->tm_min, ptm->tm_sec));
+        logMessage("Adjusted RTC...");
+      } else {
+        setPseudoRTC(epochTime);
+        logMessage("Adjusted Pseudo RTC...");
+
+      }
 
       logMessage("RTC/NTP Time discrepancy was %d seconds", timeDiscrepancy);
 
@@ -435,12 +509,12 @@ void uploadPending(){
 }
 
 void logRTC() {
-  if(rtcPresent){
-    DateTime now = rtc.now();
+  // if(rtcPresent){
+    DateTime now = PRTCnow();
     char rtcTime[25];
     sprintf(rtcTime, ISO8061FormatString, now.year(), now.month(), now.day(), now.hour(), now.minute(), now.second());
     logMessage("RTC Time: %s", rtcTime);
-  }
+  // }
 }
 
 void setup() {
@@ -466,6 +540,10 @@ void setup() {
     rtcPresent=false;
     logError("Couldn't find RTC");
     // while (1) delay(10);
+  } else {
+    logMessage("Setting PseduoRTC from expected bootTime...");
+    rtc.adjust(getPseudoRTCNow());
+    logMessage("Adjusted RTC with pseudo real time.");
   }
 
   logRTC();
@@ -604,7 +682,9 @@ void setup() {
 
 
   imageCounter = getCounter();
+  // bootTime = getBootTime();
   logMessage("imageCounter = %d\r\n", imageCounter);
+  logMessage("bootTime = %d\r\n", bootTime);
 
   print_wakeup_reason();
   print_wakeup_touchpad();
@@ -613,13 +693,13 @@ void setup() {
   char filename[50];
   char rtcTime[25];
   
-  if(rtcPresent){
-    DateTime now = rtc.now();
+  // if(rtcPresent){
+    DateTime now = PRTCnow();
     sprintf(rtcTime, YYYYMMDDHHMMSSFormatString, now.year(), now.month(), now.day(), now.hour(), now.minute(), now.second());
-  } else {
-    // Leave as blank, but valid.
-    sprintf(rtcTime, YYYYMMDDHHMMSSFormatString, 2000, 1, 1, 0, 0, 1);
-  }
+  // } else {
+  //   // Leave as blank, but valid.
+  //   sprintf(rtcTime, YYYYMMDDHHMMSSFormatString, 2000, 1, 1, 0, 0, 1);
+  // }
 
   sprintf(filename, "%s/image.%08d.%s.jpg", pendingFolder, imageCounter, rtcTime);
   logMessage("Filename: %s", filename);
@@ -667,6 +747,11 @@ void enableWakeupAndGoToSleep() {
   digitalWrite(LED_BUILTIN, HIGH);
 
   if (enableSleep) {
+    DateTime expectedWakeup = PRTCnow();
+    TimeSpan spanToSleep = TimeSpan(TIME_TO_SLEEP);
+    expectedWakeup = expectedWakeup + spanToSleep;
+    // setPseudoRTC(expectedWakeup.unixtime());
+    bootTime=expectedWakeup.unixtime();
     esp_deep_sleep_start();
   } else {
     logMessage("enableSleep = false - not sleeping");
