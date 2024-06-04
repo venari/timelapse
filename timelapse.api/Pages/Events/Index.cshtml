@@ -1,4 +1,4 @@
-﻿@page
+﻿@page "{numberOfDaysToDisplay:int?}"
 @using Humanizer
 @model Events.IndexModel
 @{
@@ -10,6 +10,19 @@
 
 <div class="text-center">
     <h1 class="display-4">Events</h1>
+</div>
+
+<div class="container">
+  <div class="row">
+    <div class="col">
+        <h4>Displaying @(Model.NumberOfDaysToDisplay) days events.</h4>
+        @{
+            <a href="/Events/7" type="button" class="btn btn-secondary">Last week</a>
+            <a href="/Events/31" type="button" class="btn btn-secondary">Last month</a>
+            <a href="/Events/999" type="button" class="btn btn-secondary">All</a>
+        }
+    </div>
+  </div>
 </div>
 
 <div>
