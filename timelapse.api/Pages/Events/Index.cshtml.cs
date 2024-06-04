@@ -16,24 +16,42 @@ public class IndexModel : PageModel
     private AppDbContext _appDbContext;
     private StorageHelper _storageHelper;
 
-    public List<Device> devices {get;}
+    public List<Device> devices {get; private set;}
     public IEnumerable<Image> images {get; set;}
     public string SasToken {get; private set;}
     public List<Areas.Identity.Data.AppUser> Users {get; private set;}
+
+    [BindProperty]
+    public int NumberOfDaysToDisplay {get; set; }
+
 
     public IndexModel(ILogger<IndexModel> logger, AppDbContext appDbContext, IConfiguration configuration, IMemoryCache memoryCache)
     {
         _logger = logger;
         _appDbContext = appDbContext;
 
-        DateTime cutOff = DateTime.UtcNow.AddDays(-2);
+        NumberOfDaysToDisplay = 7;
 
+        _storageHelper = new StorageHelper(configuration, logger, memoryCache);
+
+        var sasUri = _storageHelper.GenerateSasUri();
+        // Extract the Token from the URI
+        SasToken = sasUri.Query;
+    }
+
+    public void OnGet(int? numberOfDaysToDisplay = null)
+    {
+        Users = _appDbContext.Users.ToList();
+
+        if(numberOfDaysToDisplay!=null){
+            NumberOfDaysToDisplay = numberOfDaysToDisplay.Value;
+        }
+
+        DateTime cutOff = DateTime.UtcNow.AddDays(-1 * NumberOfDaysToDisplay);
 
         devices = _appDbContext.Devices
-            // .Include(d => d.Telemetries.Where(t => t.Timestamp >= cutOff))
-            // .Include(d => d.Images.OrderByDescending(i => i.Timestamp).Take(1))
 
-            .Include(d => d.Events)
+            .Include(d => d.Events.Where(e => e.EndTime >= cutOff))
             .ThenInclude(e => e.EventTypes)
 
             .Include(d => d.Events)
@@ -48,38 +66,5 @@ public class IndexModel : PageModel
             .ToList();
 
         images = _appDbContext.Images;
-        _storageHelper = new StorageHelper(configuration, logger, memoryCache);
-
-        var sasUri = _storageHelper.GenerateSasUri();
-        // Extract the Token from the URI
-        SasToken = sasUri.Query;
-
-        // _appDbContext.Database.EnsureCreated();
-    }
-
-    // public Uri EventStartImageUri(Event Event){
-    //     var image = images.Where(i => i.DeviceId == Event.DeviceId && i.Timestamp >= Event.StartTime).OrderBy(i => i.Timestamp).FirstOrDefault();
-
-    //     if(image!=null){
-    //         return image.BlobUri;
-    //     }
-
-    //     return null;
-    // }
-
-    // public Uri EventEndImageUri(Event Event){
-    //     var image = images.Where(i => i.DeviceId == Event.DeviceId && i.Timestamp <= Event.EndTime).OrderByDescending(i => i.Timestamp).FirstOrDefault();
-
-    //     if(image!=null){
-    //         return image.BlobUri;
-    //     }
-
-    //     return null;
-    // }
-
-    public void OnGet()
-    {
-        Users = _appDbContext.Users.ToList();
-
     }
 }
