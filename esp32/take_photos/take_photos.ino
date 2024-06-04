@@ -473,11 +473,16 @@ void uploadPending(){
 
       // Read the response from the server
       bool okResponse = false;
+      bool NotFoundResponse = false;
       while (client.connected() || client.available()) {
         if (client.available()) {
           String line = client.readStringUntil('\n');
           if(line.indexOf("HTTP/1.1 200 OK") != -1){
             okResponse = true;
+            break;
+          }
+          if(line.indexOf("HTTP/1.1 404 Not Found") != -1){
+            NotFoundResponse = true;
             break;
           }
           Serial.println(line);
@@ -498,7 +503,11 @@ void uploadPending(){
           logError("Failed to move file to uploaded folder");
         }
       } else {
-        logMessage("Error sending data.");
+        if(NotFoundResponse){
+          logMessage("404 - check device is registered.");
+        } else {
+          logMessage("Error sending data.");
+        }
       }
 
     }
