@@ -228,7 +228,7 @@
                         </td> *@
                         <td>
                             @if(device.LatestImage!=null){
-                                <a href="ImageView/@(device.Id)"><img src="@(device.LatestImage.BlobUri + Model.SasToken)" width=200 height=120></img></a>
+                                <a href="ImageView/@(device.Id)"><img src="@(device.LatestImage.BlobUri + Model.SasToken)" width=200></img></a>
                                 @if (device.LatestImage!=null && DateTime.UtcNow - device.LatestImage.Timestamp > TimeSpan.FromMinutes(60)){
                                     <span class="badge bg-warning text-dark">@((DateTime.UtcNow - device.LatestImage.Timestamp).Humanize()) old</span>
                                 }
