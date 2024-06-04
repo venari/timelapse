@@ -391,6 +391,9 @@ void getNTPTime() {
   }
 }
 
+const int FileArraySize = 100;
+const int FileBatchSize = 10;
+
 void uploadPending(){
 
   logMessage("uploadPending()....");
@@ -404,8 +407,32 @@ void uploadPending(){
     SD.mkdir(uploadedFolder);
   }
 
-  File file = root.openNextFile();
-  while (file) {
+  // Scan folder, retrieving most recent files first
+  String* sortedFiles = listAndSortFiles(root);
+  int filesUploaded = 0;
+  int filesToUpload = 0;
+
+  // Array will be 100 large, with empty entries if files don't exist.
+  for(int fileIndex = 0; fileIndex < FileArraySize; ++fileIndex){
+    if(sortedFiles[fileIndex].length()>0){
+      ++filesToUpload;
+    }
+  }
+
+  for(int fileIndex = 0; fileIndex < FileArraySize && fileIndex < filesToUpload; ++fileIndex){
+    if(fileIndex>=FileBatchSize){
+      logMessage("Batch size: %d (%d files remaining)", FileBatchSize, filesToUpload - fileIndex);
+      break;
+    } else {
+      logMessage("Uploading %d/%d...", fileIndex+1, filesToUpload);
+    }
+
+    String pendingFilename = pendingFolder;
+    pendingFilename += "/";
+    pendingFilename += sortedFiles[fileIndex];
+
+    File file = SD.open(pendingFilename);
+    
     if (!file.isDirectory()) {
 
       logMessage(file.name());
@@ -465,9 +492,6 @@ void uploadPending(){
       }
       client.print(end_request);
 
-      String pendingFilename = pendingFolder;
-      pendingFilename += "/";
-      pendingFilename += file.name();
       file.close();
 
 
@@ -515,6 +539,41 @@ void uploadPending(){
   }
   root.close();
 
+}
+
+String* listAndSortFiles(File dir) {
+  const int maxFiles = 100;
+  String* filenames = new String[maxFiles];
+  int fileCount = 0;
+
+  // Collect filenames
+  while (true) {
+    File entry = dir.openNextFile();
+    if (!entry) {
+      // no more files
+      break;
+    }
+    if (!entry.isDirectory()) {
+      if (fileCount < maxFiles) {
+        filenames[fileCount] = String(entry.name());
+        fileCount++;
+      }
+    }
+    entry.close();
+  }
+
+  // Sort filenames in reverse order
+  for (int i = 0; i < fileCount - 1; i++) {
+    for (int j = 0; j < fileCount - i - 1; j++) {
+      if (filenames[j] < filenames[j + 1]) {
+        String temp = filenames[j];
+        filenames[j] = filenames[j + 1];
+        filenames[j + 1] = temp;
+      }
+    }
+  }
+
+  return filenames;
 }
 
 void logRTC() {
@@ -683,6 +742,14 @@ void setup() {
     enableWakeupAndGoToSleep();
 
     return;
+  }
+
+  sensor_t * s = esp_camera_sensor_get();
+  // initial sensors are flipped vertically and colors are a bit saturated
+  if (s->id.PID == OV3660_PID || s->id.PID == OV5640_PID) {
+    s->set_vflip(s, 1); // flip it back
+    s->set_brightness(s, 1); // up the brightness just a bit
+    s->set_saturation(s, -2); // lower the saturation
   }
 
   camera_sign = true;  // Camera initialization check passes
