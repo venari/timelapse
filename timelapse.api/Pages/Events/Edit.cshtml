@@ -159,12 +159,12 @@
         getImageAtOrAround(@(Model.device.Id), jumpToDateTime.toISOString(), true)
     }
 
-    function getImage(deviceId, imageIndex) {
+    @* function getImage(deviceId, imageIndex) {
         imageBlobUri = last24HoursImages[imageIndex].blobUri + '@(Model.SasToken)'.replace(/&amp;/g, '&')
         image.src = imageBlobUri
         var imageHeader = document.getElementById("imageHeader");
         imageHeader.innerHTML = "Image for @(Model.device.Name) as at " + localizeDateTimeAsString(last24HoursImages[imageIndex].timestamp)
-    }
+    } *@
 
     function getImageAtOrAround(deviceId, atOrAfterTimestamp, forwards) {
 

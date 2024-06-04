@@ -61,6 +61,10 @@ public class DetailModel : PageModel
     //     }
     // }
 
+    [BindProperty]
+    public DateTime InitialTimestamp {get; set;}
+
+
     public DetailModel(ILogger<DetailModel> logger, AppDbContext appDbContext, IConfiguration configuration, IMemoryCache memoryCache)
     {
         _logger = logger;
@@ -114,7 +118,7 @@ public class DetailModel : PageModel
         }
             
         EventImages = _appDbContext.Images
-            .Where(i => i.DeviceId == Event.DeviceId && i.Timestamp >= Event.StartTime.ToUniversalTime() && i.Timestamp <= Event.EndTime.ToUniversalTime())
+            .Where(i => i.DeviceId == Event.DeviceId && i.Timestamp >= Event.StartTime.ToUniversalTime().AddMinutes(-5) && i.Timestamp <= Event.EndTime.ToUniversalTime().AddMinutes(5))
             .OrderBy(i => i.Timestamp)
             .Select(i => new ImageSubset{
                 Id = i.Id,
@@ -143,7 +147,7 @@ public class DetailModel : PageModel
         //     return RedirectToPage("/NotFound");
         // }
 
-        // InitialTimestamp = image.Timestamp;
+        InitialTimestamp = EventImages.First().Timestamp;
         // StartTime = InitialTimestamp;
         // EndTime = InitialTimestamp;
         // // DeviceId = device.Id;
