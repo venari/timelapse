@@ -1,4 +1,4 @@
-﻿@page "{numberOfHoursToDisplay:int?}"
+@page "{numberOfHoursToDisplay:int?}"
 @using Humanizer
 @model DeviceTrendsModel
 @{
@@ -58,67 +58,7 @@
         chart.update();
     }
 
-    const shortDayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
-    function localizeDateTimeToShortDayAndNumber(t)
-    {
-        if(t && t!='---'){
-            if(t.indexOf('Z')==-1){
-                t+='Z'
-            }
-            var d=new Date(t);
-            return shortDayNames[d.getDay()] + ' ' + d.getDate();
-        } else {
-            return '---';
-        }
-    }
-
-
-    function localizeDateTimeToHourAndAmPm(t)
-    {
-        if(t && t!='---'){
-            if(t.indexOf('Z')==-1){
-                t+='Z'
-            }
-            var d=new Date(t);
-            if(d.getHours()<12){
-                if(d.getHours()==0){
-                    return "12AM"
-                } else {
-                    return d.getHours() + "AM"
-                }
-            } else {
-                if(d.getHours()==12){
-                    return d.getHours() + "PM"
-                } else {
-                    return d.getHours() - 12 + "PM"
-                }
-            }
-            //return d.getHours() + (d.getHours()<12?"AM":"PM");
-        } else {
-            return '---';
-        }
-    }
-
-    function localizeDateTimeIsBetween6And6(t)
-    {
-        if(t && t!='---'){
-            if(t.indexOf('Z')==-1){
-                t+='Z'
-            }
-            var d=new Date(t);
-
-            if(d.getHours()>=6 && d.getHours()<18){
-                return 'Day';
-            } else {
-                return 'Night';
-            }
-        } else {
-            return '---';
-        }
-    }
-
-    var daytimeColumns = ['Device Name', 'Device Description', 'Device Support Mode', 'Device Monitoring Mode', 'Device Service', 'Device Hibernate Mode', 'Device Power Off'];
 
     var previousDateString = null;
 </script>
