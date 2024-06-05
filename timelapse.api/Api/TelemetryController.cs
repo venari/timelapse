@@ -69,56 +69,22 @@ namespace timelapse.api{
         public ActionResult<IEnumerable<Telemetry>> GetLatest24HoursTelemetry([FromQuery] int deviceId){
             _logger.LogInformation("Get latest 24 hours' telemetry");
 
-            DateTime ?latestTelemetryDateTime = _appDbContext.Telemetry
-                .Where(t => t.DeviceId == deviceId)
-                .OrderByDescending(t => t.Timestamp)
-                .Select(t => t.Timestamp)
-                .FirstOrDefault();
-
-            List<Telemetry> telemetry = new List<Telemetry>();
-
-            if(latestTelemetryDateTime==null || !latestTelemetryDateTime.HasValue || latestTelemetryDateTime.Value == DateTime.MinValue){
-                return new NotFoundObjectResult(telemetry);
-            }
-
-            Device? device = _appDbContext.Devices
-                .Include(d => d.Telemetries.Where(t =>t.Timestamp >= latestTelemetryDateTime.Value.AddDays(-1)))
-                .FirstOrDefault(d => d.Id == deviceId);
-
-            if(device != null){
-                telemetry =  device.Telemetries.OrderBy(t => t.Timestamp).ToList();
-                // telemetry =  device.Telemetries.OrderBy(t => t.Timestamp).ToList();
-            }
-
-            return telemetry;
+            return GetLatestTelemetry(deviceId, 24, 0);
         }
  
         [HttpGet("GetLatestTelemetry")]
-        public ActionResult<IEnumerable<Telemetry>> GetLatestTelemetry([FromQuery] int deviceId, int numberOfHoursToDisplay){
+        public ActionResult<IEnumerable<Telemetry>> GetLatestTelemetry([FromQuery] int deviceId, int numberOfHoursToDisplay, int periodOffset){
             _logger.LogInformation($"Get latest {numberOfHoursToDisplay} hours' telemetry");
 
-            DateTime ?latestTelemetryDateTime = _appDbContext.Telemetry
-                .Where(t => t.DeviceId == deviceId)
-                .OrderByDescending(t => t.Timestamp)
-                .Select(t => t.Timestamp)
-                .FirstOrDefault();
+            DateTime cutOffStart = DateTime.UtcNow.AddHours(-1 * numberOfHoursToDisplay);
+            DateTime cutOffEnd = DateTime.UtcNow;
 
-            List<Telemetry> telemetry = new List<Telemetry>();
-
-            if(latestTelemetryDateTime==null || !latestTelemetryDateTime.HasValue || latestTelemetryDateTime.Value == DateTime.MinValue){
-                return new NotFoundObjectResult(telemetry);
+            if(periodOffset!=0){
+                cutOffStart = cutOffStart.AddHours(-1 * numberOfHoursToDisplay * periodOffset);
+                cutOffEnd = cutOffEnd.AddHours(-1 * numberOfHoursToDisplay * periodOffset);
             }
 
-            Device? device = _appDbContext.Devices
-                .Include(d => d.Telemetries.Where(t =>t.Timestamp >= latestTelemetryDateTime.Value.AddHours(-1 * numberOfHoursToDisplay)))
-                .FirstOrDefault(d => d.Id == deviceId);
-
-            if(device != null){
-                telemetry =  device.Telemetries.OrderBy(t => t.Timestamp).ToList();
-                // telemetry =  device.Telemetries.OrderBy(t => t.Timestamp).ToList();
-            }
-
-            return telemetry;
+            return GetTelemetryBetweenDates(deviceId, cutOffStart, cutOffEnd);
         }
 
         [HttpGet("GetTelemetryBetweenDates")]

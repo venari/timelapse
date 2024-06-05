@@ -6,6 +6,7 @@ using Microsoft.EntityFrameworkCore;
 using timelapse.api.Helpers;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.Extensions.Caching.Memory;
+using NuGet.Protocol.Core.Types;
 
 namespace timelapse.api.Pages;
 
@@ -41,7 +42,10 @@ public class TelemetryGraphModel : PageModel
     [BindProperty]
     public int NumberOfHoursToDisplay {get; set; }
 
-    public IActionResult OnGet(int id, int? numberOfHoursToDisplay = null)
+    [BindProperty]
+    public int PeriodOffset {get; set; } = 0;
+
+    public IActionResult OnGet(int id, int? numberOfHoursToDisplay = null, int? periodOffset = null)
     {
         _logger.LogInformation("TelemetryGraph.OnGet");
         System.Diagnostics.Stopwatch stopwatch = new System.Diagnostics.Stopwatch();
@@ -63,13 +67,20 @@ public class TelemetryGraphModel : PageModel
             return RedirectToPage("/NotFound");
         }
 
-        DateTime cutOff = LatestTelemetryDateTime.Value.AddHours(-1 * NumberOfHoursToDisplay);
+        DateTime cutOffStart = LatestTelemetryDateTime.Value.AddHours(-1 * NumberOfHoursToDisplay);
+        DateTime cutOffEnd = LatestTelemetryDateTime.Value;
+
+        if(periodOffset!=null){
+            PeriodOffset = periodOffset.Value;
+            cutOffStart = cutOffStart.AddHours(-1 * NumberOfHoursToDisplay * PeriodOffset);
+            cutOffEnd = cutOffEnd.AddHours(-1 * NumberOfHoursToDisplay * PeriodOffset);
+        }
 
         _logger.LogInformation($"About to get device info, including telemetry and latest image.... {stopwatch.ElapsedMilliseconds}ms");
 
         var d = _appDbContext.Devices
-            .Include(d => d.Telemetries.Where(t => t.Timestamp >= cutOff && t.DeviceId == id))
-            .Include(d => d.Images.Where(i => i.Timestamp >= cutOff && i.DeviceId == id).OrderByDescending(i => i.Timestamp).Take(1))
+            .Include(d => d.Telemetries.Where(t => t.Timestamp >= cutOffStart && t.Timestamp <= cutOffEnd && t.DeviceId == id))
+            .Include(d => d.Images.Where(i => i.Timestamp >= cutOffStart && i.Timestamp <= cutOffEnd && i.DeviceId == id).OrderByDescending(i => i.Timestamp).Take(1))
             .AsSplitQuery()
             .FirstOrDefault(d => d.Id == id);
 
@@ -87,10 +98,13 @@ public class TelemetryGraphModel : PageModel
 
         _logger.LogInformation($"About to get latest telemetry data... {stopwatch.ElapsedMilliseconds}ms");
 
-        EarliestTelemetryDateTime = d.Telemetries
-            .OrderBy(t => t.Timestamp)
-            .Select(t => t.Timestamp)
-            .FirstOrDefault();
+        // EarliestTelemetryDateTime = d.Telemetries
+        //     .OrderBy(t => t.Timestamp)
+        //     .Select(t => t.Timestamp)
+        //     .FirstOrDefault();
+
+        EarliestTelemetryDateTime = d.Telemetries.Min(t => t.Timestamp);
+        LatestTelemetryDateTime = d.Telemetries.Max(t => t.Timestamp);
 
         _logger.LogInformation($"Retrieved latest telemetry data. {stopwatch.ElapsedMilliseconds}ms");
 

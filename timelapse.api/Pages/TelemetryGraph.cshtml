@@ -1,4 +1,4 @@
-﻿@page "{id:int}/{numberOfHoursToDisplay:int?}"
+﻿@page "{id:int}/{numberOfHoursToDisplay:int?}/{periodOffset:int?}"
 @using Humanizer
 @model TelemetryGraphModel
 @{
@@ -19,10 +19,14 @@
     <div class="col">
         <h4>Displaying @(Model.NumberOfHoursToDisplay) hours data.</h4>
         @{
+            <a href="/TelemetryGraph/@(Model.device.Id)/@(Model.NumberOfHoursToDisplay)/@(Model.PeriodOffset+1)" type="button" class="btn btn-secondary">Previous</a>
             <a href="/TelemetryGraph/@(Model.device.Id)/1" type="button" class="btn btn-secondary">Last hour</a>
             <a href="/TelemetryGraph/@(Model.device.Id)/24" type="button" class="btn btn-secondary">Last 24 hours</a>
             <a href="/TelemetryGraph/@(Model.device.Id)/48" type="button" class="btn btn-secondary">Last 48 hours</a>
             <a href="/TelemetryGraph/@(Model.device.Id)/168" type="button" class="btn btn-secondary">Last week</a>
+            @if(Model.PeriodOffset>0){
+                <a href="/TelemetryGraph/@(Model.device.Id)/@(Model.NumberOfHoursToDisplay)/@(Model.PeriodOffset-1)" type="button" class="btn btn-secondary">Next</a>
+            }
         }
     </div>
     <div class="col">
@@ -43,8 +47,8 @@
 <script>
     const latest24HoursTelemetryUri = '/api/Telemetry/GetLatestTelemetry'
 
-    function getTelemetry(deviceId, numberOfHoursToDisplay, chart) {
-        fetch(latest24HoursTelemetryUri + '?deviceId=' + deviceId + '&numberOfHoursToDisplay=' + numberOfHoursToDisplay)
+    function getTelemetry(deviceId, numberOfHoursToDisplay, periodOffset, chart) {
+        fetch(latest24HoursTelemetryUri + '?deviceId=' + deviceId + '&numberOfHoursToDisplay=' + numberOfHoursToDisplay + '&periodOffset=' + periodOffset)
             .then(response => response.json())
             .then(data => showTelemetry(chart, data))
             .catch(error => console.error('Unable to get telemetry.', error));
@@ -265,7 +269,7 @@
                             config
                         );
 
-                        getTelemetry(@(Model.device.Id), @(Model.NumberOfHoursToDisplay), myChart_@(Model.device.Id));
+                        getTelemetry(@(Model.device.Id), @(Model.NumberOfHoursToDisplay), @(Model.PeriodOffset), myChart_@(Model.device.Id));
 
                     </script>
                 </td>
