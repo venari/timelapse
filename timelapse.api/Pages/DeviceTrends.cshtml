@@ -1,4 +1,4 @@
-@page "{numberOfHoursToDisplay:int?}"
+﻿@page "{numberOfHoursToDisplay:int?}"
 @using Humanizer
 @model DeviceTrendsModel
 @{
@@ -221,6 +221,25 @@
                 }}
             </tr>
             }}
+            <thead>
+                @* <th nowrap="nowrap">Device Name</th> *@
+                <th nowrap="nowrap"></th>
+                <th nowrap="nowrap"><i class="fa fa-cog" data-toggle="tooltip" title="Support Mode"></i></th>
+                <th nowrap="nowrap"><i class="fa fa-eye" data-toggle="tooltip" title="Monitoring Mode"></i></th>
+                <th nowrap="nowrap"><i class="fa fa-wrench" data-toggle="tooltip" title="Service"></i></th>
+                <th nowrap="nowrap"><i class="fa fa-moon" data-toggle="tooltip" title="Hibernate Mode"></i></th>
+                <th nowrap="nowrap"><i class="fa fa-power-off" data-toggle="tooltip" title="Power Off"></i></th>
+                @* <th nowrap="nowrap">Description</th> *@
+                <th nowrap="nowrap"></th>
+                
+
+                @{foreach(var date in Model.DateRange){
+                    <th nowrap="nowrap"><script type="text/javascript">
+                        document.write(localizeDateTimeToShortDayAndNumber('@(date.ToString("s"))')); 
+                        @* daytimeColumns.push(localizeDateTimeIsBetween6And6('@(date.ToString("s"))')); *@
+                    </script></th>
+                }}
+            </thead>
             <thead>
                 <th nowrap="nowrap"></th>
                 <th nowrap="nowrap"></th>
