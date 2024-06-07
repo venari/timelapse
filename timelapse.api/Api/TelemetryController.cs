@@ -69,11 +69,11 @@ namespace timelapse.api{
         public ActionResult<IEnumerable<Telemetry>> GetLatest24HoursTelemetry([FromQuery] int deviceId){
             _logger.LogInformation("Get latest 24 hours' telemetry");
 
-            return GetLatestTelemetry(deviceId, 24, 0);
+            return GetTelemetry(deviceId, 24, 0);
         }
  
-        [HttpGet("GetLatestTelemetry")]
-        public ActionResult<IEnumerable<Telemetry>> GetLatestTelemetry([FromQuery] int deviceId, int numberOfHoursToDisplay, int periodOffset){
+        [HttpGet("GetTelemetry")]
+        public ActionResult<IEnumerable<Telemetry>> GetTelemetry([FromQuery] int deviceId, int numberOfHoursToDisplay, int periodOffset){
             _logger.LogInformation($"Get latest {numberOfHoursToDisplay} hours' telemetry");
 
             DateTime cutOffStart = DateTime.UtcNow.AddHours(-1 * numberOfHoursToDisplay);
@@ -99,6 +99,52 @@ namespace timelapse.api{
 
             if(device != null){
                 telemetry =  device.Telemetries.OrderBy(t => t.Timestamp).ToList();
+            }
+
+            // // Get two surrounding data points.
+            // if(telemetry.Count>0){
+            //     var first = telemetry.First();
+            //     var last = telemetry.Last();
+
+            //     if(first.Timestamp.ToUniversalTime() > startDate.ToUniversalTime()){
+            //         var previous = _appDbContext.Telemetry
+            //             .Where(t => t.DeviceId == deviceId && t.Timestamp.ToUniversalTime() < startDate.ToUniversalTime())
+            //             .OrderByDescending(t => t.Timestamp)
+            //             .FirstOrDefault();
+
+            //         if(previous!=null){
+            //             telemetry.Insert(0, previous);
+            //         }
+            //     }
+
+            //     if(last.Timestamp.ToUniversalTime() < endDate.ToUniversalTime()){
+            //         var next = _appDbContext.Telemetry
+            //             .Where(t => t.DeviceId == deviceId && t.Timestamp.ToUniversalTime() > endDate.ToUniversalTime())
+            //             .OrderBy(t => t.Timestamp)
+            //             .FirstOrDefault();
+
+            //         if(next!=null){
+            //             telemetry.Add(next);
+            //         }
+            //     }
+            // }
+
+            // Get two surrounding data points.
+            var previous = _appDbContext.Telemetry
+                .Where(t => t.DeviceId == deviceId && t.Timestamp.ToUniversalTime() < startDate.ToUniversalTime())
+                .OrderByDescending(t => t.Timestamp)
+                .FirstOrDefault();
+
+            if(previous!=null){
+                telemetry.Insert(0, previous);
+            }
+            var next = _appDbContext.Telemetry
+                .Where(t => t.DeviceId == deviceId && t.Timestamp.ToUniversalTime() > endDate.ToUniversalTime())
+                .OrderBy(t => t.Timestamp)
+                .FirstOrDefault();
+
+            if(next!=null){
+                telemetry.Add(next);
             }
 
             if(telemetry.Count==0){

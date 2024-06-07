@@ -7,6 +7,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@2.0.1/dist/chartjs-plugin-annotation.min.js"></script>
 
 <div class="text-center">
     <h1 class="display-4">
@@ -45,7 +46,7 @@
 
 
 <script>
-    const latest24HoursTelemetryUri = '/api/Telemetry/GetLatestTelemetry'
+    const latest24HoursTelemetryUri = '/api/Telemetry/GetTelemetry'
 
     function getTelemetry(deviceId, numberOfHoursToDisplay, periodOffset, chart) {
         fetch(latest24HoursTelemetryUri + '?deviceId=' + deviceId + '&numberOfHoursToDisplay=' + numberOfHoursToDisplay + '&periodOffset=' + periodOffset)
@@ -119,17 +120,51 @@
         chart.config.data.datasets[11].data = data.map(d => ({x: new Date(d.timestamp), y: d.uptimeSeconds/60}));
         chart.update();
     }
+
+    var dates = [];
+
+    var daysToDisplay = @(Model.NumberOfHoursToDisplay)/24;
+    @* var dateTo = new Date(@(Model.LatestTelemetryDateTime.Value.ToString("s")); *@
+    var dateFrom = new Date("@(Model.TargetEarliestTelemetryDateTime.Value.ToString("s"))");
+    // Move to midnight boundary
+    dateFrom = new Date(dateFrom.getFullYear(), dateFrom.getMonth(), dateFrom.getDate());
+    // Show day boundaries if 30 days or fewer - gets a bit heavy otherwise.
+    if(daysToDisplay<=30){
+        for(var dateIndex = 0; dateIndex <= daysToDisplay + 1; ++dateIndex){
+            var date = new Date(dateFrom.getTime() + dateIndex * 24 * 60 * 60 * 1000);
+            dates.push(date);
+        }
+    }
+
+    annotations = dates
+    .map((l, i) => ({
+        drawTime: 'beforeDatasetsDraw',
+        type: 'box',
+        xScaleID: 'x',
+        yScaleID: 'y',
+        xMin: new Date(l.getFullYear(), l.getMonth(), l.getDate()),
+        xMax: new Date(l.getFullYear(), l.getMonth(), l.getDate()+1),
+        backgroundColor: 'rgba(128, 128, 128, 0.2)',
+        borderColor: 'rgba(128, 128, 128, 0.0)',
+        borderWidth: 1
+    }))
+    .filter((l, i) => !(i % 2))
 </script>
 
 <div>
     <table class="table">
         <thead>
             <tr>
-            <th scope="col">Latest Telemetry for @(Model.device.Name) as at <script type="text/javascript">localizeDateTime('@(Model.device.LatestTelemetryTimestamp.Value.ToString("s"))');</script>
-            @if (Model.device.LatestTelemetry!=null && DateTime.UtcNow - Model.device.LatestTelemetry.Timestamp > TimeSpan.FromMinutes(60)){
-                <span class="badge bg-warning text-dark">Warning - @((DateTime.UtcNow - Model.device.LatestTelemetry.Timestamp).Humanize()) old</span>
-            }
-            </th>
+                @if(Model.PeriodOffset>0){
+                    <th scope="col">Telemetry for @(Model.device.Name) between <script type="text/javascript">localizeDateTime('@(Model.EarliestTelemetryDateTime.Value.ToString("s"))');</script> and <script type="text/javascript">localizeDateTime('@(Model.LatestTelemetryDateTime.Value.ToString("s"))');</script>                
+                    </th>
+                } else {
+                    <th scope="col">Latest Telemetry for @(Model.device.Name) as at <script type="text/javascript">localizeDateTime('@(Model.LatestTelemetryDateTime.Value.ToString("s"))');</script>
+                    @if (Model.device.LatestTelemetry!=null && DateTime.UtcNow - Model.device.LatestTelemetry.Timestamp > TimeSpan.FromMinutes(60)){
+                        <span class="badge bg-warning text-dark">Warning - @((DateTime.UtcNow - Model.device.LatestTelemetry.Timestamp).Humanize()) old</span>
+                    }
+                    </th>
+                }
             </tr>
         </thead>
         <tbody>
@@ -145,6 +180,9 @@
                                 plugins: {
                                     legend: {
                                         @* display: false, *@
+                                    },
+                                    annotation: {
+                                        annotations: annotations
                                     }
                                 },
                                 scales: {
@@ -153,11 +191,23 @@
                                             @* display: false, *@
                                             type: 'time',
                                             time: {
-                                                unit: 'hour'
+                                                unit: 'hour',
+                                                // https://date-fns.org/v2.28.0/docs/format
+                                                displayFormats: {
+                                                    'millisecond': 'MMM DD',
+                                                    'second': 'MMM DD',
+                                                    'minute': 'MMM DD',
+                                                    'hour': 'E do ha',
+                                                    'day': 'MMM dd HH:mm',
+                                                    'week': 'MMM DD',
+                                                    'month': 'MMM DD',
+                                                    'quarter': 'MMM DD',
+                                                    'year': 'MMM DD'
+                                                }                        
                                             },
-                                            suggestedMin: new Date(@(new DateTimeOffset(Model.EarliestTelemetryDateTime.Value).ToUnixTimeMilliseconds())),
+                                            min: new Date(@(new DateTimeOffset(Model.TargetEarliestTelemetryDateTime.Value).ToUnixTimeMilliseconds())),
                                             @* suggestedMax: new Date(), *@
-                                            suggestedMax: new Date(@(new DateTimeOffset(Model.LatestTelemetryDateTime.Value).ToUnixTimeMilliseconds())),
+                                            max: new Date(@(new DateTimeOffset(Model.TargetLatestTelemetryDateTime.Value).ToUnixTimeMilliseconds())),
                                             @* ticks: {
                                                 max: new Date(),
                                                 min: new Date(@(new DateTimeOffset(Model.device.LatestTelemetry.Timestamp).AddDays(-2).ToUnixTimeMilliseconds())),

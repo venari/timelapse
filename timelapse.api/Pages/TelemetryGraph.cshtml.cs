@@ -21,6 +21,8 @@ public class TelemetryGraphModel : PageModel
 
     public DateTime? LatestTelemetryDateTime {get; private set;}
     public DateTime? EarliestTelemetryDateTime {get; private set;}
+    public DateTime? TargetLatestTelemetryDateTime {get; private set;}
+    public DateTime? TargetEarliestTelemetryDateTime {get; private set;}
 
     // private int _numberOfHoursToDisplay;
 
@@ -105,6 +107,10 @@ public class TelemetryGraphModel : PageModel
 
         EarliestTelemetryDateTime = d.Telemetries.Min(t => t.Timestamp);
         LatestTelemetryDateTime = d.Telemetries.Max(t => t.Timestamp);
+        TargetLatestTelemetryDateTime = LatestTelemetryDateTime;
+        // TargetEarliestTelemetryDateTime = cutOffStart;
+        TargetEarliestTelemetryDateTime = LatestTelemetryDateTime.Value.AddHours(-1 * NumberOfHoursToDisplay);
+        
 
         _logger.LogInformation($"Retrieved latest telemetry data. {stopwatch.ElapsedMilliseconds}ms");
 
