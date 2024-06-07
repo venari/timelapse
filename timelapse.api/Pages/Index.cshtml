@@ -170,9 +170,8 @@
                                                     time: {
                                                         unit: 'hour'
                                                     },
-                                                    suggestedMin: new Date(@(new DateTimeOffset(device.LatestTelemetry.Timestamp).AddDays(-2).ToUnixTimeMilliseconds())),
-                                                    @* suggestedMax: new Date(), *@
-                                                    suggestedMax: new Date(@(new DateTimeOffset(device.LatestTelemetry.Timestamp).ToUnixTimeMilliseconds())),
+                                                    min: new Date("@(DateTime.UtcNow.AddDays(-2).ToString("o"))"),
+                                                    max: new Date("@(DateTime.UtcNow.ToString("o"))")
                                             },
                                             y: {
                                                     display: false,
