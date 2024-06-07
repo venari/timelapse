@@ -67,25 +67,11 @@ namespace timelapse.api{
 
         [HttpGet("GetLatest24HoursTelemetry")]
         public ActionResult<IEnumerable<Telemetry>> GetLatest24HoursTelemetry([FromQuery] int deviceId){
-            _logger.LogInformation("Get latest 24 hours' telemetry");
+            _logger.LogInformation("Get latest 24 hours' telemetry");;
 
-            return GetTelemetry(deviceId, 24, 0);
+            return GetTelemetryBetweenDates(deviceId, new DateTime(DateTime.UtcNow.Year, DateTime.UtcNow.Month, DateTime.UtcNow.Day, DateTime.UtcNow.Hour, 0, 0).AddHours(-24), DateTime.UtcNow);
         }
  
-        [HttpGet("GetTelemetry")]
-        public ActionResult<IEnumerable<Telemetry>> GetTelemetry([FromQuery] int deviceId, int numberOfHoursToDisplay, int periodOffset){
-            _logger.LogInformation($"Get latest {numberOfHoursToDisplay} hours' telemetry");
-
-            DateTime cutOffStart = DateTime.UtcNow.AddHours(-1 * numberOfHoursToDisplay);
-            DateTime cutOffEnd = DateTime.UtcNow;
-
-            if(periodOffset!=0){
-                cutOffStart = cutOffStart.AddHours(-1 * numberOfHoursToDisplay * periodOffset);
-                cutOffEnd = cutOffEnd.AddHours(-1 * numberOfHoursToDisplay * periodOffset);
-            }
-
-            return GetTelemetryBetweenDates(deviceId, cutOffStart, cutOffEnd);
-        }
 
         [HttpGet("GetTelemetryBetweenDates")]
         public ActionResult<IEnumerable<Telemetry>> GetTelemetryBetweenDates([FromQuery] int deviceId, DateTime startDate, DateTime endDate){
@@ -101,51 +87,24 @@ namespace timelapse.api{
                 telemetry =  device.Telemetries.OrderBy(t => t.Timestamp).ToList();
             }
 
+
             // // Get two surrounding data points.
-            // if(telemetry.Count>0){
-            //     var first = telemetry.First();
-            //     var last = telemetry.Last();
+            // var previous = _appDbContext.Telemetry
+            //     .Where(t => t.DeviceId == deviceId && t.Timestamp.ToUniversalTime() < startDate.ToUniversalTime())
+            //     .OrderByDescending(t => t.Timestamp)
+            //     .FirstOrDefault();
 
-            //     if(first.Timestamp.ToUniversalTime() > startDate.ToUniversalTime()){
-            //         var previous = _appDbContext.Telemetry
-            //             .Where(t => t.DeviceId == deviceId && t.Timestamp.ToUniversalTime() < startDate.ToUniversalTime())
-            //             .OrderByDescending(t => t.Timestamp)
-            //             .FirstOrDefault();
-
-            //         if(previous!=null){
-            //             telemetry.Insert(0, previous);
-            //         }
-            //     }
-
-            //     if(last.Timestamp.ToUniversalTime() < endDate.ToUniversalTime()){
-            //         var next = _appDbContext.Telemetry
-            //             .Where(t => t.DeviceId == deviceId && t.Timestamp.ToUniversalTime() > endDate.ToUniversalTime())
-            //             .OrderBy(t => t.Timestamp)
-            //             .FirstOrDefault();
-
-            //         if(next!=null){
-            //             telemetry.Add(next);
-            //         }
-            //     }
+            // if(previous!=null){
+            //     telemetry.Insert(0, previous);
             // }
+            // var next = _appDbContext.Telemetry
+            //     .Where(t => t.DeviceId == deviceId && t.Timestamp.ToUniversalTime() > endDate.ToUniversalTime())
+            //     .OrderBy(t => t.Timestamp)
+            //     .FirstOrDefault();
 
-            // Get two surrounding data points.
-            var previous = _appDbContext.Telemetry
-                .Where(t => t.DeviceId == deviceId && t.Timestamp.ToUniversalTime() < startDate.ToUniversalTime())
-                .OrderByDescending(t => t.Timestamp)
-                .FirstOrDefault();
-
-            if(previous!=null){
-                telemetry.Insert(0, previous);
-            }
-            var next = _appDbContext.Telemetry
-                .Where(t => t.DeviceId == deviceId && t.Timestamp.ToUniversalTime() > endDate.ToUniversalTime())
-                .OrderBy(t => t.Timestamp)
-                .FirstOrDefault();
-
-            if(next!=null){
-                telemetry.Add(next);
-            }
+            // if(next!=null){
+            //     telemetry.Add(next);
+            // }
 
             if(telemetry.Count==0){
                 return new NotFoundObjectResult(telemetry);
