@@ -115,6 +115,12 @@ def scheduleShutdown():
         if config['batteryStress'] == True:
             logger.warning("BATTERY STRESS MODE - ignore everything else, shutdown after 5 minutes uptime, and wakeup again in 5 minutes")
 
+            logger.warning("About to power up power switch and SIM7600 in 30s...")
+            time.sleep(30)
+            pj.power.SetSystemPowerSwitch(500)
+            powerUpSIM7600X()
+            logger.info("Powered up power switch and SIM7600")
+
             if(uptimeSeconds >= 300):            
                 logger.info('Setting System Power Switch to Off:')
                 pj.power.SetSystemPowerSwitch(0)
