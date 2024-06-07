@@ -88,23 +88,23 @@ namespace timelapse.api{
             }
 
 
-            // // Get two surrounding data points.
-            // var previous = _appDbContext.Telemetry
-            //     .Where(t => t.DeviceId == deviceId && t.Timestamp.ToUniversalTime() < startDate.ToUniversalTime())
-            //     .OrderByDescending(t => t.Timestamp)
-            //     .FirstOrDefault();
+            // Get two surrounding data points.
+            var previous = _appDbContext.Telemetry
+                .Where(t => t.DeviceId == deviceId && t.Timestamp.ToUniversalTime() < startDate.ToUniversalTime())
+                .OrderByDescending(t => t.Timestamp)
+                .FirstOrDefault();
 
-            // if(previous!=null){
-            //     telemetry.Insert(0, previous);
-            // }
-            // var next = _appDbContext.Telemetry
-            //     .Where(t => t.DeviceId == deviceId && t.Timestamp.ToUniversalTime() > endDate.ToUniversalTime())
-            //     .OrderBy(t => t.Timestamp)
-            //     .FirstOrDefault();
+            if(previous!=null){
+                telemetry.Insert(0, previous);
+            }
+            var next = _appDbContext.Telemetry
+                .Where(t => t.DeviceId == deviceId && t.Timestamp.ToUniversalTime() > endDate.ToUniversalTime())
+                .OrderBy(t => t.Timestamp)
+                .FirstOrDefault();
 
-            // if(next!=null){
-            //     telemetry.Add(next);
-            // }
+            if(next!=null){
+                telemetry.Add(next);
+            }
 
             if(telemetry.Count==0){
                 return new NotFoundObjectResult(telemetry);

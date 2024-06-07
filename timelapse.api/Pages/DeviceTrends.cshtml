@@ -91,8 +91,8 @@
                                             time: {
                                                 unit: 'hour'
                                             },
-                                            suggestedMin: new Date(@(new DateTimeOffset(Model.StartDate).ToUnixTimeMilliseconds())),
-                                            suggestedMax: new Date(@(new DateTimeOffset(Model.EndDate).ToUnixTimeMilliseconds())),
+                                            min: new Date(@(new DateTimeOffset(Model.StartDate).ToUnixTimeMilliseconds())),
+                                            max: new Date(@(new DateTimeOffset(Model.EndDate).ToUnixTimeMilliseconds())),
                                     },
                                     y: {
                                             @* display: false, *@
@@ -173,7 +173,7 @@
         <tbody>
             @{foreach(var summary in Model.PerformanceSummaries){
             <tr>
-                <td nowrap="nowrap"><a href="/TelemetryGraph/@(summary.DeviceId)/@(Model.NumberOfHoursToDisplay)">@(summary.DeviceName)</a></td>
+                <td nowrap="nowrap"><a href="/TelemetryGraph/@(summary.DeviceId)/@(Model.StartDate.ToUniversalTime().ToString("o"))/@(Model.EndDate.ToUniversalTime().ToString("o"))">@(summary.DeviceName)</a></td>
 
                 <td nowrap="nowrap">
                     @if(summary.DeviceSupportMode){
@@ -202,7 +202,6 @@
                 </td>
 
 
-                @* <td><a href="/TelemetryGraph/@(summary.DeviceId)/@(Model.NumberOfHoursToDisplay)">@(summary.DeviceName)</a></td> *@
                 <td nowrap="nowrap">@(summary.DeviceDescription)</td>
                 @{foreach(var details in summary.PerformanceDetails){
                     if(summary.DeviceService || summary.DevicePowerOff || summary.DeviceHibernateMode){
@@ -284,7 +283,6 @@
                 </td>
 
 
-                @* <td><a href="/TelemetryGraph/@(summary.DeviceId)/@(Model.NumberOfHoursToDisplay)">@(summary.DeviceName)</a></td> *@
                 <td nowrap="nowrap">@(summary.DeviceDescription)</td>
                 @{foreach(var details in summary.PerformanceDetails){
                     if(summary.DeviceService || summary.DevicePowerOff || summary.DeviceHibernateMode){
