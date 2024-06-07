@@ -142,7 +142,7 @@
 
         var cell = row.insertCell();
         var imageBlobUri = image.blobUri + '@(Model.SasToken)'.replace(/&amp;/g, '&');
-        var imageViewURL = "/ImageView/@(Model.DeviceId)/1/" + image.timestamp + window.location.search;   
+        var imageViewURL = "/ImageView/@(Model.DeviceId)/3/" + image.timestamp + window.location.search;   
         var cellInnerHTML = '<a href="' + imageViewURL + '"><img src="' + imageBlobUri + '" width=100></img></a>'
         cell.innerHTML = cellInnerHTML;
         prevHour = hour;
