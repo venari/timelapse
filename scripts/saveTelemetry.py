@@ -112,6 +112,22 @@ def scheduleShutdown():
 
         uptimeSeconds = int(time.clock_gettime(time.CLOCK_BOOTTIME))
 
+        if config['batteryStress'] == True:
+            logger.warning("BATTERY STRESS MODE - ignore everything else, shutdown after 5 minutes uptime, and wakeup again in 5 minutes")
+
+            if(uptimeSeconds >= 300):            
+                logger.info('Setting System Power Switch to Off:')
+                pj.power.SetSystemPowerSwitch(0)
+                SetWatchdog(5)
+                powerDownSIM7600X()
+                logger.info('Shutting down now...')
+                loggerIntent.info('Shutting down now...')
+                subprocess.call(['sudo', 'shutdown', '-h', 'now'])
+
+                exit()
+
+
+
         bCharging = False
         if (
             (pj.status.GetStatus()['data']['battery'] == 'CHARGING_FROM_IN' 
