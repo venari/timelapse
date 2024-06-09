@@ -11,7 +11,7 @@
 #include <EEPROM.h>
 // #include <HTTPClient.h>
 #include <WiFiClientSecure.h>
-// #include <ArduinoJson.h>
+#include <ArduinoJson.h>
 
 #define CAMERA_MODEL_XIAO_ESP32S3  // Has PSRAM
 
@@ -60,17 +60,22 @@ const bool enableSleep = true;
 
 unsigned long lastCaptureTime = 0;  // Last shooting time
 int imageCounter = 1;                 // File Counter
+int telemetryCounter = 1;
 
 // int epochPseudoRTC = 0;             // Save time of last sleep in case we don't have a real RTC.
 
 bool camera_sign = false;           // Check camera status
 bool sd_sign = false;               // Check sd status
-const char *counterFilename = "/counter";
+const char *counterFilenameImages = "/counterImages";
+const char *counterFilenameTelemetry = "/counterTelemetry";
 // const char *bootTimeFilename = "/bootTime";
 const char *logFilename = "/log.txt";
 
-const char *uploadedFolder = "/uploaded";
-const char *pendingFolder = "/pending3";
+const char *uploadedImageFolder = "/output/images/uploaded";
+const char *pendingImageFolder = "/output/images/pending";
+
+const char *uploadedTelemetryFolder = "/output/telemetry/uploaded";
+const char *pendingTelemetryFolder = "/output/telemetry/pending";
 
 const char *serverName = "timelapse-dev.azurewebsites.net";
 const int port = 443;
@@ -132,7 +137,7 @@ void logMessage(const char *format, va_list args) {
 }
 
 
-void updateCounter(int count) {
+void updateCounter(const char *counterFilename, int count) {
   File file = SD.open(counterFilename, FILE_WRITE);
   if (!file) {
     logMessage("Failed to open counter file for writing");
@@ -145,7 +150,7 @@ void updateCounter(int count) {
   }
 }
 
-int getCounter() {
+int getCounter(const char *counterFilename) {
   File file = SD.open(counterFilename);
   if (!file) {
     logMessage("Failed to open counter file for reading");
@@ -206,21 +211,68 @@ DateTime getPseudoRTCNow(){
 }
 
 
+void saveTelemetry() {
 
-// time_t getBootTime() {
-//   File file = SD.open(bootTimeFilename);
-//   if (!file) {
-//     logMessage("Failed to open bootTime file for reading");
-//     return 0;
-//   }
-//   time_t time = (time_t)file.parseInt();
-//   file.close();
-//   return time;
-// }
+  char filename[50];
+  char rtcTime[25];
+  
+  DateTime now = PRTCnow();
+  sprintf(rtcTime, YYYYMMDDHHMMSSFormatString, now.year(), now.month(), now.day(), now.hour(), now.minute(), now.second());
 
-// Save pictures to SD card
-void photo_save(const char *fileName) {
-  // Take a photo
+  sprintf(filename, "%s/telemetry.%08d.%s.json", pendingTelemetryFolder, telemetryCounter, rtcTime);
+  logMessage("filename: %s", filename);
+
+  digitalWrite(LED_BUILTIN, LOW);  // XIAO ESP32S3 LOW = on
+
+  // https://wiki.seeedstudio.com/check_battery_voltage/
+  // https://forum.seeedstudio.com/t/battery-voltage-monitor-and-ad-conversion-for-xiao-esp32c/267535
+  uint32_t Vbatt = 0;
+  for(int i = 0; i < 16; i++) {
+    Vbatt = Vbatt + analogReadMilliVolts(A0); // ADC with correction   
+  }
+  float Vbattf = 2 * Vbatt / 16; /// 1000.0;     // attenuation ratio 1/2, mV --> V
+  Serial.println(Vbattf, 3);
+
+  // // Uptime, pendingImages, pendingTelemetry, batteryVoltage
+  // const int capacity = JSON_ARRAY_SIZE(1) + 2*JSON_OBJECT_SIZE(4);
+  // StaticJsonDocument<capacity> doc;
+
+  JsonDocument doc;
+
+  doc['batteryPercent'] =  0;
+  doc['temperatureC'] =  21;
+  doc['diskSpaceFree'] =  0;
+  doc['pendingImages'] =  countFiles(pendingImageFolder);
+  doc['uploadedImages'] =  countFiles(uploadedImageFolder);
+  doc['pendingTelemetry'] =  countFiles(pendingTelemetryFolder);
+  doc['uploadedTelemetry'] =  countFiles(uploadedTelemetryFolder);
+  doc['uptimeSeconds'] =  millis()/1000;
+
+  // doc['status']['batteryVoltage'] = Vbattf;
+  String status = "{\"status\":\"OK\", \"batteryVoltage\":" + String(Vbattf) + "}";
+  doc['status'] = Status;
+  doc['SerialNumber'] = MACAddress;
+
+  File file = SD.open(filename, FILE_WRITE)
+  serializeJsonPretty(doc, file);
+
+  digitalWrite(LED_BUILTIN, HIGH);
+
+  logMessage("Saved telemetry: %s\r\n", filename);
+  updateCounter(++telemetryCounter);
+}
+
+void savePhoto() {
+
+  char filename[50];
+  char rtcTime[25];
+  
+  DateTime now = PRTCnow();
+  sprintf(rtcTime, YYYYMMDDHHMMSSFormatString, now.year(), now.month(), now.day(), now.hour(), now.minute(), now.second());
+
+  sprintf(filename, "%s/image.%08d.%s.jpg", pendingImageFolder, imageCounter, rtcTime);
+  logMessage("filename: %s", filename);
+
 
   // Serial.println("Starting photo_save()");
   digitalWrite(LED_BUILTIN, LOW);  // XIAO ESP32S3 LOW = on
@@ -234,9 +286,9 @@ void photo_save(const char *fileName) {
   }
 
   // logMessage("Writing file... %5d", millis());
-  logMessage("Writing file...", millis());
+  // logMessage("Writing file...", millis());
   // Save photo to file
-  writeFile(SD, fileName, fb->buf, fb->len);
+  writeFile(SD, filename, fb->buf, fb->len);
   // logMessage("File written %5d", millis());
 
   // Release image buffer
@@ -244,10 +296,9 @@ void photo_save(const char *fileName) {
   // logMessage("image buffer released %5d", millis());
 
   digitalWrite(LED_BUILTIN, HIGH);
-  // logMessage("All done %5d", millis());
-  // delay(500);
 
-  // Serial.println("Photo saved to file");
+  logMessage("Saved picture: %s\r\n", filename);
+  updateCounter(++imageCounter);
 }
 
 // SD card write file
@@ -392,23 +443,15 @@ void getNTPTime() {
 }
 
 const int FileArraySize = 100;
-const int FileBatchSize = 10;
+const int ImageFileBatchSize = 10;
+const int TelemetryFileBatchSize = 100;
 
-void uploadPending(){
-
-  logMessage("uploadPending()....");
-  File root = SD.open(pendingFolder);
-  if (!root) {
-    logError("Failed to open pending folder");
-    return;
-  }
-
-  if(!SD.exists(uploadedFolder)){
-    SD.mkdir(uploadedFolder);
-  }
+bool uploadPendingImages(){
+  // returns true if all pending images have been uploaded.
+  logMessage("uploadPendingImages()....");
 
   // Scan folder, retrieving most recent files first
-  String* sortedFiles = listAndSortFiles(root);
+  String* sortedFiles = listAndSortFiles(pendingImageFolder);
   int filesUploaded = 0;
   int filesToUpload = 0;
 
@@ -420,14 +463,14 @@ void uploadPending(){
   }
 
   for(int fileIndex = 0; fileIndex < FileArraySize && fileIndex < filesToUpload; ++fileIndex){
-    if(fileIndex>=FileBatchSize){
-      logMessage("Batch size: %d (%d files remaining)", FileBatchSize, filesToUpload - fileIndex);
+    if(fileIndex>=ImageFileBatchSize){
+      logMessage("Batch size: %d (%d files remaining)", ImageFileBatchSize, filesToUpload - fileIndex);
       break;
     } else {
       logMessage("Uploading %d/%d...", fileIndex+1, filesToUpload);
     }
 
-    String pendingFilename = pendingFolder;
+    String pendingFilename = pendingImageFolder;
     pendingFilename += "/";
     pendingFilename += sortedFiles[fileIndex];
 
@@ -518,8 +561,9 @@ void uploadPending(){
         // Move the file to the uploaded folder
         // Serial.println("Moving file....");
         // Serial.println(pendingFilename);
+        ++filesUploaded;
         String uploadedFilename = pendingFilename;
-        uploadedFilename.replace(pendingFolder, uploadedFolder);
+        uploadedFilename.replace(pendingImageFolder, uploadedImageFolder);
         // Serial.println(uploadedFilename);
         if (SD.rename(pendingFilename, uploadedFilename)) {
           logMessage("File moved to uploaded folder");
@@ -539,10 +583,162 @@ void uploadPending(){
   }
   root.close();
 
+  return filesUploaded == filesToUpload;
 }
 
-String* listAndSortFiles(File dir) {
-  const int maxFiles = 100;
+bool uploadPendingTelemetry(){
+  // returns true if all pending telemetry has been uploaded.
+  logMessage("uploadPendingTelemetry()....");
+
+  // Scan folder, retrieving most recent files first
+  String* sortedFiles = listAndSortFiles(pendingImageFolder);
+  int filesUploaded = 0;
+  int filesToUpload = 0;
+
+  // Array will be 100 large, with empty entries if files don't exist.
+  for(int fileIndex = 0; fileIndex < FileArraySize; ++fileIndex){
+    if(sortedFiles[fileIndex].length()>0){
+      ++filesToUpload;
+    }
+  }
+
+  for(int fileIndex = 0; fileIndex < FileArraySize && fileIndex < filesToUpload; ++fileIndex){
+    if(fileIndex>=TelemetryFileBatchSize){
+      logMessage("Batch size: %d (%d files remaining)", TelemetryFileBatchSize, filesToUpload - fileIndex);
+      break;
+    } else {
+      logMessage("Uploading %d/%d...", fileIndex+1, filesToUpload);
+    }
+
+    String pendingFilename = pendingTelemetryFolder;
+    pendingFilename += "/";
+    pendingFilename += sortedFiles[fileIndex];
+
+    File file = SD.open(pendingFilename);
+    
+    if (!file.isDirectory()) {
+
+      logMessage(file.name());
+
+      String boundary = "----WebKitFormBoundary" + String(random(0xFFFFFF), HEX);
+
+      WiFiClientSecure client;
+      client.setInsecure(); // Disable SSL certificate verification
+
+      if (!client.connect(serverName, port)) {
+        Serial.println("Connection failed!");
+        return;
+      }
+      
+      String timestampString = file.name();
+      timestampString.replace("_", "T");
+      timestampString = timestampString.substring(15);
+      timestampString = timestampString.substring(0, 13) + ":" + timestampString.substring(13, 15) + ":" + timestampString.substring(15, 17) + "Z";      
+      // Serial.println(timestampString);
+
+      DynamicJsonDocument doc(1024);
+      // JsonDocument doc;
+      deserializeJson(doc, file);
+      file.close();
+
+
+      String payload = "--" + boundary + "\r\n"
+                     "Content-Disposition: form-data; name=\"PendingTelemetry\"\r\n\r\n" + doc["PendingTelemetry"] + "\r\n"
+                     "--" + boundary + "\r\n"
+                     "Content-Disposition: form-data; name=\"TemperatureC\"\r\n\r\n" + doc["TemperatureC"] + "\r\n"
+                     "--" + boundary + "\r\n"
+                     "Content-Disposition: form-data; name=\"PendingImages\"\r\n\r\n" + doc["PendingImages"] + "\r\n"
+                     "--" + boundary + "\r\n"
+                    //  "Content-Disposition: form-data; name=\"Status\"\r\n\r\n{\"status\":\"OK\", \"batteryVoltage\":" + doc["batteryVoltage"] + "}\r\n"
+                     "Content-Disposition: form-data; name=\"Status\"\r\n\r\n" + doc["Status"] + "\r\n"
+                     "--" + boundary + "\r\n"
+                     "Content-Disposition: form-data; name=\"DiskSpaceFree\"\r\n\r\n" + doc["DiskSpaceFree"] + "\r\n"
+                     "--" + boundary + "\r\n"
+                     "Content-Disposition: form-data; name=\"Timestamp\"\r\n\r\n" + timestampString + "\r\n"
+                     "--" + boundary + "\r\n"
+                     "Content-Disposition: form-data; name=\"UptimeSeconds\"\r\n\r\n" + doc["UptimeSeconds"] + "\r\n"
+                     "--" + boundary + "\r\n"
+                     "Content-Disposition: form-data; name=\"UploadedImages\"\r\n\r\n" + doc["UploadedImages"] + "\r\n"
+                     "--" + boundary + "\r\n"
+                     "Content-Disposition: form-data; name=\"BatteryPercent\"\r\n\r\n" + doc["BatteryPercent"] + "\r\n"
+                     "--" + boundary + "\r\n"
+                     "Content-Disposition: form-data; name=\"UploadedTelemetry\"\r\n\r\n" + doc["UploadedTelemetry"] + "\r\n"
+                     "--" + boundary + "\r\n"
+                     "Content-Disposition: form-data; name=\"SerialNumber\"\r\n\r\n" + MACAddress + "\r\n"
+                     "--" + boundary + "--\r\n";
+
+      int contentLength = payload.length();
+
+      client.printf("POST /api/Telemetry HTTP/1.1\r\n");
+      client.printf("Host: %s\r\n", serverName);
+      client.printf("Content-Type: multipart/form-data; boundary=%s\r\n", boundary.c_str());
+      client.printf("Content-Length: %d\r\n", contentLength);
+      client.printf("Connection: close\r\n\r\n");
+
+      client.print(payload);
+
+
+      // Read the response from the server
+      bool okResponse = false;
+      bool NotFoundResponse = false;
+      while (client.connected() || client.available()) {
+        if (client.available()) {
+          String line = client.readStringUntil('\n');
+          if(line.indexOf("HTTP/1.1 200 OK") != -1){
+            okResponse = true;
+            break;
+          }
+          if(line.indexOf("HTTP/1.1 404 Not Found") != -1){
+            NotFoundResponse = true;
+            break;
+          }
+          Serial.println(line);
+        }
+      }
+      client.stop();
+
+      if(okResponse){
+        // Move the file to the uploaded folder
+        // Serial.println("Moving file....");
+        // Serial.println(pendingFilename);
+        ++filesUploaded;
+        String uploadedFilename = pendingFilename;
+        uploadedFilename.replace(pendingTelemtryFolder, uploadedTelemetryFolder);
+        // Serial.println(uploadedFilename);
+        if (SD.rename(pendingFilename, uploadedFilename)) {
+          logMessage("File moved to uploaded folder");
+        } else {
+          logError("Failed to move file to uploaded folder");
+        }
+      } else {
+        if(NotFoundResponse){
+          logMessage("404 - check device is registered.");
+        } else {
+          logMessage("Error sending data.");
+        }
+      }
+
+    }
+    file = root.openNextFile();
+  }
+  root.close();
+
+  return filesUploaded == filesToUpload;
+}
+
+String* listAndSortFiles(const char* folder) {
+
+  File root = SD.open(folder);
+  if (!root) {
+    logError("Failed to open folder: %s", folder);
+    return;
+  }
+
+  if(!SD.exists(folder)){
+    SD.mkdir(folder);
+  }
+
+  const int maxFiles = FileArraySize;
   String* filenames = new String[maxFiles];
   int fileCount = 0;
 
@@ -574,6 +770,36 @@ String* listAndSortFiles(File dir) {
   }
 
   return filenames;
+}
+
+int countFiles(File dir) {
+
+  File root = SD.open(folder);
+  if (!root) {
+    logError("Failed to open folder: %s", folder);
+    return;
+  }
+
+  if(!SD.exists(folder)){
+    SD.mkdir(folder);
+  }
+
+  int fileCount = 0;
+
+  // Collect filenames
+  while (true) {
+    File entry = dir.openNextFile();
+    if (!entry) {
+      // no more files
+      break;
+    }
+    if (!entry.isDirectory()) {
+      fileCount++;
+    }
+    entry.close();
+  }
+
+  return fileCount;
 }
 
 void logRTC() {
@@ -665,7 +891,9 @@ void setup() {
   if (bootCount % 5 == 0) {
     if(wifiConnect()){
       getNTPTime();
-      uploadPending();
+      uploadPendingImages();
+      uploadPendingTelemetry();
+      }
     }
   }
 
@@ -757,35 +985,17 @@ void setup() {
   displayMessage("Camera ready");
 
 
-  imageCounter = getCounter();
+  imageCounter = getCounter(imageCounterFilename);
+  telemetryCounter = getCounter(telemetryCounterFilename);
   // bootTime = getBootTime();
-  logMessage("imageCounter = %d\r\n", imageCounter);
-  logMessage("bootTime = %d\r\n", bootTime);
+  // logMessage("imageCounter = %d\r\n", imageCounter);
+  // logMessage("bootTime = %d\r\n", bootTime);
 
-  print_wakeup_reason();
-  print_wakeup_touchpad();
+  // print_wakeup_reason();
+  // print_wakeup_touchpad();
 
-
-  char filename[50];
-  char rtcTime[25];
-  
-  // if(rtcPresent){
-    DateTime now = PRTCnow();
-    sprintf(rtcTime, YYYYMMDDHHMMSSFormatString, now.year(), now.month(), now.day(), now.hour(), now.minute(), now.second());
-  // } else {
-  //   // Leave as blank, but valid.
-  //   sprintf(rtcTime, YYYYMMDDHHMMSSFormatString, 2000, 1, 1, 0, 0, 1);
-  // }
-
-  sprintf(filename, "%s/image.%08d.%s.jpg", pendingFolder, imageCounter, rtcTime);
-  logMessage("Filename: %s", filename);
-
-  photo_save(filename);
-  logMessage("Saved picture: %s\r\n", filename);
-  updateCounter(++imageCounter);
-  // lastCaptureTime = now;
-
-  displayMessage("Image saved");
+  savePhoto();
+  saveTelemetry();
   logMessage("Staying awake for 15s to ease flashing");
   delay(15000);
 
