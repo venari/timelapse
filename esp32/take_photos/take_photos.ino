@@ -71,11 +71,11 @@ const char *counterFilenameTelemetry = "/counterTelemetry";
 // const char *bootTimeFilename = "/bootTime";
 const char *logFilename = "/log.txt";
 
-const char *uploadedImageFolder = "/output/images/uploaded";
-const char *pendingImageFolder = "/output/images/pending";
+const char *uploadedImageFolder = "/uploadedImages";
+const char *pendingImageFolder = "/pendingImages";
 
-const char *uploadedTelemetryFolder = "/output/telemetry/uploaded";
-const char *pendingTelemetryFolder = "/output/telemetry/pending";
+const char *uploadedTelemetryFolder = "/uploadedTelemetry";
+const char *pendingTelemetryFolder = "/pendingTelemetry";
 
 const char *serverName = "timelapse-dev.azurewebsites.net";
 const int port = 443;
@@ -138,6 +138,8 @@ void logMessage(const char *format, va_list args) {
 
 
 void updateCounter(const char *counterFilename, int count) {
+  logMessage("updateCounter('%s', %d))", counterFilename, count);
+    
   File file = SD.open(counterFilename, FILE_WRITE);
   if (!file) {
     logMessage("Failed to open counter file for writing");
@@ -153,7 +155,7 @@ void updateCounter(const char *counterFilename, int count) {
 int getCounter(const char *counterFilename) {
   File file = SD.open(counterFilename);
   if (!file) {
-    logMessage("Failed to open counter file for reading");
+    logMessage("Failed to open counter %s file for reading", counterFilename);
     return 0;
   }
   int count = file.parseInt();
@@ -220,7 +222,7 @@ void saveTelemetry() {
   sprintf(rtcTime, YYYYMMDDHHMMSSFormatString, now.year(), now.month(), now.day(), now.hour(), now.minute(), now.second());
 
   sprintf(filename, "%s/telemetry.%08d.%s.json", pendingTelemetryFolder, telemetryCounter, rtcTime);
-  logMessage("filename: %s", filename);
+  logMessage("Telemetry filename: %s", filename);
 
   digitalWrite(LED_BUILTIN, LOW);  // XIAO ESP32S3 LOW = on
 
@@ -250,16 +252,16 @@ void saveTelemetry() {
 
   // doc['status']['batteryVoltage'] = Vbattf;
   String status = "{\"status\":\"OK\", \"batteryVoltage\":" + String(Vbattf) + "}";
-  doc['status'] = Status;
+  doc['status'] = status;
   doc['SerialNumber'] = MACAddress;
 
-  File file = SD.open(filename, FILE_WRITE)
+  File file = SD.open(filename, FILE_WRITE);
   serializeJsonPretty(doc, file);
 
   digitalWrite(LED_BUILTIN, HIGH);
 
   logMessage("Saved telemetry: %s\r\n", filename);
-  updateCounter(++telemetryCounter);
+  updateCounter(counterFilenameTelemetry, ++telemetryCounter);
 }
 
 void savePhoto() {
@@ -298,7 +300,7 @@ void savePhoto() {
   digitalWrite(LED_BUILTIN, HIGH);
 
   logMessage("Saved picture: %s\r\n", filename);
-  updateCounter(++imageCounter);
+  updateCounter(counterFilenameImages, ++imageCounter);
 }
 
 // SD card write file
@@ -487,14 +489,33 @@ bool uploadPendingImages(){
 
       if (!client.connect(serverName, port)) {
         Serial.println("Connection failed!");
-        return;
+        return false;
       }
       
       String timestampString = file.name();
+      Serial.println(timestampString);
       timestampString.replace("_", "T");
+      Serial.println(timestampString);
+
       timestampString = timestampString.substring(15);
+      // image.00000000.2000-00-01_454902.jpg
+      // image.00000000.2000-00-01T454902.jpg
+      // 01234567890123456789012345678901234567890123456789
+      // 0000000000111111111122222222223333333333
+      //                ^
+
+      Serial.println(timestampString);
+
+      // 2000-00-01T454902.jpg
+      // 01234567890123456789012345678901234567890123456789
+      // 0000000000111111111122222222223333333333
+
       timestampString = timestampString.substring(0, 13) + ":" + timestampString.substring(13, 15) + ":" + timestampString.substring(15, 17) + "Z";      
-      // Serial.println(timestampString);
+      // 2000-00-01T45:49:02.jpg
+      // 01234567890123456789012345678901234567890123456789
+      // 0000000000111111111122222222223333333333
+      // ------------- -- --Z
+      Serial.println(timestampString);
 
       // https://forum.arduino.cc/t/sending-video-avi-and-audio-wav-files-with-arduino-script-from-esp32s3-via-http-post-multipart-form-data-to-server/1234706
       // https://stackoverflow.com/questions/53264373/try-to-send-image-file-to-php-with-httpclient
@@ -579,9 +600,9 @@ bool uploadPendingImages(){
       }
 
     }
-    file = root.openNextFile();
+    // file = root.openNextFile();
   }
-  root.close();
+  // root.close();
 
   return filesUploaded == filesToUpload;
 }
@@ -627,13 +648,30 @@ bool uploadPendingTelemetry(){
 
       if (!client.connect(serverName, port)) {
         Serial.println("Connection failed!");
-        return;
+        return false;
       }
       
       String timestampString = file.name();
+      Serial.println(timestampString);
       timestampString.replace("_", "T");
-      timestampString = timestampString.substring(15);
+      Serial.println(timestampString);
+      timestampString = timestampString.substring(19);
+      Serial.println(timestampString);
+
+      // telemetry.00000000.2000-00-01_454902.json
+      // telemetry.00000000.2000-00-01T454902.json
+      // 01234567890123456789012345678901234567890123456789
+      // 0000000000111111111122222222223333333333
+      //                    ^
+
+
+      // 2000-00-01T454902.json
+      // 01234567890123456789012345678901234567890123456789
+      // 0000000000111111111122222222223333333333
+      // ------------- -- --Z
+
       timestampString = timestampString.substring(0, 13) + ":" + timestampString.substring(13, 15) + ":" + timestampString.substring(15, 17) + "Z";      
+      Serial.println(timestampString);
       // Serial.println(timestampString);
 
       DynamicJsonDocument doc(1024);
@@ -643,26 +681,26 @@ bool uploadPendingTelemetry(){
 
 
       String payload = "--" + boundary + "\r\n"
-                     "Content-Disposition: form-data; name=\"PendingTelemetry\"\r\n\r\n" + doc["PendingTelemetry"] + "\r\n"
+                     "Content-Disposition: form-data; name=\"PendingTelemetry\"\r\n\r\n" + (String)doc["PendingTelemetry"] + "\r\n"
                      "--" + boundary + "\r\n"
-                     "Content-Disposition: form-data; name=\"TemperatureC\"\r\n\r\n" + doc["TemperatureC"] + "\r\n"
+                     "Content-Disposition: form-data; name=\"TemperatureC\"\r\n\r\n" + (String)doc["TemperatureC"] + "\r\n"
                      "--" + boundary + "\r\n"
-                     "Content-Disposition: form-data; name=\"PendingImages\"\r\n\r\n" + doc["PendingImages"] + "\r\n"
+                     "Content-Disposition: form-data; name=\"PendingImages\"\r\n\r\n" + (String)doc["PendingImages"] + "\r\n"
                      "--" + boundary + "\r\n"
                     //  "Content-Disposition: form-data; name=\"Status\"\r\n\r\n{\"status\":\"OK\", \"batteryVoltage\":" + doc["batteryVoltage"] + "}\r\n"
-                     "Content-Disposition: form-data; name=\"Status\"\r\n\r\n" + doc["Status"] + "\r\n"
+                     "Content-Disposition: form-data; name=\"Status\"\r\n\r\n" + (String)doc["Status"] + "\r\n"
                      "--" + boundary + "\r\n"
-                     "Content-Disposition: form-data; name=\"DiskSpaceFree\"\r\n\r\n" + doc["DiskSpaceFree"] + "\r\n"
+                     "Content-Disposition: form-data; name=\"DiskSpaceFree\"\r\n\r\n" + (String)doc["DiskSpaceFree"] + "\r\n"
                      "--" + boundary + "\r\n"
                      "Content-Disposition: form-data; name=\"Timestamp\"\r\n\r\n" + timestampString + "\r\n"
                      "--" + boundary + "\r\n"
-                     "Content-Disposition: form-data; name=\"UptimeSeconds\"\r\n\r\n" + doc["UptimeSeconds"] + "\r\n"
+                     "Content-Disposition: form-data; name=\"UptimeSeconds\"\r\n\r\n" + (String)doc["UptimeSeconds"] + "\r\n"
                      "--" + boundary + "\r\n"
-                     "Content-Disposition: form-data; name=\"UploadedImages\"\r\n\r\n" + doc["UploadedImages"] + "\r\n"
+                     "Content-Disposition: form-data; name=\"UploadedImages\"\r\n\r\n" + (String)doc["UploadedImages"] + "\r\n"
                      "--" + boundary + "\r\n"
-                     "Content-Disposition: form-data; name=\"BatteryPercent\"\r\n\r\n" + doc["BatteryPercent"] + "\r\n"
+                     "Content-Disposition: form-data; name=\"BatteryPercent\"\r\n\r\n" + (String)doc["BatteryPercent"] + "\r\n"
                      "--" + boundary + "\r\n"
-                     "Content-Disposition: form-data; name=\"UploadedTelemetry\"\r\n\r\n" + doc["UploadedTelemetry"] + "\r\n"
+                     "Content-Disposition: form-data; name=\"UploadedTelemetry\"\r\n\r\n" + (String)doc["UploadedTelemetry"] + "\r\n"
                      "--" + boundary + "\r\n"
                      "Content-Disposition: form-data; name=\"SerialNumber\"\r\n\r\n" + MACAddress + "\r\n"
                      "--" + boundary + "--\r\n";
@@ -703,7 +741,7 @@ bool uploadPendingTelemetry(){
         // Serial.println(pendingFilename);
         ++filesUploaded;
         String uploadedFilename = pendingFilename;
-        uploadedFilename.replace(pendingTelemtryFolder, uploadedTelemetryFolder);
+        uploadedFilename.replace(pendingTelemetryFolder, uploadedTelemetryFolder);
         // Serial.println(uploadedFilename);
         if (SD.rename(pendingFilename, uploadedFilename)) {
           logMessage("File moved to uploaded folder");
@@ -719,32 +757,33 @@ bool uploadPendingTelemetry(){
       }
 
     }
-    file = root.openNextFile();
+    // file = root.openNextFile();
   }
-  root.close();
+  // root.close();
 
   return filesUploaded == filesToUpload;
 }
 
 String* listAndSortFiles(const char* folder) {
-
-  File root = SD.open(folder);
-  if (!root) {
-    logError("Failed to open folder: %s", folder);
-    return;
-  }
+  const int maxFiles = FileArraySize;
+  String* filenames = new String[maxFiles];
+  int fileCount = 0;
 
   if(!SD.exists(folder)){
     SD.mkdir(folder);
   }
 
-  const int maxFiles = FileArraySize;
-  String* filenames = new String[maxFiles];
-  int fileCount = 0;
+  File root = SD.open(folder);
+  if (!root) {
+    logError("Failed to open folder: %s", folder);
+    return filenames;
+  }
+
+
 
   // Collect filenames
   while (true) {
-    File entry = dir.openNextFile();
+    File entry = root.openNextFile();
     if (!entry) {
       // no more files
       break;
@@ -772,23 +811,23 @@ String* listAndSortFiles(const char* folder) {
   return filenames;
 }
 
-int countFiles(File dir) {
+int countFiles(const char* folder) {
+
+  if(!SD.exists(folder)){
+    SD.mkdir(folder);
+  }
 
   File root = SD.open(folder);
   if (!root) {
     logError("Failed to open folder: %s", folder);
-    return;
-  }
-
-  if(!SD.exists(folder)){
-    SD.mkdir(folder);
+    return 0;
   }
 
   int fileCount = 0;
 
   // Collect filenames
   while (true) {
-    File entry = dir.openNextFile();
+    File entry = root.openNextFile();
     if (!entry) {
       // no more files
       break;
@@ -893,7 +932,6 @@ void setup() {
       getNTPTime();
       uploadPendingImages();
       uploadPendingTelemetry();
-      }
     }
   }
 
@@ -941,6 +979,10 @@ void setup() {
   config.jpeg_quality = 12;
   config.fb_count = 1;
 
+  // Getting lots of "Failed to get camera frame buffer" errors?
+  config.xclk_freq_hz = 5000000; // Clock too high resulting in grainy/noisy image? https://github.com/espressif/esp32-camera/issues/172
+  config.frame_size = FRAMESIZE_VGA;
+
   // if PSRAM IC present, init with UXGA resolution and higher JPEG quality
   //                      for larger pre-allocated frame buffer.
   if (config.pixel_format == PIXFORMAT_JPEG) {
@@ -985,8 +1027,8 @@ void setup() {
   displayMessage("Camera ready");
 
 
-  imageCounter = getCounter(imageCounterFilename);
-  telemetryCounter = getCounter(telemetryCounterFilename);
+  imageCounter = getCounter(counterFilenameImages);
+  telemetryCounter = getCounter(counterFilenameTelemetry);
   // bootTime = getBootTime();
   // logMessage("imageCounter = %d\r\n", imageCounter);
   // logMessage("bootTime = %d\r\n", bootTime);
