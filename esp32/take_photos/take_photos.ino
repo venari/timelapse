@@ -215,7 +215,7 @@ DateTime getPseudoRTCNow(){
 
 void saveTelemetry() {
 
-  char filename[50];
+  char filename[100];
   char rtcTime[25];
   
   DateTime now = PRTCnow();
@@ -232,31 +232,40 @@ void saveTelemetry() {
   for(int i = 0; i < 16; i++) {
     Vbatt = Vbatt + analogReadMilliVolts(A0); // ADC with correction   
   }
-  float Vbattf = 2 * Vbatt / 16; /// 1000.0;     // attenuation ratio 1/2, mV --> V
+  int Vbattf = 2 * Vbatt / 16; /// 1000.0;     // attenuation ratio 1/2, mV --> V
   Serial.println(Vbattf, 3);
 
-  // // Uptime, pendingImages, pendingTelemetry, batteryVoltage
   // const int capacity = JSON_ARRAY_SIZE(1) + 2*JSON_OBJECT_SIZE(4);
-  // StaticJsonDocument<capacity> doc;
+  const int capacity = JSON_OBJECT_SIZE(8);
+  StaticJsonDocument<capacity> doc;
 
-  JsonDocument doc;
+  // JsonDocument doc;
 
-  doc['batteryPercent'] =  0;
-  doc['temperatureC'] =  21;
-  doc['diskSpaceFree'] =  0;
-  doc['pendingImages'] =  countFiles(pendingImageFolder);
-  doc['uploadedImages'] =  countFiles(uploadedImageFolder);
-  doc['pendingTelemetry'] =  countFiles(pendingTelemetryFolder);
-  doc['uploadedTelemetry'] =  countFiles(uploadedTelemetryFolder);
-  doc['uptimeSeconds'] =  millis()/1000;
+  doc["BatteryPercent"] =  0;
+  doc["TemperatureC"] =  21;
+  doc["DiskSpaceFree"] =  0;
+  doc["PendingImages"] =  countFiles(pendingImageFolder);
+  doc["UploadedImages"] =  countFiles(uploadedImageFolder);
+  doc["PendingTelemetry"] =  countFiles(pendingTelemetryFolder);
+  doc["UploadedTelemetry"] =  countFiles(uploadedTelemetryFolder);
+  doc["UptimeSeconds"] =  millis()/1000;
 
   // doc['status']['batteryVoltage'] = Vbattf;
-  String status = "{\"status\":\"OK\", \"batteryVoltage\":" + String(Vbattf) + "}";
-  doc['status'] = status;
-  doc['SerialNumber'] = MACAddress;
+  // String status = "{\'status':\"OK\", \"batteryVoltage\":" + String(Vbattf) + "}";
+  String status = "{'status': {'isFault': False, 'isButton': False, 'battery': 'UNKNOWN', 'powerInput': 'UNKNOWN', 'powerInput5vIo': 'NOT_PRESENT'}, 'batteryVoltage': " + String(Vbattf) + ", 'batteryCurrent': 0, 'ioVoltage': 0, 'ioCurrent': 0}";
+
+
+  doc["Status"] = status;
+  doc["SerialNumber"] = MACAddress;
 
   File file = SD.open(filename, FILE_WRITE);
-  serializeJsonPretty(doc, file);
+  String strJSON;
+  serializeJsonPretty(doc, strJSON);
+  logMessage("strJSON");
+  logMessage(strJSON.c_str());
+  file.print(strJSON);
+
+
 
   digitalWrite(LED_BUILTIN, HIGH);
 
@@ -266,14 +275,14 @@ void saveTelemetry() {
 
 void savePhoto() {
 
-  char filename[50];
+  char filename[100];
   char rtcTime[25];
   
   DateTime now = PRTCnow();
   sprintf(rtcTime, YYYYMMDDHHMMSSFormatString, now.year(), now.month(), now.day(), now.hour(), now.minute(), now.second());
 
   sprintf(filename, "%s/image.%08d.%s.jpg", pendingImageFolder, imageCounter, rtcTime);
-  logMessage("filename: %s", filename);
+  logMessage("Save Photo filename: %s", filename);
 
 
   // Serial.println("Starting photo_save()");
@@ -287,7 +296,7 @@ void savePhoto() {
     return;
   }
 
-  // logMessage("Writing file... %5d", millis());
+  logMessage("Writing file... %5d", millis());
   // logMessage("Writing file...", millis());
   // Save photo to file
   writeFile(SD, filename, fb->buf, fb->len);
@@ -305,11 +314,14 @@ void savePhoto() {
 
 // SD card write file
 void writeFile(fs::FS &fs, const char *path, uint8_t *data, size_t len) {
-  // Serial.printf("Writing file: %s\r\n", path);
+  Serial.printf("writeFile()");
+  Serial.flush();
+  Serial.printf("Writing file: %s\r\n", path);
+  Serial.flush();
 
   if(!fs.exists(path)){
     // Get folder name of file
-    char folder[50];
+    char folder[100];
     strcpy(folder, path);
     char *lastSlash = strrchr(folder, '/');
     if (lastSlash != NULL) {
@@ -452,6 +464,10 @@ bool uploadPendingImages(){
   // returns true if all pending images have been uploaded.
   logMessage("uploadPendingImages()....");
 
+  if(!SD.exists(uploadedImageFolder)){
+    SD.mkdir(uploadedImageFolder);
+  }
+
   // Scan folder, retrieving most recent files first
   String* sortedFiles = listAndSortFiles(pendingImageFolder);
   int filesUploaded = 0;
@@ -493,9 +509,9 @@ bool uploadPendingImages(){
       }
       
       String timestampString = file.name();
-      Serial.println(timestampString);
+      Serial.println(timestampString.c_str());
       timestampString.replace("_", "T");
-      Serial.println(timestampString);
+      Serial.println(timestampString.c_str());
 
       timestampString = timestampString.substring(15);
       // image.00000000.2000-00-01_454902.jpg
@@ -504,7 +520,7 @@ bool uploadPendingImages(){
       // 0000000000111111111122222222223333333333
       //                ^
 
-      Serial.println(timestampString);
+      Serial.println(timestampString.c_str());
 
       // 2000-00-01T454902.jpg
       // 01234567890123456789012345678901234567890123456789
@@ -515,7 +531,7 @@ bool uploadPendingImages(){
       // 01234567890123456789012345678901234567890123456789
       // 0000000000111111111122222222223333333333
       // ------------- -- --Z
-      Serial.println(timestampString);
+      Serial.println(timestampString.c_str());
 
       // https://forum.arduino.cc/t/sending-video-avi-and-audio-wav-files-with-arduino-script-from-esp32s3-via-http-post-multipart-form-data-to-server/1234706
       // https://stackoverflow.com/questions/53264373/try-to-send-image-file-to-php-with-httpclient
@@ -580,12 +596,12 @@ bool uploadPendingImages(){
 
       if(okResponse){
         // Move the file to the uploaded folder
-        // Serial.println("Moving file....");
-        // Serial.println(pendingFilename);
+        Serial.println("Moving file....");
+        Serial.println(pendingFilename);
         ++filesUploaded;
         String uploadedFilename = pendingFilename;
         uploadedFilename.replace(pendingImageFolder, uploadedImageFolder);
-        // Serial.println(uploadedFilename);
+        Serial.println(uploadedFilename);
         if (SD.rename(pendingFilename, uploadedFilename)) {
           logMessage("File moved to uploaded folder");
         } else {
@@ -612,9 +628,13 @@ bool uploadPendingTelemetry(){
   logMessage("uploadPendingTelemetry()....");
 
   // Scan folder, retrieving most recent files first
-  String* sortedFiles = listAndSortFiles(pendingImageFolder);
+  String* sortedFiles = listAndSortFiles(pendingTelemetryFolder);
   int filesUploaded = 0;
   int filesToUpload = 0;
+
+  if(!SD.exists(uploadedTelemetryFolder)){
+    SD.mkdir(uploadedTelemetryFolder);
+  }
 
   // Array will be 100 large, with empty entries if files don't exist.
   for(int fileIndex = 0; fileIndex < FileArraySize; ++fileIndex){
@@ -635,6 +655,8 @@ bool uploadPendingTelemetry(){
     pendingFilename += "/";
     pendingFilename += sortedFiles[fileIndex];
 
+    logMessage("pendingFilename: %s", pendingFilename.c_str());
+
     File file = SD.open(pendingFilename);
     
     if (!file.isDirectory()) {
@@ -652,11 +674,11 @@ bool uploadPendingTelemetry(){
       }
       
       String timestampString = file.name();
-      Serial.println(timestampString);
+      Serial.println(timestampString.c_str());
       timestampString.replace("_", "T");
-      Serial.println(timestampString);
+      Serial.println(timestampString.c_str());
       timestampString = timestampString.substring(19);
-      Serial.println(timestampString);
+      Serial.println(timestampString.c_str());
 
       // telemetry.00000000.2000-00-01_454902.json
       // telemetry.00000000.2000-00-01T454902.json
@@ -664,6 +686,7 @@ bool uploadPendingTelemetry(){
       // 0000000000111111111122222222223333333333
       //                    ^
 
+      Serial.println(timestampString.c_str());
 
       // 2000-00-01T454902.json
       // 01234567890123456789012345678901234567890123456789
@@ -677,33 +700,44 @@ bool uploadPendingTelemetry(){
       DynamicJsonDocument doc(1024);
       // JsonDocument doc;
       deserializeJson(doc, file);
-      file.close();
 
+      String PendingTelemetry = doc["PendingTelemetry"];
+      String TemperatureC = doc["TemperatureC"];
+      String PendingImages = doc["PendingImages"];
+      String Status = doc["Status"];
+      String DiskSpaceFree = doc["DiskSpaceFree"];
+      String UptimeSeconds = doc["UptimeSeconds"];
+      String UploadedImages = doc["UploadedImages"];
+      String BatteryPercent = doc["BatteryPercent"];
+      String UploadedTelemetry = doc["UploadedTelemetry"];
 
       String payload = "--" + boundary + "\r\n"
-                     "Content-Disposition: form-data; name=\"PendingTelemetry\"\r\n\r\n" + (String)doc["PendingTelemetry"] + "\r\n"
+                     "Content-Disposition: form-data; name=\"PendingTelemetry\"\r\n\r\n" + PendingTelemetry + "\r\n"
                      "--" + boundary + "\r\n"
-                     "Content-Disposition: form-data; name=\"TemperatureC\"\r\n\r\n" + (String)doc["TemperatureC"] + "\r\n"
+                     "Content-Disposition: form-data; name=\"TemperatureC\"\r\n\r\n" + TemperatureC + "\r\n"
                      "--" + boundary + "\r\n"
-                     "Content-Disposition: form-data; name=\"PendingImages\"\r\n\r\n" + (String)doc["PendingImages"] + "\r\n"
+                     "Content-Disposition: form-data; name=\"PendingImages\"\r\n\r\n" + PendingImages + "\r\n"
                      "--" + boundary + "\r\n"
                     //  "Content-Disposition: form-data; name=\"Status\"\r\n\r\n{\"status\":\"OK\", \"batteryVoltage\":" + doc["batteryVoltage"] + "}\r\n"
-                     "Content-Disposition: form-data; name=\"Status\"\r\n\r\n" + (String)doc["Status"] + "\r\n"
+                     "Content-Disposition: form-data; name=\"Status\"\r\n\r\n" + Status + "\r\n"
                      "--" + boundary + "\r\n"
-                     "Content-Disposition: form-data; name=\"DiskSpaceFree\"\r\n\r\n" + (String)doc["DiskSpaceFree"] + "\r\n"
+                     "Content-Disposition: form-data; name=\"DiskSpaceFree\"\r\n\r\n" + DiskSpaceFree + "\r\n"
                      "--" + boundary + "\r\n"
                      "Content-Disposition: form-data; name=\"Timestamp\"\r\n\r\n" + timestampString + "\r\n"
                      "--" + boundary + "\r\n"
-                     "Content-Disposition: form-data; name=\"UptimeSeconds\"\r\n\r\n" + (String)doc["UptimeSeconds"] + "\r\n"
+                     "Content-Disposition: form-data; name=\"UptimeSeconds\"\r\n\r\n" + UptimeSeconds + "\r\n"
                      "--" + boundary + "\r\n"
-                     "Content-Disposition: form-data; name=\"UploadedImages\"\r\n\r\n" + (String)doc["UploadedImages"] + "\r\n"
+                     "Content-Disposition: form-data; name=\"UploadedImages\"\r\n\r\n" + UploadedImages + "\r\n"
                      "--" + boundary + "\r\n"
-                     "Content-Disposition: form-data; name=\"BatteryPercent\"\r\n\r\n" + (String)doc["BatteryPercent"] + "\r\n"
+                     "Content-Disposition: form-data; name=\"BatteryPercent\"\r\n\r\n" + BatteryPercent + "\r\n"
                      "--" + boundary + "\r\n"
-                     "Content-Disposition: form-data; name=\"UploadedTelemetry\"\r\n\r\n" + (String)doc["UploadedTelemetry"] + "\r\n"
+                     "Content-Disposition: form-data; name=\"UploadedTelemetry\"\r\n\r\n" + UploadedTelemetry + "\r\n"
                      "--" + boundary + "\r\n"
                      "Content-Disposition: form-data; name=\"SerialNumber\"\r\n\r\n" + MACAddress + "\r\n"
                      "--" + boundary + "--\r\n";
+
+      Serial.print(payload.c_str());
+      file.close();
 
       int contentLength = payload.length();
 
@@ -730,6 +764,11 @@ bool uploadPendingTelemetry(){
             NotFoundResponse = true;
             break;
           }
+          if(line.indexOf("HTTP/1.1 302 Found") != -1){
+            okResponse = true;
+            logMessage("Got 302 rather than 200 - not sure why?");
+            break;
+          }
           Serial.println(line);
         }
       }
@@ -737,12 +776,13 @@ bool uploadPendingTelemetry(){
 
       if(okResponse){
         // Move the file to the uploaded folder
-        // Serial.println("Moving file....");
-        // Serial.println(pendingFilename);
+        Serial.println("Moving file....");
+        Serial.println(pendingFilename);
         ++filesUploaded;
         String uploadedFilename = pendingFilename;
         uploadedFilename.replace(pendingTelemetryFolder, uploadedTelemetryFolder);
-        // Serial.println(uploadedFilename);
+        Serial.println(uploadedFilename);
+
         if (SD.rename(pendingFilename, uploadedFilename)) {
           logMessage("File moved to uploaded folder");
         } else {
@@ -791,6 +831,7 @@ String* listAndSortFiles(const char* folder) {
     if (!entry.isDirectory()) {
       if (fileCount < maxFiles) {
         filenames[fileCount] = String(entry.name());
+  Serial.println(entry.name());
         fileCount++;
       }
     }
