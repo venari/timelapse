@@ -39,7 +39,7 @@ WiFiUDP ntpUDP;
 NTPClient timeClient(ntpUDP, "pool.ntp.org");
 
 #define uS_TO_S_FACTOR 1000000ULL /* Conversion factor for micro seconds to seconds */
-#define TIME_TO_SLEEP 30          /* Time ESP32 will go to sleep (in seconds) */
+#define TIME_TO_SLEEP 60          /* Time ESP32 will go to sleep (in seconds) */
 
 #if CONFIG_IDF_TARGET_ESP32
 #define THRESHOLD 40   /* Greater the value, more the sensitivity */
@@ -1079,8 +1079,8 @@ void setup() {
 
   savePhoto();
   saveTelemetry();
-  logMessage("Staying awake for 15s to ease flashing");
-  delay(15000);
+  // logMessage("Staying awake for 15s to ease flashing");
+  // delay(15000);
 
   enableWakeupAndGoToSleep();
 }
