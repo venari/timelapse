@@ -71,10 +71,8 @@ const char *counterFilenameTelemetry = "/counterTelemetry";
 // const char *bootTimeFilename = "/bootTime";
 const char *logFilename = "/log.txt";
 
-const char *uploadedImageFolder = "/uploadedImages";
 const char *pendingImageFolder = "/pendingImages";
 
-const char *uploadedTelemetryFolder = "/uploadedTelemetry";
 const char *pendingTelemetryFolder = "/pendingTelemetry";
 
 const char *serverName = "timelapse-dev.azurewebsites.net";
@@ -245,9 +243,7 @@ void saveTelemetry() {
   doc["TemperatureC"] =  21;
   doc["DiskSpaceFree"] =  0;
   doc["PendingImages"] =  countFiles(pendingImageFolder);
-  doc["UploadedImages"] =  countFiles(uploadedImageFolder);
   doc["PendingTelemetry"] =  countFiles(pendingTelemetryFolder);
-  doc["UploadedTelemetry"] =  countFiles(uploadedTelemetryFolder);
   doc["UptimeSeconds"] =  millis()/1000;
 
   // doc['status']['batteryVoltage'] = Vbattf;
@@ -464,10 +460,6 @@ bool uploadPendingImages(){
   // returns true if all pending images have been uploaded.
   logMessage("uploadPendingImages()....");
 
-  if(!SD.exists(uploadedImageFolder)){
-    SD.mkdir(uploadedImageFolder);
-  }
-
   // Scan folder, retrieving most recent files first
   String* sortedFiles = listAndSortFiles(pendingImageFolder);
   int filesUploaded = 0;
@@ -595,17 +587,11 @@ bool uploadPendingImages(){
       client.stop();
 
       if(okResponse){
-        // Move the file to the uploaded folder
-        Serial.println("Moving file....");
+        Serial.println("Deleting file....");
         Serial.println(pendingFilename);
         ++filesUploaded;
-        String uploadedFilename = pendingFilename;
-        uploadedFilename.replace(pendingImageFolder, uploadedImageFolder);
-        Serial.println(uploadedFilename);
-        if (SD.rename(pendingFilename, uploadedFilename)) {
-          logMessage("File moved to uploaded folder");
-        } else {
-          logError("Failed to move file to uploaded folder");
+        if (!SD.remove(pendingFilename)) {
+          logError("Failed to delete file");
         }
       } else {
         if(NotFoundResponse){
@@ -616,9 +602,7 @@ bool uploadPendingImages(){
       }
 
     }
-    // file = root.openNextFile();
   }
-  // root.close();
 
   return filesUploaded == filesToUpload;
 }
@@ -631,10 +615,6 @@ bool uploadPendingTelemetry(){
   String* sortedFiles = listAndSortFiles(pendingTelemetryFolder);
   int filesUploaded = 0;
   int filesToUpload = 0;
-
-  if(!SD.exists(uploadedTelemetryFolder)){
-    SD.mkdir(uploadedTelemetryFolder);
-  }
 
   // Array will be 100 large, with empty entries if files don't exist.
   for(int fileIndex = 0; fileIndex < FileArraySize; ++fileIndex){
@@ -707,9 +687,7 @@ bool uploadPendingTelemetry(){
       String Status = doc["Status"];
       String DiskSpaceFree = doc["DiskSpaceFree"];
       String UptimeSeconds = doc["UptimeSeconds"];
-      String UploadedImages = doc["UploadedImages"];
       String BatteryPercent = doc["BatteryPercent"];
-      String UploadedTelemetry = doc["UploadedTelemetry"];
 
       String payload = "--" + boundary + "\r\n"
                      "Content-Disposition: form-data; name=\"PendingTelemetry\"\r\n\r\n" + PendingTelemetry + "\r\n"
@@ -727,11 +705,7 @@ bool uploadPendingTelemetry(){
                      "--" + boundary + "\r\n"
                      "Content-Disposition: form-data; name=\"UptimeSeconds\"\r\n\r\n" + UptimeSeconds + "\r\n"
                      "--" + boundary + "\r\n"
-                     "Content-Disposition: form-data; name=\"UploadedImages\"\r\n\r\n" + UploadedImages + "\r\n"
-                     "--" + boundary + "\r\n"
                      "Content-Disposition: form-data; name=\"BatteryPercent\"\r\n\r\n" + BatteryPercent + "\r\n"
-                     "--" + boundary + "\r\n"
-                     "Content-Disposition: form-data; name=\"UploadedTelemetry\"\r\n\r\n" + UploadedTelemetry + "\r\n"
                      "--" + boundary + "\r\n"
                      "Content-Disposition: form-data; name=\"SerialNumber\"\r\n\r\n" + MACAddress + "\r\n"
                      "--" + boundary + "--\r\n";
@@ -775,18 +749,13 @@ bool uploadPendingTelemetry(){
       client.stop();
 
       if(okResponse){
-        // Move the file to the uploaded folder
-        Serial.println("Moving file....");
+        // Delete the file
+        Serial.println("Deleting file....");
         Serial.println(pendingFilename);
         ++filesUploaded;
-        String uploadedFilename = pendingFilename;
-        uploadedFilename.replace(pendingTelemetryFolder, uploadedTelemetryFolder);
-        Serial.println(uploadedFilename);
 
-        if (SD.rename(pendingFilename, uploadedFilename)) {
-          logMessage("File moved to uploaded folder");
-        } else {
-          logError("Failed to move file to uploaded folder");
+        if (!SD.remove(pendingFilename)) {
+          logError("Failed to delete file");
         }
       } else {
         if(NotFoundResponse){
