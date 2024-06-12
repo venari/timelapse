@@ -455,7 +455,7 @@ def scheduleShutdown():
         logger.error("scheduleShutdown() failed.")
         logger.error(e)
 
-def SetWatchdog(timeout = 1, non_volatile = False):
+def SetWatchdog(timeout = 3, non_volatile = False):
     try:
         if(pj.power.GetWatchdog()['data'] == timeout and pj.power.GetWatchdog()['non_volatile'] == non_volatile):
             return
