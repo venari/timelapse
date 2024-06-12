@@ -267,27 +267,34 @@ def scheduleShutdown():
                 and datetime.datetime.now().minute >= 10 \
                 and config['supportMode'] == False \
                 and bCharging == False:
-                    logger.info('scheduling 10 minute sleep due to low battery')
-                    loggerIntent.info('scheduling 10 minute sleep due to low battery')
-                    logger.info(pj.status.GetChargeLevel())
-                    logger.info(pj.status.GetStatus())
-                    DELTA_MIN=10
 
-                    time.sleep(30)
+                    if pj.status.GetChargeLevel()['data'] > config['hibernate_at_battery_percent']:
+                        logger.info('scheduling 10 minute sleep due to low battery')
+                        loggerIntent.info('scheduling 10 minute sleep due to low battery')
+                        logger.info(pj.status.GetChargeLevel())
+                        logger.info(pj.status.GetStatus())
+                        DELTA_MIN=10
 
-                    alarmObj = {
-                            'year': 'EVERY_YEAR',
-                            'month': 'EVERY_MONTH',
-                            'day': 'EVERY_DAY',
-                            'hour': 'EVERY_HOUR',
-                            'minute_period': DELTA_MIN,
-                            'second': 0,
-                    }
+                        time.sleep(30)
+
+                        alarmObj = {
+                                'year': 'EVERY_YEAR',
+                                'month': 'EVERY_MONTH',
+                                'day': 'EVERY_DAY',
+                                'hour': 'EVERY_HOUR',
+                                'minute_period': DELTA_MIN,
+                                'second': 0,
+                        }
+
+                        # Set watchdog to 15 mins to catch wakeup alarm failure
+                        SetWatchdog(15)
 
                     # If we're down at hibernate level, let's just hibernate.
-                    if pj.status.GetChargeLevel()['data'] <= config['hibernate_at_battery_percent']:
+                    else:
                         logger.info('Hibernating due to very low battery')
                         loggerIntent.info('Hibernating 10 minute sleep due to very low battery')
+                        logger.info(pj.status.GetChargeLevel())
+                        logger.info(pj.status.GetStatus())
                         alarmObj = {
                             'year': 'EVERY_YEAR',
                             'month': 'EVERY_MONTH',
@@ -296,8 +303,8 @@ def scheduleShutdown():
                             'minute': 0,
                             'second': 0,
                         }
-                        # Set watchdog to one day just to catch wakeup alarm failure
-                        SetWatchdog(60*24)
+                        # Set watchdog to 9 hours just to catch wakeup alarm failure
+                        SetWatchdog(60*9)
 
                     setAlarm = True
 
