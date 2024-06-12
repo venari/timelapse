@@ -117,7 +117,7 @@ void logMessage(const char *format, va_list args) {
   displayMessage(buf);
 
   if (sd_sign == false) {
-    Serial.println("SD Card not mounted yet.");
+    // Serial.println("SD Card not mounted yet.");
     return;
   }
 
@@ -136,7 +136,7 @@ void logMessage(const char *format, va_list args) {
 
 
 void updateCounter(const char *counterFilename, int count) {
-  logMessage("updateCounter('%s', %d))", counterFilename, count);
+  // logMessage("updateCounter('%s', %d))", counterFilename, count);
     
   File file = SD.open(counterFilename, FILE_WRITE);
   if (!file) {
@@ -161,36 +161,20 @@ int getCounter(const char *counterFilename) {
   return count;
 }
 
-// void updateBootTime(time_t booted) {
-//   logMessage("updateBootTime()");
-//   logMessage("booted: %s", booted);
-//   File file = SD.open(bootTimeFilename, FILE_WRITE);
-//   if (!file) {
-//     logMessage("Failed to open bootTime file for writing");
-//     return;
-//   }
-//   if (file.print(booted)) {
-//     // Serial.println("Counter updated");
-//   } else {
-//     logError("Failed to update boot time");
-//   }
-// }
 
 void setPseudoRTC(time_t timeNow){
   // Update the time we booted from NTP
-  logMessage("setPseudoRTC()");
-  logMessage("timeNow: %d", timeNow);
-  logMessage("millis: %d", millis());
+  // logMessage("setPseudoRTC()");
+  // logMessage("timeNow: %d", timeNow);
+  // logMessage("millis: %d", millis());
   bootTime = timeNow - millis()/1000;
-  logMessage("bootTime: %d", bootTime);
-  // bootTime = booted;
+  // logMessage("bootTime: %d", bootTime);
 }
 
 time_t getPseudoRTC(){
-  // time_t bootTime = getBootTime();
-  logMessage("getPseudoRTC()");
-  logMessage("bootTime: %d", bootTime);
-  logMessage("millis(): %d", millis());
+  // logMessage("getPseudoRTC()");
+  // logMessage("bootTime: %d", bootTime);
+  // logMessage("millis(): %d", millis());
   return bootTime + millis()/1000;
 }
 
@@ -204,7 +188,7 @@ DateTime PRTCnow(){
 
 DateTime getPseudoRTCNow(){
   time_t pseudoRTC = getPseudoRTC();
-  logMessage("pseudoRTC: %d", pseudoRTC);
+  // logMessage("pseudoRTC: %d", pseudoRTC);
   DateTime pseudoRTCNow = DateTime(pseudoRTC);
 
   return pseudoRTCNow;
@@ -220,7 +204,7 @@ void saveTelemetry() {
   sprintf(rtcTime, YYYYMMDDHHMMSSFormatString, now.year(), now.month(), now.day(), now.hour(), now.minute(), now.second());
 
   sprintf(filename, "%s/telemetry.%08d.%s.json", pendingTelemetryFolder, telemetryCounter, rtcTime);
-  logMessage("Telemetry filename: %s", filename);
+  // logMessage("Telemetry filename: %s", filename);
 
   digitalWrite(LED_BUILTIN, LOW);  // XIAO ESP32S3 LOW = on
 
@@ -231,7 +215,7 @@ void saveTelemetry() {
     Vbatt = Vbatt + analogReadMilliVolts(A0); // ADC with correction   
   }
   int Vbattf = 2 * Vbatt / 16; /// 1000.0;     // attenuation ratio 1/2, mV --> V
-  Serial.println(Vbattf, 3);
+  // Serial.println(Vbattf, 3);
 
   // const int capacity = JSON_ARRAY_SIZE(1) + 2*JSON_OBJECT_SIZE(4);
   const int capacity = JSON_OBJECT_SIZE(8);
@@ -257,11 +241,9 @@ void saveTelemetry() {
   File file = SD.open(filename, FILE_WRITE);
   String strJSON;
   serializeJsonPretty(doc, strJSON);
-  logMessage("strJSON");
-  logMessage(strJSON.c_str());
+  // logMessage("strJSON");
+  // logMessage(strJSON.c_str());
   file.print(strJSON);
-
-
 
   digitalWrite(LED_BUILTIN, HIGH);
 
@@ -292,7 +274,7 @@ void savePhoto() {
     return;
   }
 
-  logMessage("Writing file... %5d", millis());
+  // logMessage("Writing file... %5d", millis());
   // logMessage("Writing file...", millis());
   // Save photo to file
   writeFile(SD, filename, fb->buf, fb->len);
@@ -304,16 +286,13 @@ void savePhoto() {
 
   digitalWrite(LED_BUILTIN, HIGH);
 
-  logMessage("Saved picture: %s\r\n", filename);
+  // logMessage("Saved picture: %s\r\n", filename);
   updateCounter(counterFilenameImages, ++imageCounter);
 }
 
 // SD card write file
 void writeFile(fs::FS &fs, const char *path, uint8_t *data, size_t len) {
-  Serial.printf("writeFile()");
-  Serial.flush();
-  Serial.printf("Writing file: %s\r\n", path);
-  Serial.flush();
+  // Serial.printf("Writing file: %s\r\n", path);
 
   if(!fs.exists(path)){
     // Get folder name of file
@@ -488,7 +467,7 @@ bool uploadPendingImages(){
     
     if (!file.isDirectory()) {
 
-      logMessage(file.name());
+      // logMessage(file.name());
 
       String boundary = "----WebKitFormBoundary" + String(random(0xFFFFFF), HEX);
 
@@ -501,9 +480,9 @@ bool uploadPendingImages(){
       }
       
       String timestampString = file.name();
-      Serial.println(timestampString.c_str());
+      // Serial.println(timestampString.c_str());
       timestampString.replace("_", "T");
-      Serial.println(timestampString.c_str());
+      // Serial.println(timestampString.c_str());
 
       timestampString = timestampString.substring(15);
       // image.00000000.2000-00-01_454902.jpg
@@ -512,7 +491,7 @@ bool uploadPendingImages(){
       // 0000000000111111111122222222223333333333
       //                ^
 
-      Serial.println(timestampString.c_str());
+      // Serial.println(timestampString.c_str());
 
       // 2000-00-01T454902.jpg
       // 01234567890123456789012345678901234567890123456789
@@ -523,7 +502,7 @@ bool uploadPendingImages(){
       // 01234567890123456789012345678901234567890123456789
       // 0000000000111111111122222222223333333333
       // ------------- -- --Z
-      Serial.println(timestampString.c_str());
+      // Serial.println(timestampString.c_str());
 
       // https://forum.arduino.cc/t/sending-video-avi-and-audio-wav-files-with-arduino-script-from-esp32s3-via-http-post-multipart-form-data-to-server/1234706
       // https://stackoverflow.com/questions/53264373/try-to-send-image-file-to-php-with-httpclient
@@ -587,8 +566,8 @@ bool uploadPendingImages(){
       client.stop();
 
       if(okResponse){
-        Serial.println("Deleting file....");
-        Serial.println(pendingFilename);
+        // Serial.println("Deleting file....");
+        // Serial.println(pendingFilename);
         ++filesUploaded;
         if (!SD.remove(pendingFilename)) {
           logError("Failed to delete file");
@@ -641,7 +620,7 @@ bool uploadPendingTelemetry(){
     
     if (!file.isDirectory()) {
 
-      logMessage(file.name());
+      // logMessage(file.name());
 
       String boundary = "----WebKitFormBoundary" + String(random(0xFFFFFF), HEX);
 
@@ -654,11 +633,11 @@ bool uploadPendingTelemetry(){
       }
       
       String timestampString = file.name();
-      Serial.println(timestampString.c_str());
+      // Serial.println(timestampString.c_str());
       timestampString.replace("_", "T");
-      Serial.println(timestampString.c_str());
+      // Serial.println(timestampString.c_str());
       timestampString = timestampString.substring(19);
-      Serial.println(timestampString.c_str());
+      // Serial.println(timestampString.c_str());
 
       // telemetry.00000000.2000-00-01_454902.json
       // telemetry.00000000.2000-00-01T454902.json
@@ -666,7 +645,7 @@ bool uploadPendingTelemetry(){
       // 0000000000111111111122222222223333333333
       //                    ^
 
-      Serial.println(timestampString.c_str());
+      // Serial.println(timestampString.c_str());
 
       // 2000-00-01T454902.json
       // 01234567890123456789012345678901234567890123456789
@@ -674,7 +653,7 @@ bool uploadPendingTelemetry(){
       // ------------- -- --Z
 
       timestampString = timestampString.substring(0, 13) + ":" + timestampString.substring(13, 15) + ":" + timestampString.substring(15, 17) + "Z";      
-      Serial.println(timestampString);
+      // Serial.println(timestampString);
       // Serial.println(timestampString);
 
       DynamicJsonDocument doc(1024);
@@ -710,7 +689,7 @@ bool uploadPendingTelemetry(){
                      "Content-Disposition: form-data; name=\"SerialNumber\"\r\n\r\n" + MACAddress + "\r\n"
                      "--" + boundary + "--\r\n";
 
-      Serial.print(payload.c_str());
+      // Serial.print(payload.c_str());
       file.close();
 
       int contentLength = payload.length();
@@ -740,7 +719,7 @@ bool uploadPendingTelemetry(){
           }
           if(line.indexOf("HTTP/1.1 302 Found") != -1){
             okResponse = true;
-            logMessage("Got 302 rather than 200 - not sure why?");
+            // logMessage("Got 302 rather than 200 - not sure why?");
             break;
           }
           Serial.println(line);
@@ -750,8 +729,8 @@ bool uploadPendingTelemetry(){
 
       if(okResponse){
         // Delete the file
-        Serial.println("Deleting file....");
-        Serial.println(pendingFilename);
+        // Serial.println("Deleting file....");
+        // Serial.println(pendingFilename);
         ++filesUploaded;
 
         if (!SD.remove(pendingFilename)) {
@@ -800,7 +779,6 @@ String* listAndSortFiles(const char* folder) {
     if (!entry.isDirectory()) {
       if (fileCount < maxFiles) {
         filenames[fileCount] = String(entry.name());
-  Serial.println(entry.name());
         fileCount++;
       }
     }
@@ -918,16 +896,16 @@ void setup() {
     return;
   }
 
-  logMessage("SD Card Type: ");
-  if (cardType == CARD_MMC) {
-    logMessage("MMC");
-  } else if (cardType == CARD_SD) {
-    logMessage("SDSC");
-  } else if (cardType == CARD_SDHC) {
-    logMessage("SDHC");
-  } else {
-    logMessage("UNKNOWN");
-  }
+  // logMessage("SD Card Type: ");
+  // if (cardType == CARD_MMC) {
+  //   logMessage("MMC");
+  // } else if (cardType == CARD_SD) {
+  //   logMessage("SDSC");
+  // } else if (cardType == CARD_SDHC) {
+  //   logMessage("SDHC");
+  // } else {
+  //   logMessage("UNKNOWN");
+  // }
 
   sd_sign = true;  // sd initialization check passes
   // logMessage("SD Card mounted %'d", millis());
