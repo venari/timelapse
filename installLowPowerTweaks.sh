@@ -17,14 +17,14 @@ if [ ! -d "/home/pi/dev/timelapse" ]; then
     cd timelapse
     git config pull.rebase false
     # git checkout development
-    git checkout feature/lowPowerTeaks
+    git checkout feature/lowPowerTweaks
 else
     echo Updating repo...
     cd dev/timelapse
     # git checkout development
     git fetch
     git stash
-    git checkout feature/lowPowerTeaks
+    git checkout feature/lowPowerTweaks
     git pull
     git stash pop
 fi
