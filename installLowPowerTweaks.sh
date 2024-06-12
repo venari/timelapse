@@ -32,7 +32,7 @@ fi
 echo Installing crontab entries...
 
 (echo "@reboot /usr/bin/bash /home/pi/dev/timelapse/scripts/loggingSocketServer.sh")| crontab -
-(crontab -l 2>/dev/null; echo "@reboot && /usr/bin/bash /home/pi/dev/timelapse/scripts/saveTelemetry.sh")| crontab -
+(crontab -l 2>/dev/null; echo "@reboot /usr/bin/bash /home/pi/dev/timelapse/scripts/saveTelemetry.sh")| crontab -
 (crontab -l 2>/dev/null; echo "@reboot sleep 150 && /usr/bin/bash /home/pi/dev/timelapse/scripts/savePhotos.sh")| crontab -
 
 (crontab -l 2>/dev/null; echo "@reboot sleep 60 && /usr/bin/bash /home/pi/dev/timelapse/scripts/uploadPending.sh")| crontab -
