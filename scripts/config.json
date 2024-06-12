@@ -13,7 +13,7 @@
     "modem.type": "thumb",
     "modem.type_": "SIM7600X",
     "SIM7600X_port": "/dev/ttyS0",
-    "modem.power": 500,
+    "modem.power": 2100,
     "modem.power_interval": 900,
     "upload.image.timeout": 30,
     "upload.telemetry.timeout": 5,
