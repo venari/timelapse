@@ -44,3 +44,12 @@ sudo mv /var/lib/pijuice/pijuice_config.JSON /var/lib/pijuice/pijuice_config.JSO
 sudo curl -fsSL -o /var/lib/pijuice/pijuice_config.JSON https://raw.githubusercontent.com/venari/timelapse/feature/lowPowerTweaks/pijuice_config.JSON
 sudo chown pijuice:pijuice /var/lib/pijuice/pijuice_config.JSON
 
+echo We need to reboot to change PiJuice min_charge
+echo "Press any key to reboot"
+
+echo ===========================================
+echo Please check battery profile in pijuice_cli
+echo ===========================================
+
+read -n 1 -s
+sudo reboot
