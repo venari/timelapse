@@ -189,6 +189,21 @@ def scheduleShutdown():
                 return
 
 
+        # If hibernating, wake up at next 6 hourly interval
+        # e.g. midnight, 6am, 12pm, 6pm (UTC)
+        hibernateHoursToWakeAfter = 6 - (datetime.datetime.utcnow().hour % 6)
+        hibernateHourToWakeAt = datetime.datetime.utcnow().hour + hibernateHoursToWakeAfter
+
+        # loggerIntent.info('datetime.datetime.utcnow().hour')
+        # loggerIntent.info(datetime.datetime.utcnow().hour)
+        # loggerIntent.info('hoursToWakeAfter')
+        # loggerIntent.info(hoursToWakeAfter)
+        # loggerIntent.info('hourToWakeAt')
+        # loggerIntent.info(hourToWakeAt)
+
+        if hibernateHourToWakeAt >= 24:
+            hibernateHourToWakeAt = hibernateHourToWakeAt - 24
+
 
         # Hibernate mode? Lets have 10 minutes to give it a chance to check again before hibernating.
         if config['hibernateMode']:
@@ -198,34 +213,19 @@ def scheduleShutdown():
                 logger.info('hibernate mode - sleeping for 6 hours...')
                 loggerIntent.info('hibernate mode - sleeping for 6 hours...')
 
-                # wake up at next 6 hourly interval
-                # e.g. midnight, 6am, 12pm, 6pm (UTC)
-                hoursToWakeAfter = 6 - (datetime.datetime.utcnow().hour % 6)
-                hourToWakeAt = datetime.datetime.utcnow().hour + hoursToWakeAfter
-
-                loggerIntent.info('datetime.datetime.utcnow().hour')
-                loggerIntent.info(datetime.datetime.utcnow().hour)
-                loggerIntent.info('hoursToWakeAfter')
-                loggerIntent.info(hoursToWakeAfter)
-                loggerIntent.info('hourToWakeAt')
-                loggerIntent.info(hourToWakeAt)
-
-                if hourToWakeAt >= 24:
-                    hourToWakeAt = hourToWakeAt - 24
-
                 alarmObj = {
                     'year': 'EVERY_YEAR',
                     'month': 'EVERY_MONTH',
                     'day': 'EVERY_DAY',
-                    'hour': hourToWakeAt,
+                    'hour': hibernateHourToWakeAt,
                     'minute': 0,
                     'second': 0,
                 }
 
                 setAlarm = True
 
-                # Switch off watchdog
-                SetWatchdog(0)
+                # Set watchdog to one day just to catch wakeup alarm failure
+                SetWatchdog(60*24)
 
         else:
 
@@ -250,8 +250,8 @@ def scheduleShutdown():
 
                 setAlarm = True
 
-                # Set Watchdog to 1 hour
-                SetWatchdog(3600)
+                # Set Watchdog to 2 hours to catch wakeup failure
+                SetWatchdog(120)
 
             else:
 
@@ -263,7 +263,6 @@ def scheduleShutdown():
 
                 if config['sleep_at_battery_percent'] > 0 and config['hibernate_at_battery_percent'] > 0 \
                 and pj.status.GetChargeLevel()['data'] <= config['sleep_at_battery_percent'] \
-                and pj.status.GetChargeLevel()['data'] > config['hibernate_at_battery_percent'] \
                 and pj.status.GetStatus()['data']['battery'] != 'NOT_PRESENT' \
                 and datetime.datetime.now().minute >= 10 \
                 and config['supportMode'] == False \
@@ -284,6 +283,21 @@ def scheduleShutdown():
                             'minute_period': DELTA_MIN,
                             'second': 0,
                     }
+
+                    # If we're down at hibernate level, let's just hibernate.
+                    if pj.status.GetChargeLevel()['data'] <= config['hibernate_at_battery_percent']:
+                        logger.info('Hibernating due to very low battery')
+                        loggerIntent.info('Hibernating 10 minute sleep due to very low battery')
+                        alarmObj = {
+                            'year': 'EVERY_YEAR',
+                            'month': 'EVERY_MONTH',
+                            'day': 'EVERY_DAY',
+                            'hour': hibernateHourToWakeAt,
+                            'minute': 0,
+                            'second': 0,
+                        }
+                        # Set watchdog to one day just to catch wakeup alarm failure
+                        SetWatchdog(60*24)
 
                     setAlarm = True
 
@@ -434,7 +448,7 @@ def scheduleShutdown():
         logger.error("scheduleShutdown() failed.")
         logger.error(e)
 
-def SetWatchdog(timeout = 10, non_volatile = False):
+def SetWatchdog(timeout = 1, non_volatile = False):
     try:
         if(pj.power.GetWatchdog()['data'] == timeout and pj.power.GetWatchdog()['non_volatile'] == non_volatile):
             return
