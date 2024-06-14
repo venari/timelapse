@@ -1,6 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using timelapse.api.Helpers;
+using timelapse.core.Helpers;
 using timelapse.core.models;
 using timelapse.infrastructure;
 
