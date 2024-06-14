@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using timelapse.api.Helpers;
 using timelapse.core.models;
 using timelapse.infrastructure;
 
@@ -105,6 +106,14 @@ namespace timelapse.api{
             if(next!=null){
                 telemetry.Add(next);
             }
+
+            // ESP32S3 voltage to percentage hack
+            if(telemetry.Any(t => t.BatteryPercent == 0 && t.BatteryVoltage > 0)){
+                foreach(var t in telemetry){
+                    t.BatteryPercent = VoltageToPercentageHelper.VoltageToPercentage(t.BatteryVoltage.Value/1000.0);
+                }
+            }
+            // telemetry.Where(t => t.BatteryPercent == 0 && t.BatteryVoltage > 0).ToList().ForEach(t => t.BatteryPercent = VoltageToPercentageHelper.VoltageToPercentage(t.BatteryVoltage.Value));
 
             if(telemetry.Count==0){
                 return new NotFoundObjectResult(telemetry);
