@@ -108,10 +108,8 @@ namespace timelapse.api{
             }
 
             // ESP32S3 voltage to percentage hack
-            if(telemetry.Any(t => t.BatteryPercent == 0 && t.BatteryVoltage > 0)){
-                foreach(var t in telemetry){
-                    t.BatteryPercent = VoltageToPercentageHelper.VoltageToPercentage(t.BatteryVoltage.Value/1000.0);
-                }
+            foreach(var t in telemetry.Where(t => t.BatteryPercent == 0 && t.BatteryVoltage > 0)){
+                t.BatteryPercent = VoltageToPercentageHelper.VoltageToPercentage(t.BatteryVoltage.Value/1000.0);
             }
             // telemetry.Where(t => t.BatteryPercent == 0 && t.BatteryVoltage > 0).ToList().ForEach(t => t.BatteryPercent = VoltageToPercentageHelper.VoltageToPercentage(t.BatteryVoltage.Value));
 
