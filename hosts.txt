@@ -1,6 +1,6 @@
 pi@sediment-pi-zero-2w-a
 pi@envirocam-2w-b
-leigh@sediment-pi-zero-w-v1-a
+pi@envirocam-a
 leigh@envirocam-b
 pi@sediment-pi-zero-w-v1-c
 pi@sediment-pi-zero-w-v1-d
