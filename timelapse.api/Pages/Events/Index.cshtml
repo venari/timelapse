@@ -79,7 +79,7 @@
                             <script type="text/javascript">localizeDateTime('@(deviceEvent.StartTime.ToString("s"))');</script>
                         </td>
                         <td>
-                            <a href="/Events/Detail/@(deviceEvent.Id)"><img class="img-thumbnail" src="@(deviceEvent.StartImage.BlobUri + Model.SasToken)"></img></a>
+                            <a href="/Events/Detail/@(deviceEvent.Id)"><img class="img-fluid" src="@(deviceEvent.StartImage.BlobUri + Model.SasToken)"></img></a>
                         </td>
                         @* <td>
                             <a href="/Events/Detail/@(deviceEvent.Id)"><img class="img-thumbnail" src="@(deviceEvent.ThumbnailImage!=null?deviceEvent.ThumbnailImage.BlobUri + Model.SasToken:"")"></img></a>
@@ -88,7 +88,7 @@
                             <script type="text/javascript">localizeDateTime('@(deviceEvent.EndTime.ToString("s"))');</script>
                         </td>
                         <td>
-                            <a href="/Events/Detail/@(deviceEvent.Id)"><img class="img-thumbnail" src="@(deviceEvent.EndImage.BlobUri + Model.SasToken)"></img></a>
+                            <a href="/Events/Detail/@(deviceEvent.Id)"><img class="img-fluid" src="@(deviceEvent.EndImage.BlobUri + Model.SasToken)"></img></a>
                         </td>
                         @{
                             var user = Model.Users.FirstOrDefault(u => u.Id == deviceEvent.CreatedByUserId);
