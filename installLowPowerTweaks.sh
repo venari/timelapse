@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# bash <(curl -fsSL "https://github.com/venari/timelapse/raw/feature/lowPowerTweaks/installLowPowerTweaks.sh?$RANDOM")
+# bash <(curl -fsSL "https://github.com/venari/timelapse/raw/main/installLowPowerTweaks.sh?$RANDOM")
 
 
 # Enable wakeup logging.
@@ -17,14 +17,14 @@ if [ ! -d "/home/pi/dev/timelapse" ]; then
     cd timelapse
     git config pull.rebase false
     # git checkout development
-    git checkout feature/lowPowerTweaks
+    git checkout main
 else
     echo Updating repo...
     cd dev/timelapse
     # git checkout development
     git fetch
     git stash
-    git checkout feature/lowPowerTweaks
+    git checkout main
     git pull
     git stash pop
 fi
