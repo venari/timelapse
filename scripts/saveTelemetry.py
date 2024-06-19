@@ -16,7 +16,7 @@ from helpers import flashLED
 
 from SIM7600X import powerUpSIM7600X, powerDownSIM7600X
 
-config = json.load(open(os.path.relpath('config.json')))
+config = json.load(open(pathlib.Path(__file__).parent / 'config.json'))
 logFilePath = config["logFilePath"]
 intentLogFilePath = logFilePath.replace("timelapse.log", "intent.log")
 # logFilePath = logFilePath.replace(".log", ".saveTelemetry.log")
@@ -91,7 +91,7 @@ def scheduleShutdown():
         setAlarm = False
         triggerRestart = False
 
-        config = json.load(open(os.path.relpath('config.json')))
+        config = json.load(open(pathlib.Path(__file__).parent / 'config.json'))
 
         # if config['shutdown']:
         #     # print(str(datetime.datetime.now()) + ' scheduling regular shutdown')
@@ -132,7 +132,7 @@ def scheduleShutdown():
                 logger.warning('Looks like RTC has been reset - going into support mode until we reconnect.')
                 loggerIntent.warning('Looks like RTC has been reset - going into support mode until we reconnect.')
                 config['supportMode'] = True
-                json.dump(config, open(os.path.relpath('config.json'), 'w'), indent=4)
+                json.dump(config, open(pathlib.Path(__file__).parent / 'config.json', 'w'), indent=4)
 
 
         # Hibernate mode? 
@@ -149,7 +149,7 @@ def scheduleShutdown():
                 pj.status.SetLedState('D2', [0, 0, 0])
                 config['hibernateMode'] = False
                 config['supportMode'] = True
-                json.dump(config, open(os.path.relpath('config.json'), 'w'), indent=4)
+                json.dump(config, open(pathlib.Path(__file__).parent / 'config.json', 'w'), indent=4)
 
 
         # Power Off mode? 
@@ -166,7 +166,7 @@ def scheduleShutdown():
                 config['hibernateMode'] = False
                 config['powerOff'] = False
                 config['supportMode'] = True
-                json.dump(config, open(os.path.relpath('config.json'), 'w'), indent=4)
+                json.dump(config, open(pathlib.Path(__file__).parent / 'config.json', 'w'), indent=4)
 
             else:
 

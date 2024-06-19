@@ -7,10 +7,11 @@ from SIM7600X import turnOnNDIS, sendSMS, receiveSMS, deleteAllSMS, powerUpSIM76
 import time
 import pijuice
 import os
+import pathlib
 
 from helpers import internet
 
-config = json.load(open(os.path.relpath('config.json')))
+config = json.load(open(pathlib.Path(__file__).parent / 'config.json'))
 logFilePath = config["logFilePath"]
 
 formatter = logging.Formatter('%(asctime)s %(name)s %(levelname)s %(message)s')

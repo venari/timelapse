@@ -8,10 +8,11 @@ import logging
 # from logging.handlers import TimedRotatingFileHandler
 from logging.handlers import SocketHandler
 import glob
+import pathlib
 
 from SIM7600X import powerUpSIM7600X, powerDownSIM7600X
 
-config = json.load(open(os.path.relpath('config.json')))
+config = json.load(open(pathlib.Path(__file__).parent / 'config.json'))
 logFilePath = config["logFilePath"]
 intentLogFilePath = logFilePath.replace("timelapse.log", "intent.log")
 os.makedirs(os.path.dirname(logFilePath), exist_ok=True)
@@ -52,7 +53,7 @@ pj = pijuice.PiJuice(1, 0x14)
 def detectHang():
     try:
 
-        config = json.load(open(os.path.relpath('config.json')))
+        config = json.load(open(pathlib.Path(__file__).parent / 'config.json'))
 
         hung = False
 

@@ -15,7 +15,7 @@ import pathlib
 
 # from helpers import flashLED
 
-config = json.load(open(os.path.relpath('config.json')))
+config = json.load(open(pathlib.Path(__file__).parent / 'config.json'))
 logFilePath = config["logFilePath"]
 # logFilePath = logFilePath.replace(".log", ".savePhotos.log")
 os.makedirs(os.path.dirname(logFilePath), exist_ok=True)
@@ -72,7 +72,7 @@ def savePhotos():
             logger.debug('creating camera object...')
             with Picamera2() as camera:
 
-                config = json.load(open(os.path.relpath('config.json')))
+                config = json.load(open(pathlib.Path(__file__).parent / 'config.json'))
                 #camera_config = camera.create_preview_configuration()
                 camera_config = camera.create_still_configuration()
                 

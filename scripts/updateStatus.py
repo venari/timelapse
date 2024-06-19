@@ -17,6 +17,7 @@ import subprocess
 import pijuice
 import socket
 import shutil
+import pathlib
 
 from helpers import internet, flashLED
 
@@ -27,7 +28,7 @@ mostRecentPendingImage = outputImageFolder + 'monitoringPreviewMostRecentPending
 pendingImageFolder = outputImageFolder + 'pending/'
 uploadedImageFolder = outputImageFolder + 'uploaded/'
 
-config = json.load(open(os.path.relpath('config.json')))
+config = json.load(open(pathlib.Path(__file__).parent / 'config.json'))
 
 logFilePath = config["logFilePath"]
 os.makedirs(os.path.dirname(logFilePath), exist_ok=True)

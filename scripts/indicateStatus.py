@@ -10,7 +10,7 @@ from helpers import internet, flashLED
 
 from SIM7600X import powerUpSIM7600X, powerDownSIM7600X
 
-config = json.load(open(os.path.relpath('config.json')))
+config = json.load(open(pathlib.Path(__file__).parent / 'config.json'))
 logFilePath = config["logFilePath"]
 
 formatter = logging.Formatter('%(asctime)s %(name)s %(levelname)s %(message)s')
