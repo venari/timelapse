@@ -83,6 +83,11 @@ Copy log files to local machine:
 scp -o ConnectTimeout=60 -o ConnectionAttempts=30 pi@sediment-pi-zero-w-v1-a:/home/pi/logs/*.* .
 ```
 
+# Review systemd job status
+```
+watch --differences systemctl status envirocam*
+```
+
 # Waveshare SIM6700X GSM/GPRS/GNSS HAT
 
 - Enable Serial Communication

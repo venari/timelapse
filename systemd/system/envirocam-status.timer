@@ -1,0 +1,9 @@
+[Unit]
+Description=Envirocam Status Service
+
+[Timer]
+OnBootSec=60
+OnCalendar=*:0/15
+
+[Install]
+WantedBy=timers.target
