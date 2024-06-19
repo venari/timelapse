@@ -38,13 +38,13 @@ loggerIntent.setLevel(logging.DEBUG)
 # os.chmod(logFilePath, 0o777) # Make sure pijuice user script can write to log file.
 
 outputImageFolder = str(pathlib.Path(__file__).parent / '../output/images/')
-workingImageFolder = outputImageFolder + 'working/'
-pendingImageFolder = outputImageFolder + 'pending/'
-uploadedImageFolder = outputImageFolder + 'uploaded/'
+workingImageFolder = os.path.join(outputImageFolder , 'working/')
+pendingImageFolder = os.path.join(outputImageFolder , 'pending/')
+uploadedImageFolder = os.path.join(outputImageFolder , 'uploaded/')
 
 outputTelemetryFolder = str(pathlib.Path(__file__).parent / '../output/telemetry/')
-pendingTelemetryFolder = outputTelemetryFolder + 'pending/'
-uploadedTelemetryFolder = outputTelemetryFolder + 'uploaded/'
+pendingTelemetryFolder = os.path.join(outputTelemetryFolder , 'pending/')
+uploadedTelemetryFolder = os.path.join(outputTelemetryFolder , 'uploaded/')
 
 # pijuice
 time.sleep(10)

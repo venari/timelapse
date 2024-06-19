@@ -78,13 +78,13 @@ for line in rec_lines:
 
 
             outputImageFolder = str(pathlib.Path(__file__).parent / '../output/images/')
-            workingImageFolder = outputImageFolder + 'working/'
-            pendingImageFolder = outputImageFolder + 'pending/'
-            uploadedImageFolder = outputImageFolder + 'uploaded/'
+            workingImageFolder = os.path.join(outputImageFolder , 'working/')
+            pendingImageFolder = os.path.join(outputImageFolder , 'pending/')
+            uploadedImageFolder = os.path.join(outputImageFolder , 'uploaded/')
 
             outputTelemetryFolder = str(pathlib.Path(__file__).parent / '../output/telemetry/')
-            pendingTelemetryFolder = outputTelemetryFolder + 'pending/'
-            uploadedTelemetryFolder = outputTelemetryFolder + 'uploaded/'
+            pendingTelemetryFolder = os.path.join(outputTelemetryFolder , 'pending/')
+            uploadedTelemetryFolder = os.path.join(outputTelemetryFolder , 'uploaded/')
 
             batteryPercent = pj.status.GetChargeLevel()['data']
             temperatureC = pj.status.GetBatteryTemperature()['data']

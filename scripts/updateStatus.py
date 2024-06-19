@@ -22,11 +22,11 @@ import pathlib
 from helpers import internet, flashLED
 
 outputImageFolder = str(pathlib.Path(__file__).parent / '../output/images/')
-imageMonitoringPreview = outputImageFolder + 'monitoringPreview.jpg'
-mostRecentUploadedImage = outputImageFolder + 'monitoringPreviewMostRecentUploaded.jpg'
-mostRecentPendingImage = outputImageFolder + 'monitoringPreviewMostRecentPending.jpg'
-pendingImageFolder = outputImageFolder + 'pending/'
-uploadedImageFolder = outputImageFolder + 'uploaded/'
+imageMonitoringPreview = os.path.join(outputImageFolder , 'monitoringPreview.jpg')
+mostRecentUploadedImage =os.path.join(outputImageFolder , 'monitoringPreviewMostRecentUploaded.jpg')
+mostRecentPendingImage = os.path.join(outputImageFolder , 'monitoringPreviewMostRecentPending.jpg')
+pendingImageFolder = os.path.join(outputImageFolder , 'pending/')
+uploadedImageFolder = os.path.join(outputImageFolder , 'uploaded/')
 
 config = json.load(open(pathlib.Path(__file__).parent / 'config.json'))
 
