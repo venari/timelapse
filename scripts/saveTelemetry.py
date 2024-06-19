@@ -49,14 +49,14 @@ while not os.path.exists('/dev/i2c-1'):
     logger.info("dev i2c-1 doesn't exist")
     time.sleep(0.1)
 
-outputImageFolder = pathlib.Path(__file__).parent / '../output/images/'
-workingImageFolder = outputImageFolder / 'working/'
-pendingImageFolder = outputImageFolder / 'pending/'
-uploadedImageFolder = outputImageFolder / 'uploaded/'
+outputImageFolder = str(pathlib.Path(__file__).parent / '../output/images/')
+workingImageFolder = outputImageFolder + 'working/'
+pendingImageFolder = outputImageFolder + 'pending/'
+uploadedImageFolder = outputImageFolder + 'uploaded/'
 
-outputTelemetryFolder = pathlib.Path(__file__).parent / '../output/telemetry/'
-pendingTelemetryFolder = outputTelemetryFolder / 'pending/'
-uploadedTelemetryFolder = outputTelemetryFolder / 'uploaded/'
+outputTelemetryFolder = str(pathlib.Path(__file__).parent / '../output/telemetry/')
+pendingTelemetryFolder = outputTelemetryFolder + 'pending/'
+uploadedTelemetryFolder = outputTelemetryFolder + 'uploaded/'
 
 # pijuice
 time.sleep(10)
@@ -317,8 +317,8 @@ def scheduleShutdown():
                     power_interval = config['modem.power_interval']
                     
                     if uptimeSeconds > power_interval * 2 and uptimeSeconds > 1800:
-                        mostRecentUploadedFiles = sorted(glob.iglob(uploadedImageFolder / "/*.*"), key=os.path.getctime, reverse=True)
-                        mostRecentPendingFiles = sorted(glob.iglob(pendingImageFolder / "/*.*"), key=os.path.getctime, reverse=True)
+                        mostRecentUploadedFiles = sorted(glob.iglob(uploadedImageFolder + "/*.*"), key=os.path.getctime, reverse=True)
+                        mostRecentPendingFiles = sorted(glob.iglob(pendingImageFolder + "/*.*"), key=os.path.getctime, reverse=True)
 
                         secondsSinceLastUpload = -1
                         secondsSinceLastImageCapture = -1
@@ -563,7 +563,7 @@ def saveTelemetry():
                     'SerialNumber': serialNumber
                 }
 
-        telemetryFilename = pendingTelemetryFolder / datetime.datetime.now().strftime('%Y-%m-%d_%H%M%S.json')
+        telemetryFilename = pendingTelemetryFolder + datetime.datetime.now().strftime('%Y-%m-%d_%H%M%S.json')
         with open(telemetryFilename, 'w') as outfile:
             json.dump(api_data, outfile)
             logger.debug('telemetry saved')

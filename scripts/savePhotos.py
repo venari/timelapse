@@ -36,10 +36,10 @@ logger.info("Starting up savePhotos.py...")
 while not os.path.exists('/dev/i2c-1'):
     time.sleep(0.1)
 
-outputImageFolder = pathlib.Path(__file__).parent / '../output/images/'
-workingImageFolder = outputImageFolder / 'working/'
-pendingImageFolder = outputImageFolder / 'pending/'
-uploadedImageFolder = outputImageFolder / 'uploaded/'
+outputImageFolder = str(pathlib.Path(__file__).parent / '../output/images/')
+workingImageFolder = outputImageFolder + 'working/'
+pendingImageFolder = outputImageFolder + 'pending/'
+uploadedImageFolder = outputImageFolder + 'uploaded/'
 
 
 def getSerialNumber():
@@ -122,10 +122,10 @@ def savePhotos():
                 time.sleep(5)
                 logger.debug('ready')
 
-                IMAGEFILENAME = workingImageFolder / datetime.datetime.now().strftime('%Y-%m-%d_%H%M%S.jpg')
+                IMAGEFILENAME = workingImageFolder + datetime.datetime.now().strftime('%Y-%m-%d_%H%M%S.jpg')
                 camera.capture_file(IMAGEFILENAME)
                 logger.debug('image saved to working folder')
-                shutil.move(IMAGEFILENAME, pendingImageFolder / pathlib.Path(IMAGEFILENAME).name)
+                shutil.move(IMAGEFILENAME, pendingImageFolder + pathlib.Path(IMAGEFILENAME).name)
                 logger.debug('image moved to pending folder')
 
             logger.debug('destroying camera object')

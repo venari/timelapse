@@ -21,12 +21,12 @@ import pathlib
 
 from helpers import internet, flashLED
 
-outputImageFolder = pathlib.Path(__file__).parent / '../output/images/'
-imageMonitoringPreview = outputImageFolder / 'monitoringPreview.jpg'
-mostRecentUploadedImage = outputImageFolder / 'monitoringPreviewMostRecentUploaded.jpg'
-mostRecentPendingImage = outputImageFolder / 'monitoringPreviewMostRecentPending.jpg'
-pendingImageFolder = outputImageFolder / 'pending/'
-uploadedImageFolder = outputImageFolder / 'uploaded/'
+outputImageFolder = str(pathlib.Path(__file__).parent / '../output/images/')
+imageMonitoringPreview = outputImageFolder + 'monitoringPreview.jpg'
+mostRecentUploadedImage = outputImageFolder + 'monitoringPreviewMostRecentUploaded.jpg'
+mostRecentPendingImage = outputImageFolder + 'monitoringPreviewMostRecentPending.jpg'
+pendingImageFolder = outputImageFolder + 'pending/'
+uploadedImageFolder = outputImageFolder + 'uploaded/'
 
 config = json.load(open(pathlib.Path(__file__).parent / 'config.json'))
 
@@ -96,8 +96,8 @@ def updateEInkDisplay():
             logger.info("Previewing image...")
         
             logger.info("Getting most recent uploaded and pending files...")
-            mostRecentUploadedFiles = sorted(glob.iglob(uploadedImageFolder / "/*.*"), key=os.path.getctime, reverse=True)
-            mostRecentPendingFiles = sorted(glob.iglob(pendingImageFolder / "/*.*"), key=os.path.getctime, reverse=True)
+            mostRecentUploadedFiles = sorted(glob.iglob(uploadedImageFolder + "/*.*"), key=os.path.getctime, reverse=True)
+            mostRecentPendingFiles = sorted(glob.iglob(pendingImageFolder + "/*.*"), key=os.path.getctime, reverse=True)
 
             if len(mostRecentUploadedFiles) > 0:
                 shutil.copy(mostRecentUploadedFiles[0], mostRecentUploadedImage)

@@ -77,14 +77,14 @@ for line in rec_lines:
                 bCharging = True
 
 
-            outputImageFolder = pathlib.Path(__file__).parent / '../output/images/'
-            workingImageFolder = outputImageFolder / 'working/'
-            pendingImageFolder = outputImageFolder / 'pending/'
-            uploadedImageFolder = outputImageFolder / 'uploaded/'
+            outputImageFolder = str(pathlib.Path(__file__).parent / '../output/images/')
+            workingImageFolder = outputImageFolder + 'working/'
+            pendingImageFolder = outputImageFolder + 'pending/'
+            uploadedImageFolder = outputImageFolder + 'uploaded/'
 
-            outputTelemetryFolder = pathlib.Path(__file__).parent / '../output/telemetry/'
-            pendingTelemetryFolder = outputTelemetryFolder / 'pending/'
-            uploadedTelemetryFolder = outputTelemetryFolder / 'uploaded/'
+            outputTelemetryFolder = str(pathlib.Path(__file__).parent / '../output/telemetry/')
+            pendingTelemetryFolder = outputTelemetryFolder + 'pending/'
+            uploadedTelemetryFolder = outputTelemetryFolder + 'uploaded/'
 
             batteryPercent = pj.status.GetChargeLevel()['data']
             temperatureC = pj.status.GetBatteryTemperature()['data']

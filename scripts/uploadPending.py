@@ -50,14 +50,14 @@ logger.info("*******************************************************************
 
 loggerIntent.info("Starting up uploadPending.py...")
 
-outputImageFolder = pathlib.Path(__file__).parent / '../output/images/'
-pendingImageFolder = outputImageFolder / 'pending/'
-uploadedImageFolder = outputImageFolder / 'uploaded/'
+outputImageFolder = str(pathlib.Path(__file__).parent / '../output/images/')
+pendingImageFolder = outputImageFolder + 'pending/'
+uploadedImageFolder = outputImageFolder + 'uploaded/'
 
-outputTelemetryFolder = pathlib.Path(__file__).parent / '../output/telemetry/'
-pendingTelemetryFolder = outputTelemetryFolder / 'pending/'
-uploadedTelemetryFolder = outputTelemetryFolder / 'uploaded/'
-holdTelemetryFolder = outputTelemetryFolder / 'hold/'
+outputTelemetryFolder = str(pathlib.Path(__file__).parent / '../output/telemetry/')
+pendingTelemetryFolder = outputTelemetryFolder + 'pending/'
+uploadedTelemetryFolder = outputTelemetryFolder + 'uploaded/'
+holdTelemetryFolder = outputTelemetryFolder + 'hold/'
 
 bInSupportWindow = False
 
@@ -88,7 +88,7 @@ def uploadPendingPhotos():
         os.makedirs(pendingImageFolder, exist_ok = True)
         os.makedirs(uploadedImageFolder, exist_ok = True)
 
-        mostRecentPendingFiles = sorted(glob.iglob(pendingImageFolder / "/*.*"), key=os.path.getctime, reverse=True)
+        mostRecentPendingFiles = sorted(glob.iglob(pendingImageFolder + "/*.*"), key=os.path.getctime, reverse=True)
 
         connectToInternet()
 
@@ -133,7 +133,7 @@ def uploadPendingPhotos():
             if response.status_code == 200:
                 flashLED(pj, 'D2', 0, 0, 255, 1, .5)
                 logger.debug(f'Image uploaded successfully')
-                shutil.move(IMAGEFILENAME, uploadedImageFolder / pathlib.Path(IMAGEFILENAME).name)
+                shutil.move(IMAGEFILENAME, uploadedImageFolder + pathlib.Path(IMAGEFILENAME).name)
 
             else:
                 flashLED(pj, 'D2', 255, 0, 0, 1, 1)
@@ -297,7 +297,7 @@ def uploadPendingTelemetry():
         #requests.post(config['apiUrl'] + '/Telemetry', json=api_data)
         session = requests.Session()
 
-        mostRecentTelemetryFiles = sorted(glob.iglob(pendingTelemetryFolder / "/*.json"), key=os.path.getctime, reverse=True)
+        mostRecentTelemetryFiles = sorted(glob.iglob(pendingTelemetryFolder + "/*.json"), key=os.path.getctime, reverse=True)
 
         pendingFilesProcessed=0
         lastAttemptedFilename = ''
@@ -334,7 +334,7 @@ def uploadPendingTelemetry():
             if response.status_code == 200:
                 flashLED(pj, 'D2', 0, 0, 255, 1, .1)
                 logger.debug(f'Telemetry uploaded successfully')
-                shutil.move(telemetryFilename, uploadedTelemetryFolder / pathlib.Path(telemetryFilename).name)
+                shutil.move(telemetryFilename, uploadedTelemetryFolder + pathlib.Path(telemetryFilename).name)
                 logger.debug('Logged to API.')
             else:
                 flashLED(pj, 'D2', 255, 0, 0, 1, 1)
@@ -384,7 +384,7 @@ def uploadPendingTelemetry():
         if lastAttemptedFilename!="":          
           logger.error("lastAttemptedFilename: " + lastAttemptedFilename)
           # os.remove(telemetryFilename)
-          shutil.move(lastAttemptedFilename, holdTelemetryFolder / pathlib.Path(lastAttemptedFilename).name)
+          shutil.move(lastAttemptedFilename, holdTelemetryFolder + pathlib.Path(lastAttemptedFilename).name)
           logger.info("Moved " + lastAttemptedFilename + " to " + holdTelemetryFolder)
 
 def deleteOldUploadedImagesAndTelemetry():

@@ -37,14 +37,14 @@ loggerIntent.setLevel(logging.DEBUG)
 # loggerIntent.info("Starting up detectHang.py...")
 # os.chmod(logFilePath, 0o777) # Make sure pijuice user script can write to log file.
 
-outputImageFolder = pathlib.Path(__file__).parent / '../output/images/'
-workingImageFolder = outputImageFolder / 'working/'
-pendingImageFolder = outputImageFolder / 'pending/'
-uploadedImageFolder = outputImageFolder / 'uploaded/'
+outputImageFolder = str(pathlib.Path(__file__).parent / '../output/images/')
+workingImageFolder = outputImageFolder + 'working/'
+pendingImageFolder = outputImageFolder + 'pending/'
+uploadedImageFolder = outputImageFolder + 'uploaded/'
 
-outputTelemetryFolder = pathlib.Path(__file__).parent / '../output/telemetry/'
-pendingTelemetryFolder = outputTelemetryFolder / 'pending/'
-uploadedTelemetryFolder = outputTelemetryFolder / 'uploaded/'
+outputTelemetryFolder = str(pathlib.Path(__file__).parent / '../output/telemetry/')
+pendingTelemetryFolder = outputTelemetryFolder + 'pending/'
+uploadedTelemetryFolder = outputTelemetryFolder + 'uploaded/'
 
 # pijuice
 time.sleep(10)
@@ -66,8 +66,8 @@ def detectHang():
         # Let's bounce to give everything a chance to settle.
         
         if uptimeSeconds > 45 * 60:
-            mostRecentUploadedFiles = sorted(glob.iglob(uploadedImageFolder / "/*.*"), key=os.path.getctime, reverse=True)
-            mostRecentPendingFiles = sorted(glob.iglob(pendingImageFolder / "/*.*"), key=os.path.getctime, reverse=True)
+            mostRecentUploadedFiles = sorted(glob.iglob(uploadedImageFolder + "/*.*"), key=os.path.getctime, reverse=True)
+            mostRecentPendingFiles = sorted(glob.iglob(pendingImageFolder + "/*.*"), key=os.path.getctime, reverse=True)
 
             secondsSinceLastUpload = -1
             secondsSinceLastImageCapture = -1

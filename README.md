@@ -88,6 +88,12 @@ scp -o ConnectTimeout=60 -o ConnectionAttempts=30 pi@sediment-pi-zero-w-v1-a:/ho
 watch --differences systemctl status envirocam*
 ```
 
+# restart a systemd job
+```
+sudo systemctl restart envirocam-telemetry
+sudo systemctl restart envirocam*
+```
+
 # Waveshare SIM6700X GSM/GPRS/GNSS HAT
 
 - Enable Serial Communication
