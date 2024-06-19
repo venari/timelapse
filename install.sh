@@ -117,15 +117,16 @@ grep -qxF 'static domain_name_servers=8.8.4.4 8.8.8.8' /etc/dhcpcd.conf || echo 
 
 
 # Clear out any old crontab entries
-(echo "@reboot /usr/bin/bash /home/pi/dev/timelapse/scripts/loggingSocketServer.sh")| crontab -
+# (echo "@reboot /usr/bin/bash /home/pi/dev/timelapse/scripts/loggingSocketServer.sh")| crontab -
+crontab -r
 
 echo Installing systemd services...
 sudo cp /home/pi/dev/timelapse/systemd/system/*.* /etc/systemd/system/
 sudo chmod u+x /etc/systemd/system/enviro*.*
 sudo systemctl enable envirocam-logging.service
 sudo systemctl enable envirocam-telemetry.service
-sudo systemctl enable envirocam-photos.service
-sudo systemctl enable envirocam-upload.service
+sudo systemctl enable envirocam-photos.timer
+sudo systemctl enable envirocam-upload.timer
 sudo systemctl enable envirocam-detect-hang.timer
 
 # If not bookworm - don't have epaper library yet

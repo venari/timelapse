@@ -1,0 +1,7 @@
+[Unit]
+Description=Envirocam Photos Service
+
+OnBootSec=150
+
+[Install]
+WantedBy=timers.target

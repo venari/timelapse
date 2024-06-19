@@ -5,9 +5,11 @@ After=envirocam-logging-socket.service
 [Service]
 Type=idle
 User=pi
+#ExecStartPost=/bin/sleep 150
 ExecStart=/usr/bin/bash /home/pi/dev/timelapse/scripts/savePhotos.sh
 Restart=always
 RestartSec=60
+#TimeoutStartSec=210
 
 [Install]
 WantedBy=multi-user.target
