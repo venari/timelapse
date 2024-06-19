@@ -56,7 +56,7 @@ fi
 
 
 
-echo We need to reboot to kick off cron jobs
+echo We need to reboot to clear out cron jobs and kick off systemd jobs
 echo "Press any key to reboot"
 
 echo ===========================================
