@@ -63,10 +63,6 @@ byobu
 ```
 bash <(curl -fsSL "https://github.com/venari/timelapse/raw/main/install.sh?$RANDOM")
 ```
-Systemd version:
-```
-bash <(curl -fsSL "https://github.com/venari/timelapse/raw/feature/systemd/install.sh?$RANDOM")
-```
 
 # Connect to intermitently connected Pi and tail log:
 ```
