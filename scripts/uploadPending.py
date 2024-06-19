@@ -88,7 +88,7 @@ def uploadPendingPhotos():
         os.makedirs(pendingImageFolder, exist_ok = True)
         os.makedirs(uploadedImageFolder, exist_ok = True)
 
-        mostRecentPendingFiles = sorted(glob.iglob(pendingImageFolder + "/*.*"), key=os.path.getctime, reverse=True)
+        mostRecentPendingFiles = sorted(glob.iglob(pendingImageFolder / "/*.*"), key=os.path.getctime, reverse=True)
 
         connectToInternet()
 
@@ -297,7 +297,7 @@ def uploadPendingTelemetry():
         #requests.post(config['apiUrl'] + '/Telemetry', json=api_data)
         session = requests.Session()
 
-        mostRecentTelemetryFiles = sorted(glob.iglob(pendingTelemetryFolder + "/*.json"), key=os.path.getctime, reverse=True)
+        mostRecentTelemetryFiles = sorted(glob.iglob(pendingTelemetryFolder / "/*.json"), key=os.path.getctime, reverse=True)
 
         pendingFilesProcessed=0
         lastAttemptedFilename = ''

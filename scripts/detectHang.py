@@ -66,8 +66,8 @@ def detectHang():
         # Let's bounce to give everything a chance to settle.
         
         if uptimeSeconds > 45 * 60:
-            mostRecentUploadedFiles = sorted(glob.iglob(uploadedImageFolder + "/*.*"), key=os.path.getctime, reverse=True)
-            mostRecentPendingFiles = sorted(glob.iglob(pendingImageFolder + "/*.*"), key=os.path.getctime, reverse=True)
+            mostRecentUploadedFiles = sorted(glob.iglob(uploadedImageFolder / "/*.*"), key=os.path.getctime, reverse=True)
+            mostRecentPendingFiles = sorted(glob.iglob(pendingImageFolder / "/*.*"), key=os.path.getctime, reverse=True)
 
             secondsSinceLastUpload = -1
             secondsSinceLastImageCapture = -1

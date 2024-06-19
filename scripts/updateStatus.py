@@ -96,8 +96,8 @@ def updateEInkDisplay():
             logger.info("Previewing image...")
         
             logger.info("Getting most recent uploaded and pending files...")
-            mostRecentUploadedFiles = sorted(glob.iglob(uploadedImageFolder + "/*.*"), key=os.path.getctime, reverse=True)
-            mostRecentPendingFiles = sorted(glob.iglob(pendingImageFolder + "/*.*"), key=os.path.getctime, reverse=True)
+            mostRecentUploadedFiles = sorted(glob.iglob(uploadedImageFolder / "/*.*"), key=os.path.getctime, reverse=True)
+            mostRecentPendingFiles = sorted(glob.iglob(pendingImageFolder / "/*.*"), key=os.path.getctime, reverse=True)
 
             if len(mostRecentUploadedFiles) > 0:
                 shutil.copy(mostRecentUploadedFiles[0], mostRecentUploadedImage)

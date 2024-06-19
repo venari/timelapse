@@ -317,8 +317,8 @@ def scheduleShutdown():
                     power_interval = config['modem.power_interval']
                     
                     if uptimeSeconds > power_interval * 2 and uptimeSeconds > 1800:
-                        mostRecentUploadedFiles = sorted(glob.iglob(uploadedImageFolder + "/*.*"), key=os.path.getctime, reverse=True)
-                        mostRecentPendingFiles = sorted(glob.iglob(pendingImageFolder + "/*.*"), key=os.path.getctime, reverse=True)
+                        mostRecentUploadedFiles = sorted(glob.iglob(uploadedImageFolder / "/*.*"), key=os.path.getctime, reverse=True)
+                        mostRecentPendingFiles = sorted(glob.iglob(pendingImageFolder / "/*.*"), key=os.path.getctime, reverse=True)
 
                         secondsSinceLastUpload = -1
                         secondsSinceLastImageCapture = -1
