@@ -1,0 +1,8 @@
+[Unit]
+Description=Envirocam Hand Detection Service
+
+[Timer]
+OnCalendar=*:0/15
+
+[Install]
+WantedBy=timers.target
