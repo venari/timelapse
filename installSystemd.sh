@@ -1,6 +1,6 @@
 #!/bin/bash
 
-
+# bash <(curl -fsSL "https://github.com/venari/timelapse/raw/feature/systemd-merge/installSystemd.sh?$RANDOM")
 
 cd /home/pi
 # Check if dev folder exists
