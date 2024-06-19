@@ -133,7 +133,7 @@ def uploadPendingPhotos():
             if response.status_code == 200:
                 flashLED(pj, 'D2', 0, 0, 255, 1, .5)
                 logger.debug(f'Image uploaded successfully')
-                shutil.move(IMAGEFILENAME, uploadedImageFolder + pathlib.Path(IMAGEFILENAME).name)
+                shutil.move(IMAGEFILENAME, uploadedImageFolder / pathlib.Path(IMAGEFILENAME).name)
 
             else:
                 flashLED(pj, 'D2', 255, 0, 0, 1, 1)
@@ -334,7 +334,7 @@ def uploadPendingTelemetry():
             if response.status_code == 200:
                 flashLED(pj, 'D2', 0, 0, 255, 1, .1)
                 logger.debug(f'Telemetry uploaded successfully')
-                shutil.move(telemetryFilename, uploadedTelemetryFolder + pathlib.Path(telemetryFilename).name)
+                shutil.move(telemetryFilename, uploadedTelemetryFolder / pathlib.Path(telemetryFilename).name)
                 logger.debug('Logged to API.')
             else:
                 flashLED(pj, 'D2', 255, 0, 0, 1, 1)
@@ -384,7 +384,7 @@ def uploadPendingTelemetry():
         if lastAttemptedFilename!="":          
           logger.error("lastAttemptedFilename: " + lastAttemptedFilename)
           # os.remove(telemetryFilename)
-          shutil.move(lastAttemptedFilename, holdTelemetryFolder + pathlib.Path(lastAttemptedFilename).name)
+          shutil.move(lastAttemptedFilename, holdTelemetryFolder / pathlib.Path(lastAttemptedFilename).name)
           logger.info("Moved " + lastAttemptedFilename + " to " + holdTelemetryFolder)
 
 def deleteOldUploadedImagesAndTelemetry():

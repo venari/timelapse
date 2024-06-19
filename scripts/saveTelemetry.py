@@ -563,7 +563,7 @@ def saveTelemetry():
                     'SerialNumber': serialNumber
                 }
 
-        telemetryFilename = pendingTelemetryFolder + datetime.datetime.now().strftime('%Y-%m-%d_%H%M%S.json')
+        telemetryFilename = pendingTelemetryFolder / datetime.datetime.now().strftime('%Y-%m-%d_%H%M%S.json')
         with open(telemetryFilename, 'w') as outfile:
             json.dump(api_data, outfile)
             logger.debug('telemetry saved')

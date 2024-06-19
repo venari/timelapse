@@ -122,10 +122,10 @@ def savePhotos():
                 time.sleep(5)
                 logger.debug('ready')
 
-                IMAGEFILENAME = workingImageFolder + datetime.datetime.now().strftime('%Y-%m-%d_%H%M%S.jpg')
+                IMAGEFILENAME = workingImageFolder / datetime.datetime.now().strftime('%Y-%m-%d_%H%M%S.jpg')
                 camera.capture_file(IMAGEFILENAME)
                 logger.debug('image saved to working folder')
-                shutil.move(IMAGEFILENAME, pendingImageFolder + pathlib.Path(IMAGEFILENAME).name)
+                shutil.move(IMAGEFILENAME, pendingImageFolder / pathlib.Path(IMAGEFILENAME).name)
                 logger.debug('image moved to pending folder')
 
             logger.debug('destroying camera object')
