@@ -81,7 +81,7 @@ scp -o ConnectTimeout=60 -o ConnectionAttempts=30 pi@sediment-pi-zero-w-v1-a:/ho
 
 # Review systemd job status
 ```
-watch --differences systemctl status envirocam*
+watch --color SYSTEMD_COLORS=1 systemctl status enviro*.service
 ```
 
 # Waveshare SIM6700X GSM/GPRS/GNSS HAT
