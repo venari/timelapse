@@ -2,6 +2,9 @@
 
 # bash <(curl -fsSL "https://github.com/venari/timelapse/raw/feature/systemd-merge/installSystemd.sh?$RANDOM")
 
+# Ask user if we have a waveshare modem
+read -p "Does this camera have a waveshare SIM7600X modem? (y/n)" waveshare
+
 cd /home/pi
 # Check if dev folder exists
 if [ ! -d "/home/pi/dev/timelapse" ]; then
@@ -52,33 +55,6 @@ fi
 
 
 
-
-
-
-
-
-
-
-echo Overwriting pijuice config...
-sudo mv /var/lib/pijuice/pijuice_config.JSON /var/lib/pijuice/pijuice_config.JSON.bak
-sudo curl -fsSL -o /var/lib/pijuice/pijuice_config.JSON https://raw.githubusercontent.com/venari/timelapse/main/pijuice_config.JSON
-sudo chown pijuice:pijuice /var/lib/pijuice/pijuice_config.JSON
-
-echo Installing Tailscale...
-curl -fsSL https://tailscale.com/install.sh | sh
-sudo tailscale up
-
-# Query user for hostname, provide a default value
-read -p "Current hostname is $(hostname) - would you like to change it?" yn
-case $yn in 
-    [Yy]* ) echo "Changing hostname";
-        read -p "Enter new hostname if desired: " -i sediment-pi- -e hostname
-        echo Setting hostname to $hostname
-        sudo hostnamectl set-hostname $hostname;;
-
-    [Nn]* ) echo "Skipping hostname change";;
-    * ) echo "Please answer yes or no.";;
-esac
 
 echo We need to reboot to kick off cron jobs
 echo "Press any key to reboot"
