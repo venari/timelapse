@@ -1,6 +1,7 @@
 [Unit]
 Description=Envirocam Photos Service
 
+[Timer]
 OnBootSec=150
 
 [Install]
