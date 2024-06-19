@@ -1,5 +1,5 @@
 [Unit]
-Description=Envirocam Hand Detection Service
+Description=Envirocam Hang Detection Service
 After=envirocam-logging-socket.service
 
 [Service]
