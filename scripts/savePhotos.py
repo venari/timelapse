@@ -37,9 +37,9 @@ while not os.path.exists('/dev/i2c-1'):
     time.sleep(0.1)
 
 outputImageFolder = pathlib.Path(__file__).parent / '../output/images/'
-workingImageFolder = outputImageFolder + 'working/'
-pendingImageFolder = outputImageFolder + 'pending/'
-uploadedImageFolder = outputImageFolder + 'uploaded/'
+workingImageFolder = outputImageFolder / 'working/'
+pendingImageFolder = outputImageFolder / 'pending/'
+uploadedImageFolder = outputImageFolder / 'uploaded/'
 
 
 def getSerialNumber():

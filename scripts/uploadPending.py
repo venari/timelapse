@@ -51,13 +51,13 @@ logger.info("*******************************************************************
 loggerIntent.info("Starting up uploadPending.py...")
 
 outputImageFolder = pathlib.Path(__file__).parent / '../output/images/'
-pendingImageFolder = outputImageFolder + 'pending/'
-uploadedImageFolder = outputImageFolder + 'uploaded/'
+pendingImageFolder = outputImageFolder / 'pending/'
+uploadedImageFolder = outputImageFolder / 'uploaded/'
 
 outputTelemetryFolder = pathlib.Path(__file__).parent / '../output/telemetry/'
-pendingTelemetryFolder = outputTelemetryFolder + 'pending/'
-uploadedTelemetryFolder = outputTelemetryFolder + 'uploaded/'
-holdTelemetryFolder = outputTelemetryFolder + 'hold/'
+pendingTelemetryFolder = outputTelemetryFolder / 'pending/'
+uploadedTelemetryFolder = outputTelemetryFolder / 'uploaded/'
+holdTelemetryFolder = outputTelemetryFolder / 'hold/'
 
 bInSupportWindow = False
 
