@@ -131,13 +131,13 @@ sudo systemctl enable envirocam-detect-hang.timer
 
 # If not bookworm - don't have epaper library yet
 if ! grep -q "bookworm" /etc/os-release; then
-    sudo cp /home/pi/dev/timelapse/scripts/envirocam-status.timer /etc/systemd/system/
+    sudo cp /home/pi/dev/timelapse/systemd/system/envirocam-status.timer /etc/systemd/system/
     sudo systemctl enable envirocam-status.timer
 fi
 
 # If not waveshare, we can't access SMS messages
 if [ $waveshare == "y" ]; then
-    sudo cp /home/pi/dev/timelapse/scripts/envirocam-sms.timer /etc/systemd/system/
+    sudo cp /home/pi/dev/timelapse/systemd/system/envirocam-sms.timer /etc/systemd/system/
     sudo systemctl enable envirocam-sms.timer
 fi
 
@@ -171,7 +171,7 @@ case $yn in
     * ) echo "Please answer yes or no.";;
 esac
 
-echo We need to reboot to kick off cron jobs
+echo We need to reboot to clear out cron jobs and kick off systemd jobs
 echo "Press any key to reboot"
 
 echo ===========================================
