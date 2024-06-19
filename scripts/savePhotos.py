@@ -36,7 +36,7 @@ logger.info("Starting up savePhotos.py...")
 while not os.path.exists('/dev/i2c-1'):
     time.sleep(0.1)
 
-outputImageFolder = '../output/images/'
+outputImageFolder = pathlib.Path(__file__).parent / '../output/images/'
 workingImageFolder = outputImageFolder + 'working/'
 pendingImageFolder = outputImageFolder + 'pending/'
 uploadedImageFolder = outputImageFolder + 'uploaded/'

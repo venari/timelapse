@@ -77,12 +77,12 @@ for line in rec_lines:
                 bCharging = True
 
 
-            outputImageFolder = '../output/images/'
+            outputImageFolder = pathlib.Path(__file__).parent / '../output/images/'
             workingImageFolder = outputImageFolder + 'working/'
             pendingImageFolder = outputImageFolder + 'pending/'
             uploadedImageFolder = outputImageFolder + 'uploaded/'
 
-            outputTelemetryFolder = '../output/telemetry/'
+            outputTelemetryFolder = pathlib.Path(__file__).parent / '../output/telemetry/'
             pendingTelemetryFolder = outputTelemetryFolder + 'pending/'
             uploadedTelemetryFolder = outputTelemetryFolder + 'uploaded/'
 

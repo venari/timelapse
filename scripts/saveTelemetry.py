@@ -49,12 +49,12 @@ while not os.path.exists('/dev/i2c-1'):
     logger.info("dev i2c-1 doesn't exist")
     time.sleep(0.1)
 
-outputImageFolder = '../output/images/'
+outputImageFolder = pathlib.Path(__file__).parent / '../output/images/'
 workingImageFolder = outputImageFolder + 'working/'
 pendingImageFolder = outputImageFolder + 'pending/'
 uploadedImageFolder = outputImageFolder + 'uploaded/'
 
-outputTelemetryFolder = '../output/telemetry/'
+outputTelemetryFolder = pathlib.Path(__file__).parent / '../output/telemetry/'
 pendingTelemetryFolder = outputTelemetryFolder + 'pending/'
 uploadedTelemetryFolder = outputTelemetryFolder + 'uploaded/'
 

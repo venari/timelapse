@@ -37,12 +37,12 @@ loggerIntent.setLevel(logging.DEBUG)
 # loggerIntent.info("Starting up detectHang.py...")
 # os.chmod(logFilePath, 0o777) # Make sure pijuice user script can write to log file.
 
-outputImageFolder = '../output/images/'
+outputImageFolder = pathlib.Path(__file__).parent / '../output/images/'
 workingImageFolder = outputImageFolder + 'working/'
 pendingImageFolder = outputImageFolder + 'pending/'
 uploadedImageFolder = outputImageFolder + 'uploaded/'
 
-outputTelemetryFolder = '../output/telemetry/'
+outputTelemetryFolder = pathlib.Path(__file__).parent / '../output/telemetry/'
 pendingTelemetryFolder = outputTelemetryFolder + 'pending/'
 uploadedTelemetryFolder = outputTelemetryFolder + 'uploaded/'
 

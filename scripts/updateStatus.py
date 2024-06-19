@@ -21,7 +21,7 @@ import pathlib
 
 from helpers import internet, flashLED
 
-outputImageFolder = '../output/images/'
+outputImageFolder = pathlib.Path(__file__).parent / '../output/images/'
 imageMonitoringPreview = outputImageFolder + 'monitoringPreview.jpg'
 mostRecentUploadedImage = outputImageFolder + 'monitoringPreviewMostRecentUploaded.jpg'
 mostRecentPendingImage = outputImageFolder + 'monitoringPreviewMostRecentPending.jpg'
