@@ -27,7 +27,7 @@ mostRecentPendingImage = outputImageFolder + 'monitoringPreviewMostRecentPending
 pendingImageFolder = outputImageFolder + 'pending/'
 uploadedImageFolder = outputImageFolder + 'uploaded/'
 
-config = json.load(open('config.json'))
+config = json.load(open(os.path.relpath('config.json')))
 
 logFilePath = config["logFilePath"]
 os.makedirs(os.path.dirname(logFilePath), exist_ok=True)

@@ -15,7 +15,7 @@ rec_buff = ''
 
 ser = None
 
-config = json.load(open('config.json'))
+config = json.load(open(os.path.relpath('config.json')))
 logFilePath = config["logFilePath"]
 # logFilePath = logFilePath.replace(".log", ".SIM7600X.log")
 os.makedirs(os.path.dirname(logFilePath), exist_ok=True)
@@ -198,7 +198,7 @@ def send_at(command,back,timeout):
 #     logger.info("Waiting 2 mins...")
 #     time.sleep(120)
 
-#     config = json.load(open('config.json'))
+#     config = json.load(open(os.path.relpath('config.json')))
 #     if config['supportMode'] == False:
 #         logger.info("Powering off....")
 #         powerDownSIM7600X()

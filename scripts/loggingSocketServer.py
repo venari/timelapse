@@ -10,7 +10,7 @@ import threading
 import os
 
 # this logic taken from saveTelemetry.py
-config = json.load(open('config.json'))
+config = json.load(open(os.path.relpath('config.json')))
 logFilePath = config["logFilePath"]
 os.makedirs(os.path.dirname(logFilePath), exist_ok=True)
 

@@ -10,7 +10,7 @@ import os
 
 from helpers import internet
 
-config = json.load(open('config.json'))
+config = json.load(open(os.path.relpath('config.json')))
 logFilePath = config["logFilePath"]
 
 formatter = logging.Formatter('%(asctime)s %(name)s %(levelname)s %(message)s')
