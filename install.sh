@@ -110,8 +110,8 @@ grep -qxF 'static domain_name_servers=8.8.4.4 8.8.8.8' /etc/dhcpcd.conf || echo 
 echo Installing crontab entries...
 
 (echo "@reboot /usr/bin/bash /home/pi/dev/timelapse/scripts/loggingSocketServer.sh")| crontab -
-(crontab -l 2>/dev/null; echo "@reboot sleep 10 && /usr/bin/bash /home/pi/dev/timelapse/scripts/saveTelemetry.sh")| crontab -
-(crontab -l 2>/dev/null; echo "@reboot sleep 20 && /usr/bin/bash /home/pi/dev/timelapse/scripts/savePhotos.sh")| crontab -
+(crontab -l 2>/dev/null; echo "@reboot /usr/bin/bash /home/pi/dev/timelapse/scripts/saveTelemetry.sh")| crontab -
+(crontab -l 2>/dev/null; echo "@reboot sleep 150 && /usr/bin/bash /home/pi/dev/timelapse/scripts/savePhotos.sh")| crontab -
 
 (crontab -l 2>/dev/null; echo "@reboot sleep 60 && /usr/bin/bash /home/pi/dev/timelapse/scripts/uploadPending.sh")| crontab -
 

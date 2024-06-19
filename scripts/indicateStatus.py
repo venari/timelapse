@@ -45,7 +45,12 @@ def indicateStatus():
 
 def turnOnSystemPowerSwitch(retries = 3):
 
-    pj.power.SetSystemPowerSwitch(500)
+    modemPower = config['modem.power']
+    if modemPower <= 0:
+        logger.info('Modem power is disabled in config.')
+        return
+    
+    pj.power.SetSystemPowerSwitch(modemPower)
     powerUpSIM7600X()
 
     waitCounter = 0
