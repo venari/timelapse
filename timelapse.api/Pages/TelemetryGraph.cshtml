@@ -1,4 +1,5 @@
-﻿@page "{id:int}/{numberOfHoursToDisplay:int?}"
+﻿@* @page "{id:int}/{numberOfHoursToDisplay:int?}/{periodOffset:int?}" *@
+@page "{id:int}/{startDate:datetime?}/{endDate:datetime?}"
 @using Humanizer
 @model TelemetryGraphModel
 @{
@@ -7,6 +8,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@2.0.1/dist/chartjs-plugin-annotation.min.js"></script>
 
 <div class="text-center">
     <h1 class="display-4">
@@ -17,12 +19,14 @@
 <div class="container">
   <div class="row">
     <div class="col">
-        <h4>Displaying @(Model.NumberOfHoursToDisplay) hours data.</h4>
+        @* <h4>@(Model.PeriodDescription)</h4> *@
         @{
-            <a href="/TelemetryGraph/@(Model.device.Id)/1" type="button" class="btn btn-secondary">Last hour</a>
-            <a href="/TelemetryGraph/@(Model.device.Id)/24" type="button" class="btn btn-secondary">Last 24 hours</a>
-            <a href="/TelemetryGraph/@(Model.device.Id)/48" type="button" class="btn btn-secondary">Last 48 hours</a>
-            <a href="/TelemetryGraph/@(Model.device.Id)/168" type="button" class="btn btn-secondary">Last week</a>
+            <a id=btnBack href="#" type="button" class="btn btn-secondary">Previous</a>
+            <a id=btnLastHour href="#" type="button" class="btn btn-secondary">Last hour</a>
+            <a id=btnLast24Hours href="#" type="button" class="btn btn-secondary">Last 24 hours</a>
+            <a id=btnLast48Hours href="#" type="button" class="btn btn-secondary">Last 48 hours</a>
+            <a id=btnLastWeek href="#" type="button" class="btn btn-secondary">Last week</a>
+            <a id=btnForward href="#" type="button" class="btn btn-secondary">Next</a>
         }
     </div>
     <div class="col">
@@ -41,10 +45,45 @@
 
 
 <script>
-    const latest24HoursTelemetryUri = '/api/Telemetry/GetLatestTelemetry'
+    var startDate = new Date("@(Model.StartDate.ToString("o"))");
+    var endDate = new Date("@(Model.EndDate.ToString("o"))");
 
-    function getTelemetry(deviceId, numberOfHoursToDisplay, chart) {
-        fetch(latest24HoursTelemetryUri + '?deviceId=' + deviceId + '&numberOfHoursToDisplay=' + numberOfHoursToDisplay)
+    var date1HourAgo = new Date();
+    date1HourAgo.setHours(date1HourAgo.getHours() - 1);
+
+    var date24HoursAgo = new Date();
+    date24HoursAgo.setHours(date24HoursAgo.getHours() - 24);
+
+    var date48HoursAgo = new Date();
+    date48HoursAgo.setHours(date48HoursAgo.getHours() - 48);
+
+    var date1WeekAgo = new Date();
+    date1WeekAgo.setHours(date1WeekAgo.getHours() - 168);
+
+    var btnBack = document.getElementById("btnBack");
+    var btnLastHour = document.getElementById("btnLastHour");
+    var btnLast24Hours = document.getElementById("btnLast24Hours");
+    var btnLast48Hours = document.getElementById("btnLast48Hours");
+    var btnLastWeek = document.getElementById("btnLastWeek");
+    var btnForward = document.getElementById("btnForward");
+
+    btnBack.href = "/TelemetryGraph/@(Model.device.Id)/@(Model.StartDate.AddHours(-1*Model.WindowInHours).ToString("o"))/@(Model.EndDate.AddHours(-Model.WindowInHours).ToString("o"))";
+    btnLastHour.href = "/TelemetryGraph/@(Model.device.Id)/" + date1HourAgo.toISOString();
+    btnLast24Hours.href = "/TelemetryGraph/@(Model.device.Id)/" + date24HoursAgo.toISOString();
+    btnLast48Hours.href = "/TelemetryGraph/@(Model.device.Id)/" + date48HoursAgo.toISOString();
+    btnLastWeek.href = "/TelemetryGraph/@(Model.device.Id)/" + date1WeekAgo.toISOString();
+
+    if("True"=="@Model.LatestAvailableData"){
+        // disable forward button
+        btnForward.classList.add("disabled");
+    } else {
+        btnForward.href = "/TelemetryGraph/@(Model.device.Id)/@(Model.StartDate.AddHours(Model.WindowInHours).ToString("o"))/@(Model.EndDate.AddHours(Model.WindowInHours).ToString("o"))";
+    }
+
+    const telemetryUri = '/api/Telemetry/GetTelemetryBetweenDates'
+
+    function getTelemetry(deviceId, startDate, endDate, chart) {
+        fetch(telemetryUri + '?deviceId=' + deviceId + '&startDate=' + startDate + '&endDate=' + endDate)
             .then(response => response.json())
             .then(data => showTelemetry(chart, data))
             .catch(error => console.error('Unable to get telemetry.', error));
@@ -115,17 +154,55 @@
         chart.config.data.datasets[11].data = data.map(d => ({x: new Date(d.timestamp), y: d.uptimeSeconds/60}));
         chart.update();
     }
+
+    var dates = [];
+
+    @* var daysToDisplay = @(Model.NumberOfHoursToDisplay)/24;
+    var dateFrom = new Date("@(Model.TargetEarliestTelemetryDateTime.Value.ToString("s"))");
+    // Move to midnight boundary
+    dateFrom = new Date(dateFrom.getFullYear(), dateFrom.getMonth(), dateFrom.getDate());
+    // Show day boundaries if 30 days or fewer - gets a bit heavy otherwise.
+    if(daysToDisplay<=30){
+        for(var dateIndex = 0; dateIndex <= daysToDisplay + 1; ++dateIndex){
+            var date = new Date(dateFrom.getTime() + dateIndex * 24 * 60 * 60 * 1000);
+            dates.push(date);
+        }
+    } *@
+
+    // Move to midnight boundaries
+    startDate = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
+    endDate = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate());
+
+    for(var date = startDate; date<=endDate; date.setDate(date.getDate() + 1)){
+        dates.push(new Date(date));
+    }
+
+    annotations = dates
+    .map((l, i) => ({
+        drawTime: 'beforeDatasetsDraw',
+        type: 'box',
+        xScaleID: 'x',
+        yScaleID: 'y',
+        xMin: new Date(l.getFullYear(), l.getMonth(), l.getDate()),
+        xMax: new Date(l.getFullYear(), l.getMonth(), l.getDate()+1),
+        backgroundColor: 'rgba(128, 128, 128, 0.2)',
+        borderColor: 'rgba(128, 128, 128, 0.0)',
+        borderWidth: 1
+    }))
+    @* .filter((l, i) => !(i % 2)) *@
+    .filter(function (l, i) {
+        return (l.xMin.getDate() % 2)
+    })
 </script>
 
 <div>
     <table class="table">
         <thead>
             <tr>
-            <th scope="col">Latest Telemetry for @(Model.device.Name) as at <script type="text/javascript">localizeDateTime('@(Model.device.LatestTelemetryTimestamp.Value.ToString("s"))');</script>
-            @if (Model.device.LatestTelemetry!=null && DateTime.UtcNow - Model.device.LatestTelemetry.Timestamp > TimeSpan.FromMinutes(60)){
-                <span class="badge bg-warning text-dark">Warning - @((DateTime.UtcNow - Model.device.LatestTelemetry.Timestamp).Humanize()) old</span>
-            }
-            </th>
+                <th scope="col">Telemetry for @(Model.device.Name) between <script type="text/javascript">localizeDateTime('@(Model.StartDate.ToString("s"))');</script> and <script type="text/javascript">localizeDateTime('@(Model.EndDate.ToString("s"))');</script>
+                @* @if (Model.device.LatestTelemetry!=null && DateTime.UtcNow - Model.device.LatestTelemetry.Timestamp > TimeSpan.FromMinutes(60)){
+                    <span class="badge bg-warning text-dark">Warning - @((DateTime.UtcNow - Model.device.LatestTelemetry.Timestamp).Humanize()) old</span>
+                } *@
             </tr>
         </thead>
         <tbody>
@@ -141,6 +218,9 @@
                                 plugins: {
                                     legend: {
                                         @* display: false, *@
+                                    },
+                                    annotation: {
+                                        annotations: annotations
                                     }
                                 },
                                 scales: {
@@ -149,11 +229,23 @@
                                             @* display: false, *@
                                             type: 'time',
                                             time: {
-                                                unit: 'hour'
+                                                unit: 'hour',
+                                                // https://date-fns.org/v2.28.0/docs/format
+                                                displayFormats: {
+                                                    'millisecond': 'MMM DD',
+                                                    'second': 'MMM DD',
+                                                    'minute': 'MMM DD',
+                                                    'hour': 'E do ha',
+                                                    'day': 'MMM dd HH:mm',
+                                                    'week': 'MMM DD',
+                                                    'month': 'MMM DD',
+                                                    'quarter': 'MMM DD',
+                                                    'year': 'MMM DD'
+                                                }                        
                                             },
-                                            suggestedMin: new Date(@(new DateTimeOffset(Model.EarliestTelemetryDateTime.Value).ToUnixTimeMilliseconds())),
+                                            min: new Date(@(new DateTimeOffset(Model.StartDate).ToUnixTimeMilliseconds())),
                                             @* suggestedMax: new Date(), *@
-                                            suggestedMax: new Date(@(new DateTimeOffset(Model.LatestTelemetryDateTime.Value).ToUnixTimeMilliseconds())),
+                                            max: new Date(@(new DateTimeOffset(Model.EndDate).ToUnixTimeMilliseconds())),
                                             @* ticks: {
                                                 max: new Date(),
                                                 min: new Date(@(new DateTimeOffset(Model.device.LatestTelemetry.Timestamp).AddDays(-2).ToUnixTimeMilliseconds())),
@@ -265,7 +357,9 @@
                             config
                         );
 
-                        getTelemetry(@(Model.device.Id), @(Model.NumberOfHoursToDisplay), myChart_@(Model.device.Id));
+                        @* getTelemetry(@(Model.device.Id), @(Model.NumberOfHoursToDisplay), @(Model.PeriodOffset), myChart_@(Model.device.Id)); *@
+                        getTelemetry(@(Model.device.Id), '@(Model.StartDate.ToUniversalTime().ToString("o"))', '@(Model.EndDate.ToUniversalTime().ToString("o"))', myChart_@(Model.device.Id));
+                        
 
                     </script>
                 </td>

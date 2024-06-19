@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using timelapse.core.Helpers;
 
 namespace timelapse.core.models;
 
@@ -30,10 +31,18 @@ public class Device
     [System.Text.Json.Serialization.JsonIgnore]
     public List<Event> Events {get;} = new List<Event>();
 
+    private Telemetry? latestTelemetry = null;
     [System.Text.Json.Serialization.JsonIgnore]
     public Telemetry? LatestTelemetry {
         get{
-            var latestTelemetry = Telemetries.OrderByDescending(t => t.Timestamp).FirstOrDefault();
+            if(latestTelemetry == null){
+                latestTelemetry = Telemetries.OrderByDescending(t => t.Timestamp).FirstOrDefault();
+
+                // ESP32S3 voltage to percentage hack
+                if(latestTelemetry!=null && latestTelemetry.BatteryPercent == 0 && latestTelemetry.BatteryVoltage > 0){
+                    latestTelemetry.BatteryPercent = VoltageToPercentageHelper.VoltageToPercentage(latestTelemetry.BatteryVoltage.Value/1000.0);
+                }
+            }
             return latestTelemetry;
         }
     }
@@ -41,7 +50,9 @@ public class Device
     [System.Text.Json.Serialization.JsonIgnore]
     public DateTime? LatestTelemetryTimestamp {
         get{
-            var latestTelemetry = Telemetries.OrderByDescending(t => t.Timestamp).FirstOrDefault();
+            if(latestTelemetry == null){
+                latestTelemetry = Telemetries.OrderByDescending(t => t.Timestamp).FirstOrDefault();
+            }
             if(latestTelemetry!=null){
                 return latestTelemetry.Timestamp;
             } else {

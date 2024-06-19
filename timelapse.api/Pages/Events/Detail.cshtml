@@ -94,17 +94,17 @@
                     <img class="img-fluid" id="image"></img>
                 </td>
             </tr>
-            @* <tr>
+            <tr>
                 <button title="Back 1hr" onclick="navigate(-60)" type="button" class="btn btn-secondary"><i class="fa fa-fast-backward"></i></button>
                 <button title="Back 10m"onclick="navigate(-10)" type="button" class="btn btn-secondary"><i class="fa fa-backward"></i></button>
                 <button title="Back 1m"onclick="navigate(-1)" type="button" class="btn btn-secondary"><i class="fa fa-step-backward"></i></button>
-                <button id="togglePlay" onclick="togglePlay()" type="button" class="btn btn-secondary"><i class="fa fa-play"></i></button>
+                <button id="togglePlay" onclick="togglePlay()" type="button" class="btn btn-secondary"><i class="fa fa-pause"></i></button>
                 <button title="Forward 1m"onclick="navigate(1)" type="button" class="btn btn-secondary"><i class="fa fa-step-forward"></i></button>
                 <button title="Forward 10m"onclick="navigate(10)" type="button" class="btn btn-secondary"><i class="fa fa-forward"></i></button>
                 <button title="Forward 1hr"onclick="navigate(60)" type="button" class="btn btn-secondary"><i class="fa fa-fast-forward"></i></button>
-                <label for="jumpToDateTime">Jump to (date and time):</label>
-                <input onchange="jumpToDateTime()" type="datetime-local" id="jumpToDateTime" name="jumpToDateTime"> 
-            </tr> *@
+                @* <label for="jumpToDateTime">Jump to (date and time):</label>
+                <input onchange="jumpToDateTime()" type="datetime-local" id="jumpToDateTime" name="jumpToDateTime">  *@
+            </tr>
         </tbody>
     </table>
 </div>
@@ -114,7 +114,11 @@
 </div>
 
 <script>
-    @* var currentViewedTimestamp = '@(Model.Event.StartTime.ToString("o"))' *@
+    var currentViewedTimestamp = '@(Model.InitialTimestamp.ToString("o"))'
+
+    displayCurrentViewedTimestamp();
+
+    console.log("Initial timestamp: " + currentViewedTimestamp)
 
     var eventImages = @(Json.Serialize(Model.EventImages));
     var eventImageIndex = 0;
@@ -126,6 +130,20 @@
 
     var image = document.getElementById("image")
 
+    var bPlaying=true
+
+    var togglePlayButton = document.getElementById("togglePlay")
+
+    function togglePlay(){
+        bPlaying=!bPlaying;
+         if(bPlaying){
+            togglePlayButton.innerHTML = '<i class="fa fa-pause"></i>'
+            nextFrame();
+         } else {
+            togglePlayButton.innerHTML = '<i class="fa fa-play"></i>'
+         }
+    }
+
     if(eventImages.length>0){
         getImage(@(Model.Device.Id), eventImageIndex);
 
@@ -136,7 +154,20 @@
 
     function nextFrame(){
         if(bPlaying){
-            if(eventImageIndex<eventImages.length-1){
+
+            image.onload=function(){
+                setTimeout(nextFrame, 50);
+            }
+
+            // Loop if in play mode.
+            if(currentViewedTimestamp>=eventImages[eventImages.length-1].timestamp){
+                getImage(@(Model.Device.Id), 0);
+            } else {
+                navigate(1);
+            }
+
+
+            @* if(eventImageIndex<eventImages.length-1){
                 ++eventImageIndex
             } else {
                 eventImageIndex = 0
@@ -145,15 +176,68 @@
             image.onload=function(){
                 setTimeout(nextFrame, 50);
             }
-            getImage(@(Model.Device.Id), eventImageIndex);
+            getImage(@(Model.Device.Id), eventImageIndex); *@
         }
     }
 
+    function displayCurrentViewedTimestamp()
+    {
+        var imageHeader = document.getElementById("imageHeader");
+        imageHeader.innerHTML = "Image for @(Model.Device.Name) as at " + localizeDateTimeAsString(currentViewedTimestamp)
+
+        @* document.getElementById("jumpToDateTime").value = ISO8601UTCDatetimeToLocalDatetime(currentViewedTimestamp); *@
+    }
+
+    function navigate(minutes){
+        var newTimestamp = new Date(new Date(currentViewedTimestamp).getTime() + minutes * 60 * 1000)
+
+        console.log("Navigating " + minutes + " minutes from " + new Date(currentViewedTimestamp) + " to " + newTimestamp)
+
+        @* getImageAtOrAround(@(Model.device.Id), ISO8601UTCDatetimeToLocalDatetime(newTimestamp.toISOString()), minutes>0) *@
+        getImageAtOrAround(@(Model.Device.Id), newTimestamp.toISOString(), minutes>0)
+    }
+
     function getImage(deviceId, eventImageIndex) {
-        imageBlobUri = eventImages[eventImageIndex].blobUri + '@(Model.SasToken)'.replace(/&amp;/g, '&')
+        getImageAtOrAround(deviceId, eventImages[eventImageIndex].timestamp, true);
+        @* imageBlobUri = eventImages[eventImageIndex].blobUri + '@(Model.SasToken)'.replace(/&amp;/g, '&')
         image.src = imageBlobUri
         var imageHeader = document.getElementById("imageHeader");
-        imageHeader.innerHTML = "Image for @(Model.Device.Name) as at " + localizeDateTimeAsString(eventImages[eventImageIndex].timestamp)
+        imageHeader.innerHTML = "Image for @(Model.Device.Name) as at " + localizeDateTimeAsString(eventImages[eventImageIndex].timestamp) *@
+    }
+
+    function getImageAtOrAround(deviceId, atOrAfterTimestamp, forwards) {
+
+        console.log("Navigating to or around " + atOrAfterTimestamp)
+
+        var url = "/api/Image/GetImageAtOrAround/?deviceId=" + deviceId + "&timestamp=" + atOrAfterTimestamp + "&forwards=" + forwards
+        fetch(url, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        })
+        .then(function(response){
+            if(response.ok){
+                return response.json()
+            } else {
+                console.error('Something went wrong');
+            }
+        })
+        .then(function(data){
+            console.log(data.blobUri)
+            console.log(data.timestamp)
+
+            image.src = data.blobUri + '@(Model.SasToken)'.replace(/&amp;/g, '&')
+
+            currentViewedTimestamp = data.timestamp
+            displayCurrentViewedTimestamp()
+        })
+        .catch(function(err){
+            console.error(err)
+            if(bPlaying){
+                togglePlay()
+            }
+        });
     }
 
     function navToEditEvent(){
