@@ -15,7 +15,7 @@ import pathlib
 
 # from helpers import flashLED
 
-config = json.load(open('config.json'))
+config = json.load(open(pathlib.Path(__file__).parent / 'config.json'))
 logFilePath = config["logFilePath"]
 # logFilePath = logFilePath.replace(".log", ".savePhotos.log")
 os.makedirs(os.path.dirname(logFilePath), exist_ok=True)
@@ -36,10 +36,10 @@ logger.info("Starting up savePhotos.py...")
 while not os.path.exists('/dev/i2c-1'):
     time.sleep(0.1)
 
-outputImageFolder = '../output/images/'
-workingImageFolder = outputImageFolder + 'working/'
-pendingImageFolder = outputImageFolder + 'pending/'
-uploadedImageFolder = outputImageFolder + 'uploaded/'
+outputImageFolder = str(pathlib.Path(__file__).parent / '../output/images/')
+workingImageFolder = os.path.join(outputImageFolder , 'working/')
+pendingImageFolder = os.path.join(outputImageFolder , 'pending/')
+uploadedImageFolder = os.path.join(outputImageFolder , 'uploaded/')
 
 
 def getSerialNumber():
@@ -72,7 +72,7 @@ def savePhotos():
             logger.debug('creating camera object...')
             with Picamera2() as camera:
 
-                config = json.load(open('config.json'))
+                config = json.load(open(pathlib.Path(__file__).parent / 'config.json'))
                 #camera_config = camera.create_preview_configuration()
                 camera_config = camera.create_still_configuration()
                 

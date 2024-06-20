@@ -5,6 +5,7 @@ import logging
 # from logging.handlers import TimedRotatingFileHandler
 from logging.handlers import SocketHandler
 import serial
+import pathlib
 
 import RPi.GPIO as GPIO
 from time import sleep
@@ -15,7 +16,7 @@ rec_buff = ''
 
 ser = None
 
-config = json.load(open('config.json'))
+config = json.load(open(pathlib.Path(__file__).parent / 'config.json'))
 logFilePath = config["logFilePath"]
 # logFilePath = logFilePath.replace(".log", ".SIM7600X.log")
 os.makedirs(os.path.dirname(logFilePath), exist_ok=True)
@@ -198,7 +199,7 @@ def send_at(command,back,timeout):
 #     logger.info("Waiting 2 mins...")
 #     time.sleep(120)
 
-#     config = json.load(open('config.json'))
+#     config = json.load(open(pathlib.Path(__file__).parent / 'config.json'))
 #     if config['supportMode'] == False:
 #         logger.info("Powering off....")
 #         powerDownSIM7600X()

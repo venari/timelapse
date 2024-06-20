@@ -7,10 +7,11 @@ from SIM7600X import turnOnNDIS, sendSMS, receiveSMS, deleteAllSMS, powerUpSIM76
 import time
 import pijuice
 import os
+import pathlib
 
 from helpers import internet
 
-config = json.load(open('config.json'))
+config = json.load(open(pathlib.Path(__file__).parent / 'config.json'))
 logFilePath = config["logFilePath"]
 
 formatter = logging.Formatter('%(asctime)s %(name)s %(levelname)s %(message)s')
@@ -76,14 +77,14 @@ for line in rec_lines:
                 bCharging = True
 
 
-            outputImageFolder = '../output/images/'
-            workingImageFolder = outputImageFolder + 'working/'
-            pendingImageFolder = outputImageFolder + 'pending/'
-            uploadedImageFolder = outputImageFolder + 'uploaded/'
+            outputImageFolder = str(pathlib.Path(__file__).parent / '../output/images/')
+            workingImageFolder = os.path.join(outputImageFolder , 'working/')
+            pendingImageFolder = os.path.join(outputImageFolder , 'pending/')
+            uploadedImageFolder = os.path.join(outputImageFolder , 'uploaded/')
 
-            outputTelemetryFolder = '../output/telemetry/'
-            pendingTelemetryFolder = outputTelemetryFolder + 'pending/'
-            uploadedTelemetryFolder = outputTelemetryFolder + 'uploaded/'
+            outputTelemetryFolder = str(pathlib.Path(__file__).parent / '../output/telemetry/')
+            pendingTelemetryFolder = os.path.join(outputTelemetryFolder , 'pending/')
+            uploadedTelemetryFolder = os.path.join(outputTelemetryFolder , 'uploaded/')
 
             batteryPercent = pj.status.GetChargeLevel()['data']
             temperatureC = pj.status.GetBatteryTemperature()['data']
