@@ -23,6 +23,8 @@ Burn using Pi Imager. Give a default name, but you can change this inthe install
 
 Set username and password, and authentication methods as desired.
 
+## All versions up to Bullseye.
+
 Mount (reinsert) SD card
 <!-- diskutil mount /dev/disk4s1 -->
 ```
@@ -39,6 +41,28 @@ And then on the pi:
 sudo cp ~/wpa_supplicant.conf /etc/wpa_supplicant/wpa_supplicant.conf
 sudo reboot
 ```
+
+## Bookworm onwards:
+Bookworm uses NetorkManager rather than WPA Supplicant.
+
+Ensure you have local wifi network access when you burn the image.
+
+Individual network addition:
+```
+sudo nmcli dev wifi connect <wifi-ssid> password "<network-password>"
+```
+
+```
+scp ~/nmcli-connect.sh pi@[pi name]:~
+```
+And then on the pi:
+```
+chmod u+x ~/nmcli-connect.sh
+sudo ./nmcli-connect.sh
+```
+
+Note - this will only connect to WIFI networks that are present, so ensure modem stays with camera.
+
 
 Turn on and find the pi
 Pi Zero W 2:
