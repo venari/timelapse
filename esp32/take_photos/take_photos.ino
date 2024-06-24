@@ -57,7 +57,7 @@ touch_pad_t touchPin;
 
 const bool enableSleep = true;
 const bool TPL5110 = true;
-const int TPL5110_Reset_PIN = A1;
+const int TPL5110_Reset_PIN = D7;
 
 unsigned long lastCaptureTime = 0;  // Last shooting time
 int imageCounter = 1;               // File Counter
@@ -1050,7 +1050,7 @@ void enableWakeupAndGoToSleep() {
   if (TPL5110) {
     // set pin D1 to high
     digitalWrite(TPL5110_Reset_PIN, HIGH);
-    // delay(10);
+    delay(1);
     digitalWrite(TPL5110_Reset_PIN, LOW);
 
   } else {
