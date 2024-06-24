@@ -142,7 +142,7 @@ void logMessage(const char *format, va_list args) {
 
 
 void updateCounter(const char *counterFilename, int count) {
-  logMessage("updateCounter('%s', %d))", counterFilename, count);
+  // logMessage("updateCounter('%s', %d))", counterFilename, count);
 
   File file = SD.open(counterFilename, FILE_WRITE);
   if (!file) {
@@ -205,7 +205,7 @@ DateTime getPseudoRTCNow() {
 
 void saveTelemetry() {
 
-  displayMessage("saveTelemetry()...");
+  // displayMessage("saveTelemetry()...");
   char filename[100];
   char rtcTime[25];
 
@@ -256,7 +256,7 @@ void saveTelemetry() {
 
   digitalWrite(LED_BUILTIN, HIGH);
 
-  logMessage("Saved telemetry: %s\r\n", filename);
+  // logMessage("Saved telemetry: %s\r\n", filename);
   updateCounter(counterFilenameTelemetry, ++telemetryCounter);
 }
 
@@ -269,7 +269,7 @@ void savePhoto() {
   sprintf(rtcTime, YYYYMMDDHHMMSSFormatString, now.year(), now.month(), now.day(), now.hour(), now.minute(), now.second());
 
   sprintf(filename, "%s/image.%08d.%s.jpg", pendingImageFolder, imageCounter, rtcTime);
-  logMessage("Save Photo filename: %s", filename);
+  // logMessage("Save Photo filename: %s", filename);
 
 
   // Serial.println("Starting photo_save()");
@@ -424,7 +424,7 @@ void getNTPTime() {
         logMessage("Adjusted Pseudo RTC...");
       }
 
-      logMessage("RTC/NTP Time discrepancy was %d seconds", timeDiscrepancy);
+      // logMessage("RTC/NTP Time discrepancy was %d seconds", timeDiscrepancy);
 
       // DateTime now = rtc.now();
       // char rtcTime[25];
@@ -445,7 +445,7 @@ const int TelemetryFileBatchSize = 100;
 
 bool uploadPendingImages() {
   // returns true if all pending images have been uploaded.
-  logMessage("uploadPendingImages()....");
+  logMessage("uploadPendingImages()");
 
   // Scan folder, retrieving most recent files first
   String *sortedFiles = listAndSortFiles(pendingImageFolder);
@@ -459,12 +459,15 @@ bool uploadPendingImages() {
     }
   }
 
+  logMessage("Uploading: %d images", filesToUpload);
+
   for (int fileIndex = 0; fileIndex < FileArraySize && fileIndex < filesToUpload; ++fileIndex) {
     if (fileIndex >= ImageFileBatchSize) {
       logMessage("Batch size: %d (%d files remaining)", ImageFileBatchSize, filesToUpload - fileIndex);
       break;
     } else {
-      logMessage("Uploading %d/%d...", fileIndex + 1, filesToUpload);
+      // logMessage("Uploading %d/%d...", fileIndex + 1, filesToUpload);
+      displayMessageNoNewline(".");
     }
 
     String pendingFilename = pendingImageFolder;
@@ -585,6 +588,8 @@ bool uploadPendingImages() {
           logMessage("404 - check device is registered.");
         } else {
           logMessage("Error sending data.");
+
+          // TO DO - reject file here probably
         }
       }
     }
@@ -595,9 +600,12 @@ bool uploadPendingImages() {
 
 bool uploadPendingTelemetry() {
   // returns true if all pending telemetry has been uploaded.
-  logMessage("uploadPendingTelemetry()....");
+  // logMessage("uploadPendingTelemetry()....");
 
   // Scan folder, retrieving most recent files first
+
+  // TO DO optimise to avoid counting files...
+
   String *sortedFiles = listAndSortFiles(pendingTelemetryFolder);
   int filesUploaded = 0;
   int filesToUpload = 0;
@@ -609,19 +617,22 @@ bool uploadPendingTelemetry() {
     }
   }
 
+  logMessage("Uploading: %d telemetry files", filesToUpload);
+
   for (int fileIndex = 0; fileIndex < FileArraySize && fileIndex < filesToUpload; ++fileIndex) {
     if (fileIndex >= TelemetryFileBatchSize) {
       logMessage("Batch size: %d (%d files remaining)", TelemetryFileBatchSize, filesToUpload - fileIndex);
       break;
     } else {
-      logMessage("Uploading %d/%d...", fileIndex + 1, filesToUpload);
+      // logMessage("Uploading %d/%d...", fileIndex + 1, filesToUpload);
+      displayMessageNoNewline(".");
     }
 
     String pendingFilename = pendingTelemetryFolder;
     pendingFilename += "/";
     pendingFilename += sortedFiles[fileIndex];
 
-    logMessage("pendingFilename: %s", pendingFilename.c_str());
+    // logMessage("pendingFilename: %s", pendingFilename.c_str());
 
     File file = SD.open(pendingFilename);
 
@@ -899,7 +910,7 @@ void setup() {
   }
 
   logRTC();
-  logMessage("TPL5110_Reset_PIN: %d", TPL5110_Reset_PIN);
+  // logMessage("TPL5110_Reset_PIN: %d", TPL5110_Reset_PIN);
 
   // Initialize SD card
   if (!SD.begin(21)) {
@@ -940,7 +951,7 @@ void setup() {
   sd_sign = true;  // sd initialization check passes
   // logMessage("SD Card mounted %'d", millis());
   logRTC();
-  logMessage("SD Card mounted");
+  // logMessage("SD Card mounted");
 
   bootTime = getCounter(counterFilenameBoot);
 
@@ -967,18 +978,18 @@ void setup() {
     }
   }
 
-  logMessage("MAC Address: %s", MACAddress);
+  // logMessage("MAC Address: %s", MACAddress);
 
 
-  displayMessage("Camera startup");
+  // displayMessage("Camera startup");
 
 
   ++bootCount;
-  logMessage("Boot number: %d", bootCount);
+  // logMessage("Boot number: %d", bootCount);
 
   updateCounter(counterFilenameBoot, bootCount);
 
-  // logMessage("Starting up %'d", millis());
+  // logMessage("Starting up %'d", millis());/Volumes/NO NAME/counterBoot
 
 
   camera_config_t config;
@@ -1058,7 +1069,7 @@ void setup() {
 
   camera_sign = true;  // Camera initialization check passes
   // logMessage("Camera connected %'d", millis());
-  displayMessage("Camera ready");
+  // displayMessage("Camera ready");
 
 
   imageCounter = getCounter(counterFilenameImages);
