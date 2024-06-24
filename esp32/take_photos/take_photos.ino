@@ -50,24 +50,30 @@ NTPClient timeClient(ntpUDP, "pool.ntp.org");
 
 RTC_PCF8563 rtc;
 
-RTC_DATA_ATTR int bootCount = 0;
-RTC_DATA_ATTR time_t bootTime = 0;
+// RTC_DATA_ATTR int bootCount = 0;
+time_t bootTime = 0;
 
-bool rtcPresent=true;
+bool rtcPresent = true;
 touch_pad_t touchPin;
 
 const bool enableSleep = true;
+const bool TPL5110 = true;
+const int TPL5110_Reset_PIN = A1;
 
 unsigned long lastCaptureTime = 0;  // Last shooting time
-int imageCounter = 1;                 // File Counter
+int imageCounter = 1;               // File Counter
 int telemetryCounter = 1;
 
 // int epochPseudoRTC = 0;             // Save time of last sleep in case we don't have a real RTC.
 
-bool camera_sign = false;           // Check camera status
-bool sd_sign = false;               // Check sd status
+bool camera_sign = false;  // Check camera status
+bool sd_sign = false;      // Check sd status
+const char *counterFilenameBoot = "/counterBoot";
+const char *counterFilenameBootTime = "/counterBootTime";
 const char *counterFilenameImages = "/counterImages";
+const char *counterFilenamePendingImages = "/counterPendingImages";
 const char *counterFilenameTelemetry = "/counterTelemetry";
+const char *counterFilenamePendingTelemetry = "/counterPendingTelemetry";
 // const char *bootTimeFilename = "/bootTime";
 const char *logFilename = "/log.txt";
 
@@ -79,7 +85,7 @@ const char *serverName = "timelapse-dev.azurewebsites.net";
 const int port = 443;
 const char *apiPostImageURL = "/api/Image";
 // const char *apiPostImageURL = "https://webhook.site/fc3e2df5-bb36-48a5-8e04-148c41a03839";
-#define CHUNK_SIZE 4096 // Adjust this to a smaller size if needed
+#define CHUNK_SIZE 4096  // Adjust this to a smaller size if needed
 
 const char *ISO8061FormatString = "%04d-%02d-%02dT%02d:%02d:%02dZ";
 const char *YYYYMMDDHHMMSSFormatString = "%04d-%02d-%02d_%02d%02d%02d";
@@ -136,8 +142,8 @@ void logMessage(const char *format, va_list args) {
 
 
 void updateCounter(const char *counterFilename, int count) {
-  // logMessage("updateCounter('%s', %d))", counterFilename, count);
-    
+  logMessage("updateCounter('%s', %d))", counterFilename, count);
+
   File file = SD.open(counterFilename, FILE_WRITE);
   if (!file) {
     logMessage("Failed to open counter file for writing");
@@ -162,31 +168,33 @@ int getCounter(const char *counterFilename) {
 }
 
 
-void setPseudoRTC(time_t timeNow){
+void setPseudoRTC(time_t timeNow) {
   // Update the time we booted from NTP
   // logMessage("setPseudoRTC()");
   // logMessage("timeNow: %d", timeNow);
   // logMessage("millis: %d", millis());
-  bootTime = timeNow - millis()/1000;
+  bootTime = timeNow - millis() / 1000;
+  updateCounter(counterFilenameBoot, bootTime);
+  
   // logMessage("bootTime: %d", bootTime);
 }
 
-time_t getPseudoRTC(){
+time_t getPseudoRTC() {
   // logMessage("getPseudoRTC()");
   // logMessage("bootTime: %d", bootTime);
   // logMessage("millis(): %d", millis());
-  return bootTime + millis()/1000;
+  return bootTime + millis() / 1000;
 }
 
-DateTime PRTCnow(){
-  if(rtcPresent){
+DateTime PRTCnow() {
+  if (rtcPresent) {
     return rtc.now();
   } else {
     return getPseudoRTCNow();
   }
 }
 
-DateTime getPseudoRTCNow(){
+DateTime getPseudoRTCNow() {
   time_t pseudoRTC = getPseudoRTC();
   // logMessage("pseudoRTC: %d", pseudoRTC);
   DateTime pseudoRTCNow = DateTime(pseudoRTC);
@@ -197,9 +205,10 @@ DateTime getPseudoRTCNow(){
 
 void saveTelemetry() {
 
+  displayMessage("saveTelemetry()...");
   char filename[100];
   char rtcTime[25];
-  
+
   DateTime now = PRTCnow();
   sprintf(rtcTime, YYYYMMDDHHMMSSFormatString, now.year(), now.month(), now.day(), now.hour(), now.minute(), now.second());
 
@@ -211,11 +220,11 @@ void saveTelemetry() {
   // https://wiki.seeedstudio.com/check_battery_voltage/
   // https://forum.seeedstudio.com/t/battery-voltage-monitor-and-ad-conversion-for-xiao-esp32c/267535
   uint32_t Vbatt = 0;
-  for(int i = 0; i < 16; i++) {
-    Vbatt = Vbatt + analogReadMilliVolts(A0); // ADC with correction   
+  for (int i = 0; i < 16; i++) {
+    Vbatt = Vbatt + analogReadMilliVolts(A0);  // ADC with correction
   }
-  int Vbattf = 2 * Vbatt / 16; /// 1000.0;     // attenuation ratio 1/2, mV --> V
-  // Serial.println(Vbattf, 3);
+  int Vbattf = 2 * Vbatt / 16;  /// 1000.0;     // attenuation ratio 1/2, mV --> V
+  Serial.println(Vbattf, 3);
 
   // const int capacity = JSON_ARRAY_SIZE(1) + 2*JSON_OBJECT_SIZE(4);
   const int capacity = JSON_OBJECT_SIZE(8);
@@ -223,12 +232,12 @@ void saveTelemetry() {
 
   // JsonDocument doc;
 
-  doc["BatteryPercent"] =  0;
-  doc["TemperatureC"] =  21;
-  doc["DiskSpaceFree"] =  0;
-  doc["PendingImages"] =  countFiles(pendingImageFolder);
-  doc["PendingTelemetry"] =  countFiles(pendingTelemetryFolder);
-  doc["UptimeSeconds"] =  millis()/1000;
+  doc["BatteryPercent"] = 0;
+  doc["TemperatureC"] = 21;
+  doc["DiskSpaceFree"] = 0;
+  doc["PendingImages"] = countFiles(pendingImageFolder);
+  doc["PendingTelemetry"] = countFiles(pendingTelemetryFolder);
+  doc["UptimeSeconds"] = millis() / 1000;
 
   // doc['status']['batteryVoltage'] = Vbattf;
   // String status = "{\'status':\"OK\", \"batteryVoltage\":" + String(Vbattf) + "}";
@@ -255,7 +264,7 @@ void savePhoto() {
 
   char filename[100];
   char rtcTime[25];
-  
+
   DateTime now = PRTCnow();
   sprintf(rtcTime, YYYYMMDDHHMMSSFormatString, now.year(), now.month(), now.day(), now.hour(), now.minute(), now.second());
 
@@ -294,19 +303,19 @@ void savePhoto() {
 void writeFile(fs::FS &fs, const char *path, uint8_t *data, size_t len) {
   // Serial.printf("Writing file: %s\r\n", path);
 
-  if(!fs.exists(path)){
+  if (!fs.exists(path)) {
     // Get folder name of file
     char folder[100];
     strcpy(folder, path);
     char *lastSlash = strrchr(folder, '/');
     if (lastSlash != NULL) {
       *lastSlash = '\0';
-      if(!fs.exists(folder)){
+      if (!fs.exists(folder)) {
         fs.mkdir(folder);
       }
     }
   }
-  
+
   File file = fs.open(path, FILE_WRITE);
   if (!file) {
     logError("Failed to open file for writing");
@@ -407,13 +416,12 @@ void getNTPTime() {
     // Compare the time from the NTP server with the RTC time, and report the discrepancy in seconds.
     int timeDiscrepancy = PRTCnow().unixtime() - epochTime;
     if (abs(timeDiscrepancy) > 5) {
-      if(rtcPresent){
+      if (rtcPresent) {
         rtc.adjust(DateTime(currentYear, currentMonth, monthDay, ptm->tm_hour, ptm->tm_min, ptm->tm_sec));
         logMessage("Adjusted RTC...");
       } else {
         setPseudoRTC(epochTime);
         logMessage("Adjusted Pseudo RTC...");
-
       }
 
       logMessage("RTC/NTP Time discrepancy was %d seconds", timeDiscrepancy);
@@ -435,28 +443,28 @@ const int FileArraySize = 100;
 const int ImageFileBatchSize = 10;
 const int TelemetryFileBatchSize = 100;
 
-bool uploadPendingImages(){
+bool uploadPendingImages() {
   // returns true if all pending images have been uploaded.
   logMessage("uploadPendingImages()....");
 
   // Scan folder, retrieving most recent files first
-  String* sortedFiles = listAndSortFiles(pendingImageFolder);
+  String *sortedFiles = listAndSortFiles(pendingImageFolder);
   int filesUploaded = 0;
   int filesToUpload = 0;
 
   // Array will be 100 large, with empty entries if files don't exist.
-  for(int fileIndex = 0; fileIndex < FileArraySize; ++fileIndex){
-    if(sortedFiles[fileIndex].length()>0){
+  for (int fileIndex = 0; fileIndex < FileArraySize; ++fileIndex) {
+    if (sortedFiles[fileIndex].length() > 0) {
       ++filesToUpload;
     }
   }
 
-  for(int fileIndex = 0; fileIndex < FileArraySize && fileIndex < filesToUpload; ++fileIndex){
-    if(fileIndex>=ImageFileBatchSize){
+  for (int fileIndex = 0; fileIndex < FileArraySize && fileIndex < filesToUpload; ++fileIndex) {
+    if (fileIndex >= ImageFileBatchSize) {
       logMessage("Batch size: %d (%d files remaining)", ImageFileBatchSize, filesToUpload - fileIndex);
       break;
     } else {
-      logMessage("Uploading %d/%d...", fileIndex+1, filesToUpload);
+      logMessage("Uploading %d/%d...", fileIndex + 1, filesToUpload);
     }
 
     String pendingFilename = pendingImageFolder;
@@ -464,7 +472,7 @@ bool uploadPendingImages(){
     pendingFilename += sortedFiles[fileIndex];
 
     File file = SD.open(pendingFilename);
-    
+
     if (!file.isDirectory()) {
 
       // logMessage(file.name());
@@ -472,13 +480,13 @@ bool uploadPendingImages(){
       String boundary = "----WebKitFormBoundary" + String(random(0xFFFFFF), HEX);
 
       WiFiClientSecure client;
-      client.setInsecure(); // Disable SSL certificate verification
+      client.setInsecure();  // Disable SSL certificate verification
 
       if (!client.connect(serverName, port)) {
         Serial.println("Connection failed!");
         return false;
       }
-      
+
       String timestampString = file.name();
       // Serial.println(timestampString.c_str());
       timestampString.replace("_", "T");
@@ -497,7 +505,7 @@ bool uploadPendingImages(){
       // 01234567890123456789012345678901234567890123456789
       // 0000000000111111111122222222223333333333
 
-      timestampString = timestampString.substring(0, 13) + ":" + timestampString.substring(13, 15) + ":" + timestampString.substring(15, 17) + "Z";      
+      timestampString = timestampString.substring(0, 13) + ":" + timestampString.substring(13, 15) + ":" + timestampString.substring(15, 17) + "Z";
       // 2000-00-01T45:49:02.jpg
       // 01234567890123456789012345678901234567890123456789
       // 0000000000111111111122222222223333333333
@@ -506,14 +514,14 @@ bool uploadPendingImages(){
 
       // https://forum.arduino.cc/t/sending-video-avi-and-audio-wav-files-with-arduino-script-from-esp32s3-via-http-post-multipart-form-data-to-server/1234706
       // https://stackoverflow.com/questions/53264373/try-to-send-image-file-to-php-with-httpclient
-      
+
       String start_request = "--" + boundary + "\r\n";
       start_request += "Content-Disposition: form-data; name=\"SerialNumber\"\r\n\r\n";
-      start_request += MACAddress; 
+      start_request += MACAddress;
       start_request += "\r\n";
       start_request += "--" + boundary + "\r\n";
       start_request += "Content-Disposition: form-data; name=\"Timestamp\"\r\n\r\n";
-      start_request += timestampString; 
+      start_request += timestampString;
       start_request += "\r\n";
       start_request += "--" + boundary + "\r\n";
       start_request += "Content-Disposition: form-data; name=\"File\"; filename=\"";
@@ -552,11 +560,11 @@ bool uploadPendingImages(){
       while (client.connected() || client.available()) {
         if (client.available()) {
           String line = client.readStringUntil('\n');
-          if(line.indexOf("HTTP/1.1 200 OK") != -1){
+          if (line.indexOf("HTTP/1.1 200 OK") != -1) {
             okResponse = true;
             break;
           }
-          if(line.indexOf("HTTP/1.1 404 Not Found") != -1){
+          if (line.indexOf("HTTP/1.1 404 Not Found") != -1) {
             NotFoundResponse = true;
             break;
           }
@@ -565,7 +573,7 @@ bool uploadPendingImages(){
       }
       client.stop();
 
-      if(okResponse){
+      if (okResponse) {
         // Serial.println("Deleting file....");
         // Serial.println(pendingFilename);
         ++filesUploaded;
@@ -573,41 +581,40 @@ bool uploadPendingImages(){
           logError("Failed to delete file");
         }
       } else {
-        if(NotFoundResponse){
+        if (NotFoundResponse) {
           logMessage("404 - check device is registered.");
         } else {
           logMessage("Error sending data.");
         }
       }
-
     }
   }
 
   return filesUploaded == filesToUpload;
 }
 
-bool uploadPendingTelemetry(){
+bool uploadPendingTelemetry() {
   // returns true if all pending telemetry has been uploaded.
   logMessage("uploadPendingTelemetry()....");
 
   // Scan folder, retrieving most recent files first
-  String* sortedFiles = listAndSortFiles(pendingTelemetryFolder);
+  String *sortedFiles = listAndSortFiles(pendingTelemetryFolder);
   int filesUploaded = 0;
   int filesToUpload = 0;
 
   // Array will be 100 large, with empty entries if files don't exist.
-  for(int fileIndex = 0; fileIndex < FileArraySize; ++fileIndex){
-    if(sortedFiles[fileIndex].length()>0){
+  for (int fileIndex = 0; fileIndex < FileArraySize; ++fileIndex) {
+    if (sortedFiles[fileIndex].length() > 0) {
       ++filesToUpload;
     }
   }
 
-  for(int fileIndex = 0; fileIndex < FileArraySize && fileIndex < filesToUpload; ++fileIndex){
-    if(fileIndex>=TelemetryFileBatchSize){
+  for (int fileIndex = 0; fileIndex < FileArraySize && fileIndex < filesToUpload; ++fileIndex) {
+    if (fileIndex >= TelemetryFileBatchSize) {
       logMessage("Batch size: %d (%d files remaining)", TelemetryFileBatchSize, filesToUpload - fileIndex);
       break;
     } else {
-      logMessage("Uploading %d/%d...", fileIndex+1, filesToUpload);
+      logMessage("Uploading %d/%d...", fileIndex + 1, filesToUpload);
     }
 
     String pendingFilename = pendingTelemetryFolder;
@@ -617,7 +624,7 @@ bool uploadPendingTelemetry(){
     logMessage("pendingFilename: %s", pendingFilename.c_str());
 
     File file = SD.open(pendingFilename);
-    
+
     if (!file.isDirectory()) {
 
       // logMessage(file.name());
@@ -625,13 +632,13 @@ bool uploadPendingTelemetry(){
       String boundary = "----WebKitFormBoundary" + String(random(0xFFFFFF), HEX);
 
       WiFiClientSecure client;
-      client.setInsecure(); // Disable SSL certificate verification
+      client.setInsecure();  // Disable SSL certificate verification
 
       if (!client.connect(serverName, port)) {
         Serial.println("Connection failed!");
         return false;
       }
-      
+
       String timestampString = file.name();
       // Serial.println(timestampString.c_str());
       timestampString.replace("_", "T");
@@ -652,7 +659,7 @@ bool uploadPendingTelemetry(){
       // 0000000000111111111122222222223333333333
       // ------------- -- --Z
 
-      timestampString = timestampString.substring(0, 13) + ":" + timestampString.substring(13, 15) + ":" + timestampString.substring(15, 17) + "Z";      
+      timestampString = timestampString.substring(0, 13) + ":" + timestampString.substring(13, 15) + ":" + timestampString.substring(15, 17) + "Z";
       // Serial.println(timestampString);
       // Serial.println(timestampString);
 
@@ -669,25 +676,43 @@ bool uploadPendingTelemetry(){
       String BatteryPercent = doc["BatteryPercent"];
 
       String payload = "--" + boundary + "\r\n"
-                     "Content-Disposition: form-data; name=\"PendingTelemetry\"\r\n\r\n" + PendingTelemetry + "\r\n"
-                     "--" + boundary + "\r\n"
-                     "Content-Disposition: form-data; name=\"TemperatureC\"\r\n\r\n" + TemperatureC + "\r\n"
-                     "--" + boundary + "\r\n"
-                     "Content-Disposition: form-data; name=\"PendingImages\"\r\n\r\n" + PendingImages + "\r\n"
-                     "--" + boundary + "\r\n"
-                    //  "Content-Disposition: form-data; name=\"Status\"\r\n\r\n{\"status\":\"OK\", \"batteryVoltage\":" + doc["batteryVoltage"] + "}\r\n"
-                     "Content-Disposition: form-data; name=\"Status\"\r\n\r\n" + Status + "\r\n"
-                     "--" + boundary + "\r\n"
-                     "Content-Disposition: form-data; name=\"DiskSpaceFree\"\r\n\r\n" + DiskSpaceFree + "\r\n"
-                     "--" + boundary + "\r\n"
-                     "Content-Disposition: form-data; name=\"Timestamp\"\r\n\r\n" + timestampString + "\r\n"
-                     "--" + boundary + "\r\n"
-                     "Content-Disposition: form-data; name=\"UptimeSeconds\"\r\n\r\n" + UptimeSeconds + "\r\n"
-                     "--" + boundary + "\r\n"
-                     "Content-Disposition: form-data; name=\"BatteryPercent\"\r\n\r\n" + BatteryPercent + "\r\n"
-                     "--" + boundary + "\r\n"
-                     "Content-Disposition: form-data; name=\"SerialNumber\"\r\n\r\n" + MACAddress + "\r\n"
-                     "--" + boundary + "--\r\n";
+                                         "Content-Disposition: form-data; name=\"PendingTelemetry\"\r\n\r\n"
+                       + PendingTelemetry + "\r\n"
+                                            "--"
+                       + boundary + "\r\n"
+                                    "Content-Disposition: form-data; name=\"TemperatureC\"\r\n\r\n"
+                       + TemperatureC + "\r\n"
+                                        "--"
+                       + boundary + "\r\n"
+                                    "Content-Disposition: form-data; name=\"PendingImages\"\r\n\r\n"
+                       + PendingImages + "\r\n"
+                                         "--"
+                       + boundary + "\r\n"
+                                    //  "Content-Disposition: form-data; name=\"Status\"\r\n\r\n{\"status\":\"OK\", \"batteryVoltage\":" + doc["batteryVoltage"] + "}\r\n"
+                                    "Content-Disposition: form-data; name=\"Status\"\r\n\r\n"
+                       + Status + "\r\n"
+                                  "--"
+                       + boundary + "\r\n"
+                                    "Content-Disposition: form-data; name=\"DiskSpaceFree\"\r\n\r\n"
+                       + DiskSpaceFree + "\r\n"
+                                         "--"
+                       + boundary + "\r\n"
+                                    "Content-Disposition: form-data; name=\"Timestamp\"\r\n\r\n"
+                       + timestampString + "\r\n"
+                                           "--"
+                       + boundary + "\r\n"
+                                    "Content-Disposition: form-data; name=\"UptimeSeconds\"\r\n\r\n"
+                       + UptimeSeconds + "\r\n"
+                                         "--"
+                       + boundary + "\r\n"
+                                    "Content-Disposition: form-data; name=\"BatteryPercent\"\r\n\r\n"
+                       + BatteryPercent + "\r\n"
+                                          "--"
+                       + boundary + "\r\n"
+                                    "Content-Disposition: form-data; name=\"SerialNumber\"\r\n\r\n"
+                       + MACAddress + "\r\n"
+                                      "--"
+                       + boundary + "--\r\n";
 
       // Serial.print(payload.c_str());
       file.close();
@@ -709,15 +734,15 @@ bool uploadPendingTelemetry(){
       while (client.connected() || client.available()) {
         if (client.available()) {
           String line = client.readStringUntil('\n');
-          if(line.indexOf("HTTP/1.1 200 OK") != -1){
+          if (line.indexOf("HTTP/1.1 200 OK") != -1) {
             okResponse = true;
             break;
           }
-          if(line.indexOf("HTTP/1.1 404 Not Found") != -1){
+          if (line.indexOf("HTTP/1.1 404 Not Found") != -1) {
             NotFoundResponse = true;
             break;
           }
-          if(line.indexOf("HTTP/1.1 302 Found") != -1){
+          if (line.indexOf("HTTP/1.1 302 Found") != -1) {
             okResponse = true;
             // logMessage("Got 302 rather than 200 - not sure why?");
             break;
@@ -727,7 +752,7 @@ bool uploadPendingTelemetry(){
       }
       client.stop();
 
-      if(okResponse){
+      if (okResponse) {
         // Delete the file
         // Serial.println("Deleting file....");
         // Serial.println(pendingFilename);
@@ -737,13 +762,12 @@ bool uploadPendingTelemetry(){
           logError("Failed to delete file");
         }
       } else {
-        if(NotFoundResponse){
+        if (NotFoundResponse) {
           logMessage("404 - check device is registered.");
         } else {
           logMessage("Error sending data.");
         }
       }
-
     }
     // file = root.openNextFile();
   }
@@ -752,12 +776,12 @@ bool uploadPendingTelemetry(){
   return filesUploaded == filesToUpload;
 }
 
-String* listAndSortFiles(const char* folder) {
+String *listAndSortFiles(const char *folder) {
   const int maxFiles = FileArraySize;
-  String* filenames = new String[maxFiles];
+  String *filenames = new String[maxFiles];
   int fileCount = 0;
 
-  if(!SD.exists(folder)){
+  if (!SD.exists(folder)) {
     SD.mkdir(folder);
   }
 
@@ -799,9 +823,9 @@ String* listAndSortFiles(const char* folder) {
   return filenames;
 }
 
-int countFiles(const char* folder) {
+int countFiles(const char *folder) {
 
-  if(!SD.exists(folder)){
+  if (!SD.exists(folder)) {
     SD.mkdir(folder);
   }
 
@@ -831,16 +855,18 @@ int countFiles(const char* folder) {
 
 void logRTC() {
   // if(rtcPresent){
-    DateTime now = PRTCnow();
-    char rtcTime[25];
-    sprintf(rtcTime, ISO8061FormatString, now.year(), now.month(), now.day(), now.hour(), now.minute(), now.second());
-    logMessage("RTC Time: %s", rtcTime);
+  DateTime now = PRTCnow();
+  char rtcTime[25];
+  sprintf(rtcTime, ISO8061FormatString, now.year(), now.month(), now.day(), now.hour(), now.minute(), now.second());
+  logMessage("RTC Time: %s", rtcTime);
   // }
 }
 
 void setup() {
 
   pinMode(LED_BUILTIN, OUTPUT);
+  pinMode(TPL5110_Reset_PIN, OUTPUT);
+  digitalWrite(TPL5110_Reset_PIN, LOW);
 
   Serial.begin(115200);
   // while(!Serial); // When the serial monitor is turned on, the program starts to execute
@@ -855,21 +881,25 @@ void setup() {
   // u8x8log.setRedrawMode(0);		// 0: Update screen with newline, 1: Update screen for every char
   u8x8log.setRedrawMode(1);  // 0: Update screen with newline, 1: Update screen for every char
 
+  Wire.begin();
 
   // displayMessage("Checking RTC");
   if (!rtc.begin()) {
-    rtcPresent=false;
+    rtcPresent = false;
     logError("Couldn't find RTC");
     // while (1) delay(10);
   } else {
-    logMessage("Setting PseduoRTC from expected bootTime...");
-    rtc.adjust(getPseudoRTCNow());
-    logMessage("Adjusted RTC with pseudo real time.");
+    if(rtc.now().year()>2050 || rtc.now().year()<2020 || rtc.now().hour()>23){
+      // RTC not working correctly - let's behave as if it's not present
+      logError("Found RTC, but it's returning incorrect date");
+      rtcPresent = false;
+    }
+
+    displayMessage("RTC present and correct");
   }
 
   logRTC();
-
-
+  logMessage("TPL5110_Reset_PIN: %d", TPL5110_Reset_PIN);
 
   // Initialize SD card
   if (!SD.begin(21)) {
@@ -912,11 +942,25 @@ void setup() {
   logRTC();
   logMessage("SD Card mounted");
 
+  bootTime = getCounter(counterFilenameBoot);
+
+  if(!rtcPresent){
+    logMessage("Setting PseduoRTC from expected bootTime...");
+    rtc.adjust(getPseudoRTCNow());
+    logMessage("Adjusted RTC with pseudo real time.");
+  }
+
+
+  logRTC();
+
+
   // logMessage("sID: %s", sID);
   sprintf(MACAddress, "%012llx", ESP.getEfuseMac());
 
+  int bootCount = getCounter(counterFilenameBoot);
+
   if (bootCount % 5 == 0) {
-    if(wifiConnect()){
+    if (wifiConnect()) {
       getNTPTime();
       uploadPendingImages();
       uploadPendingTelemetry();
@@ -931,6 +975,8 @@ void setup() {
 
   ++bootCount;
   logMessage("Boot number: %d", bootCount);
+
+  updateCounter(counterFilenameBoot, bootCount);
 
   // logMessage("Starting up %'d", millis());
 
@@ -968,7 +1014,7 @@ void setup() {
   config.fb_count = 1;
 
   // Getting lots of "Failed to get camera frame buffer" errors?
-  config.xclk_freq_hz = 5000000; // Clock too high resulting in grainy/noisy image? https://github.com/espressif/esp32-camera/issues/172
+  config.xclk_freq_hz = 5000000;  // Clock too high resulting in grainy/noisy image? https://github.com/espressif/esp32-camera/issues/172
   config.frame_size = FRAMESIZE_VGA;
 
   // if PSRAM IC present, init with UXGA resolution and higher JPEG quality
@@ -1002,12 +1048,12 @@ void setup() {
     return;
   }
 
-  sensor_t * s = esp_camera_sensor_get();
+  sensor_t *s = esp_camera_sensor_get();
   // initial sensors are flipped vertically and colors are a bit saturated
   if (s->id.PID == OV3660_PID || s->id.PID == OV5640_PID) {
-    s->set_vflip(s, 1); // flip it back
-    s->set_brightness(s, 1); // up the brightness just a bit
-    s->set_saturation(s, -2); // lower the saturation
+    s->set_vflip(s, 1);        // flip it back
+    s->set_brightness(s, 1);   // up the brightness just a bit
+    s->set_saturation(s, -2);  // lower the saturation
   }
 
   camera_sign = true;  // Camera initialization check passes
@@ -1045,15 +1091,6 @@ void enableWakeupAndGoToSleep() {
 
 #endif
 
-
-
-  // Timer Sleep:
-  esp_sleep_enable_timer_wakeup(TIME_TO_SLEEP * uS_TO_S_FACTOR);
-  // logMessage("Setup ESP32 to sleep for  " + String(TIME_TO_SLEEP) + " Seconds");
-
-  // External wakeup - RTC:
-  esp_sleep_enable_ext0_wakeup(GPIO_NUM_33,1); //1 = High, 0 = Low
-
   logMessage("Going to sleep now");
   logRTC();
   Serial.flush();
@@ -1062,15 +1099,31 @@ void enableWakeupAndGoToSleep() {
   delay(500);
   digitalWrite(LED_BUILTIN, HIGH);
 
-  if (enableSleep) {
-    DateTime expectedWakeup = PRTCnow();
-    TimeSpan spanToSleep = TimeSpan(TIME_TO_SLEEP);
-    expectedWakeup = expectedWakeup + spanToSleep;
-    // setPseudoRTC(expectedWakeup.unixtime());
-    bootTime=expectedWakeup.unixtime();
-    esp_deep_sleep_start();
+  if (TPL5110) {
+    // set pin D1 to high
+    digitalWrite(TPL5110_Reset_PIN, HIGH);
+    // delay(10);
+    digitalWrite(TPL5110_Reset_PIN, LOW);
+
   } else {
-    logMessage("enableSleep = false - not sleeping");
+    // Timer Sleep:
+    esp_sleep_enable_timer_wakeup(TIME_TO_SLEEP * uS_TO_S_FACTOR);
+    // logMessage("Setup ESP32 to sleep for  " + String(TIME_TO_SLEEP) + " Seconds");
+
+    // External wakeup - RTC:
+    esp_sleep_enable_ext0_wakeup(GPIO_NUM_33, 1);  //1 = High, 0 = Low
+
+    if (enableSleep) {
+      DateTime expectedWakeup = PRTCnow();
+      TimeSpan spanToSleep = TimeSpan(TIME_TO_SLEEP);
+      expectedWakeup = expectedWakeup + spanToSleep;
+      // setPseudoRTC(expectedWakeup.unixtime());
+      bootTime = expectedWakeup.unixtime();
+      updateCounter(counterFilenameBoot, bootTime);
+      esp_deep_sleep_start();
+    } else {
+      logMessage("enableSleep = false - not sleeping");
+    }
   }
 }
 
