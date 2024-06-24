@@ -900,10 +900,15 @@ void setup() {
     logError("Couldn't find RTC");
     // while (1) delay(10);
   } else {
-    if(rtc.now().year()>2050 || rtc.now().year()<2020 || rtc.now().hour()>23){
-      // RTC not working correctly - let's behave as if it's not present
-      logError("Found RTC, but it's returning incorrect date");
+    if(rtc.lostPower()){
+      logError("Found RTC but it has lost power.");
       rtcPresent = false;
+    } else {
+      if(rtc.now().year()>2050 || rtc.now().year()<2020 || rtc.now().hour()>23){
+        // RTC not working correctly - let's behave as if it's not present
+        logError("Found RTC, but it's returning incorrect date");
+        rtcPresent = false;
+      }
     }
 
     displayMessage("RTC present and correct");
@@ -1106,6 +1111,13 @@ void enableWakeupAndGoToSleep() {
   logRTC();
   Serial.flush();
 
+  DateTime expectedWakeup = PRTCnow();  
+  TimeSpan spanToSleep = TimeSpan(TIME_TO_SLEEP);
+  expectedWakeup = expectedWakeup + spanToSleep;
+  // setPseudoRTC(expectedWakeup.unixtime());
+  bootTime = expectedWakeup.unixtime();
+  updateCounter(counterFilenameBoot, bootTime);
+
   digitalWrite(LED_BUILTIN, LOW);  // XIAO ESP32S3 LOW = on
   delay(500);
   digitalWrite(LED_BUILTIN, HIGH);
@@ -1125,12 +1137,6 @@ void enableWakeupAndGoToSleep() {
     esp_sleep_enable_ext0_wakeup(GPIO_NUM_33, 1);  //1 = High, 0 = Low
 
     if (enableSleep) {
-      DateTime expectedWakeup = PRTCnow();
-      TimeSpan spanToSleep = TimeSpan(TIME_TO_SLEEP);
-      expectedWakeup = expectedWakeup + spanToSleep;
-      // setPseudoRTC(expectedWakeup.unixtime());
-      bootTime = expectedWakeup.unixtime();
-      updateCounter(counterFilenameBoot, bootTime);
       esp_deep_sleep_start();
     } else {
       logMessage("enableSleep = false - not sleeping");
