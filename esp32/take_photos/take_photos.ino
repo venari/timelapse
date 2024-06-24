@@ -48,7 +48,8 @@ NTPClient timeClient(ntpUDP, "pool.ntp.org");
 #endif
 
 
-RTC_PCF8563 rtc;
+// RTC_PCF8563 rtc;
+RTC_DS1307 rtc;
 
 // RTC_DATA_ATTR int bootCount = 0;
 time_t bootTime = 0;
@@ -900,9 +901,9 @@ void setup() {
     logError("Couldn't find RTC");
     // while (1) delay(10);
   } else {
-    if(rtc.lostPower()){
-      logError("Found RTC but it has lost power.");
-      rtcPresent = false;
+    if(!rtc.isrunning()){
+      logError("Found RTC but it is not running.");
+      rtcPresent = true;
     } else {
       if(rtc.now().year()>2050 || rtc.now().year()<2020 || rtc.now().hour()>23){
         // RTC not working correctly - let's behave as if it's not present
@@ -914,7 +915,7 @@ void setup() {
     displayMessage("RTC present and correct");
   }
 
-  logRTC();
+  // logRTC();
   // logMessage("TPL5110_Reset_PIN: %d", TPL5110_Reset_PIN);
 
   // Initialize SD card
@@ -955,10 +956,10 @@ void setup() {
 
   sd_sign = true;  // sd initialization check passes
   // logMessage("SD Card mounted %'d", millis());
-  logRTC();
+  // logRTC();
   // logMessage("SD Card mounted");
 
-  bootTime = getCounter(counterFilenameBoot);
+  bootTime = getCounter(counterFilenameBootTime);
 
   if(!rtcPresent){
     logMessage("Setting PseduoRTC from expected bootTime...");
@@ -1116,7 +1117,7 @@ void enableWakeupAndGoToSleep() {
   expectedWakeup = expectedWakeup + spanToSleep;
   // setPseudoRTC(expectedWakeup.unixtime());
   bootTime = expectedWakeup.unixtime();
-  updateCounter(counterFilenameBoot, bootTime);
+  updateCounter(counterFilenameBootTime, bootTime);
 
   digitalWrite(LED_BUILTIN, LOW);  // XIAO ESP32S3 LOW = on
   delay(500);
