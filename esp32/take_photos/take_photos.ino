@@ -52,9 +52,7 @@ NTPClient timeClient(ntpUDP, "pool.ntp.org");
 RTC_DS1307 rtc;
 
 // RTC_DATA_ATTR int bootCount = 0;
-time_t bootTime = 0;
 
-bool rtcPresent = true;
 touch_pad_t touchPin;
 
 const bool enableSleep = true;
@@ -70,12 +68,10 @@ int telemetryCounter = 1;
 bool camera_sign = false;  // Check camera status
 bool sd_sign = false;      // Check sd status
 const char *counterFilenameBoot = "/counterBoot";
-const char *counterFilenameBootTime = "/counterBootTime";
 const char *counterFilenameImages = "/counterImages";
 const char *counterFilenamePendingImages = "/counterPendingImages";
 const char *counterFilenameTelemetry = "/counterTelemetry";
 const char *counterFilenamePendingTelemetry = "/counterPendingTelemetry";
-// const char *bootTimeFilename = "/bootTime";
 const char *logFilename = "/log.txt";
 
 const char *pendingImageFolder = "/pendingImages";
@@ -168,49 +164,13 @@ int getCounter(const char *counterFilename) {
   return count;
 }
 
-
-void setPseudoRTC(time_t timeNow) {
-  // Update the time we booted from NTP
-  // logMessage("setPseudoRTC()");
-  // logMessage("timeNow: %d", timeNow);
-  // logMessage("millis: %d", millis());
-  bootTime = timeNow - millis() / 1000;
-  updateCounter(counterFilenameBoot, bootTime);
-  
-  // logMessage("bootTime: %d", bootTime);
-}
-
-time_t getPseudoRTC() {
-  // logMessage("getPseudoRTC()");
-  // logMessage("bootTime: %d", bootTime);
-  // logMessage("millis(): %d", millis());
-  return bootTime + millis() / 1000;
-}
-
-DateTime PRTCnow() {
-  if (rtcPresent) {
-    return rtc.now();
-  } else {
-    return getPseudoRTCNow();
-  }
-}
-
-DateTime getPseudoRTCNow() {
-  time_t pseudoRTC = getPseudoRTC();
-  // logMessage("pseudoRTC: %d", pseudoRTC);
-  DateTime pseudoRTCNow = DateTime(pseudoRTC);
-
-  return pseudoRTCNow;
-}
-
-
 void saveTelemetry() {
 
   // displayMessage("saveTelemetry()...");
   char filename[100];
   char rtcTime[25];
 
-  DateTime now = PRTCnow();
+  DateTime now = rtc.now();
   sprintf(rtcTime, YYYYMMDDHHMMSSFormatString, now.year(), now.month(), now.day(), now.hour(), now.minute(), now.second());
 
   sprintf(filename, "%s/telemetry.%08d.%s.json", pendingTelemetryFolder, telemetryCounter, rtcTime);
@@ -266,7 +226,7 @@ void savePhoto() {
   char filename[100];
   char rtcTime[25];
 
-  DateTime now = PRTCnow();
+  DateTime now = rtc.now();
   sprintf(rtcTime, YYYYMMDDHHMMSSFormatString, now.year(), now.month(), now.day(), now.hour(), now.minute(), now.second());
 
   sprintf(filename, "%s/image.%08d.%s.jpg", pendingImageFolder, imageCounter, rtcTime);
@@ -415,22 +375,10 @@ void getNTPTime() {
     // DateTime now = rtc.now();
 
     // Compare the time from the NTP server with the RTC time, and report the discrepancy in seconds.
-    int timeDiscrepancy = PRTCnow().unixtime() - epochTime;
+    int timeDiscrepancy = rtc.now().unixtime() - epochTime;
     if (abs(timeDiscrepancy) > 5) {
-      if (rtcPresent) {
         rtc.adjust(DateTime(currentYear, currentMonth, monthDay, ptm->tm_hour, ptm->tm_min, ptm->tm_sec));
-        logMessage("Adjusted RTC...");
-      } else {
-        setPseudoRTC(epochTime);
-        logMessage("Adjusted Pseudo RTC...");
-      }
-
-      // logMessage("RTC/NTP Time discrepancy was %d seconds", timeDiscrepancy);
-
-      // DateTime now = rtc.now();
-      // char rtcTime[25];
-      // sprintf(rtcTime, ISO8061FormatString, now.year(), now.month(), now.day(), now.hour(), now.minute(), now.second());
-      // logMessage("Updated RTC Time: %s", rtcTime);
+        logMessage("RTC/NTP Time discrepancy was %d seconds", timeDiscrepancy);
       logMessage("Updated RTC Time:");
       logRTC();
     }
@@ -866,8 +814,7 @@ int countFiles(const char *folder) {
 }
 
 void logRTC() {
-  // if(rtcPresent){
-  DateTime now = PRTCnow();
+  DateTime now = rtc.now();
   char rtcTime[25];
   sprintf(rtcTime, ISO8061FormatString, now.year(), now.month(), now.day(), now.hour(), now.minute(), now.second());
   logMessage("RTC Time: %s", rtcTime);
@@ -897,26 +844,19 @@ void setup() {
 
   // displayMessage("Checking RTC");
   if (!rtc.begin()) {
-    rtcPresent = false;
     logError("Couldn't find RTC");
-    // while (1) delay(10);
+    logError("We can't carry on :-(");
+    while (1) delay(10);
   } else {
     if(!rtc.isrunning()){
       logError("Found RTC but it is not running.");
-      rtcPresent = true;
     } else {
       if(rtc.now().year()>2050 || rtc.now().year()<2020 || rtc.now().hour()>23){
         // RTC not working correctly - let's behave as if it's not present
         logError("Found RTC, but it's returning incorrect date");
-        rtcPresent = false;
       }
     }
-
-    displayMessage("RTC present and correct");
   }
-
-  // logRTC();
-  // logMessage("TPL5110_Reset_PIN: %d", TPL5110_Reset_PIN);
 
   // Initialize SD card
   if (!SD.begin(21)) {
@@ -958,15 +898,6 @@ void setup() {
   // logMessage("SD Card mounted %'d", millis());
   // logRTC();
   // logMessage("SD Card mounted");
-
-  bootTime = getCounter(counterFilenameBootTime);
-
-  if(!rtcPresent){
-    logMessage("Setting PseduoRTC from expected bootTime...");
-    rtc.adjust(getPseudoRTCNow());
-    logMessage("Adjusted RTC with pseudo real time.");
-  }
-
 
   logRTC();
 
@@ -1111,13 +1042,6 @@ void enableWakeupAndGoToSleep() {
   logMessage("Going to sleep now");
   logRTC();
   Serial.flush();
-
-  DateTime expectedWakeup = PRTCnow();  
-  TimeSpan spanToSleep = TimeSpan(TIME_TO_SLEEP);
-  expectedWakeup = expectedWakeup + spanToSleep;
-  // setPseudoRTC(expectedWakeup.unixtime());
-  bootTime = expectedWakeup.unixtime();
-  updateCounter(counterFilenameBootTime, bootTime);
 
   digitalWrite(LED_BUILTIN, LOW);  // XIAO ESP32S3 LOW = on
   delay(500);
