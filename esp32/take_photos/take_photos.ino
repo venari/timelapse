@@ -15,6 +15,7 @@
 #include <Adafruit_NeoPixel.h>
 
 #define CAMERA_MODEL_XIAO_ESP32S3  // Has PSRAM
+#define WAVESHARE_ESP32_S3_SIM7670G_4G // Waveshare board
 
 #include "camera_pins.h"
 #include "arduino_secrets.h"
@@ -68,7 +69,7 @@ Adafruit_NeoPixel strip = Adafruit_NeoPixel(1, 38, NEO_GRB + NEO_KHZ800);
 touch_pad_t touchPin;
 
 const bool enableSleep = true;
-const bool TPL5110 = true;
+const bool TPL5110 = false;
 const int TPL5110_Reset_PIN = Y9_GPIO_NUM;
 
 unsigned long lastCaptureTime = 0;  // Last shooting time
@@ -155,7 +156,7 @@ void updateCounter(const char *counterFilename, int count) {
 
   File file = SD_MMC.open(counterFilename, FILE_WRITE);
   if (!file) {
-    logMessage("Failed to open counter file for writing");
+    Serial.printf("Failed to open counter file for writing");
     return;
   }
   if (file.print(count)) {
@@ -168,7 +169,7 @@ void updateCounter(const char *counterFilename, int count) {
 int getCounter(const char *counterFilename) {
   File file = SD_MMC.open(counterFilename);
   if (!file) {
-    logMessage("Failed to open counter %s file for reading", counterFilename);
+    Serial.printf("Failed to open counter %s file for reading", counterFilename);
     return 0;
   }
   int count = file.parseInt();
@@ -186,7 +187,7 @@ void saveTelemetry() {
   sprintf(rtcTime, YYYYMMDDHHMMSSFormatString, now.year(), now.month(), now.day(), now.hour(), now.minute(), now.second());
 
   sprintf(filename, "%s/telemetry.%08d.%s.json", pendingTelemetryFolder, telemetryCounter, rtcTime);
-  // logMessage("Telemetry filename: %s", filename);
+  // Serial.printf("Telemetry filename: %s", filename);
 
   digitalWrite(LED_BUILTIN, LOW);  // XIAO ESP32S3 LOW = on
 
@@ -223,17 +224,19 @@ void saveTelemetry() {
   File file = SD_MMC.open(filename, FILE_WRITE);
   String strJSON;
   serializeJsonPretty(doc, strJSON);
-  // logMessage("strJSON");
-  // logMessage(strJSON.c_str());
+  // Serial.printf("strJSON");
+  // Serial.printf(strJSON.c_str());
   file.print(strJSON);
 
   digitalWrite(LED_BUILTIN, HIGH);
 
-  // logMessage("Saved telemetry: %s\r\n", filename);
+  // Serial.printf("Saved telemetry: %s\r\n", filename);
   updateCounter(counterFilenameTelemetry, ++telemetryCounter);
 }
 
 void savePhoto() {
+
+  Serial.printf("savePhoto()");
 
   char filename[100];
   char rtcTime[25];
@@ -242,12 +245,12 @@ void savePhoto() {
   sprintf(rtcTime, YYYYMMDDHHMMSSFormatString, now.year(), now.month(), now.day(), now.hour(), now.minute(), now.second());
 
   sprintf(filename, "%s/image.%08d.%s.jpg", pendingImageFolder, imageCounter, rtcTime);
-  // logMessage("Save Photo filename: %s", filename);
+  Serial.printf("Save Photo filename: %s", filename);
 
 
   // Serial.println("Starting photo_save()");
   digitalWrite(LED_BUILTIN, LOW);  // XIAO ESP32S3 LOW = on
-  // logMessage("Taking photo... %5d", millis());
+  Serial.printf("Taking photo... %5d\n", millis());
   // delay(500);
 
   camera_fb_t *fb = esp_camera_fb_get();
@@ -256,19 +259,19 @@ void savePhoto() {
     return;
   }
 
-  // logMessage("Writing file... %5d", millis());
-  // logMessage("Writing file...", millis());
+  Serial.printf("Writing file... %5d\n", millis());
+  // Serial.printf("Writing file...", millis());
   // Save photo to file
   writeFile(SD_MMC, filename, fb->buf, fb->len);
-  // logMessage("File written %5d", millis());
+  Serial.printf("File written %5d", millis());
 
   // Release image buffer
   esp_camera_fb_return(fb);
-  // logMessage("image buffer released %5d", millis());
+  Serial.printf("image buffer released %5d\n", millis());
 
   digitalWrite(LED_BUILTIN, HIGH);
 
-  // logMessage("Saved picture: %s\r\n", filename);
+  Serial.printf("Saved picture: %s\r\n", filename);
   updateCounter(counterFilenameImages, ++imageCounter);
 }
 
@@ -308,12 +311,12 @@ void print_wakeup_reason() {
   wakeup_reason = esp_sleep_get_wakeup_cause();
 
   switch (wakeup_reason) {
-    case ESP_SLEEP_WAKEUP_EXT0: logMessage("Wakeup caused by external signal using RTC_IO"); break;
-    case ESP_SLEEP_WAKEUP_EXT1: logMessage("Wakeup caused by external signal using RTC_CNTL"); break;
-    case ESP_SLEEP_WAKEUP_TIMER: logMessage("Wakeup caused by timer"); break;
-    case ESP_SLEEP_WAKEUP_TOUCHPAD: logMessage("Wakeup caused by touchpad"); break;
-    case ESP_SLEEP_WAKEUP_ULP: logMessage("Wakeup caused by ULP program"); break;
-    default: logMessage("Wakeup was not caused by deep sleep: %d\n", wakeup_reason); break;
+    case ESP_SLEEP_WAKEUP_EXT0: Serial.printf("Wakeup caused by external signal using RTC_IO"); break;
+    case ESP_SLEEP_WAKEUP_EXT1: Serial.printf("Wakeup caused by external signal using RTC_CNTL"); break;
+    case ESP_SLEEP_WAKEUP_TIMER: Serial.printf("Wakeup caused by timer"); break;
+    case ESP_SLEEP_WAKEUP_TOUCHPAD: Serial.printf("Wakeup caused by touchpad"); break;
+    case ESP_SLEEP_WAKEUP_ULP: Serial.printf("Wakeup caused by ULP program"); break;
+    default: Serial.printf("Wakeup was not caused by deep sleep: %d\n", wakeup_reason); break;
   }
 }
 
@@ -322,31 +325,31 @@ void print_wakeup_touchpad() {
 
 #if CONFIG_IDF_TARGET_ESP32
   switch (touchPin) {
-    case 0: logMessage("Touch detected on GPIO 4"); break;
-    case 1: logMessage("Touch detected on GPIO 0"); break;
-    case 2: logMessage("Touch detected on GPIO 2"); break;
-    case 3: logMessage("Touch detected on GPIO 15"); break;
-    case 4: logMessage("Touch detected on GPIO 13"); break;
-    case 5: logMessage("Touch detected on GPIO 12"); break;
-    case 6: logMessage("Touch detected on GPIO 14"); break;
-    case 7: logMessage("Touch detected on GPIO 27"); break;
-    case 8: logMessage("Touch detected on GPIO 33"); break;
-    case 9: logMessage("Touch detected on GPIO 32"); break;
-    default: logMessage("Wakeup not by touchpad"); break;
+    case 0: Serial.printf("Touch detected on GPIO 4"); break;
+    case 1: Serial.printf("Touch detected on GPIO 0"); break;
+    case 2: Serial.printf("Touch detected on GPIO 2"); break;
+    case 3: Serial.printf("Touch detected on GPIO 15"); break;
+    case 4: Serial.printf("Touch detected on GPIO 13"); break;
+    case 5: Serial.printf("Touch detected on GPIO 12"); break;
+    case 6: Serial.printf("Touch detected on GPIO 14"); break;
+    case 7: Serial.printf("Touch detected on GPIO 27"); break;
+    case 8: Serial.printf("Touch detected on GPIO 33"); break;
+    case 9: Serial.printf("Touch detected on GPIO 32"); break;
+    default: Serial.printf("Wakeup not by touchpad"); break;
   }
 #else
   if (touchPin < TOUCH_PAD_MAX) {
-    logMessage("Touch detected on GPIO %d\n", touchPin);
+    Serial.printf("Touch detected on GPIO %d\n", touchPin);
   } else {
-    logMessage("Wakeup not by touchpad");
+    Serial.printf("Wakeup not by touchpad");
   }
 #endif
 }
 
 bool wifiConnect() {
-  logMessage("WiFi connecting");
-  logMessage(ssid);
-  // logMessage(password);
+  Serial.printf("WiFi connecting");
+  Serial.printf(ssid);
+  // Serial.printf(password);
 
   int wifiConnectTries = 0;
 
@@ -361,7 +364,7 @@ bool wifiConnect() {
     logError("WiFi connection failed");
     return false;
   } else {
-    logMessage("WiFi connected");
+    Serial.printf("WiFi connected");
     return true;
   }
 }
@@ -390,8 +393,8 @@ void getNTPTime() {
     int timeDiscrepancy = rtc.now().unixtime() - epochTime;
     if (abs(timeDiscrepancy) > 5) {
         rtc.adjust(DateTime(currentYear, currentMonth, monthDay, ptm->tm_hour, ptm->tm_min, ptm->tm_sec));
-        logMessage("RTC/NTP Time discrepancy was %d seconds", timeDiscrepancy);
-      logMessage("Updated RTC Time:");
+        Serial.printf("RTC/NTP Time discrepancy was %d seconds", timeDiscrepancy);
+      Serial.printf("Updated RTC Time:");
       logRTC();
     }
 
@@ -406,7 +409,7 @@ const int TelemetryFileBatchSize = 100;
 
 bool uploadPendingImages() {
   // returns true if all pending images have been uploaded.
-  logMessage("uploadPendingImages()");
+  Serial.printf("uploadPendingImages()");
 
   // Scan folder, retrieving most recent files first
   String *sortedFiles = listAndSortFiles(pendingImageFolder);
@@ -420,14 +423,14 @@ bool uploadPendingImages() {
     }
   }
 
-  logMessage("Uploading: %d images", filesToUpload);
+  Serial.printf("Uploading: %d images", filesToUpload);
 
   for (int fileIndex = 0; fileIndex < FileArraySize && fileIndex < filesToUpload; ++fileIndex) {
     if (fileIndex >= ImageFileBatchSize) {
-      logMessage("Batch size: %d (%d files remaining)", ImageFileBatchSize, filesToUpload - fileIndex);
+      Serial.printf("Batch size: %d (%d files remaining)", ImageFileBatchSize, filesToUpload - fileIndex);
       break;
     } else {
-      // logMessage("Uploading %d/%d...", fileIndex + 1, filesToUpload);
+      // Serial.printf("Uploading %d/%d...", fileIndex + 1, filesToUpload);
       displayMessageNoNewline(".");
     }
 
@@ -439,7 +442,7 @@ bool uploadPendingImages() {
 
     if (!file.isDirectory()) {
 
-      // logMessage(file.name());
+      // Serial.printf(file.name());
 
       String boundary = "----WebKitFormBoundary" + String(random(0xFFFFFF), HEX);
 
@@ -546,9 +549,9 @@ bool uploadPendingImages() {
         }
       } else {
         if (NotFoundResponse) {
-          logMessage("404 - check device is registered.");
+          Serial.printf("404 - check device is registered.");
         } else {
-          logMessage("Error sending data.");
+          Serial.printf("Error sending data.");
 
           // TO DO - reject file here probably
         }
@@ -561,7 +564,7 @@ bool uploadPendingImages() {
 
 bool uploadPendingTelemetry() {
   // returns true if all pending telemetry has been uploaded.
-  // logMessage("uploadPendingTelemetry()....");
+  // Serial.printf("uploadPendingTelemetry()....");
 
   // Scan folder, retrieving most recent files first
 
@@ -578,14 +581,14 @@ bool uploadPendingTelemetry() {
     }
   }
 
-  logMessage("Uploading: %d telemetry files", filesToUpload);
+  Serial.printf("Uploading: %d telemetry files", filesToUpload);
 
   for (int fileIndex = 0; fileIndex < FileArraySize && fileIndex < filesToUpload; ++fileIndex) {
     if (fileIndex >= TelemetryFileBatchSize) {
-      logMessage("Batch size: %d (%d files remaining)", TelemetryFileBatchSize, filesToUpload - fileIndex);
+      Serial.printf("Batch size: %d (%d files remaining)", TelemetryFileBatchSize, filesToUpload - fileIndex);
       break;
     } else {
-      // logMessage("Uploading %d/%d...", fileIndex + 1, filesToUpload);
+      // Serial.printf("Uploading %d/%d...", fileIndex + 1, filesToUpload);
       displayMessageNoNewline(".");
     }
 
@@ -593,13 +596,13 @@ bool uploadPendingTelemetry() {
     pendingFilename += "/";
     pendingFilename += sortedFiles[fileIndex];
 
-    // logMessage("pendingFilename: %s", pendingFilename.c_str());
+    // Serial.printf("pendingFilename: %s", pendingFilename.c_str());
 
     File file = SD_MMC.open(pendingFilename);
 
     if (!file.isDirectory()) {
 
-      // logMessage(file.name());
+      // Serial.printf(file.name());
 
       String boundary = "----WebKitFormBoundary" + String(random(0xFFFFFF), HEX);
 
@@ -716,7 +719,7 @@ bool uploadPendingTelemetry() {
           }
           if (line.indexOf("HTTP/1.1 302 Found") != -1) {
             okResponse = true;
-            // logMessage("Got 302 rather than 200 - not sure why?");
+            // Serial.printf("Got 302 rather than 200 - not sure why?");
             break;
           }
           Serial.println(line);
@@ -735,9 +738,9 @@ bool uploadPendingTelemetry() {
         }
       } else {
         if (NotFoundResponse) {
-          logMessage("404 - check device is registered.");
+          Serial.printf("404 - check device is registered.");
         } else {
-          logMessage("Error sending data.");
+          Serial.printf("Error sending data.");
         }
       }
     }
@@ -829,15 +832,17 @@ void logRTC() {
   DateTime now = rtc.now();
   char rtcTime[25];
   sprintf(rtcTime, ISO8061FormatString, now.year(), now.month(), now.day(), now.hour(), now.minute(), now.second());
-  logMessage("RTC Time: %s", rtcTime);
+  Serial.printf("RTC Time: %s", rtcTime);
   // }
 }
 
 void setup() {
 
   pinMode(LED_BUILTIN, OUTPUT);
-  pinMode(TPL5110_Reset_PIN, OUTPUT);
-  digitalWrite(TPL5110_Reset_PIN, LOW);
+  if(TPL5110){
+    pinMode(TPL5110_Reset_PIN, OUTPUT);
+    digitalWrite(TPL5110_Reset_PIN, LOW);
+  }
 
   strip.begin();
   strip.setBrightness(100);
@@ -918,17 +923,19 @@ void setup() {
 
 
   sd_sign = true;  // sd initialization check passes
-  // logMessage("SD Card mounted %'d", millis());
+  // Serial.printf("SD Card mounted %'d", millis());
   // logRTC();
-  // logMessage("SD Card mounted");
+  // Serial.printf("SD Card mounted");
 
   logRTC();
 
 
-  // logMessage("sID: %s", sID);
+  // Serial.printf("sID: %s", sID);
   sprintf(MACAddress, "%012llx", ESP.getEfuseMac());
 
   int bootCount = getCounter(counterFilenameBoot);
+
+  Serial.printf("bootCount, %d", bootCount);
 
   if (bootCount % 5 == 0) {
     if (wifiConnect()) {
@@ -938,18 +945,20 @@ void setup() {
     }
   }
 
-  // logMessage("MAC Address: %s", MACAddress);
+  Serial.printf("MAC Address: %s", MACAddress);
 
 
   // displayMessage("Camera startup");
 
 
   ++bootCount;
-  // logMessage("Boot number: %d", bootCount);
+  // Serial.printf("Boot number: %d", bootCount);
+
+  Serial.printf("bootCount, %d", bootCount);
 
   updateCounter(counterFilenameBoot, bootCount);
 
-  // logMessage("Starting up %'d", millis());/Volumes/NO NAME/counterBoot
+  // Serial.printf("Starting up %'d", millis());/Volumes/NO NAME/counterBoot
 
 
   camera_config_t config;
@@ -1009,6 +1018,7 @@ void setup() {
   }
 
 
+  Serial.printf("about to init camera....");
   // camera init
   esp_err_t err = esp_camera_init(&config);
   if (err != ESP_OK) {
@@ -1028,7 +1038,8 @@ void setup() {
   }
 
   camera_sign = true;  // Camera initialization check passes
-  // logMessage("Camera connected %'d", millis());
+  Serial.println("Camera connected");
+  Serial.flush();
   // displayMessage("Camera ready");
 
 
@@ -1043,7 +1054,7 @@ void setup() {
 
   savePhoto();
   saveTelemetry();
-  // logMessage("Staying awake for 15s to ease flashing");
+  // Serial.printf("Staying awake for 15s to ease flashing");
   // delay(15000);
 
   enableWakeupAndGoToSleep();
@@ -1062,7 +1073,7 @@ void enableWakeupAndGoToSleep() {
 
 #endif
 
-  logMessage("Going to sleep now");
+  Serial.printf("Going to sleep now");
   logRTC();
   Serial.flush();
 
@@ -1079,7 +1090,7 @@ void enableWakeupAndGoToSleep() {
   } else {
     // Timer Sleep:
     esp_sleep_enable_timer_wakeup(TIME_TO_SLEEP * uS_TO_S_FACTOR);
-    // logMessage("Setup ESP32 to sleep for  " + String(TIME_TO_SLEEP) + " Seconds");
+    // Serial.printf("Setup ESP32 to sleep for  " + String(TIME_TO_SLEEP) + " Seconds");
 
     // External wakeup - RTC:
     esp_sleep_enable_ext0_wakeup(GPIO_NUM_33, 1);  //1 = High, 0 = Low
@@ -1087,10 +1098,11 @@ void enableWakeupAndGoToSleep() {
     if (enableSleep) {
       esp_deep_sleep_start();
     } else {
-      logMessage("enableSleep = false - not sleeping");
+      Serial.printf("enableSleep = false - not sleeping");
     }
   }
 }
+
 
 
 void loop() {
