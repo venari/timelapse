@@ -1,6 +1,6 @@
 #include "esp_camera.h"
 #include "FS.h"
-#include "SD.h"
+#include <SD_MMC.h>
 #include "SPI.h"
 #include <U8x8lib.h>
 #include <Wire.h>
@@ -12,13 +12,18 @@
 // #include <HTTPClient.h>
 #include <WiFiClientSecure.h>
 #include <ArduinoJson.h>
+#include <Adafruit_NeoPixel.h>
 
 #define CAMERA_MODEL_XIAO_ESP32S3  // Has PSRAM
 
 #include "camera_pins.h"
 #include "arduino_secrets.h"
 
-
+#define ERROR_BLINK_NO_RTC 3
+#define ERROR_BLINK_SDCARD_MOUNT_FAILED 4
+#define ERROR_BLINK_SDCARD_MOUNT_TYPE_NONE 4
+#define ERROR_BLINK_WIFI_CONNECTION_FAILED 5
+#define ERROR_BLINK_WIFI_UPLOAD_FAILED 6
 
 #define PIN_WIRE_SDA (4u)
 #define PIN_WIRE_SCL (5u)
@@ -47,9 +52,16 @@ NTPClient timeClient(ntpUDP, "pool.ntp.org");
 #define THRESHOLD 5000 /* Lower the value, more the sensitivity */
 #endif
 
+const int SDMMC_CLK = 5;
+const int SDMMC_CMD = 4;
+const int SDMMC_DATA = 6;
+const int SD_CD_PIN = 46;
+
 
 // RTC_PCF8563 rtc;
 RTC_DS1307 rtc;
+
+Adafruit_NeoPixel strip = Adafruit_NeoPixel(1, 38, NEO_GRB + NEO_KHZ800);
 
 // RTC_DATA_ATTR int bootCount = 0;
 
@@ -57,7 +69,7 @@ touch_pad_t touchPin;
 
 const bool enableSleep = true;
 const bool TPL5110 = true;
-const int TPL5110_Reset_PIN = D7;
+const int TPL5110_Reset_PIN = Y9_GPIO_NUM;
 
 unsigned long lastCaptureTime = 0;  // Last shooting time
 int imageCounter = 1;               // File Counter
@@ -124,7 +136,7 @@ void logMessage(const char *format, va_list args) {
     return;
   }
 
-  File file = SD.open(logFilename, FILE_APPEND);
+  File file = SD_MMC.open(logFilename, FILE_APPEND);
   if (!file) {
     Serial.println("Failed to open log file for writing");
     return;
@@ -141,7 +153,7 @@ void logMessage(const char *format, va_list args) {
 void updateCounter(const char *counterFilename, int count) {
   // logMessage("updateCounter('%s', %d))", counterFilename, count);
 
-  File file = SD.open(counterFilename, FILE_WRITE);
+  File file = SD_MMC.open(counterFilename, FILE_WRITE);
   if (!file) {
     logMessage("Failed to open counter file for writing");
     return;
@@ -154,7 +166,7 @@ void updateCounter(const char *counterFilename, int count) {
 }
 
 int getCounter(const char *counterFilename) {
-  File file = SD.open(counterFilename);
+  File file = SD_MMC.open(counterFilename);
   if (!file) {
     logMessage("Failed to open counter %s file for reading", counterFilename);
     return 0;
@@ -208,7 +220,7 @@ void saveTelemetry() {
   doc["Status"] = status;
   doc["SerialNumber"] = MACAddress;
 
-  File file = SD.open(filename, FILE_WRITE);
+  File file = SD_MMC.open(filename, FILE_WRITE);
   String strJSON;
   serializeJsonPretty(doc, strJSON);
   // logMessage("strJSON");
@@ -247,7 +259,7 @@ void savePhoto() {
   // logMessage("Writing file... %5d", millis());
   // logMessage("Writing file...", millis());
   // Save photo to file
-  writeFile(SD, filename, fb->buf, fb->len);
+  writeFile(SD_MMC, filename, fb->buf, fb->len);
   // logMessage("File written %5d", millis());
 
   // Release image buffer
@@ -423,7 +435,7 @@ bool uploadPendingImages() {
     pendingFilename += "/";
     pendingFilename += sortedFiles[fileIndex];
 
-    File file = SD.open(pendingFilename);
+    File file = SD_MMC.open(pendingFilename);
 
     if (!file.isDirectory()) {
 
@@ -529,7 +541,7 @@ bool uploadPendingImages() {
         // Serial.println("Deleting file....");
         // Serial.println(pendingFilename);
         ++filesUploaded;
-        if (!SD.remove(pendingFilename)) {
+        if (!SD_MMC.remove(pendingFilename)) {
           logError("Failed to delete file");
         }
       } else {
@@ -583,7 +595,7 @@ bool uploadPendingTelemetry() {
 
     // logMessage("pendingFilename: %s", pendingFilename.c_str());
 
-    File file = SD.open(pendingFilename);
+    File file = SD_MMC.open(pendingFilename);
 
     if (!file.isDirectory()) {
 
@@ -718,7 +730,7 @@ bool uploadPendingTelemetry() {
         // Serial.println(pendingFilename);
         ++filesUploaded;
 
-        if (!SD.remove(pendingFilename)) {
+        if (!SD_MMC.remove(pendingFilename)) {
           logError("Failed to delete file");
         }
       } else {
@@ -741,11 +753,11 @@ String *listAndSortFiles(const char *folder) {
   String *filenames = new String[maxFiles];
   int fileCount = 0;
 
-  if (!SD.exists(folder)) {
-    SD.mkdir(folder);
+  if (!SD_MMC.exists(folder)) {
+    SD_MMC.mkdir(folder);
   }
 
-  File root = SD.open(folder);
+  File root = SD_MMC.open(folder);
   if (!root) {
     logError("Failed to open folder: %s", folder);
     return filenames;
@@ -785,11 +797,11 @@ String *listAndSortFiles(const char *folder) {
 
 int countFiles(const char *folder) {
 
-  if (!SD.exists(folder)) {
-    SD.mkdir(folder);
+  if (!SD_MMC.exists(folder)) {
+    SD_MMC.mkdir(folder);
   }
 
-  File root = SD.open(folder);
+  File root = SD_MMC.open(folder);
   if (!root) {
     logError("Failed to open folder: %s", folder);
     return 0;
@@ -827,6 +839,10 @@ void setup() {
   pinMode(TPL5110_Reset_PIN, OUTPUT);
   digitalWrite(TPL5110_Reset_PIN, LOW);
 
+  strip.begin();
+  strip.setBrightness(100);
+  strip.show();
+
   Serial.begin(115200);
   // while(!Serial); // When the serial monitor is turned on, the program starts to execute
 
@@ -859,40 +875,47 @@ void setup() {
   }
 
   // Initialize SD card
-  if (!SD.begin(21)) {
-    logError("Card Mount Failed");
+  pinMode(SD_CD_PIN, INPUT_PULLUP);
 
-    // logMessage("Going to sleep now");
-    // Serial.flush();
-    // esp_deep_sleep_start();
+  delay(3000);
 
-    enableWakeupAndGoToSleep();
-    return;
+  /*********************************
+   * step 2 : start sd card
+  ***********************************/
+
+  SD_MMC.setPins(SDMMC_CLK, SDMMC_CMD, SDMMC_DATA);
+
+  if (!SD_MMC.begin("/sdcard", true)) {
+      Serial.println("Card Mount Failed");
+      while (1) {
+          delay(1000);
+      }
   }
-  uint8_t cardType = SD.cardType();
 
-  // Determine if the type of SD card is available
+  uint8_t cardType = SD_MMC.cardType();
   if (cardType == CARD_NONE) {
-    logError("No SD card attached");
-
-    // logMessage("Going to sleep now");
-    // Serial.flush();
-    // esp_deep_sleep_start();
-
-    enableWakeupAndGoToSleep();
-    return;
+      Serial.println("No SD_MMC card attached");
+      while (1) {
+          delay(1000);
+      }
   }
 
-  // logMessage("SD Card Type: ");
-  // if (cardType == CARD_MMC) {
-  //   logMessage("MMC");
-  // } else if (cardType == CARD_SD) {
-  //   logMessage("SDSC");
-  // } else if (cardType == CARD_SDHC) {
-  //   logMessage("SDHC");
-  // } else {
-  //   logMessage("UNKNOWN");
-  // }
+  Serial.print("SD_MMC Card Type: ");
+  if (cardType == CARD_MMC) {
+      Serial.println("MMC");
+  } else if (cardType == CARD_SD) {
+      Serial.println("SDSC");
+  } else if (cardType == CARD_SDHC) {
+      Serial.println("SDHC");
+  } else {
+      Serial.println("UNKNOWN");
+  }
+
+  uint64_t cardSize = SD_MMC.cardSize() / (1024 * 1024);
+  Serial.printf("SD_MMC Card Size: %lluMB\n", cardSize);
+
+  // listDir(SD_MMC, "/", 0);
+
 
   sd_sign = true;  // sd initialization check passes
   // logMessage("SD Card mounted %'d", millis());
