@@ -17,6 +17,8 @@
 #define CAMERA_MODEL_XIAO_ESP32S3  // Has PSRAM
 #define WAVESHARE_ESP32_S3_SIM7670G_4G // Waveshare board
 
+#define MAX17048_I2C_ADDRESS 0x36
+
 #include "camera_pins.h"
 #include "arduino_secrets.h"
 
@@ -199,7 +201,8 @@ int getCounter(const char *counterFilename) {
 
 void saveTelemetry() {
 
-  // displayMessage("saveTelemetry()...");
+  Serial.println("saveTelemetry()...");
+  logRTC();
   char filename[100];
   char rtcTime[25];
 
@@ -213,12 +216,16 @@ void saveTelemetry() {
 
   // https://wiki.seeedstudio.com/check_battery_voltage/
   // https://forum.seeedstudio.com/t/battery-voltage-monitor-and-ad-conversion-for-xiao-esp32c/267535
+  logRTC();
+  // Serial.println("About to check voltage");
   uint32_t Vbatt = 0;
-  for (int i = 0; i < 16; i++) {
-    Vbatt = Vbatt + analogReadMilliVolts(A0);  // ADC with correction
-  }
+  // for (int i = 0; i < 16; i++) {
+  //   Vbatt = Vbatt + analogReadMilliVolts(A0);  // ADC with correction
+  // }
   int Vbattf = 2 * Vbatt / 16;  /// 1000.0;     // attenuation ratio 1/2, mV --> V
-  Serial.println(Vbattf, 3);
+  float batteryLevel = getBatteryLevel();
+  logRTC();
+  // Serial.println(Vbattf, 3);
 
   // const int capacity = JSON_ARRAY_SIZE(1) + 2*JSON_OBJECT_SIZE(4);
   const int capacity = JSON_OBJECT_SIZE(8);
@@ -226,7 +233,7 @@ void saveTelemetry() {
 
   // JsonDocument doc;
 
-  doc["BatteryPercent"] = 0;
+  doc["BatteryPercent"] = batteryLevel;
   doc["TemperatureC"] = 21;
   doc["DiskSpaceFree"] = 0;
   doc["PendingImages"] = countFiles(pendingImageFolder);
@@ -235,6 +242,7 @@ void saveTelemetry() {
 
   // doc['status']['batteryVoltage'] = Vbattf;
   // String status = "{\'status':\"OK\", \"batteryVoltage\":" + String(Vbattf) + "}";
+  // String status = "{'status': {'isFault': False, 'isButton': False, 'battery': 'UNKNOWN', 'powerInput': 'UNKNOWN', 'powerInput5vIo': 'NOT_PRESENT'}, 'batteryVoltage': " + String(Vbattf) + ", 'batteryCurrent': 0, 'ioVoltage': 0, 'ioCurrent': 0}";
   String status = "{'status': {'isFault': False, 'isButton': False, 'battery': 'UNKNOWN', 'powerInput': 'UNKNOWN', 'powerInput5vIo': 'NOT_PRESENT'}, 'batteryVoltage': " + String(Vbattf) + ", 'batteryCurrent': 0, 'ioVoltage': 0, 'ioCurrent': 0}";
 
 
@@ -252,6 +260,27 @@ void saveTelemetry() {
 
   // Serial.printf("Saved telemetry: %s\r\n", filename);
   updateCounter(counterFilenameTelemetry, ++telemetryCounter);
+}
+
+float getBatteryLevel(){
+  Wire.beginTransmission(MAX17048_I2C_ADDRESS);
+  Wire.write(0x02);
+  Wire.endTransmission();
+
+  Wire.requestFrom(MAX17048_I2C_ADDRESS, 2);
+  uint16_t soc = (Wire.read() << 8) | Wire.read();
+
+  if (soc > 65535) {
+    soc = 65535;
+  }
+
+  float batteryLevel = (float)soc / 65535.0 * 100.0;
+
+  Serial.print("Battery Level: ");
+  Serial.print(batteryLevel);
+  Serial.println("%");
+
+  return batteryLevel;
 }
 
 void savePhoto() {
@@ -414,8 +443,10 @@ void getNTPTime() {
     // Compare the time from the NTP server with the RTC time, and report the discrepancy in seconds.
     int timeDiscrepancy = rtc.now().unixtime() - epochTime;
     if (abs(timeDiscrepancy) > 5) {
-        rtc.adjust(DateTime(currentYear, currentMonth, monthDay, ptm->tm_hour, ptm->tm_min, ptm->tm_sec));
-        Serial.printf("RTC/NTP Time discrepancy was %d seconds\n", timeDiscrepancy);
+      Serial.println("updating time....");
+      logRTC();
+      rtc.adjust(DateTime(currentYear, currentMonth, monthDay, ptm->tm_hour, ptm->tm_min, ptm->tm_sec));
+      Serial.printf("RTC/NTP Time discrepancy was %d seconds\n", timeDiscrepancy);
       Serial.println("Updated RTC Time:");
       logRTC();
     }
@@ -1070,13 +1101,13 @@ void setup() {
     s->set_saturation(s, -2);  // lower the saturation
   }
 
-  // logRTC();
+  logRTC();
   camera_sign = true;  // Camera initialization check passes
   Serial.println("Camera connected");
   Serial.flush();
   currentStatus = STATUS_SAVING_PHOTO;
   // displayMessage("Camera ready");
-  // logRTC();
+  logRTC();
 
 
 
@@ -1101,10 +1132,10 @@ void setup() {
   // print_wakeup_touchpad();
 
 
-  // logRTC();
+  logRTC();
   savePhoto();
 
-  // logRTC(); // ?
+  logRTC(); // ?
   // Serial.println("Deinit1");
   // logRTC(); // ?
 
@@ -1121,6 +1152,7 @@ void setup() {
   currentStatus = STATUS_SAVING_TELEMETRY;
 
   saveTelemetry();
+  logRTC(); // ?
   // Serial.printf("Staying awake for 15s to ease flashing");
   // delay(15000);
 
@@ -1148,7 +1180,8 @@ void setup() {
   }
 
   Serial.printf("MAC Address: %s\n", MACAddress);
-
+  logRTC(); // ?
+  
 
   // displayMessage("Camera startup");
 
