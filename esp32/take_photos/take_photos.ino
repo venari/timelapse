@@ -74,8 +74,13 @@ const int SD_CD_PIN = 46;
 // RTC_PCF8563 rtc;
 RTC_DS1307 rtc;
 // Pin Out definition: https://www.waveshare.com/esp32-s3-sim7670g-4g.htm
-const int RTC_DS1037_SDA = 14; //GPIO 14
-const int RTC_DS1037_SCL = 13; //GPIO 13
+// Including pins that are used by caemra/TF card/modem, etc.
+// const int RTC_DS1037_SDA = 12;
+// const int RTC_DS1037_SCL = 11;
+const int RTC_DS1037_SDA = 1;// ;
+const int RTC_DS1037_SCL = 21; //5;
+// DateTime rtcBootTime = DateTime(2000, 1, 1);
+
 
 Adafruit_NeoPixel pixels = Adafruit_NeoPixel(1, 38, NEO_RGB + NEO_KHZ800);
 
@@ -884,7 +889,7 @@ void setup() {
 
   Wire.begin(RTC_DS1037_SDA, RTC_DS1037_SCL);
 
-  // displayMessage("Checking RTC");
+  // Serial.println("Checking RTC");
   if (!rtc.begin()) {
     logError("Couldn't find RTC");
     logError("We can't carry on :-(");
@@ -895,27 +900,32 @@ void setup() {
   } else {
     if(!rtc.isrunning()){
       logError("Found RTC but it is not running.");
+      // logRTC();
       currentStatus = ERROR_BLINK_NO_RTC;
+      return;
     } else {
-      if(rtc.now().year()>2050 || rtc.now().year()<2020 || rtc.now().hour()>23){
+      DateTime now = rtc.now();
+      if(now.year()>2040 || now.year()<2020 || now.month()>12 || now.hour()>23 || now.minute()>59){
         // RTC not working correctly - let's behave as if it's not present
         logError("Found RTC, but it's returning incorrect date");
+        // logRTC();
         currentStatus = ERROR_BLINK_NO_RTC;
+        return;
       } else {
         // Everything is OK?
-        logRTC();
-        delay(1000);
-        logRTC();
-        delay(1000);
-        logRTC();
-        delay(1000);
-        logRTC();
+        // logRTC();
       }
     }
   }
 
+  // logRTC();
+  // Serial.println("About to init SD card");
+  // Wire.end();
+
   // Initialize SD card
   pinMode(SD_CD_PIN, INPUT_PULLUP);
+  // logRTC();
+  // Serial.println("SD card 2");
 
   delay(3000);
 
@@ -924,6 +934,8 @@ void setup() {
   ***********************************/
 
   SD_MMC.setPins(SDMMC_CLK, SDMMC_CMD, SDMMC_DATA);
+  // logRTC();
+  // Serial.println("SD card 3");
 
   if (!SD_MMC.begin("/sdcard", true)) {
       Serial.println("Card Mount Failed");
@@ -1026,17 +1038,18 @@ void setup() {
 #endif
   }
 
-  logRTC(); // good
-  Serial.println("A");
-  logRTC(); // ?
-  Serial.println("B");
-  logRTC(); // ?
+  // logRTC(); // good
+  // Serial.println("A");
+  // logRTC(); // ?
+  // Serial.println("B");
+  // logRTC(); // ?
 
   Serial.println("about to init camera....");
   // camera init
   logRTC(); // good
-  Serial.println("C");
-  logRTC(); // good
+  // Serial.println("C");
+  // logRTC(); // good
+  // This is where RTC gets messed up.
   esp_err_t err = esp_camera_init(&config);
   logRTC(); // buggered
   if (err != ESP_OK) {
@@ -1047,9 +1060,9 @@ void setup() {
     return;
   }
 
-  logRTC();
+  // logRTC();
   sensor_t *s = esp_camera_sensor_get();
-  logRTC();
+  // logRTC();
   // initial sensors are flipped vertically and colors are a bit saturated
   if (s->id.PID == OV3660_PID || s->id.PID == OV5640_PID) {
     s->set_vflip(s, 1);        // flip it back
@@ -1057,13 +1070,13 @@ void setup() {
     s->set_saturation(s, -2);  // lower the saturation
   }
 
-  logRTC();
+  // logRTC();
   camera_sign = true;  // Camera initialization check passes
   Serial.println("Camera connected");
   Serial.flush();
   currentStatus = STATUS_SAVING_PHOTO;
   // displayMessage("Camera ready");
-  logRTC();
+  // logRTC();
 
 
 
@@ -1088,8 +1101,22 @@ void setup() {
   // print_wakeup_touchpad();
 
 
-  logRTC();
+  // logRTC();
   savePhoto();
+
+  // logRTC(); // ?
+  // Serial.println("Deinit1");
+  // logRTC(); // ?
+
+  // esp_camera_deinit();
+
+  // Serial.println("Deinit2");
+  // logRTC(); // ?
+
+  // Serial.println("Deinit3");
+  // Wire.begin(RTC_DS1037_SDA, RTC_DS1037_SCL);
+  // rtc.begin();
+  // logRTC(); // ?
 
   currentStatus = STATUS_SAVING_TELEMETRY;
 
