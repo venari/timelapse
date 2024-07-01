@@ -103,6 +103,8 @@ void saveTelemetry() {
 
   Serial.println("saveTelemetry()...");
   logRTC();
+  currentStatus = STATUS_SAVING_TELEMETRY;
+
   char filename[100];
   char rtcTime[25];
 
@@ -187,6 +189,9 @@ void savePhoto() {
 
   Serial.println("savePhoto()");
   logRTC();
+
+  currentStatus = STATUS_SAVING_PHOTO;
+
 
   char filename[100];
   char rtcTime[25];
@@ -306,7 +311,7 @@ void getNTPTime() {
   }
 }
 
-bool uploadPendingImages() {
+int uploadPendingImages() {
   // returns true if all pending images have been uploaded.
   Serial.println("uploadPendingImages()");
 
@@ -459,10 +464,10 @@ bool uploadPendingImages() {
     }
   }
 
-  return filesUploaded == filesToUpload;
+  return filesToUpload - filesUploaded;
 }
 
-bool uploadPendingTelemetry() {
+int uploadPendingTelemetry() {
   // returns true if all pending telemetry has been uploaded.
   // Serial.printf("uploadPendingTelemetry()....");
 
@@ -649,7 +654,7 @@ bool uploadPendingTelemetry() {
   }
   // root.close();
 
-  return filesUploaded == filesToUpload;
+  return filesToUpload - filesUploaded;
 }
 
 
@@ -838,7 +843,6 @@ void setup() {
   camera_sign = true;  // Camera initialization check passes
   Serial.println("Camera connected");
   Serial.flush();
-  currentStatus = STATUS_SAVING_PHOTO;
   // displayMessage("Camera ready");
   logRTC();
 
@@ -882,7 +886,6 @@ void setup() {
   // rtc.begin();
   // logRTC(); // ?
 
-  currentStatus = STATUS_SAVING_TELEMETRY;
 
   saveTelemetry();
   logRTC(); // ?
@@ -904,8 +907,15 @@ void setup() {
       getNTPTime();
 
       currentStatus = STATUS_UPLOADING;
-      uploadPendingTelemetry();
-      uploadPendingImages();
+      while(uploadPendingTelemetry() > 0 
+        || uploadPendingImages() > 0){
+          // More images or telemetry might be waiting to be uploaded
+          saveTelemetry();
+          savePhoto();
+          currentStatus = STATUS_UPLOADING;
+        };
+
+      currentStatus = STATUS_UPLOAD_COMPLETE;
     } else {
       currentStatus = ERROR_BLINK_WIFI_CONNECTION_FAILED;
       return;
