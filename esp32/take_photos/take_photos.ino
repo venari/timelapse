@@ -1,10 +1,8 @@
 #include "esp_camera.h"
 #include "FS.h"
-#include <SD_MMC.h>
 #include "SPI.h"
 // #include <U8x8lib.h>
 #include <Wire.h>
-#include <WiFi.h>
 #include <NTPClient.h>
 #include <WiFiUdp.h>
 #include "RTClib.h"
@@ -12,7 +10,6 @@
 // #include <HTTPClient.h>
 #include <WiFiClientSecure.h>
 #include <ArduinoJson.h>
-#include <Adafruit_NeoPixel.h>
 
 #define CAMERA_MODEL_XIAO_ESP32S3  // Has PSRAM
 #define WAVESHARE_ESP32_S3_SIM7670G_4G // Waveshare board
@@ -20,24 +17,10 @@
 #define MAX17048_I2C_ADDRESS 0x36
 
 #include "camera_pins.h"
-#include "arduino_secrets.h"
-
-#define STATUS_INITIALISING 0
-#define STATUS_CONNECTING_TO_WIFI 1
-#define STATUS_UPLOADING 2
-#define STATUS_INITIALISING_CAMERA 3
-#define STATUS_SAVING_PHOTO 4
-#define STATUS_SAVING_TELEMETRY 5
-#define STATUS_COMPLETE 99
-
-int currentStatus = STATUS_INITIALISING;
-
-#define ERROR_BLINK_NO_RTC -3
-#define ERROR_BLINK_SDCARD_MOUNT_FAILED -4
-#define ERROR_BLINK_SDCARD_MOUNT_TYPE_NONE -5
-#define ERROR_BLINK_CAMERA_INIT_FAILED -6
-#define ERROR_BLINK_WIFI_CONNECTION_FAILED -7
-#define ERROR_BLINK_WIFI_UPLOAD_FAILED -8
+#include "wifi_functions.h"
+#include "log_functions.h"
+#include "sd_functions.h"
+#include "status_functions.h"
 
 #define PIN_WIRE_SDA (4u)
 #define PIN_WIRE_SCL (5u)
@@ -51,8 +34,6 @@ int currentStatus = STATUS_INITIALISING;
 // uint8_t u8log_buffer[U8LOG_WIDTH * U8LOG_HEIGHT];
 // U8X8LOG u8x8log;
 
-const char *ssid = SECRET_SSID;
-const char *password = SECRET_PASS;
 char MACAddress[25] = "Not set";
 
 WiFiUDP ntpUDP;
@@ -67,11 +48,6 @@ NTPClient timeClient(ntpUDP, "pool.ntp.org");
 #define THRESHOLD 5000 /* Lower the value, more the sensitivity */
 #endif
 
-const int SDMMC_CLK = 5;
-const int SDMMC_CMD = 4;
-const int SDMMC_DATA = 6;
-const int SD_CD_PIN = 46;
-
 
 // RTC_PCF8563 rtc;
 RTC_DS1307 rtc;
@@ -84,7 +60,6 @@ const int RTC_DS1037_SCL = 21; //5;
 // DateTime rtcBootTime = DateTime(2000, 1, 1);
 
 
-Adafruit_NeoPixel pixels = Adafruit_NeoPixel(1, 38, NEO_RGB + NEO_KHZ800);
 
 // RTC_DATA_ATTR int bootCount = 0;
 
@@ -101,17 +76,6 @@ int telemetryCounter = 1;
 // int epochPseudoRTC = 0;             // Save time of last sleep in case we don't have a real RTC.
 
 bool camera_sign = false;  // Check camera status
-bool sd_sign = false;      // Check sd status
-const char *counterFilenameBoot = "/counterBoot";
-const char *counterFilenameImages = "/counterImages";
-const char *counterFilenamePendingImages = "/counterPendingImages";
-const char *counterFilenameTelemetry = "/counterTelemetry";
-const char *counterFilenamePendingTelemetry = "/counterPendingTelemetry";
-const char *logFilename = "/log.txt";
-
-const char *pendingImageFolder = "/pendingImages";
-
-const char *pendingTelemetryFolder = "/pendingTelemetry";
 
 const char *serverName = "timelapse-dev.azurewebsites.net";
 const int port = 443;
@@ -132,72 +96,8 @@ const char *YYYYMMDDHHMMSSFormatString = "%04d-%02d-%02d_%02d%02d%02d";
 //   u8x8log.print(message);
 // }
 
-void logError(const char *format, ...) {
-  va_list args;              // Create a variable argument list
-  va_start(args, format);    // Initialize the variable argument list
-  logMessage(format, args);  // Call the function that takes a variable argument list
-  va_end(args);              // End the variable argument list
-}
-
-// logMessage function with variable arguments
-void logMessage(const char *format, ...) {
-  va_list args;              // Create a variable argument list
-  va_start(args, format);    // Initialize the variable argument list
-  logMessage(format, args);  // Call the function that takes a variable argument list
-  va_end(args);              // End the variable argument list
-}
-
-void logMessage(const char *format, va_list args) {
-
-  char buf[128];                              // Allocate a buffer to store the message
-  vsnprintf(buf, sizeof(buf), format, args);  // Write the formatted string to the buffer
-  Serial.println(buf);                        // Print the buffer to the serial port
-  // displayMessage(buf);
-
-  if (sd_sign == false) {
-    // Serial.println("SD Card not mounted yet.");
-    return;
-  }
-
-  File file = SD_MMC.open(logFilename, FILE_APPEND);
-  if (!file) {
-    Serial.println("Failed to open log file for writing");
-    return;
-  }
-
-  if (file.println(buf)) {
-    file.close();
-  } else {
-    Serial.println("Failed to append to log");
-  }
-}
 
 
-void updateCounter(const char *counterFilename, int count) {
-  // logMessage("updateCounter('%s', %d))", counterFilename, count);
-
-  File file = SD_MMC.open(counterFilename, FILE_WRITE);
-  if (!file) {
-    Serial.println("Failed to open counter file for writing");
-    return;
-  }
-  if (file.print(count)) {
-    // Serial.println("Counter updated");
-  } else {
-    logError("Failed to update counter");
-  }
-}
-
-int getCounter(const char *counterFilename) {
-  File file = SD_MMC.open(counterFilename);
-  if (!file) {
-    Serial.printf("Failed to open counter %s file for reading\n", counterFilename);
-    return 0;
-  }
-  int count = file.parseInt();
-  file.close();
-  return count;
-}
 
 void saveTelemetry() {
 
@@ -326,35 +226,7 @@ void savePhoto() {
   updateCounter(counterFilenameImages, ++imageCounter);
 }
 
-// SD card write file
-void writeFile(fs::FS &fs, const char *path, uint8_t *data, size_t len) {
-  // Serial.printf("Writing file: %s\r\n", path);
 
-  if (!fs.exists(path)) {
-    // Get folder name of file
-    char folder[100];
-    strcpy(folder, path);
-    char *lastSlash = strrchr(folder, '/');
-    if (lastSlash != NULL) {
-      *lastSlash = '\0';
-      if (!fs.exists(folder)) {
-        fs.mkdir(folder);
-      }
-    }
-  }
-
-  File file = fs.open(path, FILE_WRITE);
-  if (!file) {
-    logError("Failed to open file for writing");
-    return;
-  }
-  if (file.write(data, len) == len) {
-    // Serial.println("File written");
-  } else {
-    logError("Write failed");
-  }
-  file.close();
-}
 
 void print_wakeup_reason() {
   esp_sleep_wakeup_cause_t wakeup_reason;
@@ -397,28 +269,6 @@ void print_wakeup_touchpad() {
 #endif
 }
 
-bool wifiConnect() {
-  Serial.println("WiFi connecting");
-  Serial.println(ssid);
-  // Serial.printf(password);
-
-  int wifiConnectTries = 0;
-
-  WiFi.begin(ssid, password);
-  while (WiFi.status() != WL_CONNECTED && wifiConnectTries++ < 30) {
-    delay(3000);
-    // displayMessageNoNewline(".");
-    Serial.print(".");
-  }
-
-  if (WiFi.status() != WL_CONNECTED) {
-    logError("WiFi connection failed");
-    return false;
-  } else {
-    Serial.println("WiFi connected");
-    return true;
-  }
-}
 
 
 void getNTPTime() {
@@ -455,10 +305,6 @@ void getNTPTime() {
     logError("NTP Time is not set");
   }
 }
-
-const int FileArraySize = 100;
-const int ImageFileBatchSize = 10;
-const int TelemetryFileBatchSize = 100;
 
 bool uploadPendingImages() {
   // returns true if all pending images have been uploaded.
@@ -806,82 +652,7 @@ bool uploadPendingTelemetry() {
   return filesUploaded == filesToUpload;
 }
 
-String *listAndSortFiles(const char *folder) {
-  const int maxFiles = FileArraySize;
-  String *filenames = new String[maxFiles];
-  int fileCount = 0;
 
-  if (!SD_MMC.exists(folder)) {
-    SD_MMC.mkdir(folder);
-  }
-
-  File root = SD_MMC.open(folder);
-  if (!root) {
-    logError("Failed to open folder: %s", folder);
-    return filenames;
-  }
-
-
-
-  // Collect filenames
-  while (true) {
-    File entry = root.openNextFile();
-    if (!entry) {
-      // no more files
-      break;
-    }
-    if (!entry.isDirectory()) {
-      if (fileCount < maxFiles) {
-        filenames[fileCount] = String(entry.name());
-        fileCount++;
-      }
-    }
-    entry.close();
-  }
-
-  // Sort filenames in reverse order
-  for (int i = 0; i < fileCount - 1; i++) {
-    for (int j = 0; j < fileCount - i - 1; j++) {
-      if (filenames[j] < filenames[j + 1]) {
-        String temp = filenames[j];
-        filenames[j] = filenames[j + 1];
-        filenames[j + 1] = temp;
-      }
-    }
-  }
-
-  return filenames;
-}
-
-int countFiles(const char *folder) {
-
-  if (!SD_MMC.exists(folder)) {
-    SD_MMC.mkdir(folder);
-  }
-
-  File root = SD_MMC.open(folder);
-  if (!root) {
-    logError("Failed to open folder: %s", folder);
-    return 0;
-  }
-
-  int fileCount = 0;
-
-  // Collect filenames
-  while (true) {
-    File entry = root.openNextFile();
-    if (!entry) {
-      // no more files
-      break;
-    }
-    if (!entry.isDirectory()) {
-      fileCount++;
-    }
-    entry.close();
-  }
-
-  return fileCount;
-}
 
 void logRTC() {
   DateTime now = rtc.now();
@@ -893,6 +664,7 @@ void logRTC() {
 
 void setup() {
 
+  setupStatus();
   currentStatus = STATUS_INITIALISING;
 
   pinMode(LED_BUILTIN, OUTPUT);
@@ -900,10 +672,6 @@ void setup() {
     pinMode(TPL5110_Reset_PIN, OUTPUT);
     digitalWrite(TPL5110_Reset_PIN, LOW);
   }
-
-  pixels.begin();
-  pixels.setPixelColor(0, pixels.Color(0, 0, 255));
-  pixels.show();
 
   Serial.begin(115200);
   // while(!Serial); // When the serial monitor is turned on, the program starts to execute
@@ -964,45 +732,8 @@ void setup() {
    * step 2 : start sd card
   ***********************************/
 
-  SD_MMC.setPins(SDMMC_CLK, SDMMC_CMD, SDMMC_DATA);
-  // logRTC();
-  // Serial.println("SD card 3");
+  setupSD();
 
-  if (!SD_MMC.begin("/sdcard", true)) {
-      Serial.println("Card Mount Failed");
-      currentStatus = ERROR_BLINK_SDCARD_MOUNT_FAILED;
-
-      // enableWakeupAndGoToSleep();
-      return;
-  }
-
-  uint8_t cardType = SD_MMC.cardType();
-  if (cardType == CARD_NONE) {
-      Serial.println("No SD_MMC card attached");
-      currentStatus = ERROR_BLINK_SDCARD_MOUNT_TYPE_NONE;
-
-      // enableWakeupAndGoToSleep();
-      return;
-  }
-
-  Serial.print("SD_MMC Card Type: ");
-  if (cardType == CARD_MMC) {
-      Serial.println("MMC");
-  } else if (cardType == CARD_SD) {
-      Serial.println("SDSC");
-  } else if (cardType == CARD_SDHC) {
-      Serial.println("SDHC");
-  } else {
-      Serial.println("UNKNOWN");
-  }
-
-  uint64_t cardSize = SD_MMC.cardSize() / (1024 * 1024);
-  Serial.printf("SD_MMC Card Size: %lluMB\n", cardSize);
-
-  // listDir(SD_MMC, "/", 0);
-
-
-  sd_sign = true;  // sd initialization check passes
   // Serial.printf("SD Card mounted %'d", millis());
   // logRTC();
   // Serial.printf("SD Card mounted");
@@ -1097,8 +828,10 @@ void setup() {
   // initial sensors are flipped vertically and colors are a bit saturated
   if (s->id.PID == OV3660_PID || s->id.PID == OV5640_PID) {
     s->set_vflip(s, 1);        // flip it back
-    s->set_brightness(s, 1);   // up the brightness just a bit
+    // s->set_brightness(s, 1);   // up the brightness just a bit
+    s->set_brightness(s, 0);   // up the brightness just a bit
     s->set_saturation(s, -2);  // lower the saturation
+    // s->set_exposure_ctrl(1)   // enable exposure control
   }
 
   logRTC();
@@ -1238,8 +971,7 @@ void enableWakeupAndGoToSleep() {
     esp_sleep_enable_ext0_wakeup(GPIO_NUM_33, 1);  //1 = High, 0 = Low
 
     if (enableSleep) {
-      pixels.clear();
-      pixels.show();
+      clearStatus();
       esp_deep_sleep_start();
     } else {
       Serial.println("enableSleep = false - not sleeping");
@@ -1248,80 +980,10 @@ void enableWakeupAndGoToSleep() {
 }
 
 void loop() {
-  pixels.clear();
+  displayStatus();
 
-  Serial.printf("currentStatus: %d\n", currentStatus);
-  
-  if(currentStatus>0){
-
-    switch(currentStatus){
-      case STATUS_INITIALISING:
-        pixels.setPixelColor(0, pixels.Color(255, 255, 255));
-        pixels.show();
-        break;
-      case STATUS_CONNECTING_TO_WIFI:
-        pixels.setPixelColor(0, pixels.Color(0, 0, 255));
-        pixels.show();
-        break;
-      case STATUS_UPLOADING:
-        pixels.setPixelColor(0, pixels.Color(0, 0, 255));
-        pixels.show();
-        break;
-      case STATUS_SAVING_PHOTO:
-        pixels.setPixelColor(0, pixels.Color(0, 50, 50));
-        pixels.show();
-        break;
-      case STATUS_SAVING_TELEMETRY:
-        pixels.setPixelColor(0, pixels.Color(0, 50, 50));
-        pixels.show();
-        break;
-      case STATUS_COMPLETE:
-        pixels.setPixelColor(0, pixels.Color(0, 255, 0));
-        pixels.show();
-        break;
-      default:
-        pixels.setPixelColor(0, pixels.Color(255, 0, 0));
-        pixels.show();
-        break;
-    }
-  } else {
-    // ERROR condition.
-    int numberOfFlashes = abs(currentStatus);
-    Serial.printf("numberOfFlashes: %d\n", numberOfFlashes);
-    for(int repeatSequence = 0; repeatSequence < 3; ++repeatSequence){
-      for(int i =0; i < numberOfFlashes; ++i){
-        Serial.println("R");
-        for(int R=255; R >=0;  R-=30){
-          pixels.setPixelColor(0, pixels.Color(R, 0, 0));
-          pixels.show();
-          delay(10);
-        }
-        pixels.setPixelColor(0, pixels.Color(0, 0, 0));
-        pixels.show();
-        Serial.println("-");
-        delay(300);
-        // Serial.println("DONE 1");
-      }
-      delay(1000);
-    }
-  }
-
-  // Serial.println("DONE 2");
   delay(5000);
 
   logRTC();
   enableWakeupAndGoToSleep();
 }
-
-// uint32_t Wheel(byte WheelPos) {
-//   WheelPos = 255 - WheelPos;
-//   if(WheelPos < 85) {
-//     return pixels.Color((255 - WheelPos * 3) / 2, 0, (WheelPos * 3) / 2);
-//   }
-//   if(WheelPos < 170) {
-//     WheelPos -= 85;
-//     return pixels.Color(0, (WheelPos * 3) / 2, (255 - WheelPos * 3) / 2);
-//   }
-//   WheelPos -= 170;
-//   return pixels.Color((WheelPos * 3) / 2, (255 - WheelPos * 3) / 2, 0);
-// }
