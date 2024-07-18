@@ -1,16 +1,28 @@
+#define TINY_GSM_MODEM_SIM7600
+#include <TinyGsmClient.h>
+
+
+// Set serial for debug console (to the Serial Monitor, default is 9600)
+#define SerialMon Serial
+
+// Set serial for AT commands (to the GSM module)
+#define SerialAT Serial1
+
 static const int RXPin = 17, TXPin = 18;
 static const uint32_t GPSBaud = 115200;
+
+
 
 String rev;
 
 void SentSerial(const char *p_char) {
   for (int i = 0; i < strlen(p_char); i++) {
-    Serial1.write(p_char[i]);
+    SerialAT.write(p_char[i]);
     delay(10);
   }
-  Serial1.write('\r');
+  SerialAT.write('\r');
   delay(10);
-  Serial1.write('\n');
+  SerialAT.write('\n');
   delay(10);
 }
 
@@ -19,21 +31,21 @@ bool SentMessage(const char *p_char, unsigned long timeout = 2000) {
 
   unsigned long start = millis();
   while (millis() - start < timeout) {
-    if (Serial1.available()) {
-      rev = Serial1.readString();
+    if (SerialAT.available()) {
+      rev = SerialAT.readString();
       if (rev.indexOf("OK") != -1) {
-        Serial.println("Got OK!");
+        SerialMon.println("Got OK!");
         return true;
       }
     }
   }
-  Serial.println("Timeout!");
+  SerialMon.println("Timeout!");
   return false;
 }
 
 void setup() {
-  Serial.begin(115200);
-  Serial1.begin(GPSBaud, SERIAL_8N1, RXPin, TXPin);
+  SerialMon.begin(115200);
+  SerialAT.begin(GPSBaud, SERIAL_8N1, RXPin, TXPin);
 
   while (!SentMessage("AT", 2000)) {
     delay(1000);
@@ -55,8 +67,8 @@ void setup() {
 }
 
 void loop() {
-  if (Serial1.available()) {
-    rev = Serial1.readString();
-    Serial.println(rev);
+  if (SerialAT.available()) {
+    rev = SerialAT.readString();
+    SerialMon.println(rev);
   }
 }
