@@ -25,6 +25,7 @@ extern int currentStatus;
 #define ERROR_BLINK_WIFI_UPLOAD_FAILED -8
 
 void setupStatus();
+void flash(int R, int G, int B, int numFlashes, int msDuration = 300, int numRepeats=0);
 void displayStatus();
 void clearStatus();
 

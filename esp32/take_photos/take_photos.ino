@@ -176,7 +176,8 @@ float getBatteryLevel(){
     soc = 65535;
   }
 
-  float batteryLevel = (float)soc / 65535.0 * 100.0;
+  // float batteryLevel = (float)soc / 65535.0 * 100.0;
+  float batteryLevel = (float)soc / 65535.0 * 5;
 
   Serial.print("Battery Level: ");
   Serial.print(batteryLevel);
@@ -449,10 +450,15 @@ int uploadPendingImages() {
         // Serial.println("Deleting file....");
         // Serial.println(pendingFilename);
         ++filesUploaded;
+        flash(0, 0, 255, 1);
+
         if (!SD_MMC.remove(pendingFilename)) {
           logError("Failed to delete file");
         }
       } else {
+
+        flash(255, 0, 0, 1);
+
         if (NotFoundResponse) {
           Serial.println("404 - check device is registered.");
         } else {
@@ -638,11 +644,13 @@ int uploadPendingTelemetry() {
         // Serial.println("Deleting file....");
         // Serial.println(pendingFilename);
         ++filesUploaded;
+        flash(0, 0, 255, 1);
 
         if (!SD_MMC.remove(pendingFilename)) {
           logError("Failed to delete file");
         }
       } else {
+        flash(255, 0, 0, 1);
         if (NotFoundResponse) {
           Serial.println("404 - check device is registered.");
         } else {
@@ -827,6 +835,8 @@ void setup() {
     return;
   }
 
+  delay(3000); // Let cammers settle down.
+
   // logRTC();
   sensor_t *s = esp_camera_sensor_get();
   // logRTC();
@@ -834,9 +844,98 @@ void setup() {
   if (s->id.PID == OV3660_PID || s->id.PID == OV5640_PID) {
     s->set_vflip(s, 1);        // flip it back
     // s->set_brightness(s, 1);   // up the brightness just a bit
-    s->set_brightness(s, 0);   // up the brightness just a bit
-    s->set_saturation(s, -2);  // lower the saturation
-    // s->set_exposure_ctrl(1)   // enable exposure control
+    // s->set_brightness(s, 0);   // up the brightness just a bit
+    // s->set_saturation(s, -2);  // lower the saturation
+    
+    // s->set_aec(s, 1); //Auto exposure correction?
+    // s->set_agc(s, 1); //Auto gain control
+
+    // Settings from CameraWebServer
+    // s->set_awb(s, 1); 
+    s->set_whitebal(s, 1);
+    s->set_awb_gain(s, 1); 
+    s->set_wb_mode(s, 0);
+
+    // s->set_aec(s, 1);
+    s->set_exposure_ctrl(s, 1); // AEC SENSOR - aec -> set_exposure_ctrl
+    // s->set_aec2(s, 0);
+    s->set_aec2(s, 1);
+    s->set_ae_level(s, 0);
+    s->set_aec_value(s, 142);
+    // s->set_agc(s, 1);
+    s->set_gain_ctrl(s, 1); // AGC - agc -> set_gain_ctrl
+    s->set_agc_gain(s, 0);
+
+    /*
+
+    
+  0xd3	8
+  0x111	0
+  0x132	9
+  xclk	20
+  pixformat	4
+  framesize	9
+  quality	12
+  brightness	0
+  contrast	0
+  saturation	0
+  sharpness	0
+  special_effect	0
+  wb_mode	0
+  awb	1
+  awb_gain	1
+  aec	1
+  aec2	0
+  ae_level	0
+  aec_value	142
+  agc	1
+  agc_gain	0
+  gainceiling	0
+  bpc	0
+  wpc	1
+  raw_gma	1
+  lenc	1
+  hmirror	0
+  dcw	1
+  colorbar	0
+  led_intensity	0
+
+
+
+Or....
+
+  	
+  0xd3	8
+  0x111	0
+  0x132	9
+  xclk	20
+  pixformat	4
+  framesize	9
+  quality	12
+  brightness	0
+  contrast	0
+  saturation	0
+  sharpness	0
+  special_effect	0
+  wb_mode	0
+  awb	1
+  awb_gain	1
+  aec	1
+  aec2	1
+  ae_level	0
+  aec_value	142
+  agc	1
+  agc_gain	0
+  gainceiling	0
+  bpc	0
+  wpc	1
+  raw_gma	1
+  lenc	1
+  hmirror	0
+  dcw	1
+  colorbar	0
+  led_intensity	0
+    */
   }
 
   logRTC();
@@ -992,7 +1091,7 @@ void enableWakeupAndGoToSleep() {
 void loop() {
   displayStatus();
 
-  delay(5000);
+  delay(1000);
 
   logRTC();
   enableWakeupAndGoToSleep();

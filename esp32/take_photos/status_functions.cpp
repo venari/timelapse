@@ -9,6 +9,26 @@ void setupStatus(){
   pixels.show();
 }
 
+void flash(int R, int G, int B, int numberOfFlashes, int msDuration, int numRepeats){
+    Serial.printf("numberOfFlashes: %d\n", numberOfFlashes);
+    for(int repeatSequence = 0; repeatSequence <= numRepeats; ++repeatSequence){
+      for(int i =0; i < numberOfFlashes; ++i){
+        Serial.println("R");
+        for(; R >=0 || G >= 0 || B >-0;  R-=30, G-=30, B-=30){
+          pixels.setPixelColor(0, pixels.Color(R, G, B));
+          pixels.show();
+          delay(10);
+        }
+        pixels.setPixelColor(0, pixels.Color(0, 0, 0));
+        pixels.show();
+        Serial.println("-");
+        delay(msDuration);
+        // Serial.println("DONE 1");
+      }
+      delay(1000);
+    }
+
+}
 
 void displayStatus() {
   pixels.clear();
@@ -50,23 +70,7 @@ void displayStatus() {
   } else {
     // ERROR condition.
     int numberOfFlashes = abs(currentStatus);
-    Serial.printf("numberOfFlashes: %d\n", numberOfFlashes);
-    for(int repeatSequence = 0; repeatSequence < 3; ++repeatSequence){
-      for(int i =0; i < numberOfFlashes; ++i){
-        Serial.println("R");
-        for(int R=255; R >=0;  R-=30){
-          pixels.setPixelColor(0, pixels.Color(R, 0, 0));
-          pixels.show();
-          delay(10);
-        }
-        pixels.setPixelColor(0, pixels.Color(0, 0, 0));
-        pixels.show();
-        Serial.println("-");
-        delay(300);
-        // Serial.println("DONE 1");
-      }
-      delay(1000);
-    }
+    flash(255, 0, 0, numberOfFlashes, 300, 3);
   }
 }
 
