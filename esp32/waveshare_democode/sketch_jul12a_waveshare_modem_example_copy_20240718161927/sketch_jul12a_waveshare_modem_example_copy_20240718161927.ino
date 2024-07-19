@@ -1,5 +1,6 @@
 #define TINY_GSM_MODEM_SIM7600
 #include <TinyGsmClient.h>
+#include <SSLClient.h>
 
 
 // Set serial for debug console (to the Serial Monitor, default is 9600)
@@ -19,12 +20,21 @@ const char user[] = "";         // Set your username, if any
 const char pass[] = "";         // Set your password, if any
 
 // Server details
-const char server[] = "httpbin.org"; // Server URL
-const int port = 80;                 // Server port
+// const char server[] = "httpbin.org"; // Server URL
+const char server[] = "eo7ogadymqhz0vo.m.pipedream.net";
+
+const int port = 443;                 // Server port
 
 // Initialize the TinyGSM modem
 TinyGsm modem(SerialAT);
-TinyGsmClient client(modem);
+
+// Add GovoroxSSLClient
+// https://github.com/govorox/SSLClient
+// esp32 board v2.0.17 - v3.0.1 gives https://github.com/govorox/SSLClient/issues/93 (fatal error: mbedtls/net.h: No such file or directory)
+// TinyGsmClient client(modem);
+TinyGsmClient transport(modem);
+SSLClient client(&transport);
+
 
 String rev;
 
@@ -79,9 +89,27 @@ void setup() {
   // // 14:46:03.580 -> 
 
   // This seems to sometimes be necessary - e.g. after removing SIM card. Maybe optimise later if we can?
-  SerialMon.println("Initializing modem...");
-  modem.restart();
-  
+
+  SerialMon.print(F("Connecting to "));
+  SerialMon.print(apn);
+  if (!modem.gprsConnect(apn, user, pass)) {
+    SerialMon.println(" fail");
+
+    SerialMon.println("Initializing modem...");
+    modem.restart();
+    
+    SerialMon.print(F("Attempting to connect again to "));
+    SerialMon.print(apn);
+    if (!modem.gprsConnect(apn, user, pass)) {
+      SerialMon.println(" fail");
+
+      return;
+    }
+    SerialMon.println(" success (2nd time)");
+  }
+  SerialMon.println(" success");
+
+
   
   // return;
 
@@ -95,26 +123,32 @@ void setup() {
   // }
   // SerialMon.println(" success");
 
-  // GPRS connection
-  SerialMon.print(F("Connecting to "));
-  SerialMon.print(apn);
-  if (!modem.gprsConnect(apn, user, pass)) {
-    SerialMon.println(" fail");
-    // while (true);
+  // // GPRS connection
+  // SerialMon.print(F("Connecting to "));
+  // SerialMon.print(apn);
+  // if (!modem.gprsConnect(apn, user, pass)) {
+  //   SerialMon.println(" fail");
+  //   // while (true);
+  //   return;
+  // }
+  // SerialMon.println(" success");
+
+  // Make HTTP GET request
+  SerialMon.print("Connecting to ");
+  SerialMon.print(server);
+  if (!client.connect(server, port)) {
+    SerialMon.println(" failed");
     return;
   }
   SerialMon.println(" success");
-
-  // Make HTTP GET request
-  if (!client.connect(server, port)) {
-    SerialMon.println("Connection to server failed");
-    return;
-  }
-
+  
   // Make a HTTP GET request
+  SerialMon.println("Sending request");
   client.print(String("GET /get HTTP/1.1\r\n") +
                "Host: " + server + "\r\n" +
                "Connection: close\r\n\r\n");
+
+  SerialMon.println("Request sent");
 
   // Wait for server response
   unsigned long timeout = millis();
