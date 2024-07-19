@@ -21,7 +21,9 @@ const char pass[] = "";         // Set your password, if any
 
 // Server details
 // const char server[] = "httpbin.org"; // Server URL
-const char server[] = "eo7ogadymqhz0vo.m.pipedream.net";
+// const char server[] = "eo7ogadymqhz0vo.m.pipedream.net";
+const char server[] = "webhook.site";
+const char endpoint[] = "/f31a289a-e938-46f3-b3a7-2851e5605779";
 
 const int port = 443;                 // Server port
 
@@ -144,9 +146,20 @@ void setup() {
   
   // Make a HTTP GET request
   SerialMon.println("Sending request");
-  client.print(String("GET /get HTTP/1.1\r\n") +
-               "Host: " + server + "\r\n" +
-               "Connection: close\r\n\r\n");
+
+  String request = String("POST ") + endpoint + " HTTP/1.1\r\n";
+  request += "Host: ";
+  request += server;
+  request += "\r\n";
+  request += "Connection: close\r\n\r\n";
+  SerialMon.println(request);
+  client.print(request);
+
+  // client.print(String("POST " + endpoint + " HTTP/1.1\r\n") +
+  //              "Host: " + server + "\r\n" +
+  //              "Connection: close\r\n\r\n");
+
+
 
   SerialMon.println("Request sent");
 
