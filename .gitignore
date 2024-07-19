@@ -137,4 +137,5 @@ output/
 logs
 *.swp
 Untitled-2.sh
-esp32/take_photos/arduino_secrets.h
+arduino_secrets.h
+arduino_secrets.cpp

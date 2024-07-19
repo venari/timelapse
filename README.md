@@ -584,3 +584,39 @@ pssh --hosts ~/dev/venari/timelapse/hosts.txt -t 900 -x '-o ConnectTimeout=60 -o
 3D models
 
 - Raspberry Pi Camera Module v3 STL files: https://www.printables.com/model/368779-raspberry-pi-camera-module-3-v3/
+
+# ESP32 version/links
+
+https://www.waveshare.com/wiki/ESP32-S3-SIM7670G-4G
+
+## Upload issue with CH34X driver
+```
+"/Users/leighhunt/Library/Arduino15/packages/esp32/tools/esptool_py/4.6/esptool" --chip esp32s3 --port "/dev/cu.usbmodem585A0118141" --baud 921600  --before default_reset --after hard_reset write_flash  -z --flash_mode keep --flash_freq keep --flash_size keep 0x0 "/private/var/folders/fx/2h8qyrk51114f5m1_x5dv7yc0000gn/T/arduino/sketches/E83F322CCBA20806EEF325130EA27172/take_photos.ino.bootloader.bin" 0x8000 "/private/var/folders/fx/2h8qyrk51114f5m1_x5dv7yc0000gn/T/arduino/sketches/E83F322CCBA20806EEF325130EA27172/take_photos.ino.partitions.bin" 0xe000 "/Users/leighhunt/Library/Arduino15/packages/esp32/hardware/esp32/3.0.1/tools/partitions/boot_app0.bin" 0x10000 "/private/var/folders/fx/2h8qyrk51114f5m1_x5dv7yc0000gn/T/arduino/sketches/E83F322CCBA20806EEF325130EA27172/take_photos.ino.bin" 
+esptool.py v4.6
+Serial port /dev/cu.usbmodem585A0118141
+Connecting....
+Chip is ESP32-S3 (revision v0.2)
+Features: WiFi, BLE
+Crystal is 40MHz
+MAC: 84:fc:e6:51:84:68
+Uploading stub...
+
+A fatal error occurred: Failed to write to target RAM (result was 01070000: Operation timed out)
+```
+
+CH343 USB chip stuff: https://www.wch.cn/downloads/CH34XSER_MAC_ZIP.html
+Arduino
+- Board - ESP32S3 Dev Module
+- Port - switch from /dev/cu.usbmodem585A0118141 Serial Port to /dev/cu.wchusbserial585A0118141 
+- Serial Moonitor - /dev/cu.wchusbserial585A0118141, 115200 baud
+
+VSCode with ESP-IDF
+- Set board to ESP32S3
+  - OpenOCD Configuration - ESP32-S3 chip (via ESP-PROG-2) seems to work
+- Flash method to UART
+
+
+Terminal attach to serial port:
+```
+screen /dev/cu.wchusbserial585A0118141 115200
+```
