@@ -22,8 +22,7 @@ const char pass[] = "";         // Set your password, if any
 // Server details
 // const char server[] = "httpbin.org"; // Server URL
 // const char server[] = "eo7ogadymqhz0vo.m.pipedream.net";
-const char server[] = "webhook.site";
-const char endpoint[] = "/f31a289a-e938-46f3-b3a7-2851e5605779";
+const char serverName[] = "timelapse-dev.azurewebsites.net";
 
 const int port = 443;                 // Server port
 
@@ -137,8 +136,8 @@ void setup() {
 
   // Make HTTP GET request
   SerialMon.print("Connecting to ");
-  SerialMon.print(server);
-  if (!client.connect(server, port)) {
+  SerialMon.print(serverName);
+  if (!client.connect(serverName, port)) {
     SerialMon.println(" failed");
     return;
   }
@@ -147,13 +146,42 @@ void setup() {
   // Make a HTTP GET request
   SerialMon.println("Sending request");
 
-  String request = String("POST ") + endpoint + " HTTP/1.1\r\n";
-  request += "Host: ";
-  request += server;
-  request += "\r\n";
-  request += "Connection: close\r\n\r\n";
-  SerialMon.println(request);
-  client.print(request);
+  String boundary = "----WebKitFormBoundary" + String(random(0xFFFFFF), HEX);
+
+  String start_request = "--" + boundary + "\r\n";
+  start_request += "Content-Disposition: form-data; name=\"message\"\r\n\r\n";
+  start_request += "Hello from ESP32";
+  start_request += "\r\n";
+  
+  String end_request = "\r\n--" + boundary + "--\r\n";
+
+  int fileLength = 0; //file.size();
+  int contentLength = start_request.length() + fileLength + end_request.length();
+
+  client.printf("POST /api/Test HTTP/1.1\r\n");
+  client.printf("Host: %s\r\n", serverName);
+  client.printf("Content-Type: multipart/form-data; boundary=%s\r\n", boundary.c_str());
+  client.printf("Content-Length: %d\r\n", contentLength);
+  client.printf("Connection: close\r\n\r\n");
+
+  client.print(start_request);
+  client.print(end_request);
+
+  SerialMon.println(start_request);
+
+  // String request = String("POST ") + endpoint + " HTTP/1.1\r\n";
+  
+  // request += "Host: ";
+  // request += server;
+  // request += "\r\n";
+  // request += "\r\n";
+  
+  // request += "message=HelloFromESP32";
+  // request += "\r\n";
+  
+  // request += "Connection: close\r\n\r\n";
+  // SerialMon.println(request);
+  // client.print(request);
 
   // client.print(String("POST " + endpoint + " HTTP/1.1\r\n") +
   //              "Host: " + server + "\r\n" +
