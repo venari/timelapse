@@ -25,7 +25,7 @@ internal class Program
     new CameraDescriptionOverride(){deviceName = "envirocam-b", startTime = null, endTime = new DateTime(2024, 01, 24), descriptionOverride = "Massey, Roundabout Neretva Ave and Biokovo Street"},
     new CameraDescriptionOverride(){deviceName = "envirocam-b", startTime = new DateTime(2024, 02, 21), endTime = new DateTime(2024, 05, 02), descriptionOverride = "Milldale - Site 21 - Milldale Drive looking towards Hicks Road and Waiwai Drive"},
 
-    new CameraDescriptionOverride(){deviceName = "sediment-pi-zero-w-v1-c", startTime = null, endTime = new DateTime(), descriptionOverride = "Wiri stream (by Griffins)"},
+    new CameraDescriptionOverride(){deviceName = "sediment-pi-zero-w-v1-c", startTime = null, endTime = new DateTime(2024, 01, 24), descriptionOverride = "Wiri stream (by Griffins)"},
 
     new CameraDescriptionOverride(){deviceName = "envirocam-d", startTime = null, endTime = new DateTime(), descriptionOverride = "Wairau Valley, 17 Silverfield"},
 
@@ -36,7 +36,7 @@ internal class Program
     
     new CameraDescriptionOverride(){deviceName = "envirocam-f", startTime = null, endTime = new DateTime(2024, 02, 28), descriptionOverride = "Massey, corner Pūwhā Street and Bikovo Street"},
     new CameraDescriptionOverride(){deviceName = "envirocam-f", startTime = new DateTime(2024, 02, 28), endTime = new DateTime(2024, 05, 21), descriptionOverride = "Flat Bush - Site 16 - Southridge Road"},
-    // new CameraDescriptionOverride(){deviceName = "envirocam-f", startTime = new DateTime(2024, 05, 21), endTime = null, descriptionOverride = "Wairau Valley Site 17"},
+    new CameraDescriptionOverride(){deviceName = "envirocam-f", startTime = new DateTime(2024, 05, 21), endTime = null, descriptionOverride = "Wairau Valley - Site 17 - Boat Fix, corner Ashfield Road and Diana Drive"},
 
 
     new CameraDescriptionOverride(){deviceName = "sediment-pi-zero-w-v1-g", startTime = null, endTime = new DateTime(2023, 11, 23), descriptionOverride = "Long Bay - Site 2 - Glenvar Ridge Road"},
@@ -55,18 +55,9 @@ internal class Program
     // 22 May 24 - Orewa - Site 20 - Corner of Tauhere Road and Kaupeka Road 
     // new CameraDescriptionOverride(){deviceName = "envirocam-k", startTime = new DateTime(2024, 05, 21), endTime = null, descriptionOverride = "Owera - Site 20 - Corner of Tauhere Road and Kaupeka Road"},
 
-    new CameraDescriptionOverride(){deviceName = "envirocam-2w-b", startTime = null, endTime = new DateTime(2024, 1, 25), descriptionOverride = "Swanson - Site 11 - Duncan Drive near Saw Lane"},
-    // new CamaraDescriptionOverride(){deviceName = "sediment-pi-zero-2w-b", startTime = new DateOnly(2024, 02, 01), endTime = null, descriptionOverride = "Rockpool"},
+    new CameraDescriptionOverride(){deviceName = "envirocam-n", startTime = null, endTime = new DateTime(2024, 05, 21), descriptionOverride = "Wairau Valley - Site 17 - Boat Fix, corner Ashfield Road and Diana Drive"},
 
-    // new CameraDescriptionOverride(){deviceName = "", startTime = null, endTime = null, descriptionOverride = "Flat Bush - Site 22 - Southridge Road"},
-    // new CameraDescriptionOverride(){deviceName = "", startTime = null, endTime = null, descriptionOverride = "Massey - Site 11 - Pūwhā Street and Bikovo Street"},
-    // new CameraDescriptionOverride(){deviceName = "", startTime = null, endTime = null, descriptionOverride = "Massey - Site 9 - Roundabout Neretva Ave and Biokovo Street"},
-    // new CameraDescriptionOverride(){deviceName = "", startTime = null, endTime = null, descriptionOverride = "Swanson - Site 21 - Kiokio Place and Kātote Avenue"},
-    // new CameraDescriptionOverride(){deviceName = "", startTime = null, endTime = null, descriptionOverride = "Swanson - Site 11 - Duncan Drive near Saw Lane"},
-    // new CameraDescriptionOverride(){deviceName = "", startTime = null, endTime = null, descriptionOverride = "Wairau Valley - Site 3 - 17 Silverfield"},
-    // new CameraDescriptionOverride(){deviceName = "", startTime = null, endTime = null, descriptionOverride = "Wiri - Site 8 - Wiri stream (by Griffins)"},
-    // new CameraDescriptionOverride(){deviceName = "", startTime = null, endTime = null, descriptionOverride = "Long Bay - Site 1 - Tupa Street towards Kumukumu Road"},
-    // new CameraDescriptionOverride(){deviceName = "", startTime = null, endTime = null, descriptionOverride = "Long Bay - Site 2 - Glenvar Ridge Road catchment"},
+    new CameraDescriptionOverride(){deviceName = "envirocam-2w-b", startTime = null, endTime = new DateTime(2024, 1, 25), descriptionOverride = "Swanson - Site 11 - Duncan Drive near Saw Lane"},
 };
 
 // Site	Location	deviceId	Telemetry Link	Link with API Key	Location	Orientation	Pi hostname	Installed
@@ -163,7 +154,7 @@ internal class Program
             foreach (var Event in events)
             {
                 EventInfo eventInfo = new EventInfo(Event);
-                logger.LogInformation($"Event Description: {Event.Description}, Device Name:{Event.Device.Name}, {Event.Device.Description}.");
+                logger.LogInformation($"Event Description: {eventInfo.Description}, Device Name:{eventInfo.Device.Name}, {eventInfo.DeviceDescription}.");
                 logger.LogInformation($"Event Start Time: {Event.StartTime.ToLocalTime()}, End Time: {Event.EndTime.ToLocalTime()}");
                 logger.LogInformation($"CSV: {eventInfo.csvLine}");
                 logger.LogInformation($"EventFolder: {eventInfo.EventFolder}");
@@ -221,17 +212,17 @@ class EventInfo : Event{
         this.EventTypesCSV = string.Join(",", Event.EventTypes.Select(et => et.Name));
         this.EventDetailPage = $"https://timelapse-dev.azurewebsites.net/Events/Detail/{Event.Id}";
 
-        string eventDeviceDescription = Event.Device.Description;
+        this.DeviceDescription = Event.Device.Description;
 
         // Check if there is a camera description override
         var cameraDescriptionOverride = Program.cameraDescriptionOverrides.FirstOrDefault(cdo => cdo.deviceName == Event.Device.Name && (cdo.startTime == null || cdo.startTime <= Event.StartTime) && (cdo.endTime == null || cdo.endTime >= Event.EndTime));
 
         if(cameraDescriptionOverride != null)
         {
-            eventDeviceDescription = cameraDescriptionOverride.descriptionOverride;
+            this.DeviceDescription = cameraDescriptionOverride.descriptionOverride;
         }
         
-        this.EventFolder = $"Event {Event.Id} - {Event.Device.Name} - {Event.Device.Description}";
+        this.EventFolder = $"Event {Event.Id} - {Event.Device.Name} - {DeviceDescription}";
         // this.FirstImageFilePath = Event.FirstImageFilePath;
     }
     public string DeviceDescription {get; set;}
