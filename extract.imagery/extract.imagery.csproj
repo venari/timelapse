@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
   <ItemGroup>
     <ProjectReference Include="..\timelapse.core\timelapse.core.csproj"/>
   </ItemGroup>
@@ -10,6 +10,7 @@
     <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="8.0.0"/>
     <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="8.0.0"/>
     <PackageReference Include="Microsoft.Extensions.Configuration.UserSecrets" Version="8.0.0"/>
+    <PackageReference Include="Azure.Storage.Blobs" Version="*"/>
   </ItemGroup>
   <ItemGroup>
     <Content Include="appsettings.json">

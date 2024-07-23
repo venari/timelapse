@@ -10,3 +10,4 @@ dotnet user-secrets --project timelapse.api set "ThirdParty_ApiKey" "$ThirdParty
 dotnet user-secrets --project timelapse.api set "LINZApiKey" "$LINZApiKey"
 
 dotnet user-secrets --project extract.imagery set "ConnectionStrings:DefaultConnection" "$ConnectionStrings__DefaultConnection"
+# dotnet user-secrets --project extract.imagery set "STORAGE_CONNECTION_STRING" $STORAGE_CONNECTION_STRING
