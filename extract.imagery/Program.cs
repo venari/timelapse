@@ -116,7 +116,7 @@ internal class Program
             }
 
             AnsiConsole.Progress()
-                .Start(async ctx => 
+                .StartAsync(async ctx => 
                 {
                     // Define tasks
                     var taskCreateSummaryCSV = ctx.AddTask("[green]Create Summary CSV[/]");
@@ -132,9 +132,9 @@ internal class Program
                         {
                             var taskDownloadEvent = ctx.AddTask($"[green]Download Event {Event.Id}[/]");
 
-                            await DownloadEventImages(Event, taskDownloadEvent);
+                            DownloadEventImages(Event, taskDownloadEvent).Wait();
 
-                            taskDownloadEvent.Increment(100);
+                            // taskDownloadEvent.Increment(100);
                             taskDownloadEvents.Increment(1);
                         }
                     }
@@ -211,9 +211,8 @@ internal class Program
                     {
                         var blobName = image.BlobUri.Segments.Last();
 
-                        // async one seems to be failing...
-                        // await storageHelper.DownloadAsync(blobName, imageFilePath);
-                        storageHelper.Download(blobName, imageFilePath);
+                        await storageHelper.DownloadAsync(blobName, imageFilePath);
+                        // storageHelper.Download(blobName, imageFilePath);
                     }
                     progressTask.Increment(1);
                 }
