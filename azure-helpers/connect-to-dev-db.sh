@@ -8,3 +8,5 @@ dotnet user-secrets --project timelapse.api set "ConnectionStrings:DefaultConnec
 dotnet user-secrets --project timelapse.api set "SendgridAPIKey" "$SendgridAPIKey"
 dotnet user-secrets --project timelapse.api set "ThirdParty_ApiKey" "$ThirdParty_ApiKey"
 dotnet user-secrets --project timelapse.api set "LINZApiKey" "$LINZApiKey"
+
+dotnet user-secrets --project extract.imagery set "ConnectionStrings:DefaultConnection" "$ConnectionStrings__DefaultConnection"
