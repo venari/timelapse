@@ -9,24 +9,9 @@ using Microsoft.Extensions.Logging.Console;
 using timelapse.core.models;
 
 
-// Define logger
-var loggerFactory = LoggerFactory.Create(builder =>
+internal class Program
 {
-    builder
-        .AddConsole();
-});
-
-// Define configuration
-var configuration = new ConfigurationBuilder()
-    .AddJsonFile("appsettings.json")
-    .AddUserSecrets<Program>()
-    .Build();
-
-
-ILogger logger = loggerFactory.CreateLogger<Program>();
-logger.LogInformation(configuration.GetConnectionString("DefaultConnection"));
-
-List<CameraDescriptionOverride> cameraDescriptionOverrides = new List<CameraDescriptionOverride>(){
+    public static List<CameraDescriptionOverride> cameraDescriptionOverrides = new List<CameraDescriptionOverride>(){
 
 // Initial installs
 
@@ -39,11 +24,11 @@ List<CameraDescriptionOverride> cameraDescriptionOverrides = new List<CameraDesc
     
     new CameraDescriptionOverride(){deviceName = "envirocam-b", startTime = null, endTime = new DateTime(2024, 01, 24), descriptionOverride = "Massey, Roundabout Neretva Ave and Biokovo Street"},
     new CameraDescriptionOverride(){deviceName = "envirocam-b", startTime = new DateTime(2024, 02, 21), endTime = new DateTime(2024, 05, 02), descriptionOverride = "Milldale - Site 21 - Milldale Drive looking towards Hicks Road and Waiwai Drive"},
-    
+
     new CameraDescriptionOverride(){deviceName = "sediment-pi-zero-w-v1-c", startTime = null, endTime = new DateTime(), descriptionOverride = "Wiri stream (by Griffins)"},
-    
+
     new CameraDescriptionOverride(){deviceName = "envirocam-d", startTime = null, endTime = new DateTime(), descriptionOverride = "Wairau Valley, 17 Silverfield"},
-    
+
     new CameraDescriptionOverride(){deviceName = "envirocam-e", startTime = null, endTime = new DateTime(2023, 11, 23), descriptionOverride = "Flat Bush - Site 5 - Bremner Ridge St & Alluvial St"},
     new CameraDescriptionOverride(){deviceName = "envirocam-e", startTime = new DateTime(2023, 12, 14), endTime = new DateTime(2024, 02, 06), descriptionOverride = "Wiri - Site 08 - 39 Ash Road, stream by Griffins"},
     new CameraDescriptionOverride(){deviceName = "envirocam-e", startTime = new DateTime(2024, 02, 06), endTime = new DateTime(2024, 04, 11), descriptionOverride = "Wiri - Site 08 - 55 Ash Road, near Griffins factory"},
@@ -82,9 +67,7 @@ List<CameraDescriptionOverride> cameraDescriptionOverrides = new List<CameraDesc
     // new CameraDescriptionOverride(){deviceName = "", startTime = null, endTime = null, descriptionOverride = "Wiri - Site 8 - Wiri stream (by Griffins)"},
     // new CameraDescriptionOverride(){deviceName = "", startTime = null, endTime = null, descriptionOverride = "Long Bay - Site 1 - Tupa Street towards Kumukumu Road"},
     // new CameraDescriptionOverride(){deviceName = "", startTime = null, endTime = null, descriptionOverride = "Long Bay - Site 2 - Glenvar Ridge Road catchment"},
-
 };
-
 
 // Site	Location	deviceId	Telemetry Link	Link with API Key	Location	Orientation	Pi hostname	Installed
 // NEW
@@ -103,135 +86,166 @@ List<CameraDescriptionOverride> cameraDescriptionOverrides = new List<CameraDesc
 // 	Flat Bush Greenstead Close	24	https://timelapse-dev.azurewebsites.net/TelemetryGraph/24	https://timelapse-dev.azurewebsites.net/ImageView/24?api-key={3d9e8644-4507-489e-ae14-17bd6d968ae9}	-36.98077265999506, 174.93885132305533	170	sediment-pi-zero-w-v1-j	18 May
 // Site 1	Long Bay, Tupa Street towards Kumukumu Road 	23	https://timelapse-dev.azurewebsites.net/TelemetryGraph/23	https://timelapse-dev.azurewebsites.net/ImageView/23?api-key={3d9e8644-4507-489e-ae14-17bd6d968ae9}	-36.679817900807215, 174.73862170607092	350	sediment-pi-zero-w-v1-k	17 May
 
-
-
-
-using (var appDbContext = new AppDbContext(configuration))
-{
-    // var devices = dbContext.Devices.ToList();
-    var events = appDbContext.Events
-        .Include(e => e.EventTypes)
-        .Include(e => e.Device)
-        .ToList();
-        
-    var eventsCount = events.Count();
-    logger.LogInformation($"Events count: {eventsCount}");
-
-    // create output folder if it doesn't already exist
-    var outputFolder = configuration["OutputFolder"];
-    if (!System.IO.Directory.Exists(outputFolder))
+    private static void Main(string[] args)
     {
-        System.IO.Directory.CreateDirectory(outputFolder);
-    }
-
-    // if clean switch, empty folder
-    if (args.Length > 0 && args[0] == "clean")
-    {
-        System.IO.DirectoryInfo di = new System.IO.DirectoryInfo(outputFolder);
-
-        foreach (System.IO.FileInfo file in di.GetFiles())
+        // Define logger
+        var loggerFactory = LoggerFactory.Create(builder =>
         {
-            file.Delete();
-        }
-    }
+            builder
+                .AddConsole();
+        });
 
-    // Create summary.csv file
-    var summaryFilePath = System.IO.Path.Combine(outputFolder, "summary.csv");
-    // Delete the file if it exists
-    if (System.IO.File.Exists(summaryFilePath))
-    {
-        System.IO.File.Delete(summaryFilePath);
-    }
+        // Define configuration
+        var configuration = new ConfigurationBuilder()
+            .AddJsonFile("appsettings.json")
+            .AddUserSecrets<Program>()
+            .Build();
 
-    // Open file for writing
-    using (var writer = new System.IO.StreamWriter(summaryFilePath))
-    {
-        writer.WriteLine("\"Event Description\",\"Device Name\",\"Device Description\",\"Event Type\",\"Start Time\",\"End Time\",\"Event Detail Page\"");
 
-        foreach(var Event in events.OrderBy(e => e.Device.Name).ThenBy(e => e.StartTime))
+        ILogger logger = loggerFactory.CreateLogger<Program>();
+        logger.LogInformation(configuration.GetConnectionString("DefaultConnection"));
+
+
+
+
+
+        using (var appDbContext = new AppDbContext(configuration))
         {
-            // Convert event types into csv list of event types
-            var eventTypes = string.Join(",", Event.EventTypes.Select(et => et.Name));
-            string eventDeviceDescription = Event.Device.Description;
+            // var devices = dbContext.Devices.ToList();
+            var events = appDbContext.Events
+                .Include(e => e.EventTypes)
+                .Include(e => e.Device)
+                .ToList();
 
-            // Check if there is a camera description override
-            var cameraDescriptionOverride = cameraDescriptionOverrides.FirstOrDefault(cdo => cdo.deviceName == Event.Device.Name && (cdo.startTime == null || cdo.startTime <= Event.StartTime) && (cdo.endTime == null || cdo.endTime >= Event.EndTime));
+            var eventsCount = events.Count();
+            logger.LogInformation($"Events count: {eventsCount}");
 
-            if(cameraDescriptionOverride != null)
+            // create output folder if it doesn't already exist
+            var outputFolder = configuration["OutputFolder"];
+            if (!Directory.Exists(outputFolder))
             {
-                eventDeviceDescription = cameraDescriptionOverride.descriptionOverride;
+                Directory.CreateDirectory(outputFolder);
             }
 
-            var line = $"\"{Event.Description}\",\"{Event.Device.Name}\",\"{eventDeviceDescription}\",\"{eventTypes}\",{Event.StartTime.ToLocalTime()},{Event.EndTime.ToLocalTime()},\"https://timelapse-dev.azurewebsites.net/Events/Detail/{Event.Id}\"";
-            line = line.Replace(" ", " "); // replace strange space character.
-            writer.WriteLine(line);
+            // if clean switch, empty folder
+            if (args.Length > 0 && args[0] == "clean")
+            {
+                DirectoryInfo di = new DirectoryInfo(outputFolder);
+
+                foreach (FileInfo file in di.GetFiles())
+                {
+                    file.Delete();
+                }
+            }
+
+            // Create summary.csv file
+            var summaryFilePath = Path.Combine(outputFolder, "summary.csv");
+            // Delete the file if it exists
+            if (File.Exists(summaryFilePath))
+            {
+                File.Delete(summaryFilePath);
+            }
+
+            // Open file for writing
+            using (var writer = new StreamWriter(summaryFilePath))
+            {
+                writer.WriteLine("\"Event Description\",\"Device Name\",\"Device Description\",\"Event Type\",\"Start Time\",\"End Time\",\"Event Detail Page\"");
+
+                foreach (var Event in events.OrderBy(e => e.Device.Name).ThenBy(e => e.StartTime))
+                {
+                    EventInfo eventInfo = new EventInfo(Event);
+                    // Convert event types into csv list of event types
+
+                    writer.WriteLine(eventInfo.csvLine);
+                }
+            }
+
+            foreach (var Event in events)
+            {
+                EventInfo eventInfo = new EventInfo(Event);
+                logger.LogInformation($"Event Description: {Event.Description}, Device Name:{Event.Device.Name}, {Event.Device.Description}.");
+                logger.LogInformation($"Event Start Time: {Event.StartTime.ToLocalTime()}, End Time: {Event.EndTime.ToLocalTime()}");
+                logger.LogInformation($"CSV: {eventInfo.csvLine}");
+                logger.LogInformation($"EventFolder: {eventInfo.EventFolder}");
+
+                var EventImages = appDbContext.Images
+                    .Where(i => i.DeviceId == Event.DeviceId && i.Timestamp >= Event.StartTime.ToUniversalTime() && i.Timestamp <= Event.EndTime.ToUniversalTime())
+                    .OrderBy(i => i.Timestamp)
+                    .ToList();
+
+                logger.LogInformation($"Number of images: {EventImages.Count()}");
+
+                // Create a folder for the event
+                var eventFolder = Path.Combine(outputFolder, eventInfo.EventFolder);
+
+                if (!Directory.Exists(eventFolder))
+                {
+                    Directory.CreateDirectory(eventFolder);
+                }
+
+                // Download first image...
+
+                StorageHelper helper = new StorageHelper(configuration, logger, null);
+
+                if (EventImages.Count() > 0)
+                {
+                    var firstImage = EventImages.First();
+                    var firstImageFilePath = Path.Combine(eventFolder, $"{firstImage.Timestamp.ToString("yyyy-MM-ddTHH-mm-ss")}.jpg");
+
+                    if (!File.Exists(firstImageFilePath))
+                    {
+                        var blobName = firstImage.BlobUri.Segments.Last();
+
+                        helper.Download(blobName, firstImageFilePath);
+                        // using (var webClient = new System.Net.WebClient())
+                        // {
+                        //     webClient.DownloadFile(firstImage.BlobUri, firstImageFilePath);
+                        // }
+                    }
+                }
+            }
         }
     }
+}
 
-    foreach(var Event in events)
-    {
-        logger.LogInformation($"Event Description: {Event.Description}, Device Name:{Event.Device.Name}, {Event.Device.Description}.");
 
-        foreach(var eventType in Event.EventTypes)
-        {
-            logger.LogInformation($"Event Type: {eventType.Name}");
-        }
 
-        logger.LogInformation($"Event Start Time: {Event.StartTime.ToLocalTime()}, End Time: {Event.EndTime.ToLocalTime()}");
+class EventInfo : Event{
+    public EventInfo(Event Event){
+        this.Id = Event.Id;
+        this.DeviceId = Event.DeviceId;
+        this.Description = Event.Description;
+        this.StartTime = Event.StartTime;
+        this.EndTime = Event.EndTime;
+        this.Device = Event.Device;
+        this.EventTypesCSV = string.Join(",", Event.EventTypes.Select(et => et.Name));
+        this.EventDetailPage = $"https://timelapse-dev.azurewebsites.net/Events/Detail/{Event.Id}";
 
-        var EventImages = appDbContext.Images
-            .Where(i => i.DeviceId == Event.DeviceId && i.Timestamp >= Event.StartTime.ToUniversalTime() && i.Timestamp <= Event.EndTime.ToUniversalTime())
-            .OrderBy(i => i.Timestamp)
-            // .Select(i => new ImageSubset{
-            //     Id = i.Id,
-            //     Timestamp = i.Timestamp,
-            //     BlobUri = i.BlobUri
-            // })
-            .ToList();
-
-        logger.LogInformation($"Number of images: {EventImages.Count()}");
-
-        // Create a folder for the event
-        var eventFolder = System.IO.Path.Combine(outputFolder, "Event " + Event.Id.ToString());
-
-        // Duplication here... ooops
         string eventDeviceDescription = Event.Device.Description;
 
         // Check if there is a camera description override
-        var cameraDescriptionOverride = cameraDescriptionOverrides.FirstOrDefault(cdo => cdo.deviceName == Event.Device.Name && (cdo.startTime == null || cdo.startTime <= Event.StartTime) && (cdo.endTime == null || cdo.endTime >= Event.EndTime));
+        var cameraDescriptionOverride = Program.cameraDescriptionOverrides.FirstOrDefault(cdo => cdo.deviceName == Event.Device.Name && (cdo.startTime == null || cdo.startTime <= Event.StartTime) && (cdo.endTime == null || cdo.endTime >= Event.EndTime));
 
         if(cameraDescriptionOverride != null)
         {
             eventDeviceDescription = cameraDescriptionOverride.descriptionOverride;
         }
-
-        eventFolder += " - " + eventDeviceDescription;
         
-        if (!System.IO.Directory.Exists(eventFolder))
-        {
-            System.IO.Directory.CreateDirectory(eventFolder);
-        }
+        this.EventFolder = $"Event {Event.Id} - {Event.Device.Name} - {Event.Device.Description}";
+        // this.FirstImageFilePath = Event.FirstImageFilePath;
+    }
+    public string DeviceDescription {get; set;}
+    public string EventTypesCSV {get; set;}
+    public string EventDetailPage {get; set;}
+    public string EventFolder {get; set;}
+    public string FirstImageFilePath {get; set;}
 
-        // Download first image...
-
-        StorageHelper helper = new StorageHelper(configuration, logger, null);
-
-        if (EventImages.Count() > 0)
-        {
-            var firstImage = EventImages.First();
-            var firstImageFilePath = System.IO.Path.Combine(eventFolder, $"{firstImage.Timestamp.ToString("yyyy-MM-ddTHH-mm-ss")}.jpg");
-
-            if (!System.IO.File.Exists(firstImageFilePath))
-            {
-                var blobName = firstImage.BlobUri.Segments.Last();
-
-                helper.Download(blobName, firstImageFilePath);
-                // using (var webClient = new System.Net.WebClient())
-                // {
-                //     webClient.DownloadFile(firstImage.BlobUri, firstImageFilePath);
-                // }
-            }
-        }
+    public string csvLine {
+        get {
+            var line = $"\"{Description}\",\"{Device.Name}\",\"{DeviceDescription}\",\"{EventTypesCSV}\",{StartTime.ToLocalTime()},{EndTime.ToLocalTime()},{EventDetailPage}";
+            line = line.Replace(" ", " "); // replace strange space character.
+            return line;
+    }
     }
 }
 
