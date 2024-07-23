@@ -116,6 +116,7 @@ internal class Program
             }
 
             AnsiConsole.Progress()
+                .HideCompleted(true)
                 .StartAsync(async ctx => 
                 {
                     // Define tasks
@@ -181,7 +182,16 @@ internal class Program
     private static async Task CreateEventInfoFile(Event Event){
         try{
             EventInfo eventInfo = new EventInfo(Event);
-            var eventInfoFilePath = Path.Combine(outputFolder, eventInfo.EventFolder, "event-info.txt");
+
+            // Create a folder for the event
+            var eventFolder = Path.Combine(outputFolder, eventInfo.EventFolder);
+
+            var eventInfoFilePath = Path.Combine(eventFolder, "event-info.txt");
+
+            if (!Directory.Exists(eventFolder))
+            {
+                Directory.CreateDirectory(eventFolder);
+            }
 
             // Delete the file if it exists
             if (File.Exists(eventInfoFilePath))
