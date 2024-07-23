@@ -10,6 +10,7 @@ using Microsoft.Extensions.Logging.Console;
 using timelapse.core.models;
 using Spectre.Console;
 using Spectre.Console.Cli;
+using Humanizer;
 
 internal class Program
 {
@@ -66,7 +67,6 @@ internal class Program
 
     private static void Main(string[] args)
     {
-        AnsiConsole.Markup("[underline red]Hello[/] World!");
         // Define logger
         var loggerFactory = LoggerFactory.Create(builder =>
         {
@@ -82,7 +82,7 @@ internal class Program
 
 
         logger = loggerFactory.CreateLogger<Program>();
-        logger.LogInformation(configuration.GetConnectionString("DefaultConnection"));
+        // logger.LogInformation(configuration.GetConnectionString("DefaultConnection"));
 
         storageHelper = new StorageHelper(configuration, logger, null);
 
@@ -95,7 +95,7 @@ internal class Program
                 .ToList();
 
             var eventsCount = events.Count();
-            logger.LogInformation($"Events count: {eventsCount}");
+            // logger.LogInformation($"Events count: {eventsCount}");
 
             // create output folder if it doesn't already exist
             outputFolder = configuration["OutputFolder"];
@@ -132,6 +132,7 @@ internal class Program
                         {
                             var taskDownloadEvent = ctx.AddTask($"[green]Download Event {Event.Id}[/]");
 
+                            CreateEventInfoFile(Event).Wait();
                             DownloadEventImages(Event, taskDownloadEvent).Wait();
 
                             // taskDownloadEvent.Increment(100);
@@ -160,9 +161,9 @@ internal class Program
             // Open file for writing
             using (var writer = new StreamWriter(summaryFilePath))
             {
-                writer.WriteLine("\"Event Description\",\"Device Name\",\"Device Description\",\"Event Type\",\"Start Time\",\"End Time\",\"Event Detail Page\"");
+                writer.WriteLine("\"Event ID\",\"Event Description\",\"Device Name\",\"Device Description\",\"Event Type\",\"Start Time\",\"End Time\",\"Event Detail Page\"");
 
-                foreach (var Event in events.OrderBy(e => e.Device.Name).ThenBy(e => e.StartTime))
+                foreach (var Event in events)//.OrderBy(e => e.Device.Name).ThenBy(e => e.StartTime))
                 {
                     EventInfo eventInfo = new EventInfo(Event);
                     // Convert event types into csv list of event types
@@ -174,6 +175,35 @@ internal class Program
 
         } catch(Exception ex){
             logger.LogError(ex, "Error creating summary CSV");
+        }
+    }
+
+    private static async Task CreateEventInfoFile(Event Event){
+        try{
+            EventInfo eventInfo = new EventInfo(Event);
+            var eventInfoFilePath = Path.Combine(outputFolder, eventInfo.EventFolder, "event-info.txt");
+
+            // Delete the file if it exists
+            if (File.Exists(eventInfoFilePath))
+            {
+                File.Delete(eventInfoFilePath);
+            }
+
+            // Open file for writing
+            using (var writer = new StreamWriter(eventInfoFilePath))
+            {
+                writer.WriteLine($"Event Description: {eventInfo.Description}");
+                writer.WriteLine($"Device Name: {eventInfo.Device.Name}");
+                writer.WriteLine($"Device Description: {eventInfo.DeviceDescription}");
+                writer.WriteLine($"Event Types: {eventInfo.EventTypesCSV}");
+                writer.WriteLine($"Start Time: {eventInfo.StartTime.ToLocalTime()}");
+                writer.WriteLine($"End Time: {eventInfo.EndTime.ToLocalTime()}");
+                writer.WriteLine($"End Duration: {(eventInfo.EndTime.ToLocalTime() - eventInfo.StartTime.ToLocalTime()).Humanize()}");
+                writer.WriteLine($"Event Detail Page: {eventInfo.EventDetailPage}");
+            }
+        }
+        catch(Exception ex){
+            logger.LogError(ex, $"Error creating event info file for event {Event.Id}");
         }
     }
 
@@ -234,7 +264,7 @@ class EventInfo : Event{
         this.StartTime = Event.StartTime;
         this.EndTime = Event.EndTime;
         this.Device = Event.Device;
-        this.EventTypesCSV = string.Join(",", Event.EventTypes.Select(et => et.Name));
+        this.EventTypesCSV = string.Join(", ", Event.EventTypes.Select(et => et.Name));
         this.EventDetailPage = $"https://timelapse-dev.azurewebsites.net/Events/Detail/{Event.Id}";
 
         this.DeviceDescription = Event.Device.Description;
@@ -256,7 +286,7 @@ class EventInfo : Event{
 
     public string csvLine {
         get {
-            var line = $"\"{Description}\",\"{Device.Name}\",\"{DeviceDescription}\",\"{EventTypesCSV}\",{StartTime.ToLocalTime()},{EndTime.ToLocalTime()},{EventDetailPage}";
+            var line = $"{Id},\"{Description}\",\"{Device.Name}\",\"{DeviceDescription}\",\"{EventTypesCSV}\",{StartTime.ToLocalTime()},{EndTime.ToLocalTime()},{EventDetailPage}";
             line = line.Replace(" ", " "); // replace strange space character.
             return line;
     }
