@@ -45,6 +45,10 @@ namespace extract.imagery.infrastructure
                 .WithMany(e => e.Events);
 
             // modelBuilder.Entity<Event>()
+            //     .HasOne(e => e.Device)
+            //     .WithMany(d => d.Events);
+
+            // modelBuilder.Entity<Event>()
             //     .HasOne(e => e.EventType);
         }
 
