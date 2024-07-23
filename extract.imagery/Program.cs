@@ -35,6 +35,47 @@ using (var appDbContext = new AppDbContext(configuration))
     var eventsCount = events.Count();
     logger.LogInformation($"Events count: {eventsCount}");
 
+    // create output folder if it doesn't already exist
+    var outputFolder = configuration["OutputFolder"];
+    if (!System.IO.Directory.Exists(outputFolder))
+    {
+        System.IO.Directory.CreateDirectory(outputFolder);
+    }
+
+    // if clean switch, empty folder
+    if (args.Length > 0 && args[0] == "clean")
+    {
+        System.IO.DirectoryInfo di = new System.IO.DirectoryInfo(outputFolder);
+
+        foreach (System.IO.FileInfo file in di.GetFiles())
+        {
+            file.Delete();
+        }
+    }
+
+    // Create summary.csv file
+    var summaryFilePath = System.IO.Path.Combine(outputFolder, "summary.csv");
+    // Delete the file if it exists
+    if (System.IO.File.Exists(summaryFilePath))
+    {
+        System.IO.File.Delete(summaryFilePath);
+    }
+
+    // Open file for writing
+    using (var writer = new System.IO.StreamWriter(summaryFilePath))
+    {
+        writer.WriteLine("\"Event Description\",\"Device Name\",\"Device Description\",\"Event Type\",\"Start Time\",\"End Time\",\"Event Detail Page\"");
+
+        foreach(var Event in events.OrderBy(e => e.Device.Name).ThenBy(e => e.StartTime))
+        {
+            // Convert event types into csv list of event types
+            var eventTypes = string.Join(",", Event.EventTypes.Select(et => et.Name));
+            var line = $"\"{Event.Description}\",\"{Event.Device.Name}\",\"{Event.Device.Description}\",\"{eventTypes}\",{Event.StartTime.ToLocalTime()},{Event.EndTime.ToLocalTime()},\"https://timelapse-dev.azurewebsites.net/Events/Detail/{Event.Id}\"";
+            line = line.Replace(" ", " "); // replace strange space character.
+            writer.WriteLine(line);
+        }
+    }
+
     foreach(var Event in events)
     {
         logger.LogInformation($"Event Description: {Event.Description}, Device Name:{Event.Device.Name}, {Event.Device.Description}.");
