@@ -3,14 +3,22 @@ using System.Security.Cryptography;
 using extract.imagery.Helpers;
 using extract.imagery.infrastructure;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Migrations.Operations;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Console;
 using timelapse.core.models;
-
+using Spectre.Console;
+using Spectre.Console.Cli;
 
 internal class Program
 {
+    const int minutesContext = 5;
+    static ILogger logger;
+    static AppDbContext appDbContext;
+    static string outputFolder;
+    static StorageHelper storageHelper;
+
     public static List<CameraDescriptionOverride> cameraDescriptionOverrides = new List<CameraDescriptionOverride>(){
 
         new CameraDescriptionOverride(){deviceName = "envirocam-a", startTime = null, endTime = new DateTime(2024, 02, 01), descriptionOverride = "Flat Bush - Site 10 - Flat Bush Outflow"},
@@ -58,6 +66,7 @@ internal class Program
 
     private static void Main(string[] args)
     {
+        AnsiConsole.Markup("[underline red]Hello[/] World!");
         // Define logger
         var loggerFactory = LoggerFactory.Create(builder =>
         {
@@ -72,12 +81,12 @@ internal class Program
             .Build();
 
 
-        ILogger logger = loggerFactory.CreateLogger<Program>();
+        logger = loggerFactory.CreateLogger<Program>();
         logger.LogInformation(configuration.GetConnectionString("DefaultConnection"));
 
+        storageHelper = new StorageHelper(configuration, logger, null);
 
-
-        using (var appDbContext = new AppDbContext(configuration))
+        using (appDbContext = new AppDbContext(configuration))
         {
             // var devices = dbContext.Devices.ToList();
             var events = appDbContext.Events
@@ -89,7 +98,7 @@ internal class Program
             logger.LogInformation($"Events count: {eventsCount}");
 
             // create output folder if it doesn't already exist
-            var outputFolder = configuration["OutputFolder"];
+            outputFolder = configuration["OutputFolder"];
             if (!Directory.Exists(outputFolder))
             {
                 Directory.CreateDirectory(outputFolder);
@@ -106,6 +115,40 @@ internal class Program
                 }
             }
 
+            AnsiConsole.Progress()
+                .Start(async ctx => 
+                {
+                    // Define tasks
+                    var taskCreateSummaryCSV = ctx.AddTask("[green]Create Summary CSV[/]");
+                    var taskDownloadEvents = ctx.AddTask("[green]Download Events[/]");
+                    taskDownloadEvents.MaxValue = eventsCount;
+
+                    while(!ctx.IsFinished) 
+                    {
+                        await CreateSummaryCSV(events);
+                        taskCreateSummaryCSV.Increment(100);
+
+                        foreach (var Event in events)
+                        {
+                            var taskDownloadEvent = ctx.AddTask($"[green]Download Event {Event.Id}[/]");
+
+                            await DownloadEventImages(Event, taskDownloadEvent);
+
+                            taskDownloadEvent.Increment(100);
+                            taskDownloadEvents.Increment(1);
+                        }
+                    }
+                });
+
+
+            // TO DO
+            //- add description file
+
+        }
+    }
+
+    private static async Task CreateSummaryCSV(List<Event> events){
+        try{
             // Create summary.csv file
             var summaryFilePath = Path.Combine(outputFolder, "summary.csv");
             // Delete the file if it exists
@@ -128,46 +171,56 @@ internal class Program
                 }
             }
 
-            foreach (var Event in events)
+
+        } catch(Exception ex){
+            logger.LogError(ex, "Error creating summary CSV");
+        }
+    }
+
+    private static async Task DownloadEventImages(Event Event, ProgressTask progressTask){
+        try{
+            EventInfo eventInfo = new EventInfo(Event);
+            // logger.LogDebug($"Event Description: {eventInfo.Description}, Device Name:{eventInfo.Device.Name}, {eventInfo.DeviceDescription}.");
+            // logger.LogDebug($"Event Start Time: {Event.StartTime.ToLocalTime()}, End Time: {Event.EndTime.ToLocalTime()}");
+            // logger.LogDebug($"CSV: {eventInfo.csvLine}");
+            // logger.LogDebug($"EventFolder: {eventInfo.EventFolder}");
+
+            var EventImages = appDbContext.Images
+                .Where(i => i.DeviceId == Event.DeviceId && i.Timestamp >= Event.StartTime.AddMinutes(minutesContext*-1).ToUniversalTime() && i.Timestamp <= Event.EndTime.AddMinutes(minutesContext).ToUniversalTime())
+                .OrderBy(i => i.Timestamp)
+                .ToList();
+
+            // logger.LogInformation($"Number of images: {EventImages.Count()}");
+
+            progressTask.MaxValue = EventImages.Count();
+
+            // Create a folder for the event
+            var eventFolder = Path.Combine(outputFolder, eventInfo.EventFolder);
+
+            if (!Directory.Exists(eventFolder))
             {
-                EventInfo eventInfo = new EventInfo(Event);
-                logger.LogInformation($"Event Description: {eventInfo.Description}, Device Name:{eventInfo.Device.Name}, {eventInfo.DeviceDescription}.");
-                logger.LogInformation($"Event Start Time: {Event.StartTime.ToLocalTime()}, End Time: {Event.EndTime.ToLocalTime()}");
-                logger.LogInformation($"CSV: {eventInfo.csvLine}");
-                logger.LogInformation($"EventFolder: {eventInfo.EventFolder}");
+                Directory.CreateDirectory(eventFolder);
+            }
 
-                var EventImages = appDbContext.Images
-                    .Where(i => i.DeviceId == Event.DeviceId && i.Timestamp >= Event.StartTime.ToUniversalTime() && i.Timestamp <= Event.EndTime.ToUniversalTime())
-                    .OrderBy(i => i.Timestamp)
-                    .ToList();
+            if (EventImages.Count() > 0)
+            {
+                foreach(var image in EventImages){
+                    var imageFilePath = Path.Combine(eventFolder, $"{image.Timestamp.ToString("yyyy-MM-ddTHH-mm-ss")}.jpg");
 
-                logger.LogInformation($"Number of images: {EventImages.Count()}");
-
-                // Create a folder for the event
-                var eventFolder = Path.Combine(outputFolder, eventInfo.EventFolder);
-
-                if (!Directory.Exists(eventFolder))
-                {
-                    Directory.CreateDirectory(eventFolder);
-                }
-
-                // Download first image...
-
-                StorageHelper helper = new StorageHelper(configuration, logger, null);
-
-                if (EventImages.Count() > 0)
-                {
-                    var firstImage = EventImages.First();
-                    var firstImageFilePath = Path.Combine(eventFolder, $"{firstImage.Timestamp.ToString("yyyy-MM-ddTHH-mm-ss")}.jpg");
-
-                    if (!File.Exists(firstImageFilePath))
+                    if (!File.Exists(imageFilePath))
                     {
-                        var blobName = firstImage.BlobUri.Segments.Last();
+                        var blobName = image.BlobUri.Segments.Last();
 
-                        helper.Download(blobName, firstImageFilePath);
+                        // async one seems to be failing...
+                        // await storageHelper.DownloadAsync(blobName, imageFilePath);
+                        storageHelper.Download(blobName, imageFilePath);
                     }
+                    progressTask.Increment(1);
                 }
             }
+        }
+        catch(Exception ex){
+            logger.LogError(ex, $"Error downloading images for event {Event.Id}");
         }
     }
 }

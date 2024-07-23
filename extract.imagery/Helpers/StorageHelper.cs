@@ -52,6 +52,24 @@ namespace extract.imagery.Helpers
             }
         }
 
+        public async Task<bool> DownloadAsync(string blobName, string localFilePath){
+            try{
+                _logger.LogDebug($"DownloadAsync(\"{blobName}\")");
+                Azure.Storage.Blobs.Models.BlobDownloadInfo blobDownloadInfo = blobContainerClient.GetBlobClient(blobName).Download();
+                
+                using(FileStream fileStream = File.OpenWrite(localFilePath)){
+                    await blobDownloadInfo.Content.CopyToAsync(fileStream);
+                }
+
+                return true;
+            }
+            catch(Exception ex){
+                _logger.LogError($"Error trying to access blob {blobName}");
+                _logger.LogError(ex.ToString());
+                throw;
+            }
+        }
+
         public Uri Upload(string blobName, Stream stream){
             try{
                 _logger.LogDebug($"Upload(\"{blobName}\")");
