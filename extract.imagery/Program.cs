@@ -162,7 +162,7 @@ internal class Program
             // Open file for writing
             using (var writer = new StreamWriter(summaryFilePath))
             {
-                writer.WriteLine("\"Event ID\",\"Event Description\",\"Device Name\",\"Device Description\",\"Event Type\",\"Start Time\",\"End Time\",\"Event Detail Page\"");
+                writer.WriteLine("\"Event ID\",\"Event Description\",\"Device Name\",\"Device Description\",\"Event Type\",\"Start Time\",\"End Time\",\"Duration (hrs)\",\"Event Detail Page\"");
 
                 foreach (var Event in events)//.OrderBy(e => e.Device.Name).ThenBy(e => e.StartTime))
                 {
@@ -296,7 +296,7 @@ class EventInfo : Event{
 
     public string csvLine {
         get {
-            var line = $"{Id},\"{Description}\",\"{Device.Name}\",\"{DeviceDescription}\",\"{EventTypesCSV}\",{StartTime.ToLocalTime()},{EndTime.ToLocalTime()},{EventDetailPage}";
+            var line = $"{Id},\"{Description}\",\"{Device.Name}\",\"{DeviceDescription}\",\"{EventTypesCSV}\",{StartTime.ToLocalTime()},{EndTime.ToLocalTime()},{(EndTime-StartTime).TotalHours.ToString("0.00")},{EventDetailPage}";
             line = line.Replace(" ", " "); // replace strange space character.
             return line;
     }
