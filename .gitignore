@@ -139,3 +139,6 @@ logs
 Untitled-2.sh
 arduino_secrets.h
 arduino_secrets.cpp
+esp32/AllFunctions
+esp32/hellow-world
+esp32/sample_project

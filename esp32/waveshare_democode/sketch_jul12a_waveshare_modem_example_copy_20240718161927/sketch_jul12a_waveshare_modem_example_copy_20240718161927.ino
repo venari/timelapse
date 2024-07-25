@@ -76,18 +76,41 @@ void setup() {
     delay(1000);
   }
   
-  // SentSerial("ATE1;");
-  // SentSerial("AT+COPS?");
-  // // //  14:46:03.547 -> +COPS: 0,2,"53001",7
-  // SentSerial("AT+CGDCONT?");
-  // // // 14:46:03.580 -> +CGDCONT: 1,"IP","vodafone","100.70.101.247",,,,,,,,,,,
-  // SentSerial("AT+SIMCOMATI");
-  // // 14:46:03.580 -> Manufacturer: SIMCOM INCORPORATED
-  // // 14:46:03.580 -> Model: SIM7670G-MNGV
-  // // 14:46:03.580 -> Revision: 2360B01SIM767XM5A_M
-  // // 14:46:03.580 -> SIM767XM5A_B01V03_231207
-  // // 14:46:03.580 -> IMEI: 864643060060052
-  // // 14:46:03.580 -> 
+  SentSerial("ATE1;");
+  SentSerial("AT+COPS?");
+  // //  14:46:03.547 -> +COPS: 0,2,"53001",7
+  SentSerial("AT+CGDCONT?");
+  // // 14:46:03.580 -> +CGDCONT: 1,"IP","vodafone","100.70.101.247",,,,,,,,,,,
+
+  // SentSerial("AT+CNMP=?");
+  // SentSerial("AT+CNMP?");
+
+  // SentSerial("AT+CPSI=?");
+  // SentSerial("AT+CPSI?");
+
+  SentSerial("AT+CGPSINFO=?");
+
+  SentSerial("AT+CGPSINFO?");
+
+
+  SentSerial("AT+SIMCOMATI");
+  // 14:46:03.580 -> Manufacturer: SIMCOM INCORPORATED
+  // 14:46:03.580 -> Model: SIM7670G-MNGV
+  // 14:46:03.580 -> Revision: 2360B01SIM767XM5A_M
+  // 14:46:03.580 -> SIM767XM5A_B01V03_231207
+  // 14:46:03.580 -> IMEI: 864643060060052
+  // 14:46:03.580 -> 
+
+
+  if (SerialAT.available()) {
+    rev = SerialAT.readString();
+    while(rev!=""){
+      SerialMon.println(rev);
+      rev = SerialAT.readString();
+    }
+  }
+
+
 
   // This seems to sometimes be necessary - e.g. after removing SIM card. Maybe optimise later if we can?
 
@@ -137,6 +160,9 @@ void setup() {
   // Make HTTP GET request
   SerialMon.print("Connecting to ");
   SerialMon.print(serverName);
+
+  // client.setInsecure();  // Disable SSL certificate verification - doesn't speed anything up
+
   if (!client.connect(serverName, port)) {
     SerialMon.println(" failed");
     return;
@@ -206,6 +232,47 @@ void setup() {
   SerialMon.println(F("Server disconnected"));
 
 
+
+
+  SerialMon.println(F("Enabling GPS"));
+  modem.enableGPS();
+  SerialMon.println(F("Waiting 15s"));
+  delay(15000L);
+  SerialMon.println("....>");
+  float gps_latitude  = 0;
+  float gps_longitude = 0;
+  float gps_speed     = 0;
+  float gps_altitude  = 0;
+  int   gps_vsat      = 0;
+  int   gps_usat      = 0;
+  float gps_accuracy  = 0;
+  int   gps_year      = 0;
+  int   gps_month     = 0;
+  int   gps_day       = 0;
+  int   gps_hour      = 0;
+  int   gps_minute    = 0;
+  int   gps_second    = 0;
+  for (int8_t i = 15; i; i--) {
+    SerialMon.println("Requesting current GPS/GNSS/GLONASS location");
+    if (modem.getGPS(&gps_latitude, &gps_longitude, &gps_speed, &gps_altitude,
+                     &gps_vsat, &gps_usat, &gps_accuracy, &gps_year, &gps_month,
+                     &gps_day, &gps_hour, &gps_minute, &gps_second)) {
+      SerialMon.printf("\nLatitude:", String(gps_latitude, 8),
+          "\tLongitude:", String(gps_longitude, 8));
+      SerialMon.printf("\nSpeed:", gps_speed, "\tAltitude:", gps_altitude);
+      SerialMon.printf("\nVisible Satellites:", gps_vsat, "\tUsed Satellites:", gps_usat);
+      SerialMon.printf("\nAccuracy:", gps_accuracy);
+      SerialMon.printf("\nYear:", gps_year, "\tMonth:", gps_month, "\tDay:", gps_day);
+      SerialMon.printf("\nHour:", gps_hour, "\tMinute:", gps_minute, "\tSecond:", gps_second);
+      break;
+    } else {
+      SerialMon.println("Couldn't get GPS/GNSS/GLONASS location, retrying in 15s.");
+      delay(15000L);
+    }
+  }
+  SerialMon.println("gps_raw...");
+  String gps_raw = modem.getGPSraw();
+  SerialMon.println(gps_raw);
 
 
 }
