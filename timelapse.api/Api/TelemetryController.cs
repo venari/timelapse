@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using timelapse.core.Helpers;
 using timelapse.core.models;
 using timelapse.infrastructure;
 
@@ -67,59 +68,11 @@ namespace timelapse.api{
 
         [HttpGet("GetLatest24HoursTelemetry")]
         public ActionResult<IEnumerable<Telemetry>> GetLatest24HoursTelemetry([FromQuery] int deviceId){
-            _logger.LogInformation("Get latest 24 hours' telemetry");
+            _logger.LogInformation("Get latest 24 hours' telemetry");;
 
-            DateTime ?latestTelemetryDateTime = _appDbContext.Telemetry
-                .Where(t => t.DeviceId == deviceId)
-                .OrderByDescending(t => t.Timestamp)
-                .Select(t => t.Timestamp)
-                .FirstOrDefault();
-
-            List<Telemetry> telemetry = new List<Telemetry>();
-
-            if(latestTelemetryDateTime==null || !latestTelemetryDateTime.HasValue || latestTelemetryDateTime.Value == DateTime.MinValue){
-                return new NotFoundObjectResult(telemetry);
-            }
-
-            Device? device = _appDbContext.Devices
-                .Include(d => d.Telemetries.Where(t =>t.Timestamp >= latestTelemetryDateTime.Value.AddDays(-1)))
-                .FirstOrDefault(d => d.Id == deviceId);
-
-            if(device != null){
-                telemetry =  device.Telemetries.OrderBy(t => t.Timestamp).ToList();
-                // telemetry =  device.Telemetries.OrderBy(t => t.Timestamp).ToList();
-            }
-
-            return telemetry;
+            return GetTelemetryBetweenDates(deviceId, new DateTime(DateTime.UtcNow.Year, DateTime.UtcNow.Month, DateTime.UtcNow.Day, DateTime.UtcNow.Hour, 0, 0).AddHours(-24), DateTime.UtcNow);
         }
  
-        [HttpGet("GetLatestTelemetry")]
-        public ActionResult<IEnumerable<Telemetry>> GetLatestTelemetry([FromQuery] int deviceId, int numberOfHoursToDisplay){
-            _logger.LogInformation($"Get latest {numberOfHoursToDisplay} hours' telemetry");
-
-            DateTime ?latestTelemetryDateTime = _appDbContext.Telemetry
-                .Where(t => t.DeviceId == deviceId)
-                .OrderByDescending(t => t.Timestamp)
-                .Select(t => t.Timestamp)
-                .FirstOrDefault();
-
-            List<Telemetry> telemetry = new List<Telemetry>();
-
-            if(latestTelemetryDateTime==null || !latestTelemetryDateTime.HasValue || latestTelemetryDateTime.Value == DateTime.MinValue){
-                return new NotFoundObjectResult(telemetry);
-            }
-
-            Device? device = _appDbContext.Devices
-                .Include(d => d.Telemetries.Where(t =>t.Timestamp >= latestTelemetryDateTime.Value.AddHours(-1 * numberOfHoursToDisplay)))
-                .FirstOrDefault(d => d.Id == deviceId);
-
-            if(device != null){
-                telemetry =  device.Telemetries.OrderBy(t => t.Timestamp).ToList();
-                // telemetry =  device.Telemetries.OrderBy(t => t.Timestamp).ToList();
-            }
-
-            return telemetry;
-        }
 
         [HttpGet("GetTelemetryBetweenDates")]
         public ActionResult<IEnumerable<Telemetry>> GetTelemetryBetweenDates([FromQuery] int deviceId, DateTime startDate, DateTime endDate){
@@ -134,6 +87,31 @@ namespace timelapse.api{
             if(device != null){
                 telemetry =  device.Telemetries.OrderBy(t => t.Timestamp).ToList();
             }
+
+
+            // Get two surrounding data points.
+            var previous = _appDbContext.Telemetry
+                .Where(t => t.DeviceId == deviceId && t.Timestamp.ToUniversalTime() < startDate.ToUniversalTime())
+                .OrderByDescending(t => t.Timestamp)
+                .FirstOrDefault();
+
+            if(previous!=null){
+                telemetry.Insert(0, previous);
+            }
+            var next = _appDbContext.Telemetry
+                .Where(t => t.DeviceId == deviceId && t.Timestamp.ToUniversalTime() > endDate.ToUniversalTime())
+                .OrderBy(t => t.Timestamp)
+                .FirstOrDefault();
+
+            if(next!=null){
+                telemetry.Add(next);
+            }
+
+            // ESP32S3 voltage to percentage hack
+            foreach(var t in telemetry.Where(t => t.BatteryPercent == 0 && t.BatteryVoltage > 0)){
+                t.BatteryPercent = VoltageToPercentageHelper.VoltageToPercentage(t.BatteryVoltage.Value/1000.0);
+            }
+            // telemetry.Where(t => t.BatteryPercent == 0 && t.BatteryVoltage > 0).ToList().ForEach(t => t.BatteryPercent = VoltageToPercentageHelper.VoltageToPercentage(t.BatteryVoltage.Value));
 
             if(telemetry.Count==0){
                 return new NotFoundObjectResult(telemetry);

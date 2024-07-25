@@ -94,6 +94,7 @@
 <div>
     <table class="table" id="images">
         <thead>
+            <th>Date</th>
             @{for(var hour = 0; hour <24; ++hour){
                 <th>@(hour)</th>
             }}
@@ -115,14 +116,18 @@
     @* var firstImage = true; *@
     var row = null;
     var prevHour = 99; // Will trigger on first image as well
+    var prevDay = 99; // Will trigger on first image as well
 
     images.forEach(function(image){
         var imageDate = new Date(image.timestamp);
         var hour = imageDate.getHours();
+        var day = imageDate.getDate();
 
         // Detect day change
-        if(hour<prevHour){
+        if(hour<prevHour || day<prevDay){
             row = imagesTable.insertRow();
+            // Day label
+            row.insertCell().innerHTML = localizeDateTimeToShortDayAndNumber(image.timestamp);
             for(var i = 0; i < hour; ++i){
                 row.insertCell();
             }
@@ -137,10 +142,11 @@
 
         var cell = row.insertCell();
         var imageBlobUri = image.blobUri + '@(Model.SasToken)'.replace(/&amp;/g, '&');
-        var imageViewURL = "/ImageView/@(Model.DeviceId)/1/" + image.timestamp + window.location.search;   
-        var cellInnerHTML = '<a href="' + imageViewURL + '"><img src="' + imageBlobUri + '" width=100 height=60></img></a>'
+        var imageViewURL = "/ImageView/@(Model.DeviceId)/3/" + image.timestamp + window.location.search;   
+        var cellInnerHTML = '<a href="' + imageViewURL + '"><img src="' + imageBlobUri + '" width=100></img></a>'
         cell.innerHTML = cellInnerHTML;
         prevHour = hour;
+        prevDay = day;
     });
     
 </script>

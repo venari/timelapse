@@ -18,7 +18,7 @@ namespace timelapse.api{
         private ILogger _logger;
 
         [HttpPost]
-        public ActionResult<bool> Post([FromForm] string message){
+        public ActionResult<bool> Post(string message){
 
             _logger.LogInformation("In Test Post");
             _logger.LogInformation(message);

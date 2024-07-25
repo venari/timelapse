@@ -34,6 +34,14 @@ fi
 
 byobu-enable
 
+
+
+# sudo apt-get install locales
+# sudo locale-gen en_NZ.UTF-8
+# sudo update-locale LANG=en
+sudo dpkg-reconfigure locales
+
+
 echo Setting timezone...
 sudo timedatectl set-timezone Pacific/Auckland
 
@@ -107,25 +115,40 @@ grep -qxF 'dtparam=i2c_arm=on' $CONFIG || echo 'dtparam=i2c_arm=on' | sudo tee -
 echo Checking static domain_name_servers entry etc/dhcpcd.conf
 grep -qxF 'static domain_name_servers=8.8.4.4 8.8.8.8' /etc/dhcpcd.conf || echo 'static domain_name_servers=8.8.4.4 8.8.8.8' | sudo tee -a /etc/dhcpcd.conf
 
-echo Installing crontab entries...
 
-(echo "@reboot /usr/bin/bash /home/pi/dev/timelapse/scripts/loggingSocketServer.sh")| crontab -
-(crontab -l 2>/dev/null; echo "@reboot sleep 10 && /usr/bin/bash /home/pi/dev/timelapse/scripts/saveTelemetry.sh")| crontab -
-(crontab -l 2>/dev/null; echo "@reboot sleep 20 && /usr/bin/bash /home/pi/dev/timelapse/scripts/savePhotos.sh")| crontab -
+# Clear out any old crontab entries
+# (echo "@reboot /usr/bin/bash /home/pi/dev/timelapse/scripts/loggingSocketServer.sh")| crontab -
+crontab -r
 
-(crontab -l 2>/dev/null; echo "@reboot sleep 60 && /usr/bin/bash /home/pi/dev/timelapse/scripts/uploadPending.sh")| crontab -
+echo Installing systemd services...
+sudo cp /home/pi/dev/timelapse/systemd/system/*.* /etc/systemd/system/
+sudo chmod u+x /etc/systemd/system/enviro*.*
+sudo systemctl enable envirocam-logging.service
+sudo systemctl enable envirocam-telemetry.service
+sudo systemctl enable envirocam-photos.timer
+sudo systemctl enable envirocam-upload.timer
+sudo systemctl enable envirocam-detect-hang.timer
 
 # If not bookworm - don't have epaper library yet
 if ! grep -q "bookworm" /etc/os-release; then
-    (crontab -l 2>/dev/null; echo "* * * * * /usr/bin/bash /home/pi/dev/timelapse/scripts/updateStatus.sh")| crontab -
+    sudo cp /home/pi/dev/timelapse/systemd/system/envirocam-status.timer /etc/systemd/system/
+    sudo systemctl enable envirocam-status.timer
 fi
 
 # If not waveshare, we can't access SMS messages
 if [ $waveshare == "y" ]; then
-    (crontab -l 2>/dev/null; echo "*/5 * * * * /usr/bin/bash /home/pi/dev/timelapse/scripts/handleSMS.sh")| crontab -
+    sudo cp /home/pi/dev/timelapse/systemd/system/envirocam-sms.timer /etc/systemd/system/
+    sudo systemctl enable envirocam-sms.timer
 fi
 
-(crontab -l 2>/dev/null; echo "*/15 * * * * /usr/bin/bash /home/pi/dev/timelapse/scripts/detectHang.sh")| crontab -
+
+
+
+
+
+
+
+
 
 echo Overwriting pijuice config...
 sudo mv /var/lib/pijuice/pijuice_config.JSON /var/lib/pijuice/pijuice_config.JSON.bak
@@ -148,7 +171,7 @@ case $yn in
     * ) echo "Please answer yes or no.";;
 esac
 
-echo We need to reboot to kick off cron jobs
+echo We need to reboot to clear out cron jobs and kick off systemd jobs
 echo "Press any key to reboot"
 
 echo ===========================================
