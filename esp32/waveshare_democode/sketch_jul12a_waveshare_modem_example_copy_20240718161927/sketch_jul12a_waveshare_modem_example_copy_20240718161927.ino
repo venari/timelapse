@@ -67,6 +67,71 @@ bool SentMessage(const char *p_char, unsigned long timeout = 2000) {
   return false;
 }
 
+bool SendDebugMessageToServer(String message){
+  SerialMon.println("SendDebugMessageToServer()");
+  SerialMon.println(message);
+  SerialMon.flush();
+
+  if(!client.connected()){
+    SerialMon.print("Connecting to ");
+    SerialMon.print(serverName);
+
+    // client.setInsecure();  // Disable SSL certificate verification - doesn't speed anything up
+
+    if (!client.connect(serverName, port)) {
+      SerialMon.println(" failed");
+      return false;
+    }
+    SerialMon.println(" success");
+  }
+
+  SerialMon.println("connected");
+
+  String boundary = "----WebKitFormBoundary" + String(random(0xFFFFFF), HEX);
+
+  String start_request = "--" + boundary + "\r\n";
+  start_request += "Content-Disposition: form-data; name=\"message\"\r\n\r\n";
+  start_request += message;
+  start_request += "\r\n";
+  
+  String end_request = "\r\n--" + boundary + "--\r\n";
+
+  int fileLength = 0; //file.size();
+  int contentLength = start_request.length() + fileLength + end_request.length();
+
+  client.printf("POST /api/Test HTTP/1.1\r\n");
+  client.printf("Host: %s\r\n", serverName);
+  client.printf("Content-Type: multipart/form-data; boundary=%s\r\n", boundary.c_str());
+  client.printf("Content-Length: %d\r\n", contentLength);
+  client.printf("Connection: close\r\n\r\n");
+
+  client.print(start_request);
+  client.print(end_request);
+
+  SerialMon.println(start_request);
+
+  SerialMon.println("Request sent");
+
+  // Wait for server response
+  unsigned long timeout = millis();
+  while (client.connected() && millis() - timeout < 10000) {
+    while (client.available()) {
+      String line = client.readStringUntil('\r');
+      SerialMon.print(line);
+      timeout = millis();
+    }
+    SerialMon.print(".");
+  }
+
+  SerialMon.println("Response received");
+
+  return true;
+
+  // Close the connection
+  // client.stop();
+  // SerialMon.println(F("Server disconnected"));
+}
+
 void setup() {
   SerialMon.begin(115200);
   SerialAT.begin(GPSBaud, SERIAL_8N1, RXPin, TXPin);
@@ -158,83 +223,22 @@ void setup() {
   // SerialMon.println(" success");
 
   // Make HTTP GET request
-  SerialMon.print("Connecting to ");
-  SerialMon.print(serverName);
-
-  // client.setInsecure();  // Disable SSL certificate verification - doesn't speed anything up
-
-  if (!client.connect(serverName, port)) {
-    SerialMon.println(" failed");
-    return;
-  }
-  SerialMon.println(" success");
-  
   // Make a HTTP GET request
-  SerialMon.println("Sending request");
 
-  String boundary = "----WebKitFormBoundary" + String(random(0xFFFFFF), HEX);
 
-  String start_request = "--" + boundary + "\r\n";
-  start_request += "Content-Disposition: form-data; name=\"message\"\r\n\r\n";
-  start_request += "Hello from ESP32";
-  start_request += "\r\n";
-  
-  String end_request = "\r\n--" + boundary + "--\r\n";
-
-  int fileLength = 0; //file.size();
-  int contentLength = start_request.length() + fileLength + end_request.length();
-
-  client.printf("POST /api/Test HTTP/1.1\r\n");
-  client.printf("Host: %s\r\n", serverName);
-  client.printf("Content-Type: multipart/form-data; boundary=%s\r\n", boundary.c_str());
-  client.printf("Content-Length: %d\r\n", contentLength);
-  client.printf("Connection: close\r\n\r\n");
-
-  client.print(start_request);
-  client.print(end_request);
-
-  SerialMon.println(start_request);
-
-  // String request = String("POST ") + endpoint + " HTTP/1.1\r\n";
-  
-  // request += "Host: ";
-  // request += server;
-  // request += "\r\n";
-  // request += "\r\n";
-  
-  // request += "message=HelloFromESP32";
-  // request += "\r\n";
-  
-  // request += "Connection: close\r\n\r\n";
-  // SerialMon.println(request);
-  // client.print(request);
-
-  // client.print(String("POST " + endpoint + " HTTP/1.1\r\n") +
-  //              "Host: " + server + "\r\n" +
-  //              "Connection: close\r\n\r\n");
+  Serial.println("A");
+  SendDebugMessageToServer("Enabling GPS");
+  Serial.println("B");
+  SendDebugMessageToServer("1");
+  Serial.println("C");
+  SendDebugMessageToServer("2");
+  Serial.println("D");
+  SendDebugMessageToServer("3");
+  Serial.println("E");
 
 
 
-  SerialMon.println("Request sent");
-
-  // Wait for server response
-  unsigned long timeout = millis();
-  while (client.connected() && millis() - timeout < 10000) {
-    while (client.available()) {
-      String line = client.readStringUntil('\r');
-      SerialMon.print(line);
-      timeout = millis();
-    }
-  }
-
-  // Close the connection
-  client.stop();
-  SerialMon.println(F("Server disconnected"));
-
-
-
-
-  SerialMon.println(F("Enabling GPS"));
+  // SerialMon.println(F("Enabling GPS"));
   modem.enableGPS();
   SerialMon.println(F("Waiting 15s"));
   delay(15000L);
@@ -264,7 +268,13 @@ void setup() {
       SerialMon.printf("\nAccuracy:", gps_accuracy);
       SerialMon.printf("\nYear:", gps_year, "\tMonth:", gps_month, "\tDay:", gps_day);
       SerialMon.printf("\nHour:", gps_hour, "\tMinute:", gps_minute, "\tSecond:", gps_second);
-      break;
+      SendDebugMessageToServer("Got GPS position");
+      SendDebugMessageToServer("Latitude:");
+      SendDebugMessageToServer(String(gps_latitude, 8));
+      SendDebugMessageToServer("Longitude:");
+      SendDebugMessageToServer(String(gps_longitude, 8));
+      
+    break;
     } else {
       SerialMon.println("Couldn't get GPS/GNSS/GLONASS location, retrying in 15s.");
       delay(15000L);
@@ -273,6 +283,9 @@ void setup() {
   SerialMon.println("gps_raw...");
   String gps_raw = modem.getGPSraw();
   SerialMon.println(gps_raw);
+
+  SendDebugMessageToServer("gps_raw");
+  SendDebugMessageToServer(gps_raw);
 
 
 }
@@ -286,6 +299,8 @@ void loop() {
   {
   	lastRefreshTime += REFRESH_INTERVAL;
     Serial.print(".");
+
+    SendDebugMessageToServer("Hello from ESP32");
   }
 
   if (SerialAT.available()) {
