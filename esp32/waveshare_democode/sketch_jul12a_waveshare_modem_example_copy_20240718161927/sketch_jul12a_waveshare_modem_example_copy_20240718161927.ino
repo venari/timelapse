@@ -1,13 +1,27 @@
 #define TINY_GSM_MODEM_SIM7600
-#include <TinyGsmClient.h>
-#include <SSLClient.h>
-
+// See all AT commands, if wanted
+#define DUMP_AT_COMMANDS
 
 // Set serial for debug console (to the Serial Monitor, default is 9600)
 #define SerialMon Serial
 
 // Set serial for AT commands (to the GSM module)
 #define SerialAT Serial1
+
+
+// Define the serial console for debug prints, if needed
+#define TINY_GSM_DEBUG SerialMon
+
+// #include <TinyGsmClient.h>
+#include <TinyGSM.h>
+#include <ArduinoHttpClient.h>
+#include <SSLClient.h>
+#include "certs.h"
+#include <UrlEncode.h>
+
+#include <WiFi.h>
+#include "arduino_secrets.h"
+
 
 static const int RXPin = 17, TXPin = 18;
 static const uint32_t GPSBaud = 115200;
@@ -22,9 +36,12 @@ const char pass[] = "";         // Set your password, if any
 // Server details
 // const char server[] = "httpbin.org"; // Server URL
 // const char server[] = "eo7ogadymqhz0vo.m.pipedream.net";
-const char serverName[] = "timelapse-dev.azurewebsites.net";
+const char server[] = "timelapse-dev.azurewebsites.net";
+// const char server[] = "webhook.site";
+const char resource[] = "/api/Test";
+// const char resource[] = "/f31a289a-e938-46f3-b3a7-2851e5605779";
 
-const int port = 443;                 // Server port
+const int port = 80;                 // Server port
 
 // Initialize the TinyGSM modem
 TinyGsm modem(SerialAT);
@@ -33,9 +50,19 @@ TinyGsm modem(SerialAT);
 // https://github.com/govorox/SSLClient
 // esp32 board v2.0.17 - v3.0.1 gives https://github.com/govorox/SSLClient/issues/93 (fatal error: mbedtls/net.h: No such file or directory)
 // TinyGsmClient client(modem);
-TinyGsmClient transport(modem);
-SSLClient client(&transport);
+// TinyGsmClient transport(modem);
+// SSLClient client(&transport);
 
+// From https://github.com/govorox/SSLClient/tree/master/examples/Esp32-Arduino-IDE/https_post_sim7600
+// HTTPS Transport
+
+// TinyGsmClient base_client(modem, 0);
+// SSLClient secure_layer(&base_client);
+// HttpClient client = HttpClient(secure_layer, server, port);
+
+WiFiClient wifi;
+HttpClient client = HttpClient(wifi, server, port);
+int status = WL_IDLE_STATUS;
 
 String rev;
 
@@ -70,58 +97,107 @@ bool SentMessage(const char *p_char, unsigned long timeout = 2000) {
 bool SendDebugMessageToServer(String message){
   SerialMon.println("SendDebugMessageToServer()");
   SerialMon.println(message);
-  SerialMon.flush();
+  // SerialMon.flush();
 
-  if(!client.connected()){
-    SerialMon.print("Connecting to ");
-    SerialMon.print(serverName);
+  // if(!client.connected()){
+  //   SerialMon.print("Connecting to ");
+  //   SerialMon.print(server);
 
-    // client.setInsecure();  // Disable SSL certificate verification - doesn't speed anything up
+  //   // client.setInsecure();  // Disable SSL certificate verification - doesn't speed anything up
 
-    if (!client.connect(serverName, port)) {
-      SerialMon.println(" failed");
-      return false;
-    }
-    SerialMon.println(" success");
-  }
+  //   if (!client.connect(server, port)) {
+  //     SerialMon.println(" failed");
+  //     return false;
+  //   }
+  //   SerialMon.println(" success");
+  // }
 
-  SerialMon.println("connected");
+  // SerialMon.println("connected");
 
-  String boundary = "----WebKitFormBoundary" + String(random(0xFFFFFF), HEX);
+  // String boundary = "----WebKitFormBoundary" + String(random(0xFFFFFF), HEX);
 
-  String start_request = "--" + boundary + "\r\n";
-  start_request += "Content-Disposition: form-data; name=\"message\"\r\n\r\n";
-  start_request += message;
-  start_request += "\r\n";
+  // String start_request = "--" + boundary + "\r\n";
+  // start_request += "Content-Disposition: form-data; name=\"message\"\r\n\r\n";
+  // start_request += message;
+  // start_request += "\r\n";
   
-  String end_request = "\r\n--" + boundary + "--\r\n";
+  // String end_request = "\r\n--" + boundary + "--\r\n";
 
-  int fileLength = 0; //file.size();
-  int contentLength = start_request.length() + fileLength + end_request.length();
+  // int fileLength = 0; //file.size();
+  // int contentLength = start_request.length() + fileLength + end_request.length();
 
-  client.printf("POST /api/Test HTTP/1.1\r\n");
-  client.printf("Host: %s\r\n", serverName);
-  client.printf("Content-Type: multipart/form-data; boundary=%s\r\n", boundary.c_str());
-  client.printf("Content-Length: %d\r\n", contentLength);
-  client.printf("Connection: close\r\n\r\n");
+  // client.printf("POST /api/Test HTTP/1.1\r\n");
+  // client.printf("Host: %s\r\n", serverName);
+  // client.printf("Content-Type: multipart/form-data; boundary=%s\r\n", boundary.c_str());
+  // client.printf("Content-Length: %d\r\n", contentLength);
+  // client.printf("Connection: close\r\n\r\n");
 
-  client.print(start_request);
-  client.print(end_request);
+  // client.print(start_request);
+  // client.print(end_request);
 
-  SerialMon.println(start_request);
+  // SerialMon.println(start_request);
 
-  SerialMon.println("Request sent");
+  // SerialMon.println("Request sent");
 
-  // Wait for server response
-  unsigned long timeout = millis();
-  while (client.connected() && millis() - timeout < 10000) {
-    while (client.available()) {
-      String line = client.readStringUntil('\r');
-      SerialMon.print(line);
-      timeout = millis();
-    }
-    SerialMon.print(".");
-  }
+  // // Wait for server response
+  // unsigned long timeout = millis();
+  // while (client.connected() && millis() - timeout < 10000) {
+  //   while (client.available()) {
+  //     String line = client.readStringUntil('\r');
+  //     SerialMon.print(line);
+  //     timeout = millis();
+  //   }
+  //   SerialMon.print(".");
+  // }
+
+  // Retrieve Time
+  String time;
+    do {
+      time = modem.getGSMDateTime(DATE_FULL).substring(0, 17);
+      delay(100);
+  } while (!time);
+  DBG("Current Network Time:", time);
+
+  // Retrieve Temperature
+  float temp;
+  do {
+      temp = modem.getTemperature();
+      delay(100);
+  } while (!temp);
+  DBG("Modem Temp:", temp);
+
+
+  // if (!modem.isGprsConnected()) {
+  //     DBG("... not connected");
+  // } else {
+
+    // DBG("Connecting to ", server);
+    // Make a HTTPS POST request:
+    Serial.println("Making POST request securely");
+    // String contentType = "Content-Type: application/json";
+    String contentType = "Content-Type: x-www-form-urlencoded";
+    // String postData = "{\"time\": \""+ time + "\", \"temp\": \"" + temp + "\"}";
+    // String postData = "Hi from ESP32 ArduinoHttpClient";
+    String postData = "message="+message;
+    Serial.println(postData);
+
+    String URL = (String)resource + "?message=" + urlEncode(message);
+    Serial.println(URL);
+    client.post(URL);
+
+    // client.post(resource, contentType, postData);
+
+    int status_code = client.responseStatusCode();
+    String response = client.responseBody();
+    
+    Serial.print("Status code: ");
+    Serial.println(status_code);
+    Serial.print("Response: ");
+    Serial.println(response);
+
+    client.stop();        
+
+  // }
 
   SerialMon.println("Response received");
 
@@ -135,6 +211,32 @@ bool SendDebugMessageToServer(String message){
 void setup() {
   SerialMon.begin(115200);
   SerialAT.begin(GPSBaud, SERIAL_8N1, RXPin, TXPin);
+
+      SerialMon.print("Attempting to connect to Network named: ");
+      SerialMon.println(ssid);                   // print the network name (SSID);
+      // Serial.println(password);                   // print the network name (SSID);
+
+      WiFi.begin(ssid, password);
+      while ( WiFi.status() != WL_CONNECTED) {
+
+
+        delay(3000);
+        // displayMessageNoNewline(".");
+        SerialMon.print(".");
+
+      }
+
+      // print the SSID of the network you're attached to:
+      SerialMon.print("SSID: ");
+      SerialMon.println(WiFi.SSID());
+
+      // print your WiFi shield's IP address:
+      IPAddress ip = WiFi.localIP();
+      SerialMon.print("IP Address: ");
+      SerialMon.println(ip);
+
+      SendDebugMessageToServer("Sending debug message");
+
 
 
   while (!SentMessage("AT", 2000)) {
@@ -175,6 +277,9 @@ void setup() {
     }
   }
 
+  //Add CA Certificate
+  // secure_layer.setCACert(root_ca_azure_websites_net);
+  // secure_layer.setCACert(root_ca_webhook_site);
 
 
   // This seems to sometimes be necessary - e.g. after removing SIM card. Maybe optimise later if we can?
@@ -226,15 +331,15 @@ void setup() {
   // Make a HTTP GET request
 
 
-  Serial.println("A");
+  // Serial.println("A");
   SendDebugMessageToServer("Enabling GPS");
-  Serial.println("B");
-  SendDebugMessageToServer("1");
-  Serial.println("C");
-  SendDebugMessageToServer("2");
-  Serial.println("D");
-  SendDebugMessageToServer("3");
-  Serial.println("E");
+  // Serial.println("B");
+  // SendDebugMessageToServer("1");
+  // Serial.println("C");
+  // SendDebugMessageToServer("2");
+  // Serial.println("D");
+  // SendDebugMessageToServer("3");
+  // Serial.println("E");
 
 
 
@@ -276,7 +381,8 @@ void setup() {
       
     break;
     } else {
-      SerialMon.println("Couldn't get GPS/GNSS/GLONASS location, retrying in 15s.");
+      SendDebugMessageToServer("Couldn't get GPS/GNSS/GLONASS location, retrying in 15s.");
+      // SerialMon.println("Couldn't get GPS/GNSS/GLONASS location, retrying in 15s.");
       delay(15000L);
     }
   }
