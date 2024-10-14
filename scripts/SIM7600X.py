@@ -37,8 +37,13 @@ logger.setLevel(logging.DEBUG)
 # os.chmod(logFilePath, 0o777) # Make sure pijuice user script can write to log file.
 
 
+# PowerUp/Down code copied from https://forum.core-electronics.com.au/t/guide-by-tim-4g-and-gps-hat-for-raspberry-pi-waveshare-sim7600x/14357/88
+
 def powerUpSIM7600X():
     try:
+
+        if(config['modem.type']=="thumb"):
+            return
 
         logger.debug('Powering up SIM7600X...')
         GPIO.setmode(GPIO.BCM)
@@ -65,11 +70,15 @@ def powerUpSIM7600X():
 def powerDownSIM7600X():
     try:
 
+        if(config['modem.type']=="thumb"):
+            return
+
         logger.debug('Powering down SIM7600X...')
         GPIO.setmode(GPIO.BCM)
 
         GPIO.setwarnings(False)
         GPIO.setup(GPIO_Power_Key, GPIO.OUT)
+        sleep(0.1)
         GPIO.output(GPIO_Power_Key, GPIO.HIGH)
         sleep(3)
         GPIO.output(GPIO_Power_Key, GPIO.LOW)
@@ -82,6 +91,9 @@ def powerDownSIM7600X():
 
 def turnOnNDIS():
     try:
+        if(config['modem.type']=="thumb"):
+            return
+
         logger.debug('Turrning on NDIS...')
 
         global ser
@@ -97,6 +109,9 @@ def turnOnNDIS():
         logger.error(e)
 
 def sendSMS(phone_number,text_message):
+    if(config['modem.type']=="thumb"):
+        return
+
     global ser
     ser = serial.Serial(config["SIM7600X_port"],115200)
     ser.flushInput()
@@ -119,6 +134,9 @@ def sendSMS(phone_number,text_message):
         print('error%d'%answer)
 
 def receiveSMS():
+    if(config['modem.type']=="thumb"):
+        return
+
     global ser, rec_buff
     ser = serial.Serial(config["SIM7600X_port"],115200)
     ser.flushInput()
@@ -136,6 +154,9 @@ def receiveSMS():
     return rec_buff
 
 def deleteAllSMS():
+    if(config['modem.type']=="thumb"):
+        return
+
     global ser, rec_buff
     ser = serial.Serial(config["SIM7600X_port"],115200)
     ser.flushInput()
@@ -155,6 +176,9 @@ def deleteAllSMS():
 
 
 def send_at(command,back,timeout):
+    if(config['modem.type']=="thumb"):
+        return
+
     global ser, rec_buff
     rec_buff = ''
     ser.write((command+'\r\n').encode())
