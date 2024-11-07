@@ -87,7 +87,7 @@ namespace timelapse.api{
         }        
 
         [HttpGet("GetImageAtOrAround")]
-        [ThirdPartyApiKeyAuth]
+        // [ThirdPartyApiKeyAuth]
         public ActionResult<Image> GetImageAtOrAround([FromQuery] int deviceId, DateTime timestamp, bool forwards){
             // Fowards == true - get at or after timestamp
             // Forwards == false - get at or before timestamp
