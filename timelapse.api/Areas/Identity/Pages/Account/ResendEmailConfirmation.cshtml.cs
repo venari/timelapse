@@ -82,7 +82,7 @@ namespace timelapse.api.Areas.Identity.Pages.Account
                 "Confirm your email",
                 $"Welcome to EnviroEyes™ by Zealandia!<br><br>"
                 +"To activate your account and start exploring EnviroEyes™, please confirm your account by clicking here:<br><br>"
-                +"<a href='{HtmlEncoder.Default.Encode(callbackUrl)}'>Confirm My Account</a>.<br><br>"
+                +$"<a href='{HtmlEncoder.Default.Encode(callbackUrl)}'>Confirm My Account</a>.<br><br>"
                 +"Once your account is confirmed, you'll gain access to your organisation's EnviroEyes™ deployments. If you have any questions, our team is here to assist.<br><br>"
                 +"Thank you for joining us in advancing environmental monitoring with EnviroEyes™!<br><br>"
                 +"Best regards,<br>"
