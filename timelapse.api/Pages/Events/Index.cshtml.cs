@@ -62,7 +62,7 @@ public class IndexModel : PageModel
             // .AsSplitQuery()
             // .OrderBy(d => d.Name)
             .OrderBy(d => d.Description)
-            // .Where(d => d.Retired == false)
+            .Where(d => d.Retired == false)
             .ToList();
 
         images = _appDbContext.Images;
