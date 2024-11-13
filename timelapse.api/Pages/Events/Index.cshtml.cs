@@ -50,9 +50,9 @@ public class IndexModel : PageModel
         DateTime cutOff = DateTime.UtcNow.AddDays(-1 * NumberOfDaysToDisplay);
 
         // Temp workaround to shut off before Oct 2024.
-        if(cutOff < new DateTime(2024, 10, 01))
+        if(cutOff < new DateTime(2024, 10, 01).ToUniversalTime())
         {
-            cutOff = new DateTime(2024, 10, 01);
+            cutOff = new DateTime(2024, 10, 01).ToUniversalTime();
         }
 
         devices = _appDbContext.Devices
