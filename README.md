@@ -1,15 +1,15 @@
 # timelapse
 A set of tools/scripts to automate the taking and creation of timelapse videos and videos with a Raspberry Pi
 
-# Current issues with PiJuice
-> [!warning]
-> At present (November 2023), I cannot recommend using PiJuice as the BMS provider.
+# Current status of using PiJuice
+> [!important]
+> In November 2023, I posted an update regards the performance of the PiJuice, even when using PiSupply's own batteries.
+>
+> However, in the last month (November 2024) I've deployed one further camera that is not using a third party modem board [Waveshare SIM7600-H 4G HAT](https://www.waveshare.com/wiki/SIM7600X_4G_%26_LTE_Cat-1_HAT), but instead has reverted back to a USB thumb modem. Since swapping to this modem, the PiJuice board has behave perfectly with no missed wakeups or random restarts.
 > 
-> I am having a number of PiJuice reliability issues even when using PiSupply's own batteries.
-> 
-> Since their merger with or aquisition by Nebra, I've found attempts to purchase batteries from PiSupply to be unsuccessful as their payment options are not working. Attempts to contact them on Twitter go unanswered.
-> 
-> If this situation changes, I will update this warning. Last updated 23 November 2023.
+> In addition the ability to purchase PiSupply's PiJuice batteries seems to have returned (even if stock has not).
+>
+> TL;DR - as long as not combined with either a LiFePO4 battery chemistry or the Waveshare hat above, the PiJuice seems to perform well.
 
 # PI Setup
 
