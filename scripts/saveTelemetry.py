@@ -66,8 +66,16 @@ try:
     pj = pijuice.PiJuice(1, 0x14)
 except:
     logger.error("PiJuice not connected - PiJuice functionality will not be available")
+    loggerIntent.error("PiJuice not connected - PiJuice functionality will not be available")
+
+if pj is None:
+    logger.info('PiJuice not connected')
+else:
+    logger.info('PiJuice is connected')
+
 
 logger.info("Starting up saveTelemetry.py 3b...")
+loggerIntent.info("Starting up saveTelemetry.py 3b...")
 
 def getSerialNumber():
   # Extract serial from cpuinfo file
@@ -87,8 +95,8 @@ serialNumber = getSerialNumber()
 
 def scheduleShutdown():
     try:
-        if(pj is None):
-            logger.debug('PiJuice not connected')
+        if pj is None:
+            logger.info('PiJuice not connected')
             return
         
         alarmObj = {}
@@ -468,8 +476,8 @@ def scheduleShutdown():
 
 def SetWatchdog(timeout = 3, non_volatile = False):
     try:
-        if(pj == None):
-            logger.debug('PiJuice not connected')
+        if pj is None:
+            logger.info('PiJuice not connected')
             return
 
         if(pj.power.GetWatchdog()['data'] == timeout and pj.power.GetWatchdog()['non_volatile'] == non_volatile):
@@ -571,7 +579,7 @@ def saveTelemetry():
                     'SerialNumber': serialNumber
                 }
 
-        if(pj == None):
+        if pj is None:
             api_data['batteryPercent'] = 0
             api_data['temperatureC'] = 0
         else:
@@ -593,7 +601,7 @@ def saveTelemetry():
         logger.error("saveTelemetry() failed.")
         logger.error(e)
 
-if pj != None:
+if pj is not None:
     try:
         waitForRTCAttempts = 0
         while not os.path.exists('/dev/rtc') and waitForRTCAttempts <= 60:
