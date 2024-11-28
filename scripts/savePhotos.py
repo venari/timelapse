@@ -9,8 +9,8 @@ import datetime
 import sys
 import requests
 import logging
-# from logging.handlers import TimedRotatingFileHandler
-from logging.handlers import SocketHandler
+from logging.handlers import TimedRotatingFileHandler
+# from logging.handlers import SocketHandler
 import pathlib
 
 # from helpers import flashLED
