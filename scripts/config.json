@@ -22,7 +22,7 @@
     "eink.PreviewImage": false,
     "camera.vflip": false,
     "camera.hflip": false,
-    "camera.long_exposure_mode": false,
+    "camera.long_exposure_mode": true,
     "camera.long_exposure_time": 500000,
     "camera.analogue_gain": 4,
     "camera.resolution.width": 4608,
