@@ -60,6 +60,7 @@ uploadedTelemetryFolder = outputTelemetryFolder + 'uploaded/'
 
 # pijuice
 time.sleep(10)
+pj=None
 # Assign PiJuice but handle error if not connected
 try:
     pj = pijuice.PiJuice(1, 0x14)
@@ -86,7 +87,7 @@ serialNumber = getSerialNumber()
 
 def scheduleShutdown():
     try:
-        if(pj == None):
+        if(pj is None):
             logger.debug('PiJuice not connected')
             return
         
