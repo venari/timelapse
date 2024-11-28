@@ -19,7 +19,7 @@ from SIM7600X import powerUpSIM7600X, powerDownSIM7600X
 config = json.load(open('config.json'))
 logFilePath = config["logFilePath"]
 intentLogFilePath = logFilePath.replace("timelapse.log", "intent.log")
-logFilePath = logFilePath.replace(".log", ".saveTelemetry.log")
+# logFilePath = logFilePath.replace(".log", ".saveTelemetry.log")
 os.makedirs(os.path.dirname(logFilePath), exist_ok=True)
 # os.chmod(os.path.dirname(logFilePath), 0o777) # Make sure pijuice user scrip can write to log file.
 
