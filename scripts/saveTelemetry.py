@@ -592,23 +592,24 @@ def saveTelemetry():
         logger.error("saveTelemetry() failed.")
         logger.error(e)
 
-try:
-    waitForRTCAttempts = 0
-    while not os.path.exists('/dev/rtc') and waitForRTCAttempts <= 60:
-        logger.info("dev rtc doesn't exist - waiting... " + str(waitForRTCAttempts))
-        time.sleep(1)
-        waitForRTCAttempts = waitForRTCAttempts + 1
-        subprocess.call(['sudo', 'modprobe', '-r', 'rtc_ds1307'])
-        subprocess.call(['sudo', 'modprobe', 'rtc_ds1307'])
+if pj != None:
+    try:
+        waitForRTCAttempts = 0
+        while not os.path.exists('/dev/rtc') and waitForRTCAttempts <= 60:
+            logger.info("dev rtc doesn't exist - waiting... " + str(waitForRTCAttempts))
+            time.sleep(1)
+            waitForRTCAttempts = waitForRTCAttempts + 1
+            subprocess.call(['sudo', 'modprobe', '-r', 'rtc_ds1307'])
+            subprocess.call(['sudo', 'modprobe', 'rtc_ds1307'])
 
-    logger.debug('setting sys clock from RTC...')
-    loggerIntent.debug('setting sys clock from RTC...')
-    subprocess.call(['sudo', 'hwclock', '--hctosys'])
-    logger.debug("sudo hwclock --hctosys succeeded")
-except Exception as e:
-    logger.error("sudo hwclock --hctosys failed")
-    logger.error(e)
-    
+        logger.debug('setting sys clock from RTC...')
+        loggerIntent.debug('setting sys clock from RTC...')
+        subprocess.call(['sudo', 'hwclock', '--hctosys'])
+        logger.debug("sudo hwclock --hctosys succeeded")
+    except Exception as e:
+        logger.error("sudo hwclock --hctosys failed")
+        logger.error(e)
+        
 
 try:
     logger.info('In saveTelemetry.py')
