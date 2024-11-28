@@ -66,9 +66,8 @@ try:
     pj = pijuice.PiJuice(1, 0x14)
 except:
     logger.error("PiJuice not connected - PiJuice functionality will not be available")
-    loggerIntent.error("PiJuice not connected - PiJuice functionality will not be available")
 
-if pj is None:
+if pj is None or pj.status.GetStatus()['error'] == 'COMMUNICATION_ERROR':
     logger.info('PiJuice not connected')
 else:
     logger.info('PiJuice is connected')
@@ -95,7 +94,7 @@ serialNumber = getSerialNumber()
 
 def scheduleShutdown():
     try:
-        if pj is None:
+        if pj is None or pj.status.GetStatus()['error'] == 'COMMUNICATION_ERROR':
             logger.info('PiJuice not connected')
             return
         
@@ -476,7 +475,7 @@ def scheduleShutdown():
 
 def SetWatchdog(timeout = 3, non_volatile = False):
     try:
-        if pj is None:
+        if pj is None or pj.status.GetStatus()['error'] == 'COMMUNICATION_ERROR':
             logger.info('PiJuice not connected')
             return
 
@@ -579,7 +578,7 @@ def saveTelemetry():
                     'SerialNumber': serialNumber
                 }
 
-        if pj is None:
+        if pj is None or pj.status.GetStatus()['error'] == 'COMMUNICATION_ERROR':
             api_data['batteryPercent'] = 0
             api_data['temperatureC'] = 0
         else:
@@ -601,7 +600,7 @@ def saveTelemetry():
         logger.error("saveTelemetry() failed.")
         logger.error(e)
 
-if pj is not None:
+if pj is not None and pj.status.GetStatus()['error'] == 'NO_ERROR':
     try:
         waitForRTCAttempts = 0
         while not os.path.exists('/dev/rtc') and waitForRTCAttempts <= 60:
