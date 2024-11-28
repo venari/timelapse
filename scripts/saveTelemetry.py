@@ -567,12 +567,6 @@ def saveTelemetry():
                     'pendingTelemetry': len(os.listdir(pendingTelemetryFolder)),
                     'uploadedTelemetry': len(os.listdir(uploadedTelemetryFolder)),
                     'uptimeSeconds': int(time.clock_gettime(time.CLOCK_BOOTTIME)),
-                    'status': str({ 'status': pj.status.GetStatus()['data'],
-                                'batteryVoltage': pj.status.GetBatteryVoltage()['data'],
-                                'batteryCurrent': pj.status.GetBatteryCurrent()['data'],
-                                'ioVoltage': pj.status.GetIoVoltage()['data'],
-                                'ioCurrent': pj.status.GetIoCurrent()['data']
-                            }),
                     'SerialNumber': serialNumber
                 }
 
