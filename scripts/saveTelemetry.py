@@ -60,7 +60,12 @@ uploadedTelemetryFolder = outputTelemetryFolder + 'uploaded/'
 
 # pijuice
 time.sleep(10)
-pj = pijuice.PiJuice(1, 0x14)
+# Assign PiJuice but handle error if not connected
+try:
+    pj = pijuice.PiJuice(1, 0x14)
+except:
+    logger.error("PiJuice not connected - PiJuice functionality will not be available")
+
 logger.info("Starting up saveTelemetry.py 3b...")
 
 def getSerialNumber():
@@ -81,6 +86,10 @@ serialNumber = getSerialNumber()
 
 def scheduleShutdown():
     try:
+        if(pj == None):
+            logger.debug('PiJuice not connected')
+            return
+        
         alarmObj = {}
 
         # print(str(datetime.datetime.now()) + ' scheduleShutdown')
@@ -458,6 +467,10 @@ def scheduleShutdown():
 
 def SetWatchdog(timeout = 3, non_volatile = False):
     try:
+        if(pj == None):
+            logger.debug('PiJuice not connected')
+            return
+
         if(pj.power.GetWatchdog()['data'] == timeout and pj.power.GetWatchdog()['non_volatile'] == non_volatile):
             return
         
@@ -544,6 +557,7 @@ def SetWatchdog(timeout = 3, non_volatile = False):
 def saveTelemetry():
     try:
         warningTemp = 50
+
         api_data = {
                     'batteryPercent': pj.status.GetChargeLevel()['data'],
                     'temperatureC': pj.status.GetBatteryTemperature()['data'],
@@ -559,9 +573,21 @@ def saveTelemetry():
                                 'ioVoltage': pj.status.GetIoVoltage()['data'],
                                 'ioCurrent': pj.status.GetIoCurrent()['data']
                             }),
-                    # 'Timestamp': datetime.datetime.now().astimezone().isoformat(),
                     'SerialNumber': serialNumber
                 }
+
+        if(pj == None):
+            api_data['batteryPercent'] = 0
+            api_data['temperatureC'] = 0
+        else:
+            api_data['batteryPercent'] = pj.status.GetChargeLevel()['data']
+            api_data['temperatureC'] = pj.status.GetBatteryTemperature()['data']
+            api_data['status']= str({ 'status': pj.status.GetStatus()['data'],
+                                'batteryVoltage': pj.status.GetBatteryVoltage()['data'],
+                                'batteryCurrent': pj.status.GetBatteryCurrent()['data'],
+                                'ioVoltage': pj.status.GetIoVoltage()['data'],
+                                'ioCurrent': pj.status.GetIoCurrent()['data']
+                            })
 
         telemetryFilename = pendingTelemetryFolder + datetime.datetime.now().strftime('%Y-%m-%d_%H%M%S.json')
         with open(telemetryFilename, 'w') as outfile:
