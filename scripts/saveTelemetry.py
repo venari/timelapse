@@ -7,8 +7,8 @@ import shutil
 import datetime
 import sys
 import logging
-# from logging.handlers import TimedRotatingFileHandler
-from logging.handlers import SocketHandler
+from logging.handlers import TimedRotatingFileHandler
+# from logging.handlers import SocketHandler
 import pathlib
 import glob
 
@@ -19,16 +19,16 @@ from SIM7600X import powerUpSIM7600X, powerDownSIM7600X
 config = json.load(open('config.json'))
 logFilePath = config["logFilePath"]
 intentLogFilePath = logFilePath.replace("timelapse.log", "intent.log")
-# logFilePath = logFilePath.replace(".log", ".saveTelemetry.log")
+logFilePath = logFilePath.replace(".log", ".saveTelemetry.log")
 os.makedirs(os.path.dirname(logFilePath), exist_ok=True)
 # os.chmod(os.path.dirname(logFilePath), 0o777) # Make sure pijuice user scrip can write to log file.
 
 
 formatter = logging.Formatter('%(asctime)s %(name)s %(levelname)s %(message)s')
-# handler = TimedRotatingFileHandler(logFilePath, 
-#                                    when='midnight',
-#                                    backupCount=10)
-handler = SocketHandler('localhost', 8000)
+handler = TimedRotatingFileHandler(logFilePath, 
+                                   when='midnight',
+                                   backupCount=10)
+# handler = SocketHandler('localhost', 8000)
 handler.setFormatter(formatter)
 logger = logging.getLogger("saveTelemetry")
 logger.addHandler(handler)
