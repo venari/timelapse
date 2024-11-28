@@ -567,8 +567,6 @@ def saveTelemetry():
         warningTemp = 50
 
         api_data = {
-                    'batteryPercent': pj.status.GetChargeLevel()['data'],
-                    'temperatureC': pj.status.GetBatteryTemperature()['data'],
                     'diskSpaceFree': shutil.disk_usage('/')[2] // (1024**3), # shutil.disk_usage returns tuple of (total, used, free), converted to int gb
                     'pendingImages': len(os.listdir(pendingImageFolder)),
                     'uploadedImages': len(os.listdir(uploadedImageFolder)),
