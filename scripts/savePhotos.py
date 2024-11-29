@@ -12,10 +12,22 @@ import logging
 # from logging.handlers import TimedRotatingFileHandler
 from logging.handlers import SocketHandler
 import pathlib
+from suncalc import get_times
 
 # from helpers import flashLED
+from helpers import currentPhase
 
 config = json.load(open('config.json'))
+# Load the local config if it exists
+try:
+    with open('config.local.json', 'r') as f:
+        local_config = json.load(f)
+    # Update the primary config with overrides from the local config
+    config.update(local_config)
+except FileNotFoundError:
+    print("config.local.json not found. Using default config.")
+
+
 logFilePath = config["logFilePath"]
 # logFilePath = logFilePath.replace(".log", ".savePhotos.log")
 os.makedirs(os.path.dirname(logFilePath), exist_ok=True)
@@ -102,14 +114,27 @@ def savePhotos():
                 # camera.rotation = config['camera.rotation']
                 camera.configure(camera_config)
 
-                if(config['camera.long_exposure_mode']):
-                    # camera.set_controls({"AfMode": controls.AfModeEnum.Manual, "LensPosition": lensposition, "AeEnable": False, "ExposureTime": config['camera.long_exposure_time'], "AnalogueGain": config['camera.analogue_gain']}) #, "ColourGains": (2, 1.81)})
-                    # camera.set_controls({"AfMode": controls.AfModeEnum.Manual, "LensPosition": lensposition, "ExposureTime": config['camera.long_exposure_time'], "AnalogueGain": config['camera.analogue_gain']})
-                    
-                    #imx708 now has long exposure mode in tuning file
+                phase = currentPhase()
+                logger.debug('current phase is ' + phase)
+
+                camera.set_controls({"AfMode": controls.AfModeEnum.Manual, "LensPosition": lensposition})
+
+                if(phase == "sunset" or phase == "dusk" or phase == "dawn" or phase == "sunrise"):
+                    logger.debug('setting camera to long exposure for ' + phase)
                     camera.set_controls({"AfMode": controls.AfModeEnum.Manual, "LensPosition": lensposition, "AeExposureMode": controls.AeExposureModeEnum.Long}) 
-                else:
-                    camera.set_controls({"AfMode": controls.AfModeEnum.Manual, "LensPosition": lensposition})
+
+                if(phase == "nautical_dusk" or phase == "night" or phase == "night_end" or phase == "nautical_dawn"):
+                    logger.debug('setting camera to super long exposure for ' + phase)
+                    camera.set_controls({"AfMode": controls.AfModeEnum.Manual, "LensPosition": lensposition, "ExposureTime": config['camera.long_exposure_time'], "AnalogueGain": config['camera.analogue_gain']})
+
+                # if(config['camera.long_exposure_mode']):
+                #     # camera.set_controls({"AfMode": controls.AfModeEnum.Manual, "LensPosition": lensposition, "AeEnable": False, "ExposureTime": config['camera.long_exposure_time'], "AnalogueGain": config['camera.analogue_gain']}) #, "ColourGains": (2, 1.81)})
+                #     # camera.set_controls({"AfMode": controls.AfModeEnum.Manual, "LensPosition": lensposition, "ExposureTime": config['camera.long_exposure_time'], "AnalogueGain": config['camera.analogue_gain']})
+                    
+                #     #imx708 now has long exposure mode in tuning file
+                #     camera.set_controls({"AfMode": controls.AfModeEnum.Manual, "LensPosition": lensposition, "AeExposureMode": controls.AeExposureModeEnum.Long}) 
+                # else:
+                #     camera.set_controls({"AfMode": controls.AfModeEnum.Manual, "LensPosition": lensposition})
                     
                 camera.options["quality"] = config['camera.quality']
 
