@@ -42,7 +42,7 @@ def currentPhase():
 
         # now = datetime.now(datetime.timezone.utc)
         now = datetime.utcnow()
-        solar_times = get_times(datetime.datetime.now(), config["location.lon"], config["location.lat"])
+        solar_times = get_times(now, config["location.lon"], config["location.lat"])
         
         # Solar phases in order
         phases = {
