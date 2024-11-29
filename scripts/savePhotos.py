@@ -12,7 +12,6 @@ import logging
 # from logging.handlers import TimedRotatingFileHandler
 from logging.handlers import SocketHandler
 import pathlib
-from suncalc import get_times
 
 # from helpers import flashLED
 from helpers import currentPhase
@@ -119,11 +118,11 @@ def savePhotos():
 
                 camera.set_controls({"AfMode": controls.AfModeEnum.Manual, "LensPosition": lensposition})
 
-                if(phase == "sunset" or phase == "dusk" or phase == "dawn" or phase == "sunrise"):
+                if(phase == "sunset" or phase == "sunrise"):
                     logger.debug('setting camera to long exposure for ' + phase)
                     camera.set_controls({"AfMode": controls.AfModeEnum.Manual, "LensPosition": lensposition, "AeExposureMode": controls.AeExposureModeEnum.Long}) 
 
-                if(phase == "nautical_dusk" or phase == "night" or phase == "night_end" or phase == "nautical_dawn"):
+                if(phase == "dusk" or phase == "nautical_dusk" or phase == "night" or phase == "night_end" or phase == "nautical_dawn" or phase == "dawn"):
                     logger.debug('setting camera to super long exposure for ' + phase)
                     camera.set_controls({"AfMode": controls.AfModeEnum.Manual, "LensPosition": lensposition, "ExposureTime": config['camera.long_exposure_time'], "AnalogueGain": config['camera.analogue_gain']})
 
