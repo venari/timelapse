@@ -40,11 +40,8 @@ def reloadConfig():
     try:
         with open('config.local.json', 'r') as f:
             local_config = json.load(f)
-        logger.info("config.local.json found. Using local config.")
-        logger.info(config)
         # Update the primary config with overrides from the local config
         config.update(local_config)
-        logger.info(config)
     except FileNotFoundError:
         logger.error("config.local.json not found. Using default config.")
 
@@ -98,6 +95,10 @@ def savePhotos():
 
                 # # Use sensor mode 2 to give greater max exposure time.
                 # camera_config = camera.create_still_configuration(raw = picam2.sensor_modes[2])
+
+                logger.info(config)
+                logger.info(config['camera.vflip'])
+                logger.info(config['camera.hflip'])
 
                 camera_config["transform"] = Transform(vflip = config['camera.vflip'], hflip = config['camera.hflip'])
                 camera_config["size"] = (config['camera.resolution.width'], config['camera.resolution.height'])
