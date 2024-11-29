@@ -35,11 +35,19 @@ logger.info("Starting up savePhotos.py...")
 # os.chmod(logFilePath, 0o777) # Make sure pijuice user script can write to log file.
 
 def reloadConfig():
+    global config
     config = json.load(open('config.json'))
     # Load the local config if it exists
     try:
         with open('config.local.json', 'r') as f:
             local_config = json.load(f)
+
+        # logger.info("config.local.json found. Using local config.")
+        # logger.info(config)
+        # Update the primary config with overrides from the local config
+        config.update(local_config)
+        # logger.info(config)
+
         # Update the primary config with overrides from the local config
         config.update(local_config)
     except FileNotFoundError:
