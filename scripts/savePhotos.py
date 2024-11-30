@@ -134,11 +134,11 @@ def savePhotos():
 
                 camera.set_controls({"AfMode": controls.AfModeEnum.Manual, "LensPosition": lensposition})
 
-                if(phase == "sunset" or phase == "sunrise"):
+                if(phase == "sunset" or phase == "dawn"):
                     logger.debug('setting camera to long exposure for ' + phase)
                     camera.set_controls({"AfMode": controls.AfModeEnum.Manual, "LensPosition": lensposition, "AeExposureMode": controls.AeExposureModeEnum.Long}) 
 
-                if(phase == "dusk" or phase == "nautical_dusk" or phase == "night" or phase == "night_end" or phase == "nautical_dawn" or phase == "dawn"):
+                if(phase == "dusk" or phase == "nautical_dusk" or phase == "night" or phase == "night_end" or phase == "nautical_dawn"):
                     logger.debug('setting camera to super long exposure for ' + phase)
                     camera.set_controls({"AfMode": controls.AfModeEnum.Manual, "LensPosition": lensposition, "ExposureTime": config['camera.long_exposure_time'], "AnalogueGain": config['camera.analogue_gain']})
 
