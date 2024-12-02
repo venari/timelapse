@@ -1,4 +1,5 @@
 import json
+import pathlib
 import socket
 import time
 from datetime import datetime, timedelta
@@ -6,10 +7,10 @@ from zoneinfo import ZoneInfo
 from suncalc import get_times
 
 
-config = json.load(open('config.json'))
+config = json.load(open(pathlib.Path(__file__).parent / 'config.json'))
 # Load the local config if it exists
 try:
-    with open('config.local.json', 'r') as f:
+    with open(pathlib.Path(__file__).parent / 'config.local.json', 'r') as f:
         local_config = json.load(f)
     # Update the primary config with overrides from the local config
     config.update(local_config)
