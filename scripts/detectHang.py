@@ -8,10 +8,11 @@ import logging
 # from logging.handlers import TimedRotatingFileHandler
 from logging.handlers import SocketHandler
 import glob
+import pathlib
 
 from SIM7600X import powerUpSIM7600X, powerDownSIM7600X
 
-config = json.load(open('config.json'))
+config = json.load(open(pathlib.Path(__file__).parent / 'config.json'))
 logFilePath = config["logFilePath"]
 intentLogFilePath = logFilePath.replace("timelapse.log", "intent.log")
 os.makedirs(os.path.dirname(logFilePath), exist_ok=True)
@@ -36,14 +37,14 @@ loggerIntent.setLevel(logging.DEBUG)
 # loggerIntent.info("Starting up detectHang.py...")
 # os.chmod(logFilePath, 0o777) # Make sure pijuice user script can write to log file.
 
-outputImageFolder = '../output/images/'
-workingImageFolder = outputImageFolder + 'working/'
-pendingImageFolder = outputImageFolder + 'pending/'
-uploadedImageFolder = outputImageFolder + 'uploaded/'
+outputImageFolder = str(pathlib.Path(__file__).parent / '../output/images/')
+workingImageFolder = os.path.join(outputImageFolder , 'working/')
+pendingImageFolder = os.path.join(outputImageFolder , 'pending/')
+uploadedImageFolder = os.path.join(outputImageFolder , 'uploaded/')
 
-outputTelemetryFolder = '../output/telemetry/'
-pendingTelemetryFolder = outputTelemetryFolder + 'pending/'
-uploadedTelemetryFolder = outputTelemetryFolder + 'uploaded/'
+outputTelemetryFolder = str(pathlib.Path(__file__).parent / '../output/telemetry/')
+pendingTelemetryFolder = os.path.join(outputTelemetryFolder , 'pending/')
+uploadedTelemetryFolder = os.path.join(outputTelemetryFolder , 'uploaded/')
 
 # pijuice
 time.sleep(10)
@@ -52,7 +53,7 @@ pj = pijuice.PiJuice(1, 0x14)
 def detectHang():
     try:
 
-        config = json.load(open('config.json'))
+        config = json.load(open(pathlib.Path(__file__).parent / 'config.json'))
 
         hung = False
 

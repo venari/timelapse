@@ -16,8 +16,7 @@ import pathlib
 # from helpers import flashLED
 from helpers import currentPhase
 
-config = json.load(open('config.json'))
-
+config = json.load(open(pathlib.Path(__file__).parent / 'config.json'))
 logFilePath = config["logFilePath"]
 # logFilePath = logFilePath.replace(".log", ".savePhotos.log")
 os.makedirs(os.path.dirname(logFilePath), exist_ok=True)
@@ -36,10 +35,10 @@ logger.info("Starting up savePhotos.py...")
 
 def reloadConfig():
     global config
-    config = json.load(open('config.json'))
+    config = json.load(open(pathlib.Path(__file__).parent / 'config.json'))
     # Load the local config if it exists
     try:
-        with open('config.local.json', 'r') as f:
+        with open(pathlib.Path(__file__).parent / 'config.local.json', 'r') as f:
             local_config = json.load(f)
 
         # logger.info("config.local.json found. Using local config.")
@@ -59,10 +58,10 @@ reloadConfig()
 while not os.path.exists('/dev/i2c-1'):
     time.sleep(0.1)
 
-outputImageFolder = '../output/images/'
-workingImageFolder = outputImageFolder + 'working/'
-pendingImageFolder = outputImageFolder + 'pending/'
-uploadedImageFolder = outputImageFolder + 'uploaded/'
+outputImageFolder = str(pathlib.Path(__file__).parent / '../output/images/')
+workingImageFolder = os.path.join(outputImageFolder , 'working/')
+pendingImageFolder = os.path.join(outputImageFolder , 'pending/')
+uploadedImageFolder = os.path.join(outputImageFolder , 'uploaded/')
 
 
 def getSerialNumber():

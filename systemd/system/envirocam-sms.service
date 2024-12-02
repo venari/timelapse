@@ -5,7 +5,7 @@ After=envirocam-logging-socket.service
 [Service]
 Type=idle
 User=pi
-ExecStart=/usr/bin/bash /home/pi/dev/timelapse/scripts/handleSMS.sh
+ExecStart=/usr/bin/python3 /home/pi/dev/timelapse/scripts/handleSMS.py
 
 [Install]
 WantedBy=timers.target

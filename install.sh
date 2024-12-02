@@ -119,7 +119,6 @@ grep -qxF 'static domain_name_servers=8.8.4.4 8.8.8.8' /etc/dhcpcd.conf || echo 
 
 
 # Clear out any old crontab entries
-# (echo "@reboot /usr/bin/bash /home/pi/dev/timelapse/scripts/loggingSocketServer.sh")| crontab -
 crontab -r
 
 echo Installing systemd services...
