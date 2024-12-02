@@ -132,15 +132,16 @@ def savePhotos():
                 phase = currentPhase()
                 logger.debug('current phase is ' + phase)
 
-                camera.set_controls({"AfMode": controls.AfModeEnum.Manual, "LensPosition": lensposition})
+                camera.set_controls({"AfMode": controls.AfModeEnum.Manual, "LensPosition": lensposition, "AeExposureMode": controls.AeExposureModeEnum.Normal})
 
-                if(phase == "sunset" or phase == "dawn"):
-                    logger.debug('setting camera to long exposure for ' + phase)
-                    camera.set_controls({"AfMode": controls.AfModeEnum.Manual, "LensPosition": lensposition, "AeExposureMode": controls.AeExposureModeEnum.Long}) 
+                if(config["camera.enable_long_exposure_at_night"]):                    
+                    if(phase == "sunset" or phase == "dawn"):
+                        logger.debug('setting camera to long exposure for ' + phase)
+                        camera.set_controls({"AfMode": controls.AfModeEnum.Manual, "LensPosition": lensposition, "AeExposureMode": controls.AeExposureModeEnum.Long}) 
 
-                if(phase == "dusk" or phase == "nautical_dusk" or phase == "night" or phase == "night_end" or phase == "nautical_dawn"):
-                    logger.debug('setting camera to super long exposure for ' + phase)
-                    camera.set_controls({"AfMode": controls.AfModeEnum.Manual, "LensPosition": lensposition, "ExposureTime": config['camera.long_exposure_time'], "AnalogueGain": config['camera.analogue_gain']})
+                    if(phase == "dusk" or phase == "nautical_dusk" or phase == "night" or phase == "night_end" or phase == "nautical_dawn"):
+                        logger.debug('setting camera to super long exposure for ' + phase)
+                        camera.set_controls({"AfMode": controls.AfModeEnum.Manual, "LensPosition": lensposition, "ExposureTime": config['camera.long_exposure_time'], "AnalogueGain": config['camera.analogue_gain']})
 
                 # if(config['camera.long_exposure_mode']):
                 #     # camera.set_controls({"AfMode": controls.AfModeEnum.Manual, "LensPosition": lensposition, "AeEnable": False, "ExposureTime": config['camera.long_exposure_time'], "AnalogueGain": config['camera.analogue_gain']}) #, "ColourGains": (2, 1.81)})

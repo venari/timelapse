@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 
 from helpers import currentPhase
 
@@ -27,6 +28,21 @@ print(f"currentPhase(): {currentPhase(datetime.utcnow() + timedelta(hours=21))}"
 print(f"currentPhase(): {currentPhase(datetime.utcnow() + timedelta(hours=22))}")
 print(f"currentPhase(): {currentPhase(datetime.utcnow() + timedelta(hours=23))}")
 print(f"currentPhase(): {currentPhase(datetime.utcnow() + timedelta(hours=24))}")
+
+test = datetime(2024, 12, 2, 5, 30, 00, 00, tzinfo=ZoneInfo('Pacific/Auckland'))
+print(test)
+print(f"currentPhase(): {currentPhase(test)}")
+test = datetime(2024, 12, 1, 16, 30, 00, 00)
+print(test)
+print(f"currentPhase( 05:30am NZ in GMT): {currentPhase(test)}")
+
+test = datetime(2024, 12, 1, 16, 40, 00, 00)
+print(test)
+print(f"currentPhase( 05:40am NZ in GMT): {currentPhase(test)}")
+
+test = datetime(2024, 12, 1, 16, 50, 00, 00)
+print(test)
+print(f"currentPhase( 05:50am NZ in GMT): {currentPhase(test)}")
 
 # print(f"currentPhase(): {currentPhase(datetime.utcnow())}")
 # print(f"currentPhase(): {currentPhase(datetime.now())}")
