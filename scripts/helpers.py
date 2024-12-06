@@ -52,7 +52,7 @@ def flashLED(pj, led='D2', R=0, G=0, B=255, flashCount=3, flashDelay=0.5):
         pj.status.SetLedState(led, [0, 0, 0])
         time.sleep(flashDelay)
 
-def currentPhase(now = datetime.utcnow()):
+def currentPhase(now):
     if(config["location.lon"] and config["location.lat"]):
 
         timezone = now.astimezone().tzinfo

@@ -128,7 +128,7 @@ def savePhotos():
                 # camera.rotation = config['camera.rotation']
                 camera.configure(camera_config)
 
-                phase = currentPhase()
+                phase = currentPhase(datetime.utcnow())
                 logger.debug('current phase is ' + phase)
 
                 camera.set_controls({"AfMode": controls.AfModeEnum.Manual, "LensPosition": lensposition, "AeExposureMode": controls.AeExposureModeEnum.Normal})
