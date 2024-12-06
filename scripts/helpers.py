@@ -93,12 +93,16 @@ def currentPhase(now = datetime.utcnow()):
             "night_tomorrow": solar_times_tomorrow["night"]
         }
 
-        logger.debug(f"\nphases: {phases}")
+        # logger.debug(f"\nphases: {phases}")
         # print (f"\nphases: {phases}")
 
         # Determine the current solar phase
+
+        logger.debug("Checking phases.... ")
+        print (f"now: {now.astimezone(timezone)}")
         current_phase = None
         for phase, time in sorted(phases.items(), key=lambda x: x[1]):
+            logger.debug(str(time) + " -> " + phase)
             if now.astimezone(timezone) < time.astimezone(timezone):
                 logger.debug(f"**NOW**")
                 break
