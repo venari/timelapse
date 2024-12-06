@@ -9,6 +9,7 @@ from suncalc import get_times
 import logging
 from logging.handlers import SocketHandler
 
+config = json.load(open(pathlib.Path(__file__).parent / 'config.json'))
 
 logFilePath = config["logFilePath"]
 formatter = logging.Formatter('%(asctime)s %(name)s %(levelname)s %(message)s')
