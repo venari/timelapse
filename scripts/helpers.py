@@ -99,6 +99,7 @@ def currentPhase(now = datetime.utcnow()):
         # Determine the current solar phase
 
         logger.debug("Checking phases.... ")
+        logger.debug(f"now: {now.astimezone(timezone)}")
         # print (f"now: {now.astimezone(timezone)}")
         current_phase = None
         for phase, time in sorted(phases.items(), key=lambda x: x[1]):
