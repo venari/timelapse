@@ -6,6 +6,17 @@ from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 from suncalc import get_times
 
+import logging
+from logging.handlers import SocketHandler
+
+
+logFilePath = config["logFilePath"]
+formatter = logging.Formatter('%(asctime)s %(name)s %(levelname)s %(message)s')
+handler = SocketHandler('localhost', 8000)
+handler.setFormatter(formatter)
+logger = logging.getLogger("savePhotos")
+logger.addHandler(handler)
+logger.setLevel(logging.DEBUG)
 
 config = json.load(open(pathlib.Path(__file__).parent / 'config.json'))
 # Load the local config if it exists
@@ -81,12 +92,14 @@ def currentPhase(now = datetime.utcnow()):
             "night_tomorrow": solar_times_tomorrow["night"]
         }
 
+        logger.debug(f"\nphases: {phases}")
         # print (f"\nphases: {phases}")
 
         # Determine the current solar phase
         current_phase = None
         for phase, time in sorted(phases.items(), key=lambda x: x[1]):
             if now.astimezone(timezone) < time.astimezone(timezone):
+                logger.debug(f"**NOW**")
                 break
             current_phase = phase
 
