@@ -99,7 +99,7 @@ def currentPhase(now = datetime.utcnow()):
         # Determine the current solar phase
 
         logger.debug("Checking phases.... ")
-        print (f"now: {now.astimezone(timezone)}")
+        # print (f"now: {now.astimezone(timezone)}")
         current_phase = None
         for phase, time in sorted(phases.items(), key=lambda x: x[1]):
             logger.debug(str(time) + " -> " + phase)
@@ -108,8 +108,12 @@ def currentPhase(now = datetime.utcnow()):
                 break
             current_phase = phase
 
+        logger.debug(f"current_phase 1: {current_phase}")
+
         if("_tomorrow" in current_phase):
             current_phase = current_phase.replace("_tomorrow", "")
+
+        logger.debug(f"current_phase 2: {current_phase}")
 
         # Map phases to human-readable names
         phase_names = {
@@ -129,6 +133,8 @@ def currentPhase(now = datetime.utcnow()):
         #     print(f"The current solar phase is: {phase_names[current_phase]}")
         # else:
         #     print("Could not determine the current solar phase.")
+
+        logger.debug(f"current_phase 3: {current_phase}")
 
         return current_phase
     else:
