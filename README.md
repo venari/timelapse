@@ -547,6 +547,8 @@ Note - Wake up should be automatically enabled in `saveTelemetry.py`, but you wi
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 ```
 
+# Troubleshooting
+
 ## Troubleshooting PiJuice wakeup:
 
 ```
@@ -557,6 +559,23 @@ python3 /usr/bin/pijuice_log.py --enable WAKEUP_EVT
 ```
 sudo -u pijuice /home/pi/dev/timelapse/scripts/indicateStatus.sh
 ```
+
+## Troubleshooting non-connecting camera:
+- [Tailscale - machines connected in last week](https://login.tailscale.com/admin/machines?refreshed=true&q=lastseen%3A%3C1w)
+- [Device Trends](https://timelapse-dev.azurewebsites.net/DeviceTrends)
+
+### Failing to connect to Tailscale or timelapse-dev.azurewebsites.net:
+- Consult Sediment camera troubleshooting/maintenance checklist.
+- If you have physical access to the Pi.
+  - Connect HDMI and USB adaptors, and connect keyboard and monitor.
+  - Fire up Pi and watch for any error messages, for example complaining about corrupt filesystems
+  - Log in as user:`pi`, password:`raspberry`.
+    - .
+  - Further troubleshooting:
+    - Disconnect modem (to rule out data issues) and connect to working WiFi network, with SSID: `CameraAP`, password: `GiveMeTheInternets`.
+    - Disconnect PiJuice to determine if that is causing issues.
+    - Try fresh install of Raspbian on new SD card to rule out Pi Zero hardware issue.
+
 
 # Battery notes
 
