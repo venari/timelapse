@@ -60,7 +60,19 @@ uploadedTelemetryFolder = os.path.join(outputTelemetryFolder , 'uploaded/')
 
 # pijuice
 time.sleep(10)
-pj = pijuice.PiJuice(1, 0x14)
+pj=None
+# Assign PiJuice but handle error if not connected
+try:
+    pj = pijuice.PiJuice(1, 0x14)
+except:
+    logger.error("PiJuice not connected - PiJuice functionality will not be available")
+
+if pj is None or pj.status.GetStatus()['error'] == 'COMMUNICATION_ERROR':
+    logger.info('PiJuice not connected')
+else:
+    logger.info('PiJuice is connected')
+
+
 logger.info("Starting up saveTelemetry.py 3b...")
 
 def getSerialNumber():
@@ -81,6 +93,10 @@ serialNumber = getSerialNumber()
 
 def scheduleShutdown():
     try:
+        if pj is None or pj.status.GetStatus()['error'] == 'COMMUNICATION_ERROR':
+            logger.info('PiJuice not connected')
+            return
+        
         alarmObj = {}
 
         # print(str(datetime.datetime.now()) + ' scheduleShutdown')
@@ -458,6 +474,10 @@ def scheduleShutdown():
 
 def SetWatchdog(timeout = 3, non_volatile = False):
     try:
+        if pj is None or pj.status.GetStatus()['error'] == 'COMMUNICATION_ERROR':
+            logger.info('PiJuice not connected')
+            return
+
         if(pj.power.GetWatchdog()['data'] == timeout and pj.power.GetWatchdog()['non_volatile'] == non_volatile):
             return
         
@@ -544,24 +564,29 @@ def SetWatchdog(timeout = 3, non_volatile = False):
 def saveTelemetry():
     try:
         warningTemp = 50
+
         api_data = {
-                    'batteryPercent': pj.status.GetChargeLevel()['data'],
-                    'temperatureC': pj.status.GetBatteryTemperature()['data'],
                     'diskSpaceFree': shutil.disk_usage('/')[2] // (1024**3), # shutil.disk_usage returns tuple of (total, used, free), converted to int gb
                     'pendingImages': len(os.listdir(pendingImageFolder)),
                     'uploadedImages': len(os.listdir(uploadedImageFolder)),
                     'pendingTelemetry': len(os.listdir(pendingTelemetryFolder)),
                     'uploadedTelemetry': len(os.listdir(uploadedTelemetryFolder)),
                     'uptimeSeconds': int(time.clock_gettime(time.CLOCK_BOOTTIME)),
-                    'status': str({ 'status': pj.status.GetStatus()['data'],
+                    'SerialNumber': serialNumber
+                }
+
+        if pj is None or pj.status.GetStatus()['error'] == 'COMMUNICATION_ERROR':
+            api_data['batteryPercent'] = 0
+            api_data['temperatureC'] = 0
+        else:
+            api_data['batteryPercent'] = pj.status.GetChargeLevel()['data']
+            api_data['temperatureC'] = pj.status.GetBatteryTemperature()['data']
+            api_data['status']= str({ 'status': pj.status.GetStatus()['data'],
                                 'batteryVoltage': pj.status.GetBatteryVoltage()['data'],
                                 'batteryCurrent': pj.status.GetBatteryCurrent()['data'],
                                 'ioVoltage': pj.status.GetIoVoltage()['data'],
                                 'ioCurrent': pj.status.GetIoCurrent()['data']
-                            }),
-                    # 'Timestamp': datetime.datetime.now().astimezone().isoformat(),
-                    'SerialNumber': serialNumber
-                }
+                            })
 
         telemetryFilename = pendingTelemetryFolder + datetime.datetime.now().strftime('%Y-%m-%d_%H%M%S.json')
         with open(telemetryFilename, 'w') as outfile:
@@ -572,23 +597,24 @@ def saveTelemetry():
         logger.error("saveTelemetry() failed.")
         logger.error(e)
 
-try:
-    waitForRTCAttempts = 0
-    while not os.path.exists('/dev/rtc') and waitForRTCAttempts <= 60:
-        logger.info("dev rtc doesn't exist - waiting... " + str(waitForRTCAttempts))
-        time.sleep(1)
-        waitForRTCAttempts = waitForRTCAttempts + 1
-        subprocess.call(['sudo', 'modprobe', '-r', 'rtc_ds1307'])
-        subprocess.call(['sudo', 'modprobe', 'rtc_ds1307'])
+if pj is not None and pj.status.GetStatus()['error'] == 'NO_ERROR':
+    try:
+        waitForRTCAttempts = 0
+        while not os.path.exists('/dev/rtc') and waitForRTCAttempts <= 60:
+            logger.info("dev rtc doesn't exist - waiting... " + str(waitForRTCAttempts))
+            time.sleep(1)
+            waitForRTCAttempts = waitForRTCAttempts + 1
+            subprocess.call(['sudo', 'modprobe', '-r', 'rtc_ds1307'])
+            subprocess.call(['sudo', 'modprobe', 'rtc_ds1307'])
 
-    logger.debug('setting sys clock from RTC...')
-    loggerIntent.debug('setting sys clock from RTC...')
-    subprocess.call(['sudo', 'hwclock', '--hctosys'])
-    logger.debug("sudo hwclock --hctosys succeeded")
-except Exception as e:
-    logger.error("sudo hwclock --hctosys failed")
-    logger.error(e)
-    
+        logger.debug('setting sys clock from RTC...')
+        loggerIntent.debug('setting sys clock from RTC...')
+        subprocess.call(['sudo', 'hwclock', '--hctosys'])
+        logger.debug("sudo hwclock --hctosys succeeded")
+    except Exception as e:
+        logger.error("sudo hwclock --hctosys failed")
+        logger.error(e)
+        
 
 try:
     logger.info('In saveTelemetry.py')

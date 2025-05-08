@@ -49,6 +49,12 @@ public class IndexModel : PageModel
 
         DateTime cutOff = DateTime.UtcNow.AddDays(-1 * NumberOfDaysToDisplay);
 
+        // Temp workaround to shut off before Oct 2024.
+        if(cutOff < new DateTime(2024, 10, 01).ToUniversalTime())
+        {
+            cutOff = new DateTime(2024, 10, 01).ToUniversalTime();
+        }
+
         devices = _appDbContext.Devices
 
             .Include(d => d.Events.Where(e => e.EndTime >= cutOff))
@@ -62,7 +68,7 @@ public class IndexModel : PageModel
             // .AsSplitQuery()
             // .OrderBy(d => d.Name)
             .OrderBy(d => d.Description)
-            // .Where(d => d.Retired == false)
+            .Where(d => d.Retired == false)
             .ToList();
 
         images = _appDbContext.Images;

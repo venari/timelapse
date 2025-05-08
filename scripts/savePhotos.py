@@ -14,6 +14,7 @@ from logging.handlers import SocketHandler
 import pathlib
 
 # from helpers import flashLED
+from helpers import currentPhase
 
 config = json.load(open(pathlib.Path(__file__).parent / 'config.json'))
 logFilePath = config["logFilePath"]
@@ -31,6 +32,27 @@ logger.setLevel(logging.DEBUG)
 
 logger.info("Starting up savePhotos.py...")
 # os.chmod(logFilePath, 0o777) # Make sure pijuice user script can write to log file.
+
+def reloadConfig():
+    global config
+    config = json.load(open(pathlib.Path(__file__).parent / 'config.json'))
+    # Load the local config if it exists
+    try:
+        with open(pathlib.Path(__file__).parent / 'config.local.json', 'r') as f:
+            local_config = json.load(f)
+
+        # logger.info("config.local.json found. Using local config.")
+        # logger.info(config)
+        # Update the primary config with overrides from the local config
+        config.update(local_config)
+        # logger.info(config)
+
+        # Update the primary config with overrides from the local config
+        config.update(local_config)
+    except FileNotFoundError:
+        logger.error("config.local.json not found. Using default config.")
+
+reloadConfig()
 
 # clock
 while not os.path.exists('/dev/i2c-1'):
@@ -72,7 +94,7 @@ def savePhotos():
             logger.debug('creating camera object...')
             with Picamera2() as camera:
 
-                config = json.load(open(pathlib.Path(__file__).parent / 'config.json'))
+                reloadConfig()
                 #camera_config = camera.create_preview_configuration()
                 camera_config = camera.create_still_configuration()
                 
@@ -80,6 +102,10 @@ def savePhotos():
 
                 # # Use sensor mode 2 to give greater max exposure time.
                 # camera_config = camera.create_still_configuration(raw = picam2.sensor_modes[2])
+
+                logger.info(config)
+                logger.info(config['camera.vflip'])
+                logger.info(config['camera.hflip'])
 
                 camera_config["transform"] = Transform(vflip = config['camera.vflip'], hflip = config['camera.hflip'])
                 camera_config["size"] = (config['camera.resolution.width'], config['camera.resolution.height'])
@@ -102,14 +128,28 @@ def savePhotos():
                 # camera.rotation = config['camera.rotation']
                 camera.configure(camera_config)
 
-                if(config['camera.long_exposure_mode']):
-                    # camera.set_controls({"AfMode": controls.AfModeEnum.Manual, "LensPosition": lensposition, "AeEnable": False, "ExposureTime": config['camera.long_exposure_time'], "AnalogueGain": config['camera.analogue_gain']}) #, "ColourGains": (2, 1.81)})
-                    camera.set_controls({"AfMode": controls.AfModeEnum.Manual, "LensPosition": lensposition, "ExposureTime": config['camera.long_exposure_time'], "AnalogueGain": config['camera.analogue_gain']})
+                phase = currentPhase(datetime.datetime.utcnow())
+                logger.debug('current phase is ' + phase)
+
+                camera.set_controls({"AfMode": controls.AfModeEnum.Manual, "LensPosition": lensposition, "AeExposureMode": controls.AeExposureModeEnum.Normal})
+
+                if(config["camera.enable_long_exposure_at_night"]):                    
+                    if(phase == "sunset" or phase == "dawn"):
+                        logger.debug('setting camera to long exposure for ' + phase)
+                        camera.set_controls({"AfMode": controls.AfModeEnum.Manual, "LensPosition": lensposition, "AeExposureMode": controls.AeExposureModeEnum.Long}) 
+
+                    if(phase == "dusk" or phase == "nautical_dusk" or phase == "night" or phase == "night_end" or phase == "nautical_dawn"):
+                        logger.debug('setting camera to super long exposure for ' + phase)
+                        camera.set_controls({"AfMode": controls.AfModeEnum.Manual, "LensPosition": lensposition, "ExposureTime": config['camera.long_exposure_time'], "AnalogueGain": config['camera.analogue_gain']})
+
+                # if(config['camera.long_exposure_mode']):
+                #     # camera.set_controls({"AfMode": controls.AfModeEnum.Manual, "LensPosition": lensposition, "AeEnable": False, "ExposureTime": config['camera.long_exposure_time'], "AnalogueGain": config['camera.analogue_gain']}) #, "ColourGains": (2, 1.81)})
+                #     # camera.set_controls({"AfMode": controls.AfModeEnum.Manual, "LensPosition": lensposition, "ExposureTime": config['camera.long_exposure_time'], "AnalogueGain": config['camera.analogue_gain']})
                     
-                    # #imx708 doesn't have long exposure mode in tuning file
-                    # camera.set_controls({"AfMode": controls.AfModeEnum.Manual, "LensPosition": lensposition, "AeExposureMode": controls.AeExposureModeEnum.Long}) 
-                else:
-                    camera.set_controls({"AfMode": controls.AfModeEnum.Manual, "LensPosition": lensposition})
+                #     #imx708 now has long exposure mode in tuning file
+                #     camera.set_controls({"AfMode": controls.AfModeEnum.Manual, "LensPosition": lensposition, "AeExposureMode": controls.AeExposureModeEnum.Long}) 
+                # else:
+                #     camera.set_controls({"AfMode": controls.AfModeEnum.Manual, "LensPosition": lensposition})
                     
                 camera.options["quality"] = config['camera.quality']
 
