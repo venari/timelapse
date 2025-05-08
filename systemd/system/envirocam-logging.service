@@ -5,7 +5,7 @@ After=multi-user.target
 [Service]
 Type=idle
 User=pi
-ExecStart=/usr/bin/bash /home/pi/dev/timelapse/scripts/loggingSocketServer.sh
+ExecStart=/usr/bin/python3 /home/pi/dev/timelapse/scripts/loggingSocketServer.py
 Restart=always
 RestartSec=10
 

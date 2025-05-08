@@ -8,9 +8,10 @@ import socket
 import json
 import threading
 import os
+import pathlib
 
 # this logic taken from saveTelemetry.py
-config = json.load(open('config.json'))
+config = json.load(open(pathlib.Path(__file__).parent / 'config.json'))
 logFilePath = config["logFilePath"]
 os.makedirs(os.path.dirname(logFilePath), exist_ok=True)
 

@@ -1,15 +1,15 @@
 # timelapse
 A set of tools/scripts to automate the taking and creation of timelapse videos and videos with a Raspberry Pi
 
-# Current issues with PiJuice
-> [!warning]
-> At present (November 2023), I cannot recommend using PiJuice as the BMS provider.
+# Current status of using PiJuice
+> [!important]
+> In November 2023, I posted an update regards the performance of the PiJuice, even when using PiSupply's own batteries.
+>
+> However, in the last month (November 2024) I've deployed one further camera that is not using a third party modem board [Waveshare SIM7600-H 4G HAT](https://www.waveshare.com/wiki/SIM7600X_4G_%26_LTE_Cat-1_HAT), but instead has reverted back to a USB thumb modem. Since swapping to this modem, the PiJuice board has behaved perfectly with no missed wakeups or random restarts.
 > 
-> I am having a number of PiJuice reliability issues even when using PiSupply's own batteries.
-> 
-> Since their merger with or aquisition by Nebra, I've found attempts to purchase batteries from PiSupply to be unsuccessful as their payment options are not working. Attempts to contact them on Twitter go unanswered.
-> 
-> If this situation changes, I will update this warning. Last updated 23 November 2023.
+> In addition the ability to purchase PiSupply's PiJuice batteries seems to have returned (even if stock has not).
+>
+> TL;DR - as long as not combined with either a LiFePO4 battery chemistry or the Waveshare hat above, the PiJuice seems to perform well.
 
 # PI Setup
 
@@ -22,6 +22,8 @@ Debian version 11 - https://downloads.raspberrypi.org/raspios_lite_arm64/images/
 Burn using Pi Imager. Give a default name, but you can change this inthe install script below.
 
 Set username and password, and authentication methods as desired.
+
+## All versions up to Bullseye.
 
 Mount (reinsert) SD card
 <!-- diskutil mount /dev/disk4s1 -->
@@ -39,6 +41,28 @@ And then on the pi:
 sudo cp ~/wpa_supplicant.conf /etc/wpa_supplicant/wpa_supplicant.conf
 sudo reboot
 ```
+
+## Bookworm onwards:
+Bookworm uses NetorkManager rather than WPA Supplicant.
+
+Ensure you have local wifi network access when you burn the image.
+
+Individual network addition:
+```
+sudo nmcli dev wifi connect <wifi-ssid> password "<network-password>"
+```
+
+```
+scp ~/nmcli-connect.sh pi@[pi name]:~
+```
+And then on the pi:
+```
+chmod u+x ~/nmcli-connect.sh
+sudo ./nmcli-connect.sh
+```
+
+Note - this will only connect to WIFI networks that are present, so ensure modem stays with camera.
+
 
 Turn on and find the pi
 Pi Zero W 2:
@@ -63,10 +87,6 @@ byobu
 ```
 bash <(curl -fsSL "https://github.com/venari/timelapse/raw/main/install.sh?$RANDOM")
 ```
-Systemd version:
-```
-bash <(curl -fsSL "https://github.com/venari/timelapse/raw/feature/systemd/install.sh?$RANDOM")
-```
 
 # Connect to intermitently connected Pi and tail log:
 ```
@@ -85,7 +105,13 @@ scp -o ConnectTimeout=60 -o ConnectionAttempts=30 pi@sediment-pi-zero-w-v1-a:/ho
 
 # Review systemd job status
 ```
-watch --differences systemctl status envirocam*
+watch --color SYSTEMD_COLORS=1 systemctl status enviro*.service
+```
+
+# restart a systemd job
+```
+sudo systemctl restart envirocam-telemetry
+sudo systemctl restart envirocam*
 ```
 
 # Waveshare SIM6700X GSM/GPRS/GNSS HAT
@@ -584,6 +610,7 @@ pssh --hosts ~/dev/venari/timelapse/hosts.txt -t 900 -x '-o ConnectTimeout=60 -o
 3D models
 
 - Raspberry Pi Camera Module v3 STL files: https://www.printables.com/model/368779-raspberry-pi-camera-module-3-v3/
+
 
 # ESP32 version/links
 

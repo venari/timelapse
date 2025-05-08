@@ -18,7 +18,7 @@ from helpers import flashLED, internet
 
 from SIM7600X import powerUpSIM7600X, powerDownSIM7600X, turnOnNDIS
 
-config = json.load(open('config.json'))
+config = json.load(open(pathlib.Path(__file__).parent / 'config.json'))
 logFilePath = config["logFilePath"]
 intentLogFilePath = logFilePath.replace("timelapse.log", "intent.log")
 # logFilePath = logFilePath.replace(".log", ".uploadTelemetry.log")
@@ -50,14 +50,15 @@ logger.info("*******************************************************************
 
 loggerIntent.info("Starting up uploadPending.py...")
 
-outputImageFolder = '../output/images/'
-pendingImageFolder = outputImageFolder + 'pending/'
-uploadedImageFolder = outputImageFolder + 'uploaded/'
+outputImageFolder = str(pathlib.Path(__file__).parent / '../output/images/')
+workingImageFolder = os.path.join(outputImageFolder , 'working/')
+pendingImageFolder = os.path.join(outputImageFolder , 'pending/')
+uploadedImageFolder = os.path.join(outputImageFolder , 'uploaded/')
 
-outputTelemetryFolder = '../output/telemetry/'
-pendingTelemetryFolder = outputTelemetryFolder + 'pending/'
-uploadedTelemetryFolder = outputTelemetryFolder + 'uploaded/'
-holdTelemetryFolder = outputTelemetryFolder + 'hold/'
+outputTelemetryFolder = str(pathlib.Path(__file__).parent / '../output/telemetry/')
+pendingTelemetryFolder = os.path.join(outputTelemetryFolder , 'pending/')
+uploadedTelemetryFolder = os.path.join(outputTelemetryFolder , 'uploaded/')
+holdTelemetryFolder = os.path.join(outputTelemetryFolder , 'hold/')
 
 bInSupportWindow = False
 
@@ -147,26 +148,26 @@ def uploadPendingPhotos():
                     logger.info('Support mode changed to ' + str(json.loads(response.text)['device']['supportMode']))
                     loggerIntent.info('Support mode changed to ' + str(json.loads(response.text)['device']['supportMode']))
                     config['supportMode'] = json.loads(response.text)['device']['supportMode']
-                    json.dump(config, open('config.json', 'w'), indent=4)
+                    json.dump(config, open(pathlib.Path(__file__).parent / 'config.json', 'w'), indent=4)
 
                 if json.loads(response.text)['device']['monitoringMode'] != config['monitoringMode']:
                     logger.info('Monitoring mode changed to ' + str(json.loads(response.text)['device']['monitoringMode']))
                     loggerIntent.info('Monitoring mode changed to ' + str(json.loads(response.text)['device']['monitoringMode']))
                     config['monitoringMode'] = json.loads(response.text)['device']['monitoringMode']
-                    json.dump(config, open('config.json', 'w'), indent=4)
+                    json.dump(config, open(pathlib.Path(__file__).parent / 'config.json', 'w'), indent=4)
 
                 if json.loads(response.text)['device']['hibernateMode'] != config['hibernateMode']:
                     logger.info('Hibernate mode changed to ' + str(json.loads(response.text)['device']['hibernateMode']))
                     loggerIntent.info('Hibernate mode changed to ' + str(json.loads(response.text)['device']['hibernateMode']))
                     config['hibernateMode'] = json.loads(response.text)['device']['hibernateMode']
-                    json.dump(config, open('config.json', 'w'), indent=4)
+                    json.dump(config, open(pathlib.Path(__file__).parent / 'config.json', 'w'), indent=4)
 
                    
                 if json.loads(response.text)['device']['powerOff'] != config['powerOff']:
                     logger.info('Power Off changed to ' + str(json.loads(response.text)['device']['powerOff']))
                     loggerIntent.info('Power Off changed to ' + str(json.loads(response.text)['device']['powerOff']))
                     config['powerOff'] = json.loads(response.text)['device']['powerOff']
-                    json.dump(config, open('config.json', 'w'), indent=4)
+                    json.dump(config, open(pathlib.Path(__file__).parent / 'config.json', 'w'), indent=4)
 
             except json.decoder.JSONDecodeError:
                 logger.debug(response.text)
@@ -347,26 +348,26 @@ def uploadPendingTelemetry():
                     logger.info('Support mode changed to ' + str(json.loads(response.text)['device']['supportMode']))
                     loggerIntent.info('Support mode changed to ' + str(json.loads(response.text)['device']['supportMode']))
                     config['supportMode'] = json.loads(response.text)['device']['supportMode']
-                    json.dump(config, open('config.json', 'w'), indent=4)
+                    json.dump(config, open(pathlib.Path(__file__).parent / 'config.json', 'w'), indent=4)
 
                 if json.loads(response.text)['device']['monitoringMode'] != config['monitoringMode']:
                     logger.info('Monitoring mode changed to ' + str(json.loads(response.text)['device']['monitoringMode']))
                     loggerIntent.info('Monitoring mode changed to ' + str(json.loads(response.text)['device']['monitoringMode']))
                     config['monitoringMode'] = json.loads(response.text)['device']['monitoringMode']
-                    json.dump(config, open('config.json', 'w'), indent=4)
+                    json.dump(config, open(pathlib.Path(__file__).parent / 'config.json', 'w'), indent=4)
 
                 if json.loads(response.text)['device']['hibernateMode'] != config['hibernateMode']:
                     logger.info('Hibernate mode changed to ' + str(json.loads(response.text)['device']['hibernateMode']))
                     loggerIntent.info('Hibernate mode changed to ' + str(json.loads(response.text)['device']['hibernateMode']))
                     config['hibernateMode'] = json.loads(response.text)['device']['hibernateMode']
-                    json.dump(config, open('config.json', 'w'), indent=4)
+                    json.dump(config, open(pathlib.Path(__file__).parent / 'config.json', 'w'), indent=4)
 
                    
                 if json.loads(response.text)['device']['powerOff'] != config['powerOff']:
                     logger.info('Power Off changed to ' + str(json.loads(response.text)['device']['powerOff']))
                     loggerIntent.info('Power Off changed to ' + str(json.loads(response.text)['device']['powerOff']))
                     config['powerOff'] = json.loads(response.text)['device']['powerOff']
-                    json.dump(config, open('config.json', 'w'), indent=4)
+                    json.dump(config, open(pathlib.Path(__file__).parent / 'config.json', 'w'), indent=4)
 
             except json.decoder.JSONDecodeError:
                 flashLED(pj, 'D2', 255, 0, 255, 1, 1)
@@ -420,7 +421,7 @@ try:
 
     while True:
 
-      config = json.load(open('config.json'))
+      config = json.load(open(pathlib.Path(__file__).parent / 'config.json'))
       deleteOldUploadedImagesAndTelemetry()
       uploadPendingTelemetry()
       uploadPendingPhotos()
