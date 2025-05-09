@@ -587,6 +587,7 @@ sudo -u pijuice /home/pi/dev/timelapse/scripts/indicateStatus.sh
       - `tail -f logs/intent.log`
       - `tail -f logs/timelapse.log`
       - `tail -f logs/intent.log`
+      - `journalctl -u envirocam-telemetry.service`
     - Disconnect modem (to rule out data issues) and connect to working WiFi network, with SSID: `CameraAP`, password: `GiveMeTheInternets`.
     - Disconnect PiJuice to determine if that is causing issues.
     - Try fresh install of Raspbian on new SD card to rule out Pi Zero hardware issue.
