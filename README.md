@@ -570,8 +570,23 @@ sudo -u pijuice /home/pi/dev/timelapse/scripts/indicateStatus.sh
   - Connect HDMI and USB adaptors, and connect keyboard and monitor.
   - Fire up Pi and watch for any error messages, for example complaining about corrupt filesystems
   - Log in as user:`pi`, password:`raspberry`.
-    - .
+    - Check network connection status:
+      - `ifconfig`
+      - `nmcli`
+      - List devices: `nmcli device`
+      - List known networks: `nmcli connection`
+      - Check wireless is on: `nmcli radio`
+      - List available wireless networks: `nmcli device wifi list`
+      - Connect to CameraAP network: `nmcli device wifi connect CameraAP password GiveMeTheInternets`
+    - List wireless networks:
+      - `sudo iwlist wlan0 scan | grep ESSID`
+    - Check tailscale status
+      - `tailscale netcheck`
   - Further troubleshooting:
+    - Check envirocam logs
+      - `tail -f logs/intent.log`
+      - `tail -f logs/timelapse.log`
+      - `tail -f logs/intent.log`
     - Disconnect modem (to rule out data issues) and connect to working WiFi network, with SSID: `CameraAP`, password: `GiveMeTheInternets`.
     - Disconnect PiJuice to determine if that is causing issues.
     - Try fresh install of Raspbian on new SD card to rule out Pi Zero hardware issue.
