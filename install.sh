@@ -32,7 +32,7 @@ if ! grep -q "bookworm" /etc/os-release; then
     pip3 install waveshare-epaper
 fi
 
-pip3 install suncalc
+pip3 install suncalc --break-system-packages
 
 byobu-enable
 

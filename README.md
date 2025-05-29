@@ -14,10 +14,12 @@ A set of tools/scripts to automate the taking and creation of timelapse videos a
 # PI Setup
 
 Raspberry Pi OS Lite (32 bit - Pi Zero W)
-Debian version 11 (bullseye) - https://downloads.raspberrypi.org/raspios_lite_armhf/images/raspios_lite_armhf-2022-09-26/2022-09-22-raspios-bullseye-armhf-lite.img.xz
+Debian Bookworm - https://downloads.raspberrypi.org/raspios_lite_armhf/images/raspios_lite_armhf-2025-05-13/2025-05-13-raspios-bookworm-armhf-lite.img.xz
+
 
 Raspberry Pi OS Lite (64 bit - Pi Zero 2 W
-Debian version 11 - https://downloads.raspberrypi.org/raspios_lite_arm64/images/raspios_lite_arm64-2022-01-28/2022-01-28-raspios-bullseye-arm64-lite.zip
+Debian Bookworm - https://downloads.raspberrypi.org/raspios_lite_arm64/images/raspios_lite_arm64-2025-05-13/2025-05-13-raspios-bookworm-arm64-lite.img.xz
+
 
 Burn using Pi Imager. Give a default name, but you can change this inthe install script below.
 

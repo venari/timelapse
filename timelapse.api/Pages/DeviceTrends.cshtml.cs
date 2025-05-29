@@ -9,7 +9,7 @@ using Microsoft.Extensions.Caching.Memory;
 
 namespace timelapse.api.Pages;
 
-[Authorize]
+[Authorize(Roles = "Admin")]
 public class DeviceTrendsModel : PageModel
 {
     private readonly ILogger<DeviceTrendsModel> _logger;
@@ -85,7 +85,7 @@ public class DeviceTrendsModel : PageModel
         var devices = _appDbContext.Devices
             .Include(d => d.Images.Where(i => i.Timestamp >= StartDate && i.Timestamp <= EndDate).OrderBy(i => i.Timestamp))
             .Include(d => d.Telemetries.Where(t => t.Timestamp >= StartDate && t.Timestamp <= EndDate).OrderBy(t => t.Timestamp))
-            .Where(d => d.Retired == false)
+            // .Where(d => d.Retired == false)
             .AsSplitQuery()
             .OrderBy(d => d.ShortDescription);
 

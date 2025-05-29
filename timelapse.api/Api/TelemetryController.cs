@@ -89,15 +89,15 @@ namespace timelapse.api{
             }
 
 
-            // Get two surrounding data points.
-            var previous = _appDbContext.Telemetry
-                .Where(t => t.DeviceId == deviceId && t.Timestamp.ToUniversalTime() < startDate.ToUniversalTime())
-                .OrderByDescending(t => t.Timestamp)
-                .FirstOrDefault();
+            // // Get two surrounding data points.
+            // var previous = _appDbContext.Telemetry
+            //     .Where(t => t.DeviceId == deviceId && t.Timestamp.ToUniversalTime() < startDate.ToUniversalTime())
+            //     .OrderByDescending(t => t.Timestamp)
+            //     .FirstOrDefault();
 
-            if(previous!=null){
-                telemetry.Insert(0, previous);
-            }
+            // if(previous!=null){
+            //     telemetry.Insert(0, previous);
+            // }
             var next = _appDbContext.Telemetry
                 .Where(t => t.DeviceId == deviceId && t.Timestamp.ToUniversalTime() > endDate.ToUniversalTime())
                 .OrderBy(t => t.Timestamp)
