@@ -14,10 +14,12 @@ A set of tools/scripts to automate the taking and creation of timelapse videos a
 # PI Setup
 
 Raspberry Pi OS Lite (32 bit - Pi Zero W)
-Debian version 11 (bullseye) - https://downloads.raspberrypi.org/raspios_lite_armhf/images/raspios_lite_armhf-2022-09-26/2022-09-22-raspios-bullseye-armhf-lite.img.xz
+Debian Bookworm - https://downloads.raspberrypi.org/raspios_lite_armhf/images/raspios_lite_armhf-2025-05-13/2025-05-13-raspios-bookworm-armhf-lite.img.xz
+
 
 Raspberry Pi OS Lite (64 bit - Pi Zero 2 W
-Debian version 11 - https://downloads.raspberrypi.org/raspios_lite_arm64/images/raspios_lite_arm64-2022-01-28/2022-01-28-raspios-bullseye-arm64-lite.zip
+Debian Bookworm - https://downloads.raspberrypi.org/raspios_lite_arm64/images/raspios_lite_arm64-2025-05-13/2025-05-13-raspios-bookworm-arm64-lite.img.xz
+
 
 Burn using Pi Imager. Give a default name, but you can change this inthe install script below.
 
@@ -547,6 +549,8 @@ Note - Wake up should be automatically enabled in `saveTelemetry.py`, but you wi
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 ```
 
+# Troubleshooting
+
 ## Troubleshooting PiJuice wakeup:
 
 ```
@@ -557,6 +561,50 @@ python3 /usr/bin/pijuice_log.py --enable WAKEUP_EVT
 ```
 sudo -u pijuice /home/pi/dev/timelapse/scripts/indicateStatus.sh
 ```
+
+## Troubleshooting non-connecting camera:
+- [Tailscale - machines connected in last week](https://login.tailscale.com/admin/machines?refreshed=true&q=lastseen%3A%3C1w)
+- [Device Trends](https://timelapse-dev.azurewebsites.net/DeviceTrends)
+
+### Failing to connect to Tailscale or timelapse-dev.azurewebsites.net:
+- Consult Sediment camera troubleshooting/maintenance checklist.
+- If you have physical access to the Pi.
+  - Connect HDMI and USB adaptors, and connect keyboard and monitor.
+  - Fire up Pi and watch for any error messages, for example complaining about corrupt filesystems, or kernel panics.
+  - Log in as user:`pi`, password:`raspberry`.
+    - Check network connection status:
+      - `ifconfig`
+      - `nmcli`
+      - List devices: `nmcli device`
+      - List known networks: `nmcli connection`
+      - Check wireless is on: `nmcli radio`
+      - List available wireless networks: `nmcli device wifi list`
+      - Connect to CameraAP network: `nmcli device wifi connect CameraAP password GiveMeTheInternets`
+    - If `nmcli` isn't available:
+      - List wireless networks: `sudo iwlist wlan0 scan | grep ESSID`
+      - To connect to network, edit the `/etc/wpa_supplicant/wpa_supplicant.conf` file to add a section, and then `sudo reboot` to restart:
+      ````
+      ctrl_interface=DIR=/var/run/wpa_supplicant GROUP=netdev
+      update_config=1
+      country=NZ
+
+      network={
+              ssid="CameraAP"
+              psk="GiveMeTheInternets"
+      }
+      ````
+    - Check tailscale status
+      - `tailscale netcheck`
+  - Further troubleshooting:
+    - Check envirocam logs
+      - `tail -f logs/intent.log`
+      - `tail -f logs/timelapse.log`
+      - `tail -f logs/intent.log`
+      - `journalctl -u envirocam-telemetry.service`
+    - Disconnect modem (to rule out data issues) and connect to working WiFi network, with SSID: `CameraAP`, password: `GiveMeTheInternets`.
+    - Disconnect PiJuice to determine if that is causing issues.
+    - Try fresh install of Raspbian on new SD card to rule out Pi Zero hardware issue.
+
 
 # Battery notes
 
