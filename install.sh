@@ -30,9 +30,11 @@ python3 /usr/bin/pijuice_log.py --enable WAKEUP_EVT
 # sudo apt-get install python3-waveshare-epaper -y
 if ! grep -q "bookworm" /etc/os-release; then
     pip3 install waveshare-epaper
+    pip3 install suncalc
+else
+    pip3 install suncalc --break-system-packages
 fi
 
-pip3 install suncalc --break-system-packages
 
 byobu-enable
 
