@@ -344,7 +344,7 @@
             </thead>
             @{foreach(var summary in Model.PerformanceSummaries){
             <tr>
-                <td nowrap="nowrap"><a href="/TelemetryGraph/@(summary.DeviceId)/@(Model.NumberOfHoursToDisplay)">@(summary.DeviceName)</a></td>
+                <td nowrap="nowrap"><a href="/TelemetryGraph/@(summary.DeviceId)/@(Model.StartDate.ToUniversalTime().ToString("o"))/@(Model.EndDate.ToUniversalTime().ToString("o"))">@(summary.DeviceName)</a></td>
 
                 <td nowrap="nowrap">
                     @if(summary.DeviceSupportMode){
