@@ -43,6 +43,12 @@ namespace timelapse.infrastructure
                 .HasMany(e => e.EventTypes)
                 .WithMany(e => e.Events);
 
+            modelBuilder.Entity<Telemetry>()
+                .HasIndex(e => e.Timestamp);
+
+            modelBuilder.Entity<Image>()
+                .HasIndex(e => e.Timestamp);
+
             // modelBuilder.Entity<Event>()
             //     .HasOne(e => e.EventType);
         }
@@ -62,7 +68,8 @@ namespace timelapse.infrastructure
 
             var connectionString = _configuration.GetConnectionString("DefaultConnection");
             // _logger.LogInformation(connectionString);
-            optionsBuilder.UseNpgsql(connectionString)
+            optionsBuilder.UseNpgsql(connectionString) 
+            // , npgsqlOptions => npgsqlOptions.CommandTimeout(300)) // If we're running a particularly slow migration - e.g. adding missing indexes
             .UseSnakeCaseNamingConvention();
         }
     }
