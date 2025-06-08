@@ -3,14 +3,23 @@
 # Ask user if we have a waveshare modem
 read -p "Does this camera have a waveshare SIM7600X modem? (y/n)" waveshare
 
+# Avoiding issue #89
 read -p "Would you like to update the operating system software using apt-get update/upgrade? (y/n)" updateApt
 
 if [ $updateApt == "y" ]; then
+
+    read -p "Would you like to do a FULL UPGRADE? (y/n)" fullUpgradeApt
+
     echo Updating....
     sudo apt-get update
 
-    echo Upgrading...
-    sudo apt-get upgrade -y
+    if [ $fullUpgradeApt == "y" ]; then
+        echo Performing FULL UPGRADE...
+        sudo apt-get full-upgrade -y
+    else
+        echo Upgrading...
+        sudo apt-get upgrade -y
+    fi
 fi
 
 echo Installing packages...
@@ -166,7 +175,7 @@ sudo tailscale up
 read -p "Current hostname is $(hostname) - would you like to change it?" yn
 case $yn in 
     [Yy]* ) echo "Changing hostname";
-        read -p "Enter new hostname if desired: " -i sediment-pi- -e hostname
+        read -p "Enter new hostname if desired: " -i envirocam- -e hostname
         echo Setting hostname to $hostname
         sudo hostnamectl set-hostname $hostname;;
 
