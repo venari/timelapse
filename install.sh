@@ -197,7 +197,7 @@ echo ===========================================
 echo Please check battery profile in pijuice_cli
 echo ===========================================
 
-echo We need to reboot to clear out cron jobs if we're updating an old camera
+echo We need to reboot to clear out cron jobs if we\'re updating an old camera
 read -p "Do you want to reboot? (y/n)" rebootNow
 if [ "$rebootNow" == "y" ]; then
     echo "Rebooting now..."
