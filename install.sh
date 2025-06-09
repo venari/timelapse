@@ -141,10 +141,20 @@ sudo systemctl enable envirocam-photos.timer
 sudo systemctl enable envirocam-upload.timer
 sudo systemctl enable envirocam-detect-hang.timer
 
+echo Starting systemd services...
+sudo systemctl start envirocam-logging.service
+sudo systemctl start envirocam-telemetry.service
+sudo systemctl start envirocam-photos.service
+sudo systemctl start envirocam-upload.service
+
+sudo systemctl start envirocam-detect-hang.timer
+
+
 # If not bookworm - don't have epaper library yet
 if ! grep -q "bookworm" /etc/os-release; then
     sudo cp /home/pi/dev/timelapse/systemd/system/envirocam-status.timer /etc/systemd/system/
     sudo systemctl enable envirocam-status.timer
+    sudo systemctl start envirocam-status.timer
 fi
 
 # If not waveshare, we can't access SMS messages
@@ -183,12 +193,17 @@ case $yn in
     * ) echo "Please answer yes or no.";;
 esac
 
-echo We need to reboot to clear out cron jobs and kick off systemd jobs
-echo "Press any key to reboot"
-
 echo ===========================================
 echo Please check battery profile in pijuice_cli
 echo ===========================================
 
-read -n 1 -s
-sudo reboot
+echo We need to reboot to clear out cron jobs if we're updating an old camera
+read -p "Do you want to reboot? (y/n)" rebootNow
+if [ "$rebootNow" == "y" ]; then
+    echo "Rebooting now..."
+    read -n 1 -s
+    sudo reboot
+else
+    echo "Reboot skipped."
+fi
+
