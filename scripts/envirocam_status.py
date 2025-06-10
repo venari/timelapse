@@ -75,7 +75,7 @@ def main():
     PENDING_IMAGES_PATTERN = "/home/pi/dev/timelapse/output/images/pending/*.jpg"
     UPLOADED_IMAGES_PATTERN = "/home/pi/dev/timelapse/output/images/uploaded/*.jpg"
     PENDING_TELEMETRY_PATTERN = "/home/pi/dev/timelapse/output/telemetry/pending/*.json"
-    UPLOADED_TELEMETRY_PATTERN = "/home/pi/dev/timelapse/telemetry/uploaded/*.json"
+    UPLOADED_TELEMETRY_PATTERN = "/home/pi/dev/timelapse/output/telemetry/uploaded/*.json"
     
     # Count files
     pending_images = count_files(PENDING_IMAGES_PATTERN)
