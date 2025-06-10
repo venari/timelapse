@@ -72,10 +72,10 @@ def main():
     args = parser.parse_args()
 
     # Adjust these paths to match your system
-    PENDING_IMAGES_PATTERN = "/home/pi/dev/timelapse/pending_images/*.jpg"
-    UPLOADED_IMAGES_PATTERN = "/home/pi/dev/timelapse/uploaded_images/*.jpg"
-    PENDING_TELEMETRY_PATTERN = "/home/pi/dev/timelapse/pending_telemetry/*.json"
-    UPLOADED_TELEMETRY_PATTERN = "/home/pi/dev/timelapse/uploaded_telemetry/*.json"
+    PENDING_IMAGES_PATTERN = "/home/pi/dev/timelapse/output/images/pending/*.jpg"
+    UPLOADED_IMAGES_PATTERN = "/home/pi/dev/timelapse/output/images/uploaded/*.jpg"
+    PENDING_TELEMETRY_PATTERN = "/home/pi/dev/timelapse/output/telemetry/pending/*.json"
+    UPLOADED_TELEMETRY_PATTERN = "/home/pi/dev/timelapse/telemetry/uploaded/*.json"
     
     # Count files
     pending_images = count_files(PENDING_IMAGES_PATTERN)
