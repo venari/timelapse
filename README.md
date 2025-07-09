@@ -307,6 +307,11 @@ brew install pgadmin4
 dotnet tool install --global dotnet-ef
 ```
 
+# Azure CLI install
+```
+curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
+```
+
 Postgres DB Server:
 ```
 
