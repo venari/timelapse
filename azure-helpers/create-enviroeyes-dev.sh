@@ -19,6 +19,17 @@ STORAGE_CONTAINER_NAME=enviroeyes-dev-container
 echo Determining IP Address...
 IP_ADDRESS=$(curl ipecho.net/plain)
 
+# Check if resource group already exists
+MATCHING_COUNT=$(az group list --query "[?name=='$AZURE_RESOURCE_GROUP'].{name:name}.length(@)")
+if [ $MATCHING_COUNT = 0 ]
+then
+    echo "Creating resource group $AZURE_RESOURCE_GROUP in $AZURE_LOCATION..."
+    az group create --name $AZURE_RESOURCE_GROUP --location $AZURE_LOCATION
+    echo "✅"
+else
+    echo "✔️"
+fi
+
 
 echo "Checking if app service plan $AZURE_APP_PLAN_NAME already exists...."
 MATCHING_COUNT=$(az appservice plan list --query "[?name=='$AZURE_APP_PLAN_NAME'].{name:name}.length(@)")
@@ -99,7 +110,7 @@ then
     echo "Creating DB Server $DB_SERVER..."
     az postgres flexible-server create --admin-user $Timelapse_DBadmin_user --admin-password $Timelapse_DBadmin_password  --name $DB_SERVER --location $AZURE_LOCATION  --resource-group $AZURE_RESOURCE_GROUP \
     --database-name $DB_NAME \
-    --tier Burstable --sku-name Standard_B1ms  --storage-size 32  --version 13
+    --tier Burstable --sku-name Standard_B1ms  --storage-size 32
     # --public-access $IP_ADDRESS
     # --vnet $VNET_NAME --private-dns-zone $PRIVATE_DNS_ZONE_PREFIX.private.postgres.database.azure.com --subnet $SUBNET_NAME
     echo "✅"
@@ -158,7 +169,7 @@ fi
 
 # STORAGE_KEY1=$(az storage account keys list --account-name $STORAGE_ACCOUNT_NAME --resource-group $AZURE_RESOURCE_GROUP --query "[?keyName=='key1'].{value:value}[0].value")
 # STORAGE_KEY2=$(az storage account keys list --account-name $STORAGE_ACCOUNT_NAME --resource-group $AZURE_RESOURCE_GROUP --query "[?keyName=='key2'].{value:value}[0].value")
-STORAGE_CONNECTION_STRING=$(az storage account show-connection-string --name $STORAGE_ACCOUNT_NAME --resource-group $AZURE_RESOURCE_GROUP --key primary --query "connectionString" -o tsv)
+STORAGE_CONNECTION_STRING=$(az storage account show-connection-string --name $STORAGE_ACCOUNT_NAME --resource-group $AZURE_RESOURCE_GROUP --key key1 --query "connectionString" -o tsv)
 
 
 echo "Checking if Storage Container $STORAGE_CONTAINER_NAME already exists...."
