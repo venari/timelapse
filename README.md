@@ -558,8 +558,14 @@ Note - Wake up should be automatically enabled in `saveTelemetry.py`, but you wi
 
 ## Troubleshooting PiJuice wakeup:
 
+### Enable wakeup logging
 ```
 python3 /usr/bin/pijuice_log.py --enable WAKEUP_EVT
+```
+
+### Output wakeup logs
+```
+python3 /usr/bin/pijuice_log.py
 ```
 
 ## Troubleshooting indicateStatus script:
