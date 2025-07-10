@@ -312,6 +312,11 @@ dotnet tool install --global dotnet-ef
 curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
 ```
 
+# GitHub CLI install
+```
+sudo apt install gh
+```
+
 Postgres DB Server:
 ```
 
