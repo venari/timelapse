@@ -1,6 +1,7 @@
 using System;
 using System.Linq;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using timelapse.api.Areas.Identity.Data;
 using timelapse.core.models;
@@ -16,7 +17,7 @@ namespace timelapse.api.Data
 
         public static void Initialize(AppDbContext context)//, UserManager<ApplicationUser> userManager)
         {
-            context.Database.EnsureCreated();
+            context.Database.Migrate();
         
             if(!context.Roles.Where(r => r.Name == RoleName_Admin).Any()){
                 context.Roles.Add(new Microsoft.AspNetCore.Identity.IdentityRole() {Name = RoleName_Admin, NormalizedName = RoleName_Admin.ToUpper()});
