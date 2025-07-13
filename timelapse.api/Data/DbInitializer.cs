@@ -17,7 +17,7 @@ namespace timelapse.api.Data
 
         public static void Initialize(AppDbContext context)//, UserManager<ApplicationUser> userManager)
         {
-            context.Database.Migrate();
+            context.Database.EnsureCreated();
         
             if(!context.Roles.Where(r => r.Name == RoleName_Admin).Any()){
                 context.Roles.Add(new Microsoft.AspNetCore.Identity.IdentityRole() {Name = RoleName_Admin, NormalizedName = RoleName_Admin.ToUpper()});
