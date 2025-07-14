@@ -152,6 +152,9 @@
         chart.config.data.datasets[9].data = data.map(d => ({x: new Date(d.timestamp), y: d.charging}));        
         chart.config.data.datasets[10].data = data.map(d => ({x: new Date(d.timestamp), y: d.batteryPercentPerHour}));
         chart.config.data.datasets[11].data = data.map(d => ({x: new Date(d.timestamp), y: d.uptimeSeconds/60}));
+        chart.config.data.datasets[12].data = data.map(d => ({x: new Date(d.timestamp), y: d.connectedToWirelessNetwork}));
+        chart.config.data.datasets[13].data = data.map(d => ({x: new Date(d.timestamp), y: d.connectedToInternet}));
+        chart.config.data.datasets[14].data = data.map(d => ({x: new Date(d.timestamp), y: d.powerSwitch}));
         chart.update();
     }
 
@@ -345,6 +348,24 @@
                                 label: "Uptime (minutes)",
                                 backgroundColor: 'rgb(00, 00, 00)',
                                 borderColor: 'rgb(00, 00, 00)',
+                                hidden: true,
+                                yAxisID: 'y',
+                            }, {
+                                label: "Connected to Wireless Network",
+                                backgroundColor: 'rgb(00, 165, 20)',
+                                borderColor: 'rgb(00, 165, 20)',
+                                hidden: true,
+                                yAxisID: 'y',
+                            }, {
+                                label: "Connected to Internet",
+                                backgroundColor: 'rgb(00, 165, 20)',
+                                borderColor: 'rgb(00, 165, 20)',
+                                hidden: true,
+                                yAxisID: 'y',
+                            }, {
+                                label: "Power Switch",
+                                backgroundColor: 'rgb(165, 20, 20)',
+                                borderColor: 'rgb(165, 20, 20)',
                                 hidden: true,
                                 yAxisID: 'y',
                             }]

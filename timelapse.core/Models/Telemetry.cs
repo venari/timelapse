@@ -101,20 +101,34 @@ public class Telemetry
         get{
             if(Status!=null){
                 dynamic status = System.Text.Json.JsonSerializer.Deserialize<dynamic>(FixUpInvalidPiJuiceJSONStatus);
-                bool powerSwitch = System.Text.Json.JsonSerializer.Deserialize<bool>(status.GetProperty("powerSwitch"));
-                return powerSwitch;
+                
+                if (!status.TryGetProperty("powerSwitch", out System.Text.Json.JsonElement powerSwitch))
+                {
+                    return null;
+                }
+
+                if (!powerSwitch.TryGetProperty("data", out System.Text.Json.JsonElement powerSwitchData))
+                {
+                    return null;
+                }
+
+                return powerSwitchData.GetInt32() > 0?true:null;
             }
 
             return null;
         }
     }
 
-    public bool? ConnectedToWireless {
+    public bool? ConnectedToWirelessNetwork {
         get{
             if(Status!=null){
                 dynamic status = System.Text.Json.JsonSerializer.Deserialize<dynamic>(FixUpInvalidPiJuiceJSONStatus);
-                bool connectedToWireless = System.Text.Json.JsonSerializer.Deserialize<bool>(status.GetProperty("connectedToWireless"));
-                return connectedToWireless;
+                if (!status.TryGetProperty("connectedToWirelessNetwork", out System.Text.Json.JsonElement connectedToWireless))
+                {
+                    return null;
+                }
+
+                return connectedToWireless.GetString()=="True"?true:null;
             }
 
             return null;
@@ -125,8 +139,11 @@ public class Telemetry
         get{
             if(Status!=null){
                 dynamic status = System.Text.Json.JsonSerializer.Deserialize<dynamic>(FixUpInvalidPiJuiceJSONStatus);
-                string wirelessSSID = System.Text.Json.JsonSerializer.Deserialize<string>(status.GetProperty("wirelessSSID"));
-                return wirelessSSID;
+                if (!status.TryGetProperty("wirelessSSID", out System.Text.Json.JsonElement wirelessSSID))
+                {
+                    return null;
+                }
+                return wirelessSSID.GetString();
             }
 
             return null;
@@ -137,8 +154,11 @@ public class Telemetry
         get{
             if(Status!=null){
                 dynamic status = System.Text.Json.JsonSerializer.Deserialize<dynamic>(FixUpInvalidPiJuiceJSONStatus);
-                bool connectedToInternet = System.Text.Json.JsonSerializer.Deserialize<bool>(status.GetProperty("connectedToInternet"));
-                return connectedToInternet;
+                if (!status.TryGetProperty("connectedToInternet", out System.Text.Json.JsonElement connectedToInternet))
+                {
+                    return null;
+                }
+                return connectedToInternet.GetString() == "True"?true:null;
             }
 
             return null;
