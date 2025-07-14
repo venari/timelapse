@@ -12,9 +12,10 @@ from logging.handlers import SocketHandler
 import pathlib
 import glob
 
-from helpers import flashLED
+from helpers import flashLED, internet
 
 from SIM7600X import powerUpSIM7600X, powerDownSIM7600X
+from isConnectedToWifi import is_connected_to_wifi_linux, wifiSSID
 
 config = json.load(open(pathlib.Path(__file__).parent / 'config.json'))
 logFilePath = config["logFilePath"]
@@ -585,7 +586,11 @@ def saveTelemetry():
                                 'batteryVoltage': pj.status.GetBatteryVoltage()['data'],
                                 'batteryCurrent': pj.status.GetBatteryCurrent()['data'],
                                 'ioVoltage': pj.status.GetIoVoltage()['data'],
-                                'ioCurrent': pj.status.GetIoCurrent()['data']
+                                'ioCurrent': pj.status.GetIoCurrent()['data'],
+                                'powerSwitch': pj.power.GetSystemPowerSwitch(),
+                                'connectedToWirelessNetwork': is_connected_to_wifi_linux(),
+                                'wirelessSSID': wifiSSID(),
+                                'connectedToInternet': internet(),
                             })
 
         telemetryFilename = pendingTelemetryFolder + datetime.datetime.now().strftime('%Y-%m-%d_%H%M%S.json')
