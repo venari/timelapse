@@ -15,6 +15,7 @@ public class TelemetryWirelessSummary
 {
     public DateTime TimestampStart { get; set; }
     public DateTime? TimestampEnd { get; set; }
+    public bool? PowerSwitch { get; set; }
     public bool? ConnectedToWirelessNetwork { get; set; }
     public string? WirelessNetworkName { get; set; }
     public bool? ConnectedToInternet { get; set; }
@@ -180,6 +181,7 @@ public class TelemetryGraphModel : PageModel
         {
             bool isChange =
             currentSummary == null ||
+            currentSummary.PowerSwitch != t.PowerSwitch ||
             currentSummary.ConnectedToWirelessNetwork != t.ConnectedToWirelessNetwork ||
             currentSummary.WirelessNetworkName != t.WirelessSSID ||
             currentSummary.ConnectedToInternet != t.ConnectedToInternet;
@@ -195,6 +197,7 @@ public class TelemetryGraphModel : PageModel
                 currentSummary = new TelemetryWirelessSummary
                 {
                     TimestampStart = t.Timestamp,
+                    PowerSwitch = t.PowerSwitch,
                     ConnectedToWirelessNetwork = t.ConnectedToWirelessNetwork,
                     WirelessNetworkName = t.WirelessSSID,
                     ConnectedToInternet = t.ConnectedToInternet
