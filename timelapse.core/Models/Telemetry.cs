@@ -31,6 +31,7 @@ public class Telemetry
             status = status.Replace("'", "\"");
             status = status.Replace(": False", ": \"False\"");
             status = status.Replace(": True", ": \"True\"");
+            status = status.Replace(": None", ": null");
             return status;
         }
         return null;
