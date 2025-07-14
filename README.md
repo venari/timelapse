@@ -325,6 +325,17 @@ az login
   - A confirmation email will be sent to this account, click on the link and login as the new user.
   
 
+# Update camera to enviroeyes-dev
+```
+cd dev/timelapse
+git fetch; git stash; git checkout release/zookeeper; git pull; git stash pop
+sudo systemctl restart envirocam-upload.service envirocam-telemetry.service
+```
+
+```
+sudo hostnamectl set-hostname [hostname];
+```
+
 # GitHub CLI install
 ```
 sudo apt install gh
