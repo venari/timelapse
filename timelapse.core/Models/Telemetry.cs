@@ -97,10 +97,60 @@ public class Telemetry
         }
     }
 
-
-    public string? Status_Battery {
+    public bool? PowerSwitch {
         get{
             if(Status!=null){
+                dynamic status = System.Text.Json.JsonSerializer.Deserialize<dynamic>(FixUpInvalidPiJuiceJSONStatus);
+                bool powerSwitch = System.Text.Json.JsonSerializer.Deserialize<bool>(status.GetProperty("powerSwitch"));
+                return powerSwitch;
+            }
+
+            return null;
+        }
+    }
+
+    public bool? ConnectedToWireless {
+        get{
+            if(Status!=null){
+                dynamic status = System.Text.Json.JsonSerializer.Deserialize<dynamic>(FixUpInvalidPiJuiceJSONStatus);
+                bool connectedToWireless = System.Text.Json.JsonSerializer.Deserialize<bool>(status.GetProperty("connectedToWireless"));
+                return connectedToWireless;
+            }
+
+            return null;
+        }
+    }
+
+    public string? WirelessSSID {
+        get{
+            if(Status!=null){
+                dynamic status = System.Text.Json.JsonSerializer.Deserialize<dynamic>(FixUpInvalidPiJuiceJSONStatus);
+                string wirelessSSID = System.Text.Json.JsonSerializer.Deserialize<string>(status.GetProperty("wirelessSSID"));
+                return wirelessSSID;
+            }
+
+            return null;
+        }
+    }
+
+    public bool? ConnectedToInternet {
+        get{
+            if(Status!=null){
+                dynamic status = System.Text.Json.JsonSerializer.Deserialize<dynamic>(FixUpInvalidPiJuiceJSONStatus);
+                bool connectedToInternet = System.Text.Json.JsonSerializer.Deserialize<bool>(status.GetProperty("connectedToInternet"));
+                return connectedToInternet;
+            }
+
+            return null;
+        }
+    }
+
+    public string? Status_Battery
+    {
+        get
+        {
+            if (Status != null)
+            {
                 dynamic status = PiJuiceJSONStatus;
                 return status.GetProperty("battery").ToString()
                     .Replace("CHARGING_FROM_IN", "Charging")
