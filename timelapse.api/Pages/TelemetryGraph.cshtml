@@ -387,4 +387,40 @@
             </tr>
         </tbody>
     </table>
+
+    @if (Model.WirelessSummary != null)
+    {
+        <div class="mt-3">
+            <h5>Connection Summary</h5>
+            <table class="table table-bordered" style="border-radius: 6px; overflow: hidden;">
+                <thead>
+                    <tr>
+                        <th style="padding: 8px;">From</th>
+                        <th style="padding: 8px;">To</th>
+                        <th style="padding: 8px;">Connected to Wireless</th>
+                        <th style="padding: 8px;">SSID</th>
+                        <th style="padding: 8px;">Connected to Internet</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var summary in Model.WirelessSummary)
+                    {
+                        <tr>
+                            <td style="padding: 8px;">@summary.TimestampStart.ToString("yyyy-MM-dd HH:mm:ss")</td>
+                            <td style="padding: 8px;">@(summary.TimestampEnd.HasValue ? summary.TimestampEnd.Value.ToString("yyyy-MM-dd HH:mm:ss") : "---")</td>
+                            <td style="padding: 8px;">@summary.ConnectedToWirelessNetwork</td>
+                            <td style="padding: 8px;">@summary.WirelessNetworkName</td>
+                            <td style="padding: 8px;">@summary.ConnectedToInternet</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+    else
+    {
+        <div class="alert alert-warning mt-3">
+            No telemetry data available for connection summary.
+        </div>
+    }
 </div>
