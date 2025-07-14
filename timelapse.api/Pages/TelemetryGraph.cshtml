@@ -152,9 +152,9 @@
         chart.config.data.datasets[9].data = data.map(d => ({x: new Date(d.timestamp), y: d.charging}));        
         chart.config.data.datasets[10].data = data.map(d => ({x: new Date(d.timestamp), y: d.batteryPercentPerHour}));
         chart.config.data.datasets[11].data = data.map(d => ({x: new Date(d.timestamp), y: d.uptimeSeconds/60}));
-        chart.config.data.datasets[12].data = data.map(d => ({x: new Date(d.timestamp), y: d.connectedToWirelessNetwork}));
-        chart.config.data.datasets[13].data = data.map(d => ({x: new Date(d.timestamp), y: d.connectedToInternet}));
-        chart.config.data.datasets[14].data = data.map(d => ({x: new Date(d.timestamp), y: d.powerSwitch}));
+        chart.config.data.datasets[12].data = data.map(d => ({x: new Date(d.timestamp), y: d.connectedToWirelessNetwork ? 4 : null}));
+        chart.config.data.datasets[13].data = data.map(d => ({x: new Date(d.timestamp), y: d.connectedToInternet ? 5 : null}));
+        chart.config.data.datasets[14].data = data.map(d => ({x: new Date(d.timestamp), y: d.powerSwitch ? 3 : null}));
         chart.update();
     }
 
@@ -397,6 +397,7 @@
                     <tr>
                         <th style="padding: 8px;">From</th>
                         <th style="padding: 8px;">To</th>
+                        <th style="padding: 8px;">Power Switch</th>
                         <th style="padding: 8px;">Connected to Wireless</th>
                         <th style="padding: 8px;">SSID</th>
                         <th style="padding: 8px;">Connected to Internet</th>
@@ -406,8 +407,9 @@
                     @foreach (var summary in Model.WirelessSummary)
                     {
                         <tr>
-                            <td style="padding: 8px;">@summary.TimestampStart.ToString("yyyy-MM-dd HH:mm:ss")</td>
-                            <td style="padding: 8px;">@(summary.TimestampEnd.HasValue ? summary.TimestampEnd.Value.ToString("yyyy-MM-dd HH:mm:ss") : "---")</td>
+                            <td style="padding: 8px;"><script type="text/javascript">localizeDateTime('@(summary.TimestampStart.ToUniversalTime().ToString("s"))');</script></td>
+                            <td style="padding: 8px;"><script type="text/javascript">localizeDateTime('@(summary.TimestampEnd.HasValue ? summary.TimestampEnd.Value.ToUniversalTime().ToString("s") : "---")');</script></td>
+                            <td style="padding: 8px;">@summary.PowerSwitch</td>
                             <td style="padding: 8px;">@summary.ConnectedToWirelessNetwork</td>
                             <td style="padding: 8px;">@summary.WirelessNetworkName</td>
                             <td style="padding: 8px;">@summary.ConnectedToInternet</td>
