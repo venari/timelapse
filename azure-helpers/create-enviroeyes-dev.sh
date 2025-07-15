@@ -3,13 +3,13 @@
 ## Create Web App service
 
 AZURE_RESOURCE_GROUP=enviroeyes-dev
-AZURE_APP_NAME=enviroeyes-dev2
+AZURE_APP_NAME=enviroeyes-dev
 AZURE_APP_PLAN_NAME=enviroeyes-dev-plan
 AZURE_LOCATION=australiasoutheast
-DB_SERVER=enviroeyes-dev-db3
+DB_SERVER=enviroeyes-dev-db
 DB_NAME=enviroeyes-dev
-STORAGE_ACCOUNT_NAME=enviroeyesdevstorage2
-STORAGE_CONTAINER_NAME=enviroeyesdevcontainer2
+STORAGE_ACCOUNT_NAME=enviroeyesdevstorage
+STORAGE_CONTAINER_NAME=enviroeyesdevcontainer
 
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 source $DIR/database-connection-strings.secret.sh
