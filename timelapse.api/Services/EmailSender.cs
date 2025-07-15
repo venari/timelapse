@@ -25,15 +25,19 @@ public class EmailSender : IEmailSender
         {
             throw new Exception("Null SendGridAPIKey");
         }
-        await Execute(Options.SendGridAPIKey, subject, message, toEmail);
+        if (string.IsNullOrEmpty(Options.SendGridFromAddress))
+        {
+            throw new Exception("Null SendGridFromAddress");
+        }
+        await Execute(Options.SendGridAPIKey, subject, message, toEmail, Options.SendGridFromAddress, Options.SendGridFromName);
     }
 
-    public async Task Execute(string apiKey, string subject, string message, string toEmail)
+    public async Task Execute(string apiKey, string subject, string message, string toEmail, string fromEmail, string fromName)
     {
         var client = new SendGridClient(apiKey);
         var msg = new SendGridMessage()
         {
-            From = new EmailAddress("admin@zealandia.eco", "EnviroEyes"),
+            From = new EmailAddress(fromEmail, fromName),
             Subject = subject,
             PlainTextContent = message,
             HtmlContent = message

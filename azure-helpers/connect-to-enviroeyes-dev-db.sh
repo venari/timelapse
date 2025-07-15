@@ -6,6 +6,7 @@ ConnectionStrings__DefaultConnection=$EnviroeyesDev_ConnectionStrings__DefaultCo
 
 dotnet user-secrets --project timelapse.api set "ConnectionStrings:DefaultConnection" "$ConnectionStrings__DefaultConnection"
 dotnet user-secrets --project timelapse.api set "SendgridAPIKey" "$SendgridAPIKey"
+# dotnet user-secrets --project timelapse.api set "SendgridFromAddress" "$EnviroeyesDev_SendgridFromAddress"
 dotnet user-secrets --project timelapse.api set "ThirdParty_ApiKey" "$ThirdParty_ApiKey"
 dotnet user-secrets --project timelapse.api set "LINZApiKey" "$LINZApiKey"
 dotnet user-secrets --project timelapse.api set "STORAGE_CONNECTION_STRING" "$EnviroeyesDev_STORAGE_CONNECTION_STRING"

@@ -3,5 +3,6 @@ export TimelapseDev_ConnectionStrings__DefaultConnection="Host=timelapse.postgre
 export Timelapse_DBadmin_user="postgres"
 export Timelapse_DBadmin_password="<SUPER SECRET PASSWORD>"
 export SendgridAPIKey="<SUPER SECRET PASSWORD>"
+export SendgridFromAddress="enviroeyes@<yurdomain>"
 export ThirdParty_ApiKey="<SUPER SECRET PASSWORD>"
 export LINZApiKey="<SUPER SECRET API KEY>"
