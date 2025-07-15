@@ -35,24 +35,42 @@ namespace timelapse.api.Data
                 context.SaveChanges();                
             }
 
-            if(!context.EventTypes.Any()){
-                context.EventTypes.AddRange(
-                    new EventType() {Name = "Test", Description = "Test"},
-                    new EventType() {Name = "Sediment Discharge", Description = "Sediment Discharge"},
-                    new EventType() {Name = "Water Level", Description = "Water Level"},
-                    new EventType() {Name = "Paint Discharge", Description = "Paint Discharge"},
-                    new EventType() {Name = "Effluent Discharge", Description = "Effluent Discharge"},
-                    new EventType() {Name = "Condensation", Description = "Condensation"},
-                    new EventType() {Name = "Lighting Issue", Description = "Lighting Issue"},
-                    new EventType() {Name = "Other Camera Issue", Description = "Other Camera Issue"}               
+            if(!context.Users.Where(u => u.UserName == "Cameron.McDonald@zealandia.eco ").Any()){
+                context.Users.Add(
+                    new AppUser() {UserName = "Cameron.McDonald@zealandia.eco ", Email = "Cameron.McDonald@zealandia.eco", NormalizedUserName = "LEIGH@VENARI.CO.NZ", NormalizedEmail = "LEIGH@VENARI.CO.NZ", EmailConfirmed = true}
                 );
                 context.SaveChanges();                
+            }
+
+            if(!context.Users.Where(u => u.UserName == "tom.stephenson@zealandia.eco").Any()){
+                context.Users.Add(
+                    new AppUser() {UserName = "tom.stephenson@zealandia.eco", Email = "tom.stephenson@zealandia.eco", NormalizedUserName = "LEIGH@VENARI.CO.NZ", NormalizedEmail = "LEIGH@VENARI.CO.NZ", EmailConfirmed = true}
+                );
+                context.SaveChanges();                
+            }
+
+
+            if (!context.EventTypes.Any())
+            {
+                context.EventTypes.AddRange(
+                    new EventType() { Name = "Test", Description = "Test" },
+                    new EventType() { Name = "Sediment Discharge", Description = "Sediment Discharge" },
+                    new EventType() { Name = "Water Level", Description = "Water Level" },
+                    new EventType() { Name = "Paint Discharge", Description = "Paint Discharge" },
+                    new EventType() { Name = "Effluent Discharge", Description = "Effluent Discharge" },
+                    new EventType() { Name = "Condensation", Description = "Condensation" },
+                    new EventType() { Name = "Lighting Issue", Description = "Lighting Issue" },
+                    new EventType() { Name = "Other Camera Issue", Description = "Other Camera Issue" }
+                );
+                context.SaveChanges();
             }
 
 
             if(!context.UserRoles.Any()){
 
                 var userLeigh = context.Users.Single(u => u.UserName == "leigh@venari.co.nz");
+                var userCameron = context.Users.Single(u => u.UserName == "Cameron.McDonald@zealandia.eco ");
+                var userTom = context.Users.Single(u => u.UserName == "tom.stephenson@zealandia.eco");
 
                 var roleAdmin = context.Roles.Single(r => r.Name == RoleName_Admin);
 
@@ -61,7 +79,15 @@ namespace timelapse.api.Data
                     new Microsoft.AspNetCore.Identity.IdentityUserRole<string>(){
                         UserId = userLeigh.Id,
                         RoleId = roleAdmin.Id
-                    }        
+                    },
+                    new Microsoft.AspNetCore.Identity.IdentityUserRole<string>(){ 
+                        UserId = userCameron.Id,
+                        RoleId = roleAdmin.Id
+                    },
+                    new Microsoft.AspNetCore.Identity.IdentityUserRole<string>(){ 
+                        UserId = userTom.Id,
+                        RoleId = roleAdmin.Id
+                    }
                 );
 
                 context.SaveChanges();
