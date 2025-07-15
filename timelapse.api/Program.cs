@@ -97,8 +97,9 @@ try
     {
         var services = scope.ServiceProvider;
         var context = services.GetRequiredService<AppDbContext>();    
-        // var userManager = services.GetRequiredService<UserManager<ApplicationUser>>();
-        DbInitializer.Initialize(context); //, userManager);
+        var userManager = services.GetRequiredService<UserManager<AppUser>>();
+        var roleManager = services.GetRequiredService<RoleManager<IdentityRole>>();
+        DbInitializer.Initialize(context, userManager, roleManager);
     }
 }
 catch (Exception ex)

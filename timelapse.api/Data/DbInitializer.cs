@@ -15,39 +15,21 @@ namespace timelapse.api.Data
         public const string RoleName_Admin = "Admin";
         public const string RoleName_OrganisationAdmin = "OrganisationAdmin";
 
-        public static void Initialize(AppDbContext context)//, UserManager<ApplicationUser> userManager)
+        public static void Initialize(AppDbContext context, UserManager<AppUser> userManager, RoleManager<IdentityRole> roleManager)
         {
             context.Database.EnsureCreated();
-        
-            if(!context.Roles.Where(r => r.Name == RoleName_Admin).Any()){
-                context.Roles.Add(new Microsoft.AspNetCore.Identity.IdentityRole() {Name = RoleName_Admin, NormalizedName = RoleName_Admin.ToUpper()});
-                context.SaveChanges();
-            }
-            if(!context.Roles.Where(r => r.Name == RoleName_OrganisationAdmin).Any()){
-                context.Roles.Add(new Microsoft.AspNetCore.Identity.IdentityRole() {Name = RoleName_OrganisationAdmin, NormalizedName = RoleName_OrganisationAdmin.ToUpper()});
-                context.SaveChanges();
-            }
 
-            if(!context.Users.Where(u => u.UserName == "leigh@venari.co.nz").Any()){
-                context.Users.Add(
-                    new AppUser() {UserName = "leigh@venari.co.nz", Email = "leigh@venari.co.nz", NormalizedUserName = "LEIGH@VENARI.CO.NZ", NormalizedEmail = "LEIGH@VENARI.CO.NZ", EmailConfirmed = true}
-                );
-                context.SaveChanges();                
-            }
+            // Create roles first
+            CreateRoleIfNotExists(roleManager, RoleName_Admin);
+            CreateRoleIfNotExists(roleManager, RoleName_OrganisationAdmin);
 
-            if(!context.Users.Where(u => u.UserName == "Cameron.McDonald@zealandia.eco ").Any()){
-                context.Users.Add(
-                    new AppUser() {UserName = "Cameron.McDonald@zealandia.eco ", Email = "Cameron.McDonald@zealandia.eco", NormalizedUserName = "CAMERON.MCDONALD@ZEALANDIA.ECO", NormalizedEmail = "CAMERON.MCDONALD@ZEALANDIA.ECO", EmailConfirmed = true}
-                );
-                context.SaveChanges();                
-            }
+            // Create admin user with password
+            CreateUserIfNotExists(userManager, "admin@enviroeyes", "admin@enviroeyes", "Enviroeyes123!", RoleName_Admin);
 
-            if(!context.Users.Where(u => u.UserName == "tom.stephenson@zealandia.eco").Any()){
-                context.Users.Add(
-                    new AppUser() {UserName = "tom.stephenson@zealandia.eco", Email = "tom.stephenson@zealandia.eco", NormalizedUserName = "TOM.STEPHENSON@ZEALANDIA.ECO", NormalizedEmail = "TOM.STEPHENSON@ZEALANDIA.ECO", EmailConfirmed = true}
-                );
-                context.SaveChanges();                
-            }
+            // Create other users
+            CreateUserIfNotExists(userManager, "leigh@venari.co.nz", "leigh@venari.co.nz", "Enviroeyes123!", RoleName_Admin);
+            CreateUserIfNotExists(userManager, "Cameron.McDonald@zealandia.eco", "Cameron.McDonald@zealandia.eco", "Enviroeyes123!", RoleName_Admin);
+            CreateUserIfNotExists(userManager, "tom.stephenson@zealandia.eco", "tom.stephenson@zealandia.eco", "Enviroeyes123!", RoleName_Admin);
 
 
             if (!context.EventTypes.Any())
@@ -93,6 +75,34 @@ namespace timelapse.api.Data
                 context.SaveChanges();
             }
 
+        }
+
+        private static void CreateRoleIfNotExists(RoleManager<IdentityRole> roleManager, string roleName)
+        {
+            if (!roleManager.RoleExistsAsync(roleName).Result)
+            {
+                var role = new IdentityRole(roleName);
+                roleManager.CreateAsync(role).Wait();
+            }
+        }
+
+        private static void CreateUserIfNotExists(UserManager<AppUser> userManager, string userName, string email, string password, string roleName)
+        {
+            if (userManager.FindByNameAsync(userName).Result == null)
+            {
+                var user = new AppUser
+                {
+                    UserName = userName,
+                    Email = email,
+                    EmailConfirmed = true
+                };
+
+                var result = userManager.CreateAsync(user, password).Result;
+                if (result.Succeeded)
+                {
+                    userManager.AddToRoleAsync(user, roleName).Wait();
+                }
+            }
         }
     }
 }
