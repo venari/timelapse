@@ -594,8 +594,9 @@ sudo -u pijuice /home/pi/dev/timelapse/scripts/indicateStatus.sh
       - List devices: `nmcli device`
       - List known networks: `nmcli connection`
       - Check wireless is on: `nmcli radio`
-      - List available wireless networks: `nmcli device wifi list`
+      - List available wireless networks: `sudo nmcli device wifi list`
       - Connect to CameraAP network: `nmcli device wifi connect CameraAP password GiveMeTheInternets`
+      - Connect to network that's not present: `sudo nmcli connection add type wifi con-name <name> ssid <SSID> 802-11-wireless-security.key-mgmt WPA-PSK 802-11-wireless-security.psk <PASSWORD>`
     - If `nmcli` isn't available:
       - List wireless networks: `sudo iwlist wlan0 scan | grep ESSID`
       - To connect to network, edit the `/etc/wpa_supplicant/wpa_supplicant.conf` file to add a section, and then `sudo reboot` to restart:
