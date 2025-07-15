@@ -37,14 +37,14 @@ namespace timelapse.api.Data
 
             if(!context.Users.Where(u => u.UserName == "Cameron.McDonald@zealandia.eco ").Any()){
                 context.Users.Add(
-                    new AppUser() {UserName = "Cameron.McDonald@zealandia.eco ", Email = "Cameron.McDonald@zealandia.eco", NormalizedUserName = "LEIGH@VENARI.CO.NZ", NormalizedEmail = "LEIGH@VENARI.CO.NZ", EmailConfirmed = true}
+                    new AppUser() {UserName = "Cameron.McDonald@zealandia.eco ", Email = "Cameron.McDonald@zealandia.eco", NormalizedUserName = "CAMERON.MCDONALD@ZEALANDIA.ECO", NormalizedEmail = "LEIGH@VENARI.CO.NZ", EmailConfirmed = true}
                 );
                 context.SaveChanges();                
             }
 
             if(!context.Users.Where(u => u.UserName == "tom.stephenson@zealandia.eco").Any()){
                 context.Users.Add(
-                    new AppUser() {UserName = "tom.stephenson@zealandia.eco", Email = "tom.stephenson@zealandia.eco", NormalizedUserName = "LEIGH@VENARI.CO.NZ", NormalizedEmail = "LEIGH@VENARI.CO.NZ", EmailConfirmed = true}
+                    new AppUser() {UserName = "tom.stephenson@zealandia.eco", Email = "tom.stephenson@zealandia.eco", NormalizedUserName = "TOM.STEPHENSON@ZEALANDIA.ECO", NormalizedEmail = "TOM.STEPHENSON@ZEALANDIA.ECO", EmailConfirmed = true}
                 );
                 context.SaveChanges();                
             }
