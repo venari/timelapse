@@ -27,9 +27,9 @@ namespace timelapse.api.Data
             CreateUserIfNotExists(userManager, "admin@enviroeyes", "admin@enviroeyes", "Enviroeyes123!", RoleName_Admin);
 
             // Create other users
-            CreateUserIfNotExists(userManager, "leigh@venari.co.nz", "leigh@venari.co.nz", "Enviroeyes123!", RoleName_Admin);
-            CreateUserIfNotExists(userManager, "Cameron.McDonald@zealandia.eco", "Cameron.McDonald@zealandia.eco", "Enviroeyes123!", RoleName_Admin);
-            CreateUserIfNotExists(userManager, "tom.stephenson@zealandia.eco", "tom.stephenson@zealandia.eco", "Enviroeyes123!", RoleName_Admin);
+            // CreateUserIfNotExists(userManager, "leigh@venari.co.nz", "leigh@venari.co.nz", "Enviroeyes123!", RoleName_Admin);
+            // CreateUserIfNotExists(userManager, "Cameron.McDonald@zealandia.eco", "Cameron.McDonald@zealandia.eco", "Enviroeyes123!", RoleName_Admin);
+            // CreateUserIfNotExists(userManager, "tom.stephenson@zealandia.eco", "tom.stephenson@zealandia.eco", "Enviroeyes123!", RoleName_Admin);
 
 
             if (!context.EventTypes.Any())
@@ -48,32 +48,32 @@ namespace timelapse.api.Data
             }
 
 
-            if(!context.UserRoles.Any()){
+            // if(!context.UserRoles.Any()){
 
-                var userLeigh = context.Users.Single(u => u.UserName == "leigh@venari.co.nz");
-                var userCameron = context.Users.Single(u => u.UserName == "Cameron.McDonald@zealandia.eco ");
-                var userTom = context.Users.Single(u => u.UserName == "tom.stephenson@zealandia.eco");
+            //     var userLeigh = context.Users.Single(u => u.UserName == "leigh@venari.co.nz");
+            //     var userCameron = context.Users.Single(u => u.UserName == "Cameron.McDonald@zealandia.eco ");
+            //     var userTom = context.Users.Single(u => u.UserName == "tom.stephenson@zealandia.eco");
 
-                var roleAdmin = context.Roles.Single(r => r.Name == RoleName_Admin);
+            //     var roleAdmin = context.Roles.Single(r => r.Name == RoleName_Admin);
 
-                context.UserRoles.AddRange(
+            //     context.UserRoles.AddRange(
 
-                    new Microsoft.AspNetCore.Identity.IdentityUserRole<string>(){
-                        UserId = userLeigh.Id,
-                        RoleId = roleAdmin.Id
-                    },
-                    new Microsoft.AspNetCore.Identity.IdentityUserRole<string>(){ 
-                        UserId = userCameron.Id,
-                        RoleId = roleAdmin.Id
-                    },
-                    new Microsoft.AspNetCore.Identity.IdentityUserRole<string>(){ 
-                        UserId = userTom.Id,
-                        RoleId = roleAdmin.Id
-                    }
-                );
+            //         new Microsoft.AspNetCore.Identity.IdentityUserRole<string>(){
+            //             UserId = userLeigh.Id,
+            //             RoleId = roleAdmin.Id
+            //         },
+            //         new Microsoft.AspNetCore.Identity.IdentityUserRole<string>(){ 
+            //             UserId = userCameron.Id,
+            //             RoleId = roleAdmin.Id
+            //         },
+            //         new Microsoft.AspNetCore.Identity.IdentityUserRole<string>(){ 
+            //             UserId = userTom.Id,
+            //             RoleId = roleAdmin.Id
+            //         }
+            //     );
 
-                context.SaveChanges();
-            }
+            //     context.SaveChanges();
+            // }
 
         }
 
