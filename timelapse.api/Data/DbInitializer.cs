@@ -37,7 +37,7 @@ namespace timelapse.api.Data
 
             if(!context.Users.Where(u => u.UserName == "Cameron.McDonald@zealandia.eco ").Any()){
                 context.Users.Add(
-                    new AppUser() {UserName = "Cameron.McDonald@zealandia.eco ", Email = "Cameron.McDonald@zealandia.eco", NormalizedUserName = "CAMERON.MCDONALD@ZEALANDIA.ECO", NormalizedEmail = "LEIGH@VENARI.CO.NZ", EmailConfirmed = true}
+                    new AppUser() {UserName = "Cameron.McDonald@zealandia.eco ", Email = "Cameron.McDonald@zealandia.eco", NormalizedUserName = "CAMERON.MCDONALD@ZEALANDIA.ECO", NormalizedEmail = "CAMERON.MCDONALD@ZEALANDIA.ECO", EmailConfirmed = true}
                 );
                 context.SaveChanges();                
             }
