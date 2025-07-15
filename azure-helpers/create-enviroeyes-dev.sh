@@ -53,7 +53,9 @@ then
 
     # az webapp deployment github-actions add --name $AZURE_APP_NAME --repo venari/timelapse --resource-group $AZURE_RESOURCE_GROUP --branch release/zookeeper --token ghp_xxx --runtime "DOTNETCORE:8.0"    
     # az webapp deployment github-actions add --name $AZURE_APP_NAME --repo venari/timelapse --resource-group $AZURE_RESOURCE_GROUP --branch release/zookeeper --token ghp_xxx --runtime "DOTNETCORE:8.0"    
+    echo "Configuring repository source..."
     az webapp deployment source config --name $AZURE_APP_NAME --resource-group $AZURE_RESOURCE_GROUP --repository-type git --repo-url https://github.com/venari/timelapse  --branch release/zookeeper  --manual-integration 
+    echo "Syncing deployment..."
     az webapp deployment source sync --name $AZURE_APP_NAME --resource-group $AZURE_RESOURCE_GROUP 
     # --runtime "DOTNETCORE:8.0"    
     # Command group 'webapp deployment github-actions' is in preview and under development. Reference and support levels: https://aka.ms/CLI_refstatus
