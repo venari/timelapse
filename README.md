@@ -333,7 +333,8 @@ sudo systemctl restart envirocam-upload.service envirocam-telemetry.service
 ```
 
 ```
-sudo hostnamectl set-hostname [hostname];
+sudo hostnamectl set-hostname [hostname]
+sudo tailscale up
 ```
 
 # GitHub CLI install
