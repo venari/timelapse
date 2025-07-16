@@ -312,6 +312,19 @@ dotnet tool install --global dotnet-ef
 curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
 ```
 
+# Running creation script
+This will create the infrastructure to run the API and web interface
+```
+az login
+./azure-helpers/create-enviroeyes-dev.sh
+```
+
+# Configure users
+- Browse to [AZURE_APP_NAME].azurewebsite.net, and log in as user `admin@enviroeyes`, password `Enviroeyes123!`.
+- Register new accounts at [AZURE_APP_NAME].azurewebsite.net/Identity/Account/Register
+  - A confirmation email will be sent to this account, click on the link and login as the new user.
+  
+
 # GitHub CLI install
 ```
 sudo apt install gh
