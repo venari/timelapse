@@ -337,6 +337,11 @@ sudo hostnamectl set-hostname [hostname]
 sudo tailscale up
 ```
 
+# Copy preconfigured local config
+```
+scp ~/config.local.[project-name].json pi@[pi name]:~/dev/timelapse/scripts/config.local.json
+```
+
 # GitHub CLI install
 ```
 sudo apt install gh
