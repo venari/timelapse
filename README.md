@@ -700,6 +700,41 @@ pssh --hosts ~/dev/venari/timelapse/hosts.txt -t 900 -x '-o ConnectTimeout=60 -o
 pssh --hosts ~/dev/venari/timelapse/hosts.txt -t 900 -x '-o ConnectTimeout=60 -o ConnectionAttempts=15' -i 'cd dev/timelapse; git diff'
 ```
 
+<!-- parallel-ssh --hosts ~/dev/timelapse/hosts-penlink.txt -t 900 -i 'sudo systemctl restart envirocam-upload.service' -->
+<!-- parallel-ssh --hosts ~/dev/timelapse/hosts-penlink.txt --askpass -x '-i $HOME/.ssh/id_macbook_air_rsa' -i 'sudo systemctl restart envirocam-upload.service' -->
+
+# Repoint cameras to new endpoint
+```
+ssh -i ~/.ssh/id_macbook_air_rsa pi@envirocam-2w-b 'sed -i '\''s#"apiUrl": "https://enviroeyes-dev.azurewebsites.net/api/",#"apiUrl": "https://enviroeyes-prod.azurewebsites.net/api/",#'\'' dev/timelapse/scripts/config.json && sudo systemctl restart envirocam-upload.service'
+ssh -i ~/.ssh/id_macbook_air_rsa pi@envirocam-a 'sed -i '\''s#"apiUrl": "https://enviroeyes-dev.azurewebsites.net/api/",#"apiUrl": "https://enviroeyes-prod.azurewebsites.net/api/",#'\'' dev/timelapse/scripts/config.json && sudo systemctl restart envirocam-upload.service'
+ssh -i ~/.ssh/id_macbook_air_rsa pi@envirocam-b 'sed -i '\''s#"apiUrl": "https://enviroeyes-dev.azurewebsites.net/api/",#"apiUrl": "https://enviroeyes-prod.azurewebsites.net/api/",#'\'' dev/timelapse/scripts/config.json && sudo systemctl restart envirocam-upload.service'
+ssh -i ~/.ssh/id_macbook_air_rsa pi@envirocam-c 'sed -i '\''s#"apiUrl": "https://enviroeyes-dev.azurewebsites.net/api/",#"apiUrl": "https://enviroeyes-prod.azurewebsites.net/api/",#'\'' dev/timelapse/scripts/config.json && sudo systemctl restart envirocam-upload.service'
+ssh -i ~/.ssh/id_macbook_air_rsa pi@envirocam-j 'sed -i '\''s#"apiUrl": "https://enviroeyes-dev.azurewebsites.net/api/",#"apiUrl": "https://enviroeyes-prod.azurewebsites.net/api/",#'\'' dev/timelapse/scripts/config.json && sudo systemctl restart envirocam-upload.service'
+ssh -i ~/.ssh/id_macbook_air_rsa pi@envirocam-k 'sed -i '\''s#"apiUrl": "https://enviroeyes-dev.azurewebsites.net/api/",#"apiUrl": "https://enviroeyes-prod.azurewebsites.net/api/",#'\'' dev/timelapse/scripts/config.json && sudo systemctl restart envirocam-upload.service'
+ssh -i ~/.ssh/id_macbook_air_rsa pi@envirocam-g 'sed -i '\''s#"apiUrl": "https://enviroeyes-dev.azurewebsites.net/api/",#"apiUrl": "https://enviroeyes-prod.azurewebsites.net/api/",#'\'' dev/timelapse/scripts/config.json && sudo systemctl restart envirocam-upload.service'
+ssh -i ~/.ssh/id_macbook_air_rsa pi@envirocam-h 'sed -i '\''s#"apiUrl": "https://enviroeyes-dev.azurewebsites.net/api/",#"apiUrl": "https://enviroeyes-prod.azurewebsites.net/api/",#'\'' dev/timelapse/scripts/config.json && sudo systemctl restart envirocam-upload.service'
+ssh -i ~/.ssh/id_macbook_air_rsa pi@envirocam-m 'sed -i '\''s#"apiUrl": "https://enviroeyes-dev.azurewebsites.net/api/",#"apiUrl": "https://enviroeyes-prod.azurewebsites.net/api/",#'\'' dev/timelapse/scripts/config.json && sudo systemctl restart envirocam-upload.service'
+```
+
+
+# Copy local config files to cameras
+```
+ssh -i ~/.ssh/id_macbook_air_rsa pi@envirocam-2w-b 'cat dev/timelapse/scripts/config.local.json'
+ssh -i ~/.ssh/id_macbook_air_rsa pi@envirocam-a 'cat dev/timelapse/scripts/config.local.json'
+ssh -i ~/.ssh/id_macbook_air_rsa pi@envirocam-b 'cat dev/timelapse/scripts/config.local.json'
+ssh -i ~/.ssh/id_macbook_air_rsa pi@envirocam-c 'cat dev/timelapse/scripts/config.local.json'
+ssh -i ~/.ssh/id_macbook_air_rsa pi@envirocam-j 'cat dev/timelapse/scripts/config.local.json'
+ssh -i ~/.ssh/id_macbook_air_rsa pi@envirocam-k 'cat dev/timelapse/scripts/config.local.json'
+ssh -i ~/.ssh/id_macbook_air_rsa pi@envirocam-g 'cat dev/timelapse/scripts/config.local.json'
+ssh -i ~/.ssh/id_macbook_air_rsa pi@envirocam-h 'cat dev/timelapse/scripts/config.local.json'
+ssh -i ~/.ssh/id_macbook_air_rsa pi@envirocam-m 'cat dev/timelapse/scripts/config.local.json'
+```
+
+# Copy imagery from one container to another
+```
+azcopy copy "https://enviroeyesdevstorage.blob.core.windows.net/enviroeyesdevcontainer/?<SAS TOKEN>" "https://enviroeyesprodstorage.blob.core.windows.net/enviroeyesprodcontainer/?<SAS rw token>" --recursive=true
+```
+
 
 # Credits
 

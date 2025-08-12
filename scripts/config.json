@@ -1,7 +1,7 @@
 {
     "logToFile": true,
     "logToAPI": true,
-    "apiUrl": "https://enviroeyes-dev.azurewebsites.net/api/",
+    "apiUrl": "https://enviroeyes-prod.azurewebsites.net/api/",
     "logFilePath": "/home/pi/logs/timelapse.log",
     "shutdown": false,
     "tempWarning": 50,
