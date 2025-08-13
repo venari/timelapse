@@ -21,7 +21,11 @@
 #include "esp_log.h"
 #include "mqtt_client.h"
 
+#include "esp_mac.h" // For ESP-IDF v4.x and later, use esp_mac.h
+
+
 static const char *TAG = "mqtt_example";
+static char MAC_ADDRESS_TEXT[25] = "xx:xx:xx:xx:xx:xx";
 
 
 static void log_error_if_nonzero(const char *message, int error_code)
@@ -52,6 +56,14 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
         ESP_LOGI(TAG, "MQTT_EVENT_CONNECTED");
         msg_id = esp_mqtt_client_publish(client, "/topic/qos1", "data_3", 0, 1, 0);
         ESP_LOGI(TAG, "sent publish successful, msg_id=%d", msg_id);
+
+        char deviceTopicBuffer[50];
+        sprintf(deviceTopicBuffer, "/device/%s", MAC_ADDRESS_TEXT);
+        ESP_LOGI(TAG, "device topic: %s", deviceTopicBuffer);
+
+        msg_id = esp_mqtt_client_publish(client, deviceTopicBuffer, "data to device", 0, 1, 0);
+        ESP_LOGI(TAG, "sent publish successful, msg_id=%d", msg_id);
+
 
         msg_id = esp_mqtt_client_subscribe(client, "/topic/qos0", 0);
         ESP_LOGI(TAG, "sent subscribe successful, msg_id=%d", msg_id);
@@ -139,6 +151,23 @@ void app_main(void)
     ESP_LOGI(TAG, "[APP] Startup..");
     ESP_LOGI(TAG, "[APP] Free memory: %" PRIu32 " bytes", esp_get_free_heap_size());
     ESP_LOGI(TAG, "[APP] IDF version: %s", esp_get_idf_version());
+
+    uint8_t mac_addr[6];
+    // // Get the MAC address for the Wi-Fi Station interface
+    esp_read_mac(mac_addr, ESP_MAC_WIFI_STA);
+    // sprintf(MAC_ADDRESS_TEXT, "%02x:%02x:%02x:%02x:%02x:%02x",
+    //        mac_addr[0], mac_addr[1], mac_addr[2], mac_addr[3], mac_addr[4], mac_addr[5]);
+    
+    // ESP_LOGI(TAG, "1 Wi-Fi Station MAC Address: %s\n", MAC_ADDRESS_TEXT);
+    
+    // ESP_LOGI(TAG, "2 Wi-Fi Station MAC Address: %02x:%02x:%02x:%02x:%02x:%02x",
+    //     mac_addr[0], mac_addr[1], mac_addr[2], mac_addr[3], mac_addr[4], mac_addr[5]);
+
+    sprintf(MAC_ADDRESS_TEXT, "%02x:%02x:%02x:%02x:%02x:%02x",
+        mac_addr[0], mac_addr[1], mac_addr[2], mac_addr[3], mac_addr[4], mac_addr[5]);
+    
+    ESP_LOGI(TAG, "Wi-Fi Station MAC Address: %s\n", MAC_ADDRESS_TEXT);
+    
 
     esp_log_level_set("*", ESP_LOG_INFO);
     esp_log_level_set("mqtt_client", ESP_LOG_VERBOSE);
