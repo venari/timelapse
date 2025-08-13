@@ -59,10 +59,17 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
 
         char deviceTopicBuffer[50];
         sprintf(deviceTopicBuffer, "/device/%s", MAC_ADDRESS_TEXT);
+
+        char deviceTopicBufferSubscribe[50];
+        sprintf(deviceTopicBufferSubscribe, "/device/%s/#", MAC_ADDRESS_TEXT);
         ESP_LOGI(TAG, "device topic: %s", deviceTopicBuffer);
+        ESP_LOGI(TAG, "device topic subscribe: %s", deviceTopicBufferSubscribe);
 
         msg_id = esp_mqtt_client_publish(client, deviceTopicBuffer, "data to device", 0, 1, 0);
         ESP_LOGI(TAG, "sent publish successful, msg_id=%d", msg_id);
+
+        msg_id = esp_mqtt_client_subscribe(client, deviceTopicBufferSubscribe, 0);
+        ESP_LOGI(TAG, "sent subscribe successful, msg_id=%d", msg_id);
 
 
         msg_id = esp_mqtt_client_subscribe(client, "/topic/qos0", 0);
