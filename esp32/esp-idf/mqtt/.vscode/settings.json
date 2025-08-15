@@ -1,0 +1,4 @@
+{
+    "cmake.sourceDirectory": "/home/leigh/dev/timelapse/esp32/esp-idf/mqtt/tcp/tcp/main",
+    "idf.port": "/dev/ttyACM0"
+}
