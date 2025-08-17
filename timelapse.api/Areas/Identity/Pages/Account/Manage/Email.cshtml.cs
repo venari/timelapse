@@ -21,15 +21,18 @@ namespace timelapse.api.Areas.Identity.Pages.Account.Manage
         private readonly UserManager<AppUser> _userManager;
         private readonly SignInManager<AppUser> _signInManager;
         private readonly IEmailSender _emailSender;
+        private readonly IConfiguration _configuration;
 
         public EmailModel(
             UserManager<AppUser> userManager,
             SignInManager<AppUser> signInManager,
-            IEmailSender emailSender)
+            IEmailSender emailSender,
+            IConfiguration configuration)
         {
             _userManager = userManager;
             _signInManager = signInManager;
             _emailSender = emailSender;
+            _configuration = configuration;
         }
 
         /// <summary>
@@ -126,15 +129,8 @@ namespace timelapse.api.Areas.Identity.Pages.Account.Manage
                     protocol: Request.Scheme);
                 await _emailSender.SendEmailAsync(
                     Input.NewEmail,
-                    "Confirm your email",
-                    $"Welcome to EnviroEyes™ by Zealandia!<br><br>"
-                    +"To activate your account and start exploring EnviroEyes™, please confirm your account by clicking here:<br><br>"
-                    +$"<a href='{HtmlEncoder.Default.Encode(callbackUrl)}'>Confirm My Account</a>.<br><br>"
-                    +"Once your account is confirmed, you'll gain access to your organisation's EnviroEyes™ deployments. If you have any questions, our team is here to assist.<br><br>"
-                    +"Thank you for joining us in advancing environmental monitoring with EnviroEyes™!<br><br>"
-                    +"Best regards,<br>"
-                    +"The EnviroEyes™ Team<br>"
-                    +"Zealandia Consulting Ltd");
+                    _configuration["ChangeEmailSubject"],
+                    string.Format(_configuration["ChangeEmailBody"], HtmlEncoder.Default.Encode(callbackUrl)));
 
                 StatusMessage = "Confirmation link to change email sent. Please check your email.";
                 return RedirectToPage();
@@ -169,15 +165,8 @@ namespace timelapse.api.Areas.Identity.Pages.Account.Manage
                 protocol: Request.Scheme);
             await _emailSender.SendEmailAsync(
                 email,
-                "Confirm your email",
-                $"Welcome to EnviroEyes™ by Zealandia!<br><br>"
-                +"To activate your account and start exploring EnviroEyes™, please confirm your account by clicking here:<br><br>"
-                +$"<a href='{HtmlEncoder.Default.Encode(callbackUrl)}'>Confirm My Account</a>.<br><br>"
-                +"Once your account is confirmed, you'll gain access to your organisation's EnviroEyes™ deployments. If you have any questions, our team is here to assist.<br><br>"
-                +"Thank you for joining us in advancing environmental monitoring with EnviroEyes™!<br><br>"
-                +"Best regards,<br>"
-                +"The EnviroEyes™ Team<br>"
-                +"Zealandia Consulting Ltd");
+                _configuration["WelcomeEmailSubject"],
+                string.Format(_configuration["WelcomeEmailBody"], HtmlEncoder.Default.Encode(callbackUrl)));
 
             StatusMessage = "Verification email sent. Please check your email.";
             return RedirectToPage();

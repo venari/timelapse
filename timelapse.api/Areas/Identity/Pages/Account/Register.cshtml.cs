@@ -31,13 +31,15 @@ namespace timelapse.api.Areas.Identity.Pages.Account
         private readonly IUserEmailStore<AppUser> _emailStore;
         private readonly ILogger<RegisterModel> _logger;
         private readonly IEmailSender _emailSender;
+        public readonly IConfiguration _configuration;
 
         public RegisterModel(
             UserManager<AppUser> userManager,
             IUserStore<AppUser> userStore,
             SignInManager<AppUser> signInManager,
             ILogger<RegisterModel> logger,
-            IEmailSender emailSender)
+            IEmailSender emailSender,
+            IConfiguration configuration)
         {
             _userManager = userManager;
             _userStore = userStore;
@@ -45,6 +47,7 @@ namespace timelapse.api.Areas.Identity.Pages.Account
             _signInManager = signInManager;
             _logger = logger;
             _emailSender = emailSender;
+            _configuration = configuration;
         }
 
         /// <summary>
@@ -133,15 +136,9 @@ namespace timelapse.api.Areas.Identity.Pages.Account
                         values: new { area = "Identity", userId = userId, code = code, returnUrl = returnUrl },
                         protocol: Request.Scheme);
 
-                    await _emailSender.SendEmailAsync(Input.Email, "Confirm your email",
-                        $"Welcome to EnviroEyes™ by Zealandia!<br><br>"
-                        +"To activate your account and start exploring EnviroEyes™, please confirm your account by clicking here:<br><br>"
-                        +$"<a href='{HtmlEncoder.Default.Encode(callbackUrl)}'>Confirm My Account</a>.<br><br>"
-                        +"Once your account is confirmed, you'll gain access to your organisation's EnviroEyes™ deployments. If you have any questions, our team is here to assist.<br><br>"
-                        +"Thank you for joining us in advancing environmental monitoring with EnviroEyes™!<br><br>"
-                        +"Best regards,<br>"
-                        +"The EnviroEyes™ Team<br>"
-                        +"Zealandia Consulting Ltd");
+                    await _emailSender.SendEmailAsync(Input.Email, _configuration["WelcomeEmailSubject"],
+                        string.Format(_configuration["WelcomeEmailBody"], HtmlEncoder.Default.Encode(callbackUrl)));
+
 
                     if (_userManager.Options.SignIn.RequireConfirmedAccount)
                     {
