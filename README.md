@@ -778,3 +778,43 @@ Terminal attach to serial port:
 ```
 screen /dev/cu.wchusbserial585A0118141 115200
 ```
+
+
+
+ESP-IDF notes
+
+Bind and share USB with WSL
+https://docs.espressif.com/projects/vscode-esp-idf-extension/en/latest/additionalfeatures/wsl.html
+
+```
+PS C:\Users\LeighHunt> usbipd list
+Connected:
+BUSID  VID:PID    DEVICE                                                        STATE
+1-1    30c9:0044  HP HD Camera, HP IR Camera                                    Not shared
+1-6    303a:1001  USB Serial Device (COM9), USB JTAG/serial debug unit          Shared
+1-7    04f3:0c7e  ELAN WBF Fingerprint Sensor                                   Not shared
+1-10   0bda:b85c  Realtek Wireless Bluetooth Adapter                            Not shared
+
+Persisted:
+GUID                                  DEVICE
+1a0db9aa-9707-41b3-b289-41d48a84353b  USB Serial Device (COM3)
+1eadada6-b1ae-4ccd-bd2a-b111bf5c2a38  USB Serial Device (COM8), USB JTAG/serial debug unit
+41e3d5b1-593c-43ac-af10-a212fcda3760  Remote NDIS based Internet Sharing Device #2, USB Serial ...i
+ae647d65-26a4-4003-84f3-1512085d024c  USB Serial Device (COM10), USB JTAG/serial debug unit
+```
+- Connect to USB
+```
+PS C:\Users\LeighHunt> usbipd bind --busid=1-6
+usbipd: info: Device with busid '1-6' was already shared.
+PS C:\Users\LeighHunt> usbipd attach --wsl --busid=1-6
+usbipd: info: Using WSL distribution 'Ubuntu' to attach; the device will be available in all WSL 2 distributions.
+usbipd: info: Detected networking mode 'nat'.
+usbipd: info: Using IP address 172.23.144.1 to reach the host.
+```
+
+Should then be mounted in WSL to something like `/dev/ttyACM0`.
+
+Logging:
+```
+id.py monitor
+```
