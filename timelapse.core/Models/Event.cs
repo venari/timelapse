@@ -9,7 +9,6 @@ public class EventType{
     public string Description {get; set;}
 
     public List<Event> Events {get;} = new();
-
 }
 
 public class Event
@@ -52,4 +51,9 @@ public class Event
 
     public int EndImageId {get; set;}
     public Image EndImage {get; set;}
+
+    // Timelapse support
+    public string TimelapseUrl {get; set;}
+    public DateTime? TimelapseCreatedDate {get; set;}
+    public string TimelapseStatus {get; set;} // "Pending", "Processing", "Completed", "Failed"
 }

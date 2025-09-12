@@ -113,6 +113,51 @@
     <a asp-page="Index">Back to List</a>
 </div>
 
+<!-- Add this button section to your existing event detail page -->
+
+<div class="row mt-3">
+    <div class="col-md-12">
+        <h5>Timelapse</h5>
+        @if (!string.IsNullOrEmpty(Model.Event.TimelapseUrl))
+        {
+            <div class="alert alert-success">
+                <strong>Timelapse Available:</strong>
+                <a href="@Model.Event.TimelapseUrl" target="_blank" class="btn btn-sm btn-primary ms-2">
+                    <i class="fas fa-play"></i> View Timelapse
+                </a>
+                <small class="text-muted d-block">Created: @Model.Event.TimelapseCreatedDate?.ToString("yyyy-MM-dd HH:mm")</small>
+            </div>
+        }
+        else if (Model.Event.TimelapseStatus == "Processing")
+        {
+            <div class="alert alert-info">
+                <i class="fas fa-spinner fa-spin"></i> Timelapse is being created... Please check back in a few minutes.
+            </div>
+        }
+        else if (Model.Event.TimelapseStatus == "Pending")
+        {
+            <div class="alert alert-warning">
+                <i class="fas fa-clock"></i> Timelapse creation is queued.
+            </div>
+        }
+        else if (Model.Event.TimelapseStatus == "Failed")
+        {
+            <div class="alert alert-danger">
+                <i class="fas fa-exclamation-triangle"></i> Timelapse creation failed. 
+                <button type="button" class="btn btn-sm btn-outline-secondary ms-2" onclick="createTimelapse()">
+                    <i class="fas fa-redo"></i> Retry
+                </button>
+            </div>
+        }
+        else
+        {
+            <button type="button" class="btn btn-success" onclick="createTimelapse()">
+                <i class="fas fa-video"></i> Create Timelapse
+            </button>
+        }
+    </div>
+</div>
+
 <script>
     var currentViewedTimestamp = '@(Model.InitialTimestamp.ToString("o"))'
 
@@ -256,4 +301,35 @@
         .catch(error => console.error('Unable to Delete Event.', error));
     }
 
+    async function createTimelapse() {
+        const button = event.target;
+        button.disabled = true;
+        button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Creating...';
+        
+        try {
+            const response = await fetch('/api/timelapse/create', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    eventId: @Model.Event.Id,
+                    requestedByUserId: '@User.Identity.Name'
+                })
+            });
+            
+            if (response.ok) {
+                location.reload(); // Refresh to show updated status
+            } else {
+                alert('Failed to create timelapse. Please try again.');
+                button.disabled = false;
+                button.innerHTML = '<i class="fas fa-video"></i> Create Timelapse';
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            alert('Failed to create timelapse. Please try again.');
+            button.disabled = false;
+            button.innerHTML = '<i class="fas fa-video"></i> Create Timelapse';
+        }
+    }
 </script>
