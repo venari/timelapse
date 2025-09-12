@@ -1,0 +1,9 @@
+{
+  "profiles": {
+    "timelapse_functions": {
+      "commandName": "Project",
+      "commandLineArgs": "--port 7019",
+      "launchBrowser": false
+    }
+  }
+}
