@@ -4,6 +4,8 @@ using Microsoft.Extensions.Logging;
 using System.Net;
 using System.Text.Json;
 using Azure.Messaging.ServiceBus;
+using timelapse.functions.Models;
+using timelapse.core.models;
 
 namespace timelapse.functions.Functions;
 
@@ -183,10 +185,10 @@ public class TimelapseFunction
 
         var imagePaths = new List<string>();
         
-        foreach (var image in images.OrderBy(i => i.CapturedDate))
+        foreach (var image in images.OrderBy(i => i.Timestamp))
         {
             var localPath = Path.Combine(tempDir, $"{image.Id}.jpg");
-            await _blobService.DownloadFileAsync(image.BlobPath, localPath);
+            await _blobService.DownloadFileAsync(image.BlobUri, localPath);
             imagePaths.Add(localPath);
         }
 
