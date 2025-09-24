@@ -4,10 +4,11 @@ using Microsoft.Extensions.Logging;
 using System.Net;
 using System.Text.Json;
 using Azure.Messaging.ServiceBus;
-using timelapse.functions.Models;
+// using timelapse.functions.Models;
 using timelapse.core.models;
+using timelapse.functions.services;
 
-namespace timelapse.functions.Functions;
+namespace timelapse.functions.functions;
 
 public class TimelapseFunction
 {
@@ -32,9 +33,9 @@ public class TimelapseFunction
     }
 
     [Function("CreateTimelapse")]
-    public async Task<HttpResponseData> CreateTimelapse(
-        [HttpTrigger(AuthorizationLevel.Function, "post")] HttpRequestData req,
-        [ServiceBusOutput("timelapse-queue")] ServiceBusMessage[] outputMessages)
+    [ServiceBusOutput("timelapse-queue")]
+    public async Task<ServiceBusMessage> CreateTimelapse(
+        [HttpTrigger(AuthorizationLevel.Function, "post")] HttpRequestData req)
     {
         try
         {
@@ -46,7 +47,7 @@ public class TimelapseFunction
             {
                 var badResponse = req.CreateResponse(HttpStatusCode.BadRequest);
                 await badResponse.WriteStringAsync("Either EventId or (DeviceId + StartTime + EndTime) must be provided");
-                return badResponse;
+                throw new InvalidOperationException("Either EventId or (DeviceId + StartTime + EndTime) must be provided");
             }
 
             // Update status to pending
@@ -57,24 +58,13 @@ public class TimelapseFunction
 
             // Queue the processing request
             var queueMessage = JsonSerializer.Serialize(request);
-            outputMessages[0] = new ServiceBusMessage(queueMessage);
 
-            var response = req.CreateResponse(HttpStatusCode.Accepted);
-            await response.WriteStringAsync(JsonSerializer.Serialize(new TimelapseResponse 
-            { 
-                Success = true, 
-                Message = "Timelapse creation queued successfully",
-                QueueId = Guid.NewGuid().ToString()
-            }));
-
-            return response;
+            return new ServiceBusMessage(queueMessage);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error queuing timelapse creation");
-            var errorResponse = req.CreateResponse(HttpStatusCode.InternalServerError);
-            await errorResponse.WriteStringAsync("Internal server error");
-            return errorResponse;
+            throw;
         }
     }
 
@@ -188,7 +178,7 @@ public class TimelapseFunction
         foreach (var image in images.OrderBy(i => i.Timestamp))
         {
             var localPath = Path.Combine(tempDir, $"{image.Id}.jpg");
-            await _blobService.DownloadFileAsync(image.BlobUri, localPath);
+            await _blobService.DownloadFileAsync(image.BlobUri.AbsolutePath, localPath);
             imagePaths.Add(localPath);
         }
 

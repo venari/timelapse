@@ -1,6 +1,9 @@
 using System.Diagnostics;
 using System.Text;
 using Microsoft.Extensions.Logging;
+using timelapse.core.models; // Add this import
+
+namespace timelapse.functions.services; // Add namespace
 
 public class VideoProcessingService
 {

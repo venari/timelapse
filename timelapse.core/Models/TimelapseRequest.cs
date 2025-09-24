@@ -1,5 +1,5 @@
 // filepath: /home/leigh/dev/timelapse/timelapse.functions/Models/TimelapseRequest.cs
-namespace timelapse.functions.Models;
+namespace timelapse.core.models;
 
 public class TimelapseRequest
 {
