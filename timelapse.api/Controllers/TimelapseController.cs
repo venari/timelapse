@@ -18,23 +18,26 @@ public class TimelapseController : ControllerBase
     {
         try
         {
-            var functionUrl = _configuration["AzureFunctions:TimelapseUrl"];
-            var functionKey = _configuration["AzureFunctions:TimelapseKey"];
+            // For local development, point to local function
+            var functionUrl = _configuration["AzureFunctions:TimelapseUrl"] ?? "http://localhost:7019/api/CreateTimelapse";
+            var functionKey = _configuration["AzureFunctions:TimelapseKey"]; // Not needed for local
             
-            var response = await _httpClient.PostAsJsonAsync(
-                $"{functionUrl}?code={functionKey}", 
-                request);
+            var url = string.IsNullOrEmpty(functionKey) ? functionUrl : $"{functionUrl}?code={functionKey}";
+            
+            var response = await _httpClient.PostAsJsonAsync(url, request);
 
             if (response.IsSuccessStatusCode)
             {
-                return Ok(new { success = true, message = "Timelapse creation started" });
+                var result = await response.Content.ReadAsStringAsync();
+                return Ok(new { success = true, message = "Timelapse creation started", details = result });
             }
 
-            return BadRequest(new { success = false, message = "Failed to start timelapse creation" });
+            var errorContent = await response.Content.ReadAsStringAsync();
+            return BadRequest(new { success = false, message = "Failed to start timelapse creation", error = errorContent });
         }
         catch (Exception ex)
         {
-            return StatusCode(500, new { success = false, message = "Internal server error" });
+            return StatusCode(500, new { success = false, message = "Internal server error", error = ex.Message });
         }
     }
 }
