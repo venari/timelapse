@@ -3,14 +3,23 @@
 # Ask user if we have a waveshare modem
 read -p "Does this camera have a waveshare SIM7600X modem? (y/n)" waveshare
 
+# Avoiding issue #89
 read -p "Would you like to update the operating system software using apt-get update/upgrade? (y/n)" updateApt
 
 if [ $updateApt == "y" ]; then
+
+    read -p "Would you like to do a FULL UPGRADE? (y/n)" fullUpgradeApt
+
     echo Updating....
     sudo apt-get update
 
-    echo Upgrading...
-    sudo apt-get upgrade -y
+    if [ $fullUpgradeApt == "y" ]; then
+        echo Performing FULL UPGRADE...
+        sudo apt-get full-upgrade -y
+    else
+        echo Upgrading...
+        sudo apt-get upgrade -y
+    fi
 fi
 
 echo Installing packages...
@@ -31,8 +40,10 @@ python3 /usr/bin/pijuice_log.py --enable WAKEUP_EVT
 if ! grep -q "bookworm" /etc/os-release; then
     pip3 install waveshare-epaper
     pip3 install suncalc
+    pip3 install psutil tabulate
 else
     pip3 install suncalc --break-system-packages
+    pip3 install psutil tabulate --break-system-packages
 fi
 
 
@@ -132,10 +143,20 @@ sudo systemctl enable envirocam-photos.timer
 sudo systemctl enable envirocam-upload.timer
 sudo systemctl enable envirocam-detect-hang.timer
 
+echo Starting systemd services...
+sudo systemctl start envirocam-logging.service
+sudo systemctl start envirocam-telemetry.service
+sudo systemctl start envirocam-photos.service
+sudo systemctl start envirocam-upload.service
+
+sudo systemctl start envirocam-detect-hang.timer
+
+
 # If not bookworm - don't have epaper library yet
 if ! grep -q "bookworm" /etc/os-release; then
     sudo cp /home/pi/dev/timelapse/systemd/system/envirocam-status.timer /etc/systemd/system/
     sudo systemctl enable envirocam-status.timer
+    sudo systemctl start envirocam-status.timer
 fi
 
 # If not waveshare, we can't access SMS messages
@@ -166,7 +187,7 @@ sudo tailscale up
 read -p "Current hostname is $(hostname) - would you like to change it?" yn
 case $yn in 
     [Yy]* ) echo "Changing hostname";
-        read -p "Enter new hostname if desired: " -i sediment-pi- -e hostname
+        read -p "Enter new hostname if desired: " -i envirocam- -e hostname
         echo Setting hostname to $hostname
         sudo hostnamectl set-hostname $hostname;;
 
@@ -174,12 +195,17 @@ case $yn in
     * ) echo "Please answer yes or no.";;
 esac
 
-echo We need to reboot to clear out cron jobs and kick off systemd jobs
-echo "Press any key to reboot"
-
 echo ===========================================
 echo Please check battery profile in pijuice_cli
 echo ===========================================
 
-read -n 1 -s
-sudo reboot
+echo We need to reboot to clear out cron jobs if we\'re updating an old camera
+read -p "Do you want to reboot? (y/n)" rebootNow
+if [ "$rebootNow" == "y" ]; then
+    echo "Rebooting now..."
+    read -n 1 -s
+    sudo reboot
+else
+    echo "Reboot skipped."
+fi
+
