@@ -579,6 +579,15 @@ def saveTelemetry():
         if pj is None or pj.status.GetStatus()['error'] == 'COMMUNICATION_ERROR':
             api_data['batteryPercent'] = 0
             api_data['temperatureC'] = 0
+            api_data['status']= str({ 'status': {'isFault': True, 'battery': 'UNKNOWN', 'powerInput': 'UNKNOWN', 'powerInput5vIo': 'UNKNOWN'},
+                                'batteryVoltage': 0,
+                                'batteryCurrent': 0,
+                                'ioVoltage': 0,
+                                'ioCurrent': 0,
+                                'connectedToWirelessNetwork': is_connected_to_wifi_linux(),
+                                'wirelessSSID': wifiSSID(),
+                                'connectedToInternet': internet(),
+                            })
         else:
             api_data['batteryPercent'] = pj.status.GetChargeLevel()['data']
             api_data['temperatureC'] = pj.status.GetBatteryTemperature()['data']
