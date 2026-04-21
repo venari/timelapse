@@ -14,9 +14,7 @@ var host = new HostBuilder()
         // services.ConfigureFunctionsApplicationInsights();
 
         // Add Entity Framework
-        var connectionString = context.Configuration["ConnectionStrings:DefaultConnection"];
-        services.AddDbContext<AppDbContext>(options =>
-            options.UseSqlServer(connectionString));
+        services.AddDbContext<AppDbContext>();
 
         // Register services with their interfaces
         services.AddScoped<IEventService, EventService>();

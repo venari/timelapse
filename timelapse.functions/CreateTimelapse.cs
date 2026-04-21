@@ -7,18 +7,18 @@ using timelapse.functions.services;
 
 namespace timelapse.functions;
 
-public class CreateTimelapse
+public class TestDbConnection
 {
-    private readonly ILogger<CreateTimelapse> _logger;
+    private readonly ILogger<TestDbConnection> _logger;
     private readonly IEventService _eventService;
 
-    public CreateTimelapse(ILogger<CreateTimelapse> logger, IEventService eventService)
+    public TestDbConnection(ILogger<TestDbConnection> logger, IEventService eventService)
     {
         _logger = logger;
         _eventService = eventService;
     }
 
-    [Function("CreateTimelapse")]
+    [Function("TestDbConnection")]
     public async Task<HttpResponseData> Run(
         [HttpTrigger(AuthorizationLevel.Function, "post")] HttpRequestData req)
     {

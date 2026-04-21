@@ -8,6 +8,8 @@ sudo apt-get install azure-functions-core-tools-4
 
 # Install ffmpeg for local testing
 sudo apt-get install ffmpeg
+
+npm install -g azure-functions-core-tools@4 --unsafe-perm true
 ```
 
 ```
@@ -15,7 +17,7 @@ mkdir timelapse.functions
 cd timelapse.functions
 
 # Initialize the function app
-func init --worker-runtime dotnet-isolated --target-framework net8.0
+func init --worker-runtime dotnet-isolated --target-framework net9.0
 ```
 
 ```
