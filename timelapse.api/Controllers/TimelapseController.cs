@@ -19,7 +19,7 @@ public class TimelapseController : ControllerBase
         try
         {
             // For local development, point to local function
-            var functionUrl = _configuration["AzureFunctions:TimelapseUrl"] ?? "http://localhost:7019/api/CreateTimelapse";
+            var functionUrl = _configuration["AzureFunctions:TimelapseUrl"] ?? "http://localhost:7071/api/CreateTimelapse";
             var functionKey = _configuration["AzureFunctions:TimelapseKey"]; // Not needed for local
             
             var url = string.IsNullOrEmpty(functionKey) ? functionUrl : $"{functionUrl}?code={functionKey}";

@@ -23,3 +23,9 @@ func init --worker-runtime dotnet-isolated --target-framework net9.0
 ```
 func new --name CreateTimelapse --template "HTTP trigger"
 ```
+
+In timelapse.functions:
+func host start
+
+Attach to process in VSCode
+

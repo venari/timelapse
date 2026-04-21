@@ -10,6 +10,13 @@ using timelapse.functions.services;
 
 namespace timelapse.functions.functions;
 
+public class CreateTimelapseOutput
+{
+    [ServiceBusOutput("timelapse-queue", Connection = "ServiceBusConnection")]
+    public ServiceBusMessage? QueueMessage { get; set; }
+    public HttpResponseData HttpResponse { get; set; } = null!;
+}
+
 public class TimelapseFunction
 {
     private readonly ILogger<TimelapseFunction> _logger;
@@ -33,44 +40,65 @@ public class TimelapseFunction
     }
 
     [Function("CreateTimelapse")]
-    [ServiceBusOutput("timelapse-queue")]
-    public async Task<ServiceBusMessage> CreateTimelapse(
+    public async Task<CreateTimelapseOutput> CreateTimelapse(
         [HttpTrigger(AuthorizationLevel.Function, "post")] HttpRequestData req)
     {
+        var requestBody = await new StreamReader(req.Body).ReadToEndAsync();
+
+        if (string.IsNullOrWhiteSpace(requestBody))
+        {
+            var bad = req.CreateResponse(HttpStatusCode.BadRequest);
+            await bad.WriteStringAsync("Request body is required");
+            return new CreateTimelapseOutput { HttpResponse = bad };
+        }
+
+        TimelapseRequest? request;
         try
         {
-            var requestBody = await new StreamReader(req.Body).ReadToEndAsync();
-            var request = JsonSerializer.Deserialize<TimelapseRequest>(requestBody);
+            request = JsonSerializer.Deserialize<TimelapseRequest>(requestBody);
+        }
+        catch (JsonException ex)
+        {
+            _logger.LogError(ex, "Invalid JSON in request body");
+            var bad = req.CreateResponse(HttpStatusCode.BadRequest);
+            await bad.WriteStringAsync("Invalid JSON in request body");
+            return new CreateTimelapseOutput { HttpResponse = bad };
+        }
 
-            // Validate request
-            if (request.EventId == null && (request.DeviceId == null || request.StartTime == null || request.EndTime == null))
-            {
-                var badResponse = req.CreateResponse(HttpStatusCode.BadRequest);
-                await badResponse.WriteStringAsync("Either EventId or (DeviceId + StartTime + EndTime) must be provided");
-                throw new InvalidOperationException("Either EventId or (DeviceId + StartTime + EndTime) must be provided");
-            }
+        if (request == null || (request.EventId == null && (request.DeviceId == null || request.StartTime == null || request.EndTime == null)))
+        {
+            var bad = req.CreateResponse(HttpStatusCode.BadRequest);
+            await bad.WriteStringAsync("Either EventId or (DeviceId + StartTime + EndTime) must be provided");
+            return new CreateTimelapseOutput { HttpResponse = bad };
+        }
 
-            // Update status to pending
+        try
+        {
             if (request.EventId.HasValue)
             {
                 await _eventService.UpdateTimelapseStatusAsync(request.EventId.Value, "Pending");
             }
 
-            // Queue the processing request
-            var queueMessage = JsonSerializer.Serialize(request);
-
-            return new ServiceBusMessage(queueMessage);
+            var ok = req.CreateResponse(HttpStatusCode.Accepted);
+            await ok.WriteAsJsonAsync(new { message = "Timelapse queued", eventId = request.EventId });
+            return new CreateTimelapseOutput
+            {
+                HttpResponse = ok,
+                QueueMessage = new ServiceBusMessage(JsonSerializer.Serialize(request))
+            };
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error queuing timelapse creation");
-            throw;
+            var error = req.CreateResponse(HttpStatusCode.InternalServerError);
+            await error.WriteStringAsync($"Error: {ex.Message}");
+            return new CreateTimelapseOutput { HttpResponse = error };
         }
     }
 
     [Function("ProcessTimelapseQueue")]
     public async Task ProcessTimelapseQueue(
-        [ServiceBusTrigger("timelapse-queue")] ServiceBusReceivedMessage message,
+        [ServiceBusTrigger("timelapse-queue", Connection = "ServiceBusConnection")] ServiceBusReceivedMessage message,
         ServiceBusMessageActions messageActions)
     {
         var request = JsonSerializer.Deserialize<TimelapseRequest>(message.Body.ToString());
