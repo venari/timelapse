@@ -404,7 +404,7 @@ def saveTelemetry():
                                 'connectedToInternet': internet(),
                             })
         else:
-            api_data['batteryPercent'] = pvpiClient.estimated_soc()
+            api_data['batteryPercent'] = round(pvpiClient.estimated_soc())
             api_data['temperatureC'] = pvpiClient.get_board_temp()
             api_data['status']= str({ 'status': {
                                     'chargeState': pvpiClient.get_charge_state(),
