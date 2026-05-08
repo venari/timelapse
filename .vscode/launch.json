@@ -10,7 +10,7 @@
             "request": "launch",
             "preLaunchTask": "build",
             // If you have changed target frameworks, make sure to update the program path.
-            "program": "${workspaceFolder}/timelapse.api/bin/Debug/net9.0/timelapse.api.dll",
+            "program": "${workspaceFolder}/timelapse.api/bin/Debug/net10.0/timelapse.api.dll",
             "args": [],
             "cwd": "${workspaceFolder}/timelapse.api",
             "stopAtEntry": false,
