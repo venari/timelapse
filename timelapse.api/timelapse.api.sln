@@ -1,0 +1,24 @@
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.5.2.0
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "timelapse.api", "timelapse.api.csproj", "{771B2FB3-AA7A-4F87-1A24-BEE708B62EBC}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{771B2FB3-AA7A-4F87-1A24-BEE708B62EBC}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{771B2FB3-AA7A-4F87-1A24-BEE708B62EBC}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{771B2FB3-AA7A-4F87-1A24-BEE708B62EBC}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{771B2FB3-AA7A-4F87-1A24-BEE708B62EBC}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {8985EA02-6E04-439A-9375-0D8ED07ADCA6}
+	EndGlobalSection
+EndGlobal

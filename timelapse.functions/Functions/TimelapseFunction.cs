@@ -39,6 +39,13 @@ public class TimelapseFunction
         _videoService = videoService;
     }
 
+    [Function("HelloWorld")]
+    public async Task<string> HelloWorld(
+        [HttpTrigger(AuthorizationLevel.Function, "get")] HttpRequestData req)
+    {
+        return "Hello, World!";
+    }
+
     [Function("CreateTimelapse")]
     public async Task<CreateTimelapseOutput> CreateTimelapse(
         [HttpTrigger(AuthorizationLevel.Function, "post")] HttpRequestData req)
