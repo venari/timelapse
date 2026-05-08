@@ -409,6 +409,8 @@ def saveTelemetry():
             api_data['status']= str({ 'status': {
                                     'chargeState': pvpiClient.get_charge_state(),
                                     'faults': pvpiClient.get_fault_states(),
+                                    'battery': 'UNKNOWN',
+                                    'powerInput': 'UNKNOWN',
                                 },
                                 'batteryVoltage': round(pvpiClient.get_battery_voltage()*1000),
                                 'batteryCurrent': round(pvpiClient.get_battery_current()*1000),
