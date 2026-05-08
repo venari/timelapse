@@ -1,6 +1,6 @@
 import subprocess
 import json
-import pijuice
+from pvpi import PvPiClient, PvPiChargeState
 import os
 import time
 import shutil
@@ -12,7 +12,7 @@ from logging.handlers import SocketHandler
 import pathlib
 import glob
 
-from helpers import flashLED, internet
+from helpers import internet
 
 from SIM7600X import powerUpSIM7600X, powerDownSIM7600X
 from isConnectedToWifi import is_connected_to_wifi_linux, wifiSSID
@@ -22,11 +22,10 @@ logFilePath = config["logFilePath"]
 intentLogFilePath = logFilePath.replace("timelapse.log", "intent.log")
 # logFilePath = logFilePath.replace(".log", ".saveTelemetry.log")
 os.makedirs(os.path.dirname(logFilePath), exist_ok=True)
-# os.chmod(os.path.dirname(logFilePath), 0o777) # Make sure pijuice user scrip can write to log file.
 
 
 formatter = logging.Formatter('%(asctime)s %(name)s %(levelname)s %(message)s')
-# handler = TimedRotatingFileHandler(logFilePath, 
+# handler = TimedRotatingFileHandler(logFilePath,
 #                                    when='midnight',
 #                                    backupCount=10)
 handler = SocketHandler('localhost', 8000)
@@ -43,7 +42,6 @@ loggerIntent.setLevel(logging.DEBUG)
 
 logger.info("Starting up saveTelemetry.py...")
 loggerIntent.info("Starting up saveTelemetry.py...")
-# os.chmod(logFilePath, 0o777) # Make sure pijuice user script can write to log file.
 
 # clock
 while not os.path.exists('/dev/i2c-1'):
@@ -59,19 +57,24 @@ outputTelemetryFolder = str(pathlib.Path(__file__).parent / '../output/telemetry
 pendingTelemetryFolder = os.path.join(outputTelemetryFolder , 'pending/')
 uploadedTelemetryFolder = os.path.join(outputTelemetryFolder , 'uploaded/')
 
-# pijuice
+# pvpi
 time.sleep(10)
-pj=None
-# Assign PiJuice but handle error if not connected
+pvpiClient = None
 try:
-    pj = pijuice.PiJuice(1, 0x14)
+    pvpiClient = PvPiClient()
 except:
-    logger.error("PiJuice not connected - PiJuice functionality will not be available")
+    logger.error("PvPi not connected - PvPi functionality will not be available")
 
-if pj is None or pj.status.GetStatus()['error'] == 'COMMUNICATION_ERROR':
-    logger.info('PiJuice not connected')
+def pj_is_alive():
+    try:
+        return pvpiClient is not None and pvpiClient.get_alive()
+    except Exception:
+        return False
+
+if not pj_is_alive():
+    logger.info('PvPi not connected')
 else:
-    logger.info('PiJuice is connected')
+    logger.info('PvPi is connected')
 
 
 logger.info("Starting up saveTelemetry.py 3b...")
@@ -92,50 +95,34 @@ def getSerialNumber():
 
 serialNumber = getSerialNumber()
 
+_CHARGING_STATES = (
+    PvPiChargeState.TrickleCharge,
+    PvPiChargeState.PreCharge,
+    PvPiChargeState.FastCharge,
+    PvPiChargeState.TaperCharge,
+    PvPiChargeState.TopOffTimerCharge,
+)
+
 def scheduleShutdown():
     try:
-        if pj is None or pj.status.GetStatus()['error'] == 'COMMUNICATION_ERROR':
-            logger.info('PiJuice not connected')
+        if not pj_is_alive():
+            logger.info('PvPi not connected')
             return
-        
-        alarmObj = {}
+
+        alarm_time = None
 
         # print(str(datetime.datetime.now()) + ' scheduleShutdown')
         logger.debug('scheduleShutdown')
-        logger.debug('rtcAlarm.GetControlStatus(): ' + str(pj.rtcAlarm.GetControlStatus()))
-        logger.debug('rtcAlarm.GetTime(): ' + str(pj.rtcAlarm.GetTime()))
+        logger.debug('get_mcu_time(): ' + str(pvpiClient.get_mcu_time()))
 
         setAlarm = False
         triggerRestart = False
 
         config = json.load(open(pathlib.Path(__file__).parent / 'config.json'))
 
-        # if config['shutdown']:
-        #     # print(str(datetime.datetime.now()) + ' scheduling regular shutdown')
-        #     logger.info('scheduling regular shutdown')
-        #     DELTA_MIN=10
-
-        #     alarmObj = {
-        #             'year': 'EVERY_YEAR',
-        #             'month': 'EVERY_MONTH',
-        #             'day': 'EVERY_DAY',
-        #             'hour': 'EVERY_HOUR',
-        #             'minute_period': DELTA_MIN,
-        #             'second': 0,
-        #     }
-
-        #     setAlarm = True
-
-
         uptimeSeconds = int(time.clock_gettime(time.CLOCK_BOOTTIME))
 
-        bCharging = False
-        if (
-            (pj.status.GetStatus()['data']['battery'] == 'CHARGING_FROM_IN' 
-            or pj.status.GetStatus()['data']['battery'] == 'CHARGING_FROM_5V_IO' )
-            and  pj.status.GetStatus()['data']['powerInput'] == 'PRESENT'
-        ):
-            bCharging = True
+        bCharging = pvpiClient.get_charge_state_code() in _CHARGING_STATES
 
         if config['sleep_during_night'] == True and (datetime.datetime.now().hour >= config['daytime_ends_at_h'] or datetime.datetime.now().hour < config['daytime_starts_at_h']):
             if config['supportMode'] == True:
@@ -144,42 +131,35 @@ def scheduleShutdown():
             if bCharging:
                 logger.info("Night time - but we're charging/powered, so we'll stay on.")
 
-        # Has battery been disconnected, and RTC reset? Go into support mode until we connect and reset RTC.
-        if (pj.rtcAlarm.GetTime()['data']['year'] == 2000):
-                logger.warning('Looks like RTC has been reset - going into support mode until we reconnect.')
-                loggerIntent.warning('Looks like RTC has been reset - going into support mode until we reconnect.')
+        # Has MCU RTC been reset? (year 2000 = factory default)
+        if pvpiClient.get_mcu_time().year <= 2025:
+                logger.warning('Looks like MCU RTC has been reset - going into support mode until we reconnect.')
+                loggerIntent.warning('Looks like MCU RTC has been reset - going into support mode until we reconnect.')
                 config['supportMode'] = True
                 json.dump(config, open(pathlib.Path(__file__).parent / 'config.json', 'w'), indent=4)
 
 
-        # Hibernate mode? 
+        # Hibernate mode?
         if config['hibernateMode']:
             # If we've awoken from hibernate - let's check it's within 5 minutes of the hour, or if hour is other than 0, 6, 12, or 18.
             # If not, user may have pressed button - let's switch out of hibernate mode.
-            # 
-            if uptimeSeconds < 300 and (pj.rtcAlarm.GetTime()['data']['minute'] > 5 or pj.rtcAlarm.GetTime()['data']['hour'] % 6 != 0):
+            #
+            mcu_time = pvpiClient.get_mcu_time()
+            if uptimeSeconds < 300 and (mcu_time.minute > 5 or mcu_time.hour % 6 != 0):
                 logger.info('hibernate mode - but looks like we have been woken by user - switching out of hibernate mode.')
                 loggerIntent.info('hibernate mode - but looks like we have been woken by user - switching out of hibernate mode, and into support mode.')
-                flashLED(pj, 'D2', 255, 0, 0, 2, 1)
-                flashLED(pj, 'D2', 0, 255, 0, 2, 1)
-                flashLED(pj, 'D2', 0, 0, 255, 2, 1)
-                pj.status.SetLedState('D2', [0, 0, 0])
                 config['hibernateMode'] = False
                 config['supportMode'] = True
                 json.dump(config, open(pathlib.Path(__file__).parent / 'config.json', 'w'), indent=4)
 
 
-        # Power Off mode? 
+        # Power Off mode?
         if config['powerOff']:
-            # If we've awoken from Power Off, let's switch out of Power Off 
-            # 
+            # If we've awoken from Power Off, let's switch out of Power Off
+            #
             if uptimeSeconds < 300 :
                 logger.info('Power Off - but looks like we have been woken by user - switching out of Power Off.')
                 loggerIntent.info('Power Off - but looks like we have been woken by user - switching out of Power Off.')
-                flashLED(pj, 'D2', 255, 0, 0, 2, 1)
-                flashLED(pj, 'D2', 0, 255, 0, 2, 1)
-                flashLED(pj, 'D2', 0, 0, 255, 2, 1)
-                pj.status.SetLedState('D2', [0, 0, 0])
                 config['hibernateMode'] = False
                 config['powerOff'] = False
                 config['supportMode'] = True
@@ -187,21 +167,18 @@ def scheduleShutdown():
 
             else:
 
-                # Otherwise, let's cancel wake up alarms, watchdog, and power down.
-                logger.info('Power Off - cancelling wake up alarms, watchdog, and power down.')
-                loggerIntent.info('Power Off - cancelling wake up alarms, watchdog, and power down.')
-                pj.rtcAlarm.SetWakeupEnabled(False)
-                SetWatchdog(0)
-                
+                # Otherwise, let's cancel watchdog and power down.
+                logger.info('Power Off - cancelling watchdog and powering down.')
+                loggerIntent.info('Power Off - cancelling watchdog and powering down.')
+                pvpiClient.stop_watchdog()
+
                 loggerIntent.info('Power off scheduled for 1 min from now')
-                pj.power.SetPowerOff(60)
-                logger.info('Setting System Power Switch to Off:')
-                pj.power.SetSystemPowerSwitch(0)
+                pvpiClient.power_off(60)
                 powerDownSIM7600X()
                 logger.info('Shutting down now...')
                 loggerIntent.info('Shutting down now...')
                 subprocess.call(['sudo', 'shutdown', '-h', 'now'])
-                
+
                 # Exit to make sure we don't than go and undo the power off!
                 return
 
@@ -210,13 +187,6 @@ def scheduleShutdown():
         # e.g. midnight, 6am, 12pm, 6pm (UTC)
         hibernateHoursToWakeAfter = 6 - (datetime.datetime.utcnow().hour % 6)
         hibernateHourToWakeAt = datetime.datetime.utcnow().hour + hibernateHoursToWakeAfter
-
-        # loggerIntent.info('datetime.datetime.utcnow().hour')
-        # loggerIntent.info(datetime.datetime.utcnow().hour)
-        # loggerIntent.info('hoursToWakeAfter')
-        # loggerIntent.info(hoursToWakeAfter)
-        # loggerIntent.info('hourToWakeAt')
-        # loggerIntent.info(hourToWakeAt)
 
         if hibernateHourToWakeAt >= 24:
             hibernateHourToWakeAt = hibernateHourToWakeAt - 24
@@ -230,19 +200,12 @@ def scheduleShutdown():
                 logger.info('hibernate mode - sleeping for 6 hours...')
                 loggerIntent.info('hibernate mode - sleeping for 6 hours...')
 
-                alarmObj = {
-                    'year': 'EVERY_YEAR',
-                    'month': 'EVERY_MONTH',
-                    'day': 'EVERY_DAY',
-                    'hour': hibernateHourToWakeAt,
-                    'minute': 0,
-                    'second': 0,
-                }
-
+                alarm_time = datetime.time(hibernateHourToWakeAt, 0, 0)
                 setAlarm = True
 
-                # Set watchdog to one day just to catch wakeup alarm failure
-                SetWatchdog(60*24)
+                # # Set watchdog to 60 mins (pvpi max) as safety backup for wakeup alarm failure
+                # SetWatchdog(60)
+                # Max watchdog period for pvpi is 60 minutes, which is shorter than our hibernate period, so we'll rely on the RTC alarm to wake us up
 
         else:
 
@@ -254,55 +217,37 @@ def scheduleShutdown():
                 logger.info("Night time so we're scheduling shutdown")
                 loggerIntent.info("Night time so we're scheduling shutdown")
 
-                alarmObj = {
-                    'year': 'EVERY_YEAR',
-                    'month': 'EVERY_MONTH',
-                    'day': 'EVERY_DAY',
-                    # 'hour': 20, # 8am
-                    # 'minute_period': DELTA_MIN,
-                    'hour': 'EVERY_HOUR',
-                    'minute': 0,
-                    'second': 0,
-                }
-
+                next_hour = datetime.datetime.now() + datetime.timedelta(hours=1)
+                alarm_time = datetime.time(next_hour.hour, 0, 0)
                 setAlarm = True
 
-                # Set Watchdog to 2 hours to catch wakeup failure
-                SetWatchdog(120)
+                # Set Watchdog to 60 mins (pvpi max) to catch wakeup failure
+                SetWatchdog(60)
 
             else:
 
                 # sleep_at_battery_percent - at this battery percentage, we go to sleep and wake up every 10 minutes.
-                # pijuice_config.JSON.system_task.min_charge.threshold - at this battery percentage, the pi_juice min_charge setting puts us to sleep until battery gets to wakeup_on_charge value,
-                # so we let this setting take precedence via the pijuice_config.JSON file and don't set an alarm here.
-                # We'll also pre-empt it by 5% to try and shut down more gracefully than the PiJuice might do.
+                # pijuice_config.JSON.system_task.min_charge.threshold - at this battery percentage, the min_charge setting
+                # puts us to sleep until battery recovers, so we pre-empt it by 5% and shut down more gracefully.
 
                 # Also let's give it a chance to upload once an hour to catch up and avoid anxiety that camera has been stolen
 
                 if config['sleep_at_battery_percent'] > 0 and config['pijuice_config.JSON.system_task.min_charge.threshold'] > 0 \
-                and pj.status.GetChargeLevel()['data'] <= config['sleep_at_battery_percent'] \
-                and pj.status.GetStatus()['data']['battery'] != 'NOT_PRESENT' \
+                and pvpiClient.estimated_soc() <= config['sleep_at_battery_percent'] \
                 and datetime.datetime.now().minute >= 10 \
                 and config['supportMode'] == False \
                 and bCharging == False:
 
-                    if pj.status.GetChargeLevel()['data'] > config['pijuice_config.JSON.system_task.min_charge.threshold'] + 5:
+                    if pvpiClient.estimated_soc() > config['pijuice_config.JSON.system_task.min_charge.threshold'] + 5:
                         logger.info('scheduling 10 minute sleep due to low battery')
                         loggerIntent.info('scheduling 10 minute sleep due to low battery')
-                        logger.info(pj.status.GetChargeLevel())
-                        logger.info(pj.status.GetStatus())
-                        DELTA_MIN=10
+                        logger.info(pvpiClient.estimated_soc())
+                        logger.info(pvpiClient.get_charge_state())
 
                         time.sleep(30)
 
-                        alarmObj = {
-                                'year': 'EVERY_YEAR',
-                                'month': 'EVERY_MONTH',
-                                'day': 'EVERY_DAY',
-                                'hour': 'EVERY_HOUR',
-                                'minute_period': DELTA_MIN,
-                                'second': 0,
-                        }
+                        wake_time = datetime.datetime.now() + datetime.timedelta(minutes=10)
+                        alarm_time = datetime.time(wake_time.hour, wake_time.minute, 0)
 
                         # Set watchdog to 15 mins to catch wakeup alarm failure
                         SetWatchdog(15)
@@ -310,29 +255,22 @@ def scheduleShutdown():
                     # If we're down at hibernate level, let's just hibernate.
                     else:
                         logger.info('Hibernating due to very low battery')
-                        loggerIntent.info('Hibernating 10 minute sleep due to very low battery')
-                        logger.info(pj.status.GetChargeLevel())
-                        logger.info(pj.status.GetStatus())
-                        alarmObj = {
-                            'year': 'EVERY_YEAR',
-                            'month': 'EVERY_MONTH',
-                            'day': 'EVERY_DAY',
-                            'hour': hibernateHourToWakeAt,
-                            'minute': 0,
-                            'second': 0,
-                        }
-                        # Set watchdog to 9 hours just to catch wakeup alarm failure
-                        SetWatchdog(60*9)
+                        loggerIntent.info('Hibernating due to very low battery')
+                        logger.info(pvpiClient.estimated_soc())
+                        logger.info(pvpiClient.get_charge_state())
+                        alarm_time = datetime.time(hibernateHourToWakeAt, 0, 0)
+                        # Set watchdog to 60 mins (pvpi max) to catch wakeup alarm failure
+                        SetWatchdog(60)
 
                     setAlarm = True
 
                 else:
 
-                    # If we've been up for more than 2 modem cycles or 30 minutes, and the most recently captured image is older than 10 minutes, or the most recently uploaded image is older than 30 minutes, 
+                    # If we've been up for more than 2 modem cycles or 30 minutes, and the most recently captured image is older than 10 minutes, or the most recently uploaded image is older than 30 minutes,
                     # either network is out, or we can't get a cellular signal, DNS is messing around, or camera isn't capturing.
                     # Let's shutdown, power down, and wake up again in 3 mins to see if that fixes it.
                     power_interval = config['modem.power_interval']
-                    
+
                     if uptimeSeconds > power_interval * 2 and uptimeSeconds > 1800:
                         mostRecentUploadedFiles = sorted(glob.iglob(uploadedImageFolder + "/*.*"), key=os.path.getctime, reverse=True)
                         mostRecentPendingFiles = sorted(glob.iglob(pendingImageFolder + "/*.*"), key=os.path.getctime, reverse=True)
@@ -348,7 +286,6 @@ def scheduleShutdown():
                         if len(mostRecentUploadedFiles) > 0:
 
                             latestUploadedFilename = max(mostRecentUploadedFiles, key=os.path.getctime)
-                            # logger.debug("latestUploadedFilename: " + str(latestUploadedFilename))
 
                             secondsSinceLastUpload = (datetime.datetime.now() - datetime.datetime.fromtimestamp(os.path.getctime(latestUploadedFilename))).total_seconds()
                             logger.debug("secondsSinceLastUpload: " + str(secondsSinceLastUpload))
@@ -371,21 +308,8 @@ def scheduleShutdown():
                             triggerRestart = True
 
                         if triggerRestart:
-                            minsToWakeAfter = 3
-                            minToWakeAt = datetime.datetime.now().minute + minsToWakeAfter
-                            if minToWakeAt >= 60:
-                                minToWakeAt = minToWakeAt - 60
-
-                            alarmObj = {
-                                    'year': 'EVERY_YEAR',
-                                    'month': 'EVERY_MONTH',
-                                    'day': 'EVERY_DAY',
-                                    'hour': 'EVERY_HOUR',
-                                    # 'minute_period': DELTA_MIN,
-                                    'minute': minToWakeAt,
-                                    'second': 0,
-                            }
-
+                            wake_time = datetime.datetime.now() + datetime.timedelta(minutes=3)
+                            alarm_time = datetime.time(wake_time.hour, wake_time.minute, 0)
                             setAlarm = True
 
         if setAlarm == True:
@@ -394,177 +318,67 @@ def scheduleShutdown():
 
             alarmSet = False
             while alarmSet == False:
-                status = pj.rtcAlarm.SetAlarm(alarmObj)
-
-                if status['error'] != 'NO_ERROR':
-                    logger.error('Cannot set alarm\n')
-                    # sys.exit()
-                    alarmSet = False
+                try:
+                    pvpiClient.set_alarm(alarm_time)
+                    logger.debug('Alarm set for ' + str(alarm_time))
+                    loggerIntent.debug('Alarm set for ' + str(alarm_time))
+                    alarmSet = True
+                except Exception as e:
+                    logger.error('Cannot set alarm: ' + str(e))
                     logger.info('Sleeping and retrying...\n')
                     time.sleep(10)
-                else:
-                    logger.debug('Alarm set for ' + str(pj.rtcAlarm.GetAlarm()))
-                    loggerIntent.debug('Alarm set for ' + str(pj.rtcAlarm.GetAlarm()))
-                    alarmSet = True
 
-            # Ensure Wake up alarm is actually enabled!
-            wakeUpEnabled = False
-            while wakeUpEnabled == False:
-
-                status = pj.rtcAlarm.SetWakeupEnabled(True)
-
-                if status['error'] != 'NO_ERROR':
-                    logger.error('Cannot enable wakeup\n')
-                    # sys.exit()
-                    wakeUpEnabled = False
-                    logger.info('Sleeping and retrying for wakeup...\n')
-                    time.sleep(10)
-                else:
-                    logger.debug('Wakeup enabled')
-                    loggerIntent.debug('Wakeup enabled')
-                    wakeUpEnabled = True
-
-            logger.debug('rtcAlarm.GetControlStatus(): ' + str(pj.rtcAlarm.GetControlStatus()))
-            logger.debug('rtcAlarm.GetTime(): ' + str(pj.rtcAlarm.GetTime()))
-
-            logger.debug('Clearing Alarm Flag...')
-            pj.rtcAlarm.ClearAlarmFlag()
-            logger.debug('rtcAlarm.GetControlStatus(): ' + str(pj.rtcAlarm.GetControlStatus()))
-            logger.debug('rtcAlarm.GetTime(): ' + str(pj.rtcAlarm.GetTime()))
-            loggerIntent.debug('rtcAlarm.GetControlStatus(): ' + str(pj.rtcAlarm.GetControlStatus()))
-            loggerIntent.debug('rtcAlarm.GetTime(): ' + str(pj.rtcAlarm.GetTime()))
-            loggerIntent.debug('power.GetWatchdog(): ' + str(pj.power.GetWatchdog()))
+            logger.debug('get_mcu_time(): ' + str(pvpiClient.get_mcu_time()))
+            loggerIntent.debug('get_mcu_time(): ' + str(pvpiClient.get_mcu_time()))
 
             if triggerRestart:
-                logger.info('Restart scheduled for ' + str(minsToWakeAfter) + ' minutes from now')
+                logger.info('Restart scheduled for 3 minutes from now')
                 logger.info("So we'll skip the power off.")
             else:
                 logger.info('Power off scheduled for 1 min from now')
                 loggerIntent.info('Power off scheduled for 1 min from now')
-                pj.power.SetPowerOff(60)
-        
-            logger.info('Setting System Power Switch to Off:')
-            pj.power.SetSystemPowerSwitch(0)
+                pvpiClient.power_off(60)
+
             powerDownSIM7600X()
             logger.info('Shutting down now...')
             loggerIntent.info('Shutting down now...')
             subprocess.call(['sudo', 'shutdown', '-h', 'now'])
-        else:
-            # Ensure Wake up alarm is *not* enabled - or it will cause pi to reboot
-            wakeUpCancelled = False
-            while wakeUpCancelled == False:
-
-                status = pj.rtcAlarm.SetWakeupEnabled(False)
-
-                if status['error'] != 'NO_ERROR':
-                    logger.error('Cannot cancel wakeup\n')
-                    # sys.exit()
-                    wakeUpCancelled = False
-                    logger.info('Sleeping and retrying to cancel wakeup...\n')
-                    time.sleep(10)
-                else:
-                    # logger.debug('Wakeup cancelled')
-                    # loggerIntent.debug('Wakeup cancelled')
-                    wakeUpCancelled = True
-
-        #     SetSafetyWakeup()
 
     except Exception as e:
         logger.error("scheduleShutdown() failed.")
         logger.error(e)
 
-def SetWatchdog(timeout = 3, non_volatile = False):
+def SetWatchdog(timeout = 3):
     try:
-        if pj is None or pj.status.GetStatus()['error'] == 'COMMUNICATION_ERROR':
-            logger.info('PiJuice not connected')
+        if not pj_is_alive():
+            logger.info('PvPi not connected')
             return
 
-        if(pj.power.GetWatchdog()['data'] == timeout and pj.power.GetWatchdog()['non_volatile'] == non_volatile):
-            return
-        
+        # pvpi watchdog accepts 1-60 mins
+        timeout = min(timeout, 60)
+
         logger.debug('Setting Watchdog...')
         loggerIntent.debug('Setting Watchdog...')
 
         watchdogSet = False
         while watchdogSet == False:
-            status = pj.power.SetWatchdog(timeout, non_volatile)
-
-            if status['error'] != 'NO_ERROR':
-                logger.error('Cannot set watchdog\n')
-                watchdogSet = False
+            try:
+                pvpiClient.set_watchdog(timeout)
+                logger.debug('Watchdog set for ' + str(timeout) + ' mins')
+                loggerIntent.debug('Watchdog set for ' + str(timeout) + ' mins')
+                watchdogSet = True
+            except Exception as e:
+                logger.error('Cannot set watchdog: ' + str(e))
                 logger.info('Sleeping and retrying...\n')
                 time.sleep(10)
-            else:
-                logger.debug('Watchdog set for ' + str(pj.power.GetWatchdog()))
-                loggerIntent.debug('Watchdog set for ' + str(pj.power.GetWatchdog()))
-                watchdogSet = True
 
     except Exception as e:
         logger.error("SetWatchdog() failed.")
         logger.error(e)
 
 
-# def SetSafetyWakeup():
-                
-#     try:
-#             minsToWakeAfter = 10
-
-#             logger.debug('skipping shutdown - scheduling safety wakeup in ' + str(minsToWakeAfter) + ' minutes incase we crash...')
-#             # Set wake up for near period in future in case we crash.
-
-#             minToWakeAt = datetime.datetime.now().minute + minsToWakeAfter
-#             if minToWakeAt >= 60:
-#                 minToWakeAt = minToWakeAt - 60
-
-#             alarmObj = {
-#                     'year': 'EVERY_YEAR',
-#                     'month': 'EVERY_MONTH',
-#                     'day': 'EVERY_DAY',
-#                     'hour': 'EVERY_HOUR',
-#                     # 'minute_period': DELTA_MIN,
-#                     'minute': minToWakeAt,
-#                     'second': 0,
-#             }
-
-#             alarmSet = False
-#             while alarmSet == False:
-#                 status = pj.rtcAlarm.SetAlarm(alarmObj)
-
-#                 if status['error'] != 'NO_ERROR':
-#                     logger.error('Cannot set alarm\n')
-#                     # sys.exit()
-#                     alarmSet = False
-#                     logger.info('Sleeping and retrying...\n')
-#                     time.sleep(10)
-#                 else:
-#                     logger.debug('Safety Alarm set for ' + str(pj.rtcAlarm.GetAlarm()))
-#                     alarmSet = True
-
-#             # Ensure Wake up alarm is actually enabled!
-#             wakeUpEnabled = False
-#             while wakeUpEnabled == False:
-
-#                 status = pj.rtcAlarm.SetWakeupEnabled(True)
-
-#                 if status['error'] != 'NO_ERROR':
-#                     logger.error('Cannot enable wakeup\n')
-#                     # sys.exit()
-#                     wakeUpEnabled = False
-#                     logger.info('Sleeping and retrying for wakeup...\n')
-#                     time.sleep(10)
-#                 else:
-#                     logger.debug('Safety Wakeup enabled')
-#                     wakeUpEnabled = True
-
-#     except Exception as e:
-#         logger.error("SetSafetyWakeup() failed.")
-#         logger.error(e)
-
-
-
 def saveTelemetry():
     try:
-        warningTemp = 50
 
         api_data = {
                     'diskSpaceFree': shutil.disk_usage('/')[2] // (1024**3), # shutil.disk_usage returns tuple of (total, used, free), converted to int gb
@@ -576,27 +390,29 @@ def saveTelemetry():
                     'SerialNumber': serialNumber
                 }
 
-        if pj is None or pj.status.GetStatus()['error'] == 'COMMUNICATION_ERROR':
+        if not pj_is_alive():
             api_data['batteryPercent'] = 0
             api_data['temperatureC'] = 0
-            api_data['status']= str({ 'status': {'isFault': True, 'battery': 'UNKNOWN', 'powerInput': 'UNKNOWN', 'powerInput5vIo': 'UNKNOWN'},
+            api_data['status']= str({ 'status': {'chargeState': 'UNKNOWN', 'faults': []},
                                 'batteryVoltage': 0,
                                 'batteryCurrent': 0,
-                                'ioVoltage': 0,
-                                'ioCurrent': 0,
+                                'pvVoltage': 0,
+                                'pvCurrent': 0,
                                 'connectedToWirelessNetwork': is_connected_to_wifi_linux(),
                                 'wirelessSSID': wifiSSID(),
                                 'connectedToInternet': internet(),
                             })
         else:
-            api_data['batteryPercent'] = pj.status.GetChargeLevel()['data']
-            api_data['temperatureC'] = pj.status.GetBatteryTemperature()['data']
-            api_data['status']= str({ 'status': pj.status.GetStatus()['data'],
-                                'batteryVoltage': pj.status.GetBatteryVoltage()['data'],
-                                'batteryCurrent': pj.status.GetBatteryCurrent()['data'],
-                                'ioVoltage': pj.status.GetIoVoltage()['data'],
-                                'ioCurrent': pj.status.GetIoCurrent()['data'],
-                                'powerSwitch': pj.power.GetSystemPowerSwitch(),
+            api_data['batteryPercent'] = pvpiClient.estimated_soc()
+            api_data['temperatureC'] = pvpiClient.get_board_temp()
+            api_data['status']= str({ 'status': {
+                                    'chargeState': pvpiClient.get_charge_state(),
+                                    'faults': pvpiClient.get_fault_states(),
+                                },
+                                'batteryVoltage': pvpiClient.get_battery_voltage(),
+                                'batteryCurrent': pvpiClient.get_battery_current(),
+                                'pvVoltage': pvpiClient.get_pv_voltage(),
+                                'pvCurrent': pvpiClient.get_pv_current(),
                                 'connectedToWirelessNetwork': is_connected_to_wifi_linux(),
                                 'wirelessSSID': wifiSSID(),
                                 'connectedToInternet': internet(),
@@ -611,35 +427,22 @@ def saveTelemetry():
         logger.error("saveTelemetry() failed.")
         logger.error(e)
 
-if pj is not None and pj.status.GetStatus()['error'] == 'NO_ERROR':
+if pj_is_alive():
     try:
-        waitForRTCAttempts = 0
-        while not os.path.exists('/dev/rtc') and waitForRTCAttempts <= 60:
-            logger.info("dev rtc doesn't exist - waiting... " + str(waitForRTCAttempts))
-            time.sleep(1)
-            waitForRTCAttempts = waitForRTCAttempts + 1
-            subprocess.call(['sudo', 'modprobe', '-r', 'rtc_ds1307'])
-            subprocess.call(['sudo', 'modprobe', 'rtc_ds1307'])
-
-        logger.debug('setting sys clock from RTC...')
-        loggerIntent.debug('setting sys clock from RTC...')
-        subprocess.call(['sudo', 'hwclock', '--hctosys'])
-        logger.debug("sudo hwclock --hctosys succeeded")
+        logger.debug('setting sys clock from pvpi MCU time...')
+        loggerIntent.debug('setting sys clock from pvpi MCU time...')
+        mcu_time = pvpiClient.get_mcu_time()
+        subprocess.call(['sudo', 'date', '-s', mcu_time.strftime('%Y-%m-%d %H:%M:%S')])
+        logger.debug("sys clock set from pvpi MCU time")
     except Exception as e:
-        logger.error("sudo hwclock --hctosys failed")
+        logger.error("Failed to set sys clock from pvpi MCU time")
         logger.error(e)
-        
+
 
 try:
     logger.info('In saveTelemetry.py')
 
-    # Set safety wakeup right up front incase modem causes us to fall over.
-    # SetSafetyWakeup()
     SetWatchdog()
-
-    # if config['shutdown']:
-    #     logger.info('Setting failsafe power off for 2 minutes 30 seconds from now.')
-    #     pj.power.SetPowerOff(150)   # Fail safe turn the thing off
 
     while True:
         saveTelemetry()

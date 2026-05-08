@@ -1,6 +1,6 @@
 import subprocess
 import json
-import pijuice
+from pvpi import PvPiClient
 import os
 import time
 import datetime
@@ -46,9 +46,19 @@ outputTelemetryFolder = str(pathlib.Path(__file__).parent / '../output/telemetry
 pendingTelemetryFolder = os.path.join(outputTelemetryFolder , 'pending/')
 uploadedTelemetryFolder = os.path.join(outputTelemetryFolder , 'uploaded/')
 
-# pijuice
+# pvpi
 time.sleep(10)
-pj = pijuice.PiJuice(1, 0x14)
+pvpiClient = None
+try:
+    pvpiClient = PvPiClient()
+except:
+    logger.error("PvPi not connected - PvPi functionality will not be available")
+
+def pj_is_alive():
+    try:
+        return pvpiClient is not None and pvpiClient.get_alive()
+    except Exception:
+        return False
 
 def detectHang():
     try:
@@ -107,14 +117,12 @@ def detectHang():
             logger.info("detectHang - we're bouncing...")
             loggerIntent.info("detectHang - we're bouncing...")
 
-            logger.debug('rtcAlarm.GetControlStatus(): ' + str(pj.rtcAlarm.GetControlStatus()))
-            logger.debug('rtcAlarm.GetTime(): ' + str(pj.rtcAlarm.GetTime()))
-            loggerIntent.debug('rtcAlarm.GetControlStatus(): ' + str(pj.rtcAlarm.GetControlStatus()))
-            loggerIntent.debug('rtcAlarm.GetTime(): ' + str(pj.rtcAlarm.GetTime()))
-            loggerIntent.debug('power.GetWatchdog(): ' + str(pj.power.GetWatchdog()))
+            if pj_is_alive():
+                logger.debug('get_mcu_time(): ' + str(pvpiClient.get_mcu_time()))
+                loggerIntent.debug('get_mcu_time(): ' + str(pvpiClient.get_mcu_time()))
         
-            logger.info('Setting System Power Switch to Off:')
-            pj.power.SetSystemPowerSwitch(0)
+            # logger.info('Setting System Power Switch to Off:')
+            # pj.power.SetSystemPowerSwitch(0)
             powerDownSIM7600X()
             logger.info('detectHang - Restarting after hang now...')
             loggerIntent.info('detectHang - Restarting after hang now...')
