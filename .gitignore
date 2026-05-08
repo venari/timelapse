@@ -139,3 +139,4 @@ logs
 Untitled-2.sh
 arduino_secrets.h
 arduino_secrets.cpp
+timelapse.functions/local.settings.json
