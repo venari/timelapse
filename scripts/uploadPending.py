@@ -14,7 +14,7 @@ import glob
 import pathlib
 import socket
 
-from helpers import flashLED, internet
+from helpers import internet
 
 from SIM7600X import powerUpSIM7600X, powerDownSIM7600X, turnOnNDIS
 
@@ -335,12 +335,12 @@ def uploadPendingTelemetry():
             #requests.post(config['apiUrl'] + '/Telemetry', json=api_data)
 
             if response.status_code == 200:
-                flashLED(pj, 'D2', 0, 0, 255, 1, .1)
+                # flashLED(pj, 'D2', 0, 0, 255, 1, .1)
                 logger.debug(f'Telemetry uploaded successfully')
                 shutil.move(telemetryFilename, uploadedTelemetryFolder + pathlib.Path(telemetryFilename).name)
                 logger.debug('Logged to API.')
             else:
-                flashLED(pj, 'D2', 255, 0, 0, 1, 1)
+                # flashLED(pj, 'D2', 255, 0, 0, 1, 1)
                 logger.error(f'Telemetry upload failed')
 
             try:
@@ -372,7 +372,7 @@ def uploadPendingTelemetry():
                     json.dump(config, open(pathlib.Path(__file__).parent / 'config.json', 'w'), indent=4)
 
             except json.decoder.JSONDecodeError:
-                flashLED(pj, 'D2', 255, 0, 255, 1, 1)
+                # flashLED(pj, 'D2', 255, 0, 255, 1, 1)
                 logger.debug(response.text)
 
 

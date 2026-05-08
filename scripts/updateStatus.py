@@ -19,7 +19,7 @@ import socket
 import shutil
 import pathlib
 
-from helpers import internet, flashLED
+from helpers import internet
 
 outputImageFolder = str(pathlib.Path(__file__).parent / '../output/images/')
 imageMonitoringPreview = os.path.join(outputImageFolder , 'monitoringPreview.jpg')
@@ -211,15 +211,6 @@ if config['supportMode'] == False:
     pj.status.SetLedState('D2', [0, 0, 0])
 
 else:
-
-    flashLED(pj, 'D2', 0, 0, 255, 5, 0.1)   # Flash blue - we're on
-    if internet():
-        logger.info("We've got internet")
-        flashLED(pj, 'D2', 0, 255, 0, 1, 2)
-    else:
-        logger.info("No internet")
-        flashLED(pj, 'D2', 255, 0, 0, 1, 2)
-
     # Only update eink every 5 minutes
     if(datetime.datetime.now().minute % 5 == 0):
         updateEInkDisplay()
