@@ -5,7 +5,8 @@ from logging.handlers import SocketHandler
 import socket
 from SIM7600X import turnOnNDIS, sendSMS, receiveSMS, deleteAllSMS, powerUpSIM7600X
 import time
-from pvpi import PvPiClient, PvPiChargeState
+from pvpi import PvPiClient
+from pvpi.client import PvPiChargeState
 import os
 import pathlib
 

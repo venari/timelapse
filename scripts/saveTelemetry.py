@@ -1,6 +1,7 @@
 import subprocess
 import json
-from pvpi import PvPiClient, PvPiChargeState
+from pvpi import PvPiClient
+from pvpi.client import PvPiChargeState
 import os
 import time
 import shutil
