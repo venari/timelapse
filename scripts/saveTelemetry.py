@@ -435,20 +435,25 @@ def saveTelemetry():
 
 if pj_is_alive():
     try:
-        loggerIntent.info('PvPi is alive, determining which clock is further in the future')
+        loggerIntent.info('PvPi is alive, determining which clock is further in the future - ignore <5 second differences.')
         mcu_time = pvpiClient.get_mcu_time()
         loggerIntent.info('pvpi MCU time: ' + str(mcu_time))
         loggerIntent.info('system time: ' + str(datetime.datetime.now()))
-        if(mcu_time > datetime.datetime.now()):
-            loggerIntent.info('setting sys clock from pvpi MCU time...')
-            if mcu_time.year <= 2025:
-                loggerIntent.warning("MCU time looks wrong, so we're not setting system clock from it.")
-                loggerIntent.warning("MCU time looks wrong, so we're not setting system clock from it.")
-            else:
-                subprocess.call(['sudo', 'date', '-s', mcu_time.strftime('%Y-%m-%d %H:%M:%S')])
+
+        if(abs((mcu_time - datetime.datetime.now()).total_seconds()) < 5):
+            loggerIntent.info('pvpi MCU time and system time are within 5 seconds of each other, so we will not update either clock.')
         else:
-            loggerIntent.info('pvpi MCU time is behind system time, so we will set mcu from sys clock.')
-            pvpiClient.set_mcu_time(datetime.datetime.now())
+
+            if(mcu_time > datetime.datetime.now()):
+                loggerIntent.info('setting sys clock from pvpi MCU time...')
+                if mcu_time.year <= 2025:
+                    loggerIntent.warning("MCU time looks wrong, so we're not setting system clock from it.")
+                    loggerIntent.warning("MCU time looks wrong, so we're not setting system clock from it.")
+                else:
+                    subprocess.call(['sudo', 'date', '-s', mcu_time.strftime('%Y-%m-%d %H:%M:%S')])
+            else:
+                loggerIntent.info('pvpi MCU time is behind system time, so we will set mcu from sys clock.')
+                pvpiClient.set_mcu_time(datetime.datetime.now())
 
     except Exception as e:
         loggerIntent.error("Failed to set sys clock from pvpi MCU time")
