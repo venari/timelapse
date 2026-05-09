@@ -433,11 +433,19 @@ def saveTelemetry():
 
 if pj_is_alive():
     try:
-        logger.debug('setting sys clock from pvpi MCU time...')
-        loggerIntent.debug('setting sys clock from pvpi MCU time...')
+        logger.debug('PvPi is alive, determining which clock is further in the future')
         mcu_time = pvpiClient.get_mcu_time()
-        subprocess.call(['sudo', 'date', '-s', mcu_time.strftime('%Y-%m-%d %H:%M:%S')])
-        logger.debug("sys clock set from pvpi MCU time")
+        if(mcu_time > datetime.datetime.now()):
+            logger.debug('setting sys clock from pvpi MCU time...')
+            if mcu_time.year <= 2025:
+                logger.warning("MCU time looks wrong, so we're not setting system clock from it.")
+                loggerIntent.warning("MCU time looks wrong, so we're not setting system clock from it.")
+            else:
+                subprocess.call(['sudo', 'date', '-s', mcu_time.strftime('%Y-%m-%d %H:%M:%S')])
+        else:
+            logger.debug('pvpi MCU time is behind system time, so we will set mcu from sys clock.')
+            pvpiClient.set_mcu_time(datetime.datetime.now())
+
     except Exception as e:
         logger.error("Failed to set sys clock from pvpi MCU time")
         logger.error(e)
