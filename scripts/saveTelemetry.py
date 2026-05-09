@@ -397,7 +397,12 @@ def saveTelemetry():
         if not pj_is_alive():
             api_data['batteryPercent'] = 0
             api_data['temperatureC'] = 0
-            api_data['status']= str({ 'status': {'chargeState': 'UNKNOWN', 'faults': []},
+            api_data['status']= str({ 'status': {
+                                    'chargeState': 'UNKNOWN', 
+                                    'faults': [],
+                                    'battery': 'UNKNOWN',
+                                    'powerInput': 'UNKNOWN',
+                                },
                                 'batteryVoltage': 0,
                                 'batteryCurrent': 0,
                                 'ioVoltage': 0,
