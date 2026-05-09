@@ -7,7 +7,7 @@ Type=idle
 User=pi
 ExecStart=/usr/bin/python3 /home/pi/dev/timelapse/scripts/saveTelemetry.py
 Restart=always
-RestartSec=60
+RestartSec=30
 
 [Install]
 WantedBy=multi-user.target
