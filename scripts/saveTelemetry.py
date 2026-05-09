@@ -312,6 +312,7 @@ def scheduleShutdown():
                             wake_time = datetime.datetime.now() + datetime.timedelta(minutes=3)
                             alarm_time = datetime.time(wake_time.hour, wake_time.minute, 0)
                             setAlarm = True
+                            SetWatchdog(5)
 
         if setAlarm == True:
             logger.info("scheduleShutdown - we're setting the shutdown...")
