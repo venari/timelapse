@@ -220,8 +220,15 @@ def scheduleShutdown():
                 logger.info("Night time so we're scheduling shutdown")
                 loggerIntent.info("Night time so we're scheduling shutdown")
 
-                next_hour = datetime.datetime.now() + datetime.timedelta(hours=1)
-                alarm_time = datetime.time(next_hour.hour, 0, 0)
+                # Calculate next wake time in local time
+                next_hour_local = datetime.datetime.now() + datetime.timedelta(hours=1)
+                # Convert to UTC for PvPi RTC alarm
+                next_hour_utc = next_hour_local.astimezone(datetime.timezone.utc)
+                alarm_time = datetime.time(next_hour_utc.hour, 0, 0)
+                
+                logger.debug(f'Local wake time: {next_hour_local.strftime("%Y-%m-%d %H:%M:%S %Z")}')
+                logger.debug(f'UTC wake time for alarm: {next_hour_utc.strftime("%Y-%m-%d %H:%M:%S %Z")}')
+                
                 setAlarm = True
 
                 # Set Watchdog to 60 mins (pvpi max) to catch wakeup failure
@@ -249,8 +256,12 @@ def scheduleShutdown():
 
                         time.sleep(30)
 
-                        wake_time = datetime.datetime.now() + datetime.timedelta(minutes=10)
-                        alarm_time = datetime.time(wake_time.hour, wake_time.minute, 0)
+                        # Calculate wake time in local, convert to UTC
+                        wake_time_local = datetime.datetime.now() + datetime.timedelta(minutes=10)
+                        wake_time_utc = wake_time_local.astimezone(datetime.timezone.utc)
+                        alarm_time = datetime.time(wake_time_utc.hour, wake_time_utc.minute, 0)
+                        
+                        logger.debug(f'Low battery sleep: wake at {wake_time_utc.strftime("%H:%M:%S")} UTC')
 
                         # Set watchdog to 15 mins to catch wakeup alarm failure
                         SetWatchdog(15)
@@ -311,8 +322,16 @@ def scheduleShutdown():
                             triggerRestart = True
 
                         if triggerRestart:
-                            wake_time = datetime.datetime.now() + datetime.timedelta(minutes=3)
-                            alarm_time = datetime.time(wake_time.hour, wake_time.minute, 0)
+                            # Calculate wake time in local time
+                            wake_time_local = datetime.datetime.now() + datetime.timedelta(minutes=3)
+                            # Convert to UTC for PvPi RTC alarm (which operates in UTC)
+                            wake_time_utc = wake_time_local.astimezone(datetime.timezone.utc)
+                            alarm_time = datetime.time(wake_time_utc.hour, wake_time_utc.minute, 0)
+                            
+                            logger.debug(f'Local wake time: {wake_time_local.strftime("%Y-%m-%d %H:%M:%S %Z")}')
+                            logger.debug(f'UTC wake time: {wake_time_utc.strftime("%Y-%m-%d %H:%M:%S %Z")}')
+                            loggerIntent.debug(f'Setting alarm for {alarm_time} UTC')
+                            
                             setAlarm = True
                             SetWatchdog(5)
 
@@ -320,12 +339,25 @@ def scheduleShutdown():
             logger.info("scheduleShutdown - we're setting the shutdown...")
             loggerIntent.info("scheduleShutdown - we're setting the shutdown...")
 
+            logger.debug('Current MCU time before alarm set: ' + str(pvpiClient.get_mcu_time()))
+            loggerIntent.debug('Current MCU time before alarm set: ' + str(pvpiClient.get_mcu_time()))
+            
             alarmSet = False
             while alarmSet == False:
                 try:
                     pvpiClient.set_alarm(alarm_time)
                     logger.debug('Alarm set for ' + str(alarm_time))
                     loggerIntent.debug('Alarm set for ' + str(alarm_time))
+                    
+                    # Calculate and log how many minutes until alarm
+                    current_time = datetime.datetime.now()
+                    alarm_datetime = datetime.datetime.combine(current_time.date(), alarm_time)
+                    if alarm_datetime <= current_time:
+                        alarm_datetime += datetime.timedelta(days=1)
+                    minutes_until_alarm = (alarm_datetime - current_time).total_seconds() / 60
+                    logger.debug(f'Alarm will trigger in {minutes_until_alarm:.1f} minutes')
+                    loggerIntent.debug(f'Alarm will trigger in {minutes_until_alarm:.1f} minutes')
+                    
                     alarmSet = True
                 except Exception as e:
                     logger.error('Cannot set alarm: ' + str(e))
@@ -442,24 +474,29 @@ def saveTelemetry():
 if pj_is_alive():
     try:
         loggerIntent.info('PvPi is alive, determining which clock is further in the future - ignore <5 second differences.')
-        mcu_time = pvpiClient.get_mcu_time()
-        loggerIntent.info('pvpi MCU time: ' + str(mcu_time))
-        loggerIntent.info('system time: ' + str(datetime.datetime.now()))
+        # NOTE: PvPi MCU RTC operates in UTC
+        mcu_time_utc = pvpiClient.get_mcu_time()
+        system_time_utc = datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None)
+        
+        loggerIntent.info('pvpi MCU time (UTC): ' + str(mcu_time_utc))
+        loggerIntent.info('system time (UTC): ' + str(system_time_utc))
+        loggerIntent.info('system time (local): ' + str(datetime.datetime.now()))
 
-        if(abs((mcu_time - datetime.datetime.now()).total_seconds()) < 5):
+        if(abs((mcu_time_utc - system_time_utc).total_seconds()) < 5):
             loggerIntent.info('pvpi MCU time and system time are within 5 seconds of each other, so we will not update either clock.')
         else:
 
-            if(mcu_time > datetime.datetime.now()):
-                loggerIntent.info('setting sys clock from pvpi MCU time...')
-                if mcu_time.year <= 2025:
-                    loggerIntent.warning("MCU time looks wrong, so we're not setting system clock from it.")
+            if(mcu_time_utc > system_time_utc):
+                loggerIntent.info('setting sys clock from pvpi MCU time (UTC)...')
+                if mcu_time_utc.year <= 2025:
                     loggerIntent.warning("MCU time looks wrong, so we're not setting system clock from it.")
                 else:
-                    subprocess.call(['sudo', 'date', '-s', mcu_time.strftime('%Y-%m-%d %H:%M:%S')])
+                    # Convert UTC to local time for setting system clock
+                    mcu_time_local = mcu_time_utc.replace(tzinfo=datetime.timezone.utc).astimezone()
+                    subprocess.call(['sudo', 'date', '-s', mcu_time_local.strftime('%Y-%m-%d %H:%M:%S')])
             else:
-                loggerIntent.info('pvpi MCU time is behind system time, so we will set mcu from sys clock.')
-                pvpiClient.set_mcu_time(datetime.datetime.now())
+                loggerIntent.info('pvpi MCU time is behind system time, so we will set mcu from sys clock (UTC).')
+                pvpiClient.set_mcu_time(system_time_utc)
 
     except Exception as e:
         loggerIntent.error("Failed to set sys clock from pvpi MCU time")
