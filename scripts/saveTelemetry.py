@@ -335,13 +335,14 @@ def scheduleShutdown():
             logger.debug('get_mcu_time(): ' + str(pvpiClient.get_mcu_time()))
             loggerIntent.debug('get_mcu_time(): ' + str(pvpiClient.get_mcu_time()))
 
+            # Always call power_off() to enable RTC alarm wake capability
+            logger.info('Power off scheduled for 1 min from now')
+            loggerIntent.info('Power off scheduled for 1 min from now')
+            pvpiClient.power_off(60)
+            
             if triggerRestart:
-                logger.info('Restart scheduled for 3 minutes frologgerm now')
-                logger.info("So we'll skip the power off.")
-            else:
-                logger.info('Power off scheduled for 1 min from now')
-                loggerIntent.info('Power off scheduled for 1 min from now')
-                pvpiClient.power_off(60)
+                logger.info('Restart scheduled for 3 minutes from now (via RTC alarm)')
+                loggerIntent.info('Restart scheduled for 3 minutes from now (via RTC alarm)')
 
             powerDownSIM7600X()
             logger.info('Shutting down now...')
