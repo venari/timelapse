@@ -349,6 +349,12 @@ def SetWatchdog(timeout = 3):
             logger.info('PvPi not connected')
             return
 
+        if(timeout == 0):
+            pvpiClient.stop_watchdog()
+            logger.debug('Watchdog stopped')
+            loggerIntent.debug('Watchdog stopped')
+            return
+
         # pvpi watchdog accepts 1-60 mins
         timeout = min(timeout, 60)
 
