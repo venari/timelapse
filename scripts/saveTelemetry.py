@@ -320,17 +320,7 @@ def scheduleShutdown():
             logger.info("scheduleShutdown - we're setting the shutdown...")
             loggerIntent.info("scheduleShutdown - we're setting the shutdown...")
 
-            alarmSet = False
-            while alarmSet == False:
-                try:
-                    pvpiClient.set_alarm(alarm_time)
-                    logger.debug('Alarm set for ' + str(alarm_time))
-                    loggerIntent.debug('Alarm set for ' + str(alarm_time))
-                    alarmSet = True
-                except Exception as e:
-                    logger.error('Cannot set alarm: ' + str(e))
-                    logger.info('Sleeping and retrying...\n')
-                    time.sleep(10)
+            SetAlarm(alarm_time)
 
             logger.debug('get_mcu_time(): ' + str(pvpiClient.get_mcu_time()))
             loggerIntent.debug('get_mcu_time(): ' + str(pvpiClient.get_mcu_time()))
@@ -381,6 +371,32 @@ def SetWatchdog(timeout = 3):
         logger.error("SetWatchdog() failed.")
         logger.error(e)
 
+def SetAlarm(wakeTime: time):
+    try:
+        if not pj_is_alive():
+            logger.info('PvPi not connected')
+            return
+
+        logger.debug('Setting Alarm...')
+        loggerIntent.debug('Setting Alarm...')
+
+        alarmSet = False
+        while alarmSet == False:
+            try:
+                pvpiClient.set_alarm(wakeTime)
+                logger.debug('Alarm set for ' + str(wakeTime))
+                loggerIntent.debug('Alarm set for ' + str(wakeTime))
+                alarmSet = True
+                SetWatchdog(0) # Disable watchdog as only RTC alarm or watchdog can be active, not both
+
+            except Exception as e:
+                logger.error('Cannot set alarm: ' + str(e))
+                logger.info('Sleeping and retrying...\n')
+                time.sleep(10)
+
+    except Exception as e:
+        logger.error("SetAlarm() failed.")
+        logger.error(e)
 
 def saveTelemetry():
     try:
