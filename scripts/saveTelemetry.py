@@ -206,10 +206,6 @@ def scheduleShutdown():
                 alarm_time = datetime.time(hibernateHourToWakeAt, 0, 0)
                 setAlarm = True
 
-                # # Set watchdog to 60 mins (pvpi max) as safety backup for wakeup alarm failure
-                # SetWatchdog(60)
-                # Max watchdog period for pvpi is 60 minutes, which is shorter than our hibernate period, so we'll rely on the RTC alarm to wake us up
-
         else:
 
             if config['sleep_during_night'] == True \
@@ -223,9 +219,6 @@ def scheduleShutdown():
                 next_hour = datetime.datetime.now() + datetime.timedelta(hours=1)
                 alarm_time = datetime.time(next_hour.hour, 0, 0)
                 setAlarm = True
-
-                # Set Watchdog to 60 mins (pvpi max) to catch wakeup failure
-                SetWatchdog(60)
 
             else:
 
@@ -252,9 +245,6 @@ def scheduleShutdown():
                         wake_time = datetime.datetime.now() + datetime.timedelta(minutes=10)
                         alarm_time = datetime.time(wake_time.hour, wake_time.minute, 0)
 
-                        # Set watchdog to 15 mins to catch wakeup alarm failure
-                        SetWatchdog(15)
-
                     # If we're down at hibernate level, let's just hibernate.
                     else:
                         logger.info('Hibernating due to very low battery')
@@ -262,8 +252,6 @@ def scheduleShutdown():
                         logger.info(pvpiClient.estimated_soc())
                         logger.info(pvpiClient.get_charge_state())
                         alarm_time = datetime.time(hibernateHourToWakeAt, 0, 0)
-                        # Set watchdog to 60 mins (pvpi max) to catch wakeup alarm failure
-                        SetWatchdog(60)
 
                     setAlarm = True
 
@@ -314,7 +302,6 @@ def scheduleShutdown():
                             wake_time = datetime.datetime.now() + datetime.timedelta(minutes=3)
                             alarm_time = datetime.time(wake_time.hour, wake_time.minute, 0)
                             setAlarm = True
-                            SetWatchdog(5)
 
         if setAlarm == True:
             logger.info("scheduleShutdown - we're setting the shutdown...")
