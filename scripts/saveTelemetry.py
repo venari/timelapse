@@ -118,8 +118,8 @@ def scheduleShutdown():
         logger.debug('scheduleShutdown')
         logger.debug('get_mcu_time(): ' + str(pvpiClient.get_mcu_time()))
 
-        setAlarm = False
-        triggerRestart = False
+        setAlarm = False        # Alarm for waking up later than one hour from now
+        triggerRestart = False  # watchdog appears more reliable but can only be used for max 60 minutes
 
         config = json.load(open(pathlib.Path(__file__).parent / 'config.json'))
 
@@ -298,29 +298,31 @@ def scheduleShutdown():
                             loggerIntent.debug("No uploaded or captured images found - restarting...")
                             triggerRestart = True
 
-                        if triggerRestart:
-                            wake_time = datetime.datetime.now() + datetime.timedelta(minutes=3)
-                            alarm_time = datetime.time(wake_time.hour, wake_time.minute, 0)
-                            setAlarm = True
+                            # wake_time = datetime.datetime.now() + datetime.timedelta(minutes=3)
+                            # alarm_time = datetime.time(wake_time.hour, wake_time.minute, 0)
+                            # setAlarm = True
 
-        if setAlarm == True:
-            logger.info("scheduleShutdown - we're setting the shutdown...")
-            loggerIntent.info("scheduleShutdown - we're setting the shutdown...")
+        if(setAlarm == True and triggerRestart == True):
+            logger.error("scheduleShutdown - we've set both setAlarm and triggerRestart - ignore and treat as restart")
+            setAlarm = False
 
-            SetAlarm(alarm_time)
+        if(setAlarm == True or triggerRestart == True):
+            logger.info("scheduleShutdown - we're going to sleep soon...")
+            loggerIntent.info("scheduleShutdown - we're going to sleep soon...")
 
             logger.debug('get_mcu_time(): ' + str(pvpiClient.get_mcu_time()))
             loggerIntent.debug('get_mcu_time(): ' + str(pvpiClient.get_mcu_time()))
+
+            if triggerRestart:
+                SetWatchdog();
+
+            if setAlarm == True:
+                SetAlarm(alarm_time)
 
             # Always call power_off() to enable RTC alarm wake capability
             logger.info('Power off scheduled for 1 min from now')
             loggerIntent.info('Power off scheduled for 1 min from now')
             pvpiClient.power_off(60)
-            
-            if triggerRestart:
-                logger.info('Restart scheduled for 3 minutes from now (via RTC alarm)')
-                loggerIntent.info('Restart scheduled for 3 minutes from now (via RTC alarm)')
-
             powerDownSIM7600X()
             logger.info('Shutting down now...')
             loggerIntent.info('Shutting down now...')
@@ -333,7 +335,7 @@ def scheduleShutdown():
 def SetWatchdog(timeout = 3):
     try:
         if not pj_is_alive():
-            logger.info('PvPi not connected')
+            logger.error('PvPi not connected')
             return
 
         if(timeout == 0):
@@ -367,7 +369,7 @@ def SetWatchdog(timeout = 3):
 def SetAlarm(wakeTime: time):
     try:
         if not pj_is_alive():
-            logger.info('PvPi not connected')
+            logger.error('PvPi not connected')
             return
 
         logger.debug('Setting Alarm...')
@@ -376,11 +378,11 @@ def SetAlarm(wakeTime: time):
         alarmSet = False
         while alarmSet == False:
             try:
+                pvpiClient.stop_watchdog()
                 pvpiClient.set_alarm(wakeTime)
                 logger.debug('Alarm set for ' + str(wakeTime))
                 loggerIntent.debug('Alarm set for ' + str(wakeTime))
                 alarmSet = True
-                SetWatchdog(0) # Disable watchdog as only RTC alarm or watchdog can be active, not both
 
             except Exception as e:
                 logger.error('Cannot set alarm: ' + str(e))
@@ -450,7 +452,6 @@ def saveTelemetry():
 
 if pj_is_alive():
     try:
-        loggerIntent.info('PvPi is alive, determining which clock is further in the future - ignore <5 second differences.')
         mcu_time = pvpiClient.get_mcu_time()
         loggerIntent.info('pvpi MCU time: ' + str(mcu_time))
         loggerIntent.info('system time: ' + str(datetime.datetime.now()))
