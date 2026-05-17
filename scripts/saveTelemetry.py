@@ -231,7 +231,6 @@ def scheduleShutdown():
                 if config['sleep_at_battery_percent'] > 0 and config['pijuice_config.JSON.system_task.min_charge.threshold'] > 0 \
                 and pvpiClient.estimated_soc() <= config['sleep_at_battery_percent'] \
                 and datetime.datetime.now().minute >= 10 \
-                and config['supportMode'] == False \
                 and bCharging == False:
 
                     if pvpiClient.estimated_soc() > config['pijuice_config.JSON.system_task.min_charge.threshold'] + 5:
