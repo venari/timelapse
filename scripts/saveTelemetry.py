@@ -222,22 +222,22 @@ def scheduleShutdown():
 
             else:
 
-                # sleep_at_battery_percent - at this battery percentage, we go to sleep and wake up every 10 minutes.
-                # pijuice_config.JSON.system_task.min_charge.threshold - at this battery percentage, the min_charge setting
-                # puts us to sleep until battery recovers, so we pre-empt it by 5% and shut down more gracefully.
+                # low_battery_voltage - at this battery voltage, we go to sleep and wake up every 10 minutes.
+                # ideally 100mV above the PvPi low_bat_volatge of 12.9
 
                 # Also let's give it a chance to upload once an hour to catch up and avoid anxiety that camera has been stolen
 
-                if config['sleep_at_battery_percent'] > 0 and config['pijuice_config.JSON.system_task.min_charge.threshold'] > 0 \
-                and pvpiClient.estimated_soc() <= config['sleep_at_battery_percent'] \
+                if config['low_battery_voltage'] > 0 \
+                and round(pvpiClient.get_battery_voltage()*1000) <= config['low_battery_voltage'] \
                 and datetime.datetime.now().minute >= 10 \
                 and bCharging == False:
 
-                    if pvpiClient.estimated_soc() > config['pijuice_config.JSON.system_task.min_charge.threshold'] + 5:
+                    if round(pvpiClient.get_battery_voltage()*1000) > config['pvpi_low_battery_voltage']:
                         logger.info('scheduling 10 minute sleep due to low battery')
                         loggerIntent.info('scheduling 10 minute sleep due to low battery')
-                        logger.info(pvpiClient.estimated_soc())
-                        logger.info(pvpiClient.get_charge_state())
+                        logger.info(f"Battery voltage: {round(pvpiClient.get_battery_voltage()*1000)} mV")
+                        logger.info(f"State of charge: {pvpiClient.estimated_soc()}%")
+                        logger.info(f"Charge state: {pvpiClient.get_charge_state()}")
 
                         time.sleep(30)
 
@@ -248,8 +248,9 @@ def scheduleShutdown():
                     else:
                         logger.info('Hibernating due to very low battery')
                         loggerIntent.info('Hibernating due to very low battery')
-                        logger.info(pvpiClient.estimated_soc())
-                        logger.info(pvpiClient.get_charge_state())
+                        logger.info(f"Battery voltage: {round(pvpiClient.get_battery_voltage()*1000)} mV")
+                        logger.info(f"State of charge: {pvpiClient.estimated_soc()}%")
+                        logger.info(f"Charge state: {pvpiClient.get_charge_state()}")
                         alarm_time = datetime.time(hibernateHourToWakeAt, 0, 0)
 
                     setAlarm = True
