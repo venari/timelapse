@@ -317,8 +317,8 @@ def scheduleShutdown():
 
             if setAlarm == True:
                 SetAlarm(alarm_time)
+                SetWatchdog(0) # stop watchdog if we're using alarm - it should already be stopped in scheduleShutdown, but just to be sure.
 
-            # Always call power_off() to enable RTC alarm wake capability
             logger.info('Power off scheduled for 1 min from now')
             loggerIntent.info('Power off scheduled for 1 min from now')
             pvpiClient.power_off(60)
