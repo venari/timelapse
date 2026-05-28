@@ -318,7 +318,6 @@ def scheduleShutdown():
 
             if setAlarm == True:
                 SetAlarm(alarm_time)
-                SetWatchdog(0) # stop watchdog if we're using alarm - it should already be stopped in scheduleShutdown, but just to be sure.
 
             logger.info('Power off scheduled for 1 min from now')
             loggerIntent.info('Power off scheduled for 1 min from now')
@@ -372,13 +371,25 @@ def SetAlarm(wakeTime: time):
             logger.error('PvPi not connected')
             return
 
+        now = datetime.datetime.now()
+        wake_dt = datetime.datetime.combine(now.date(), wakeTime)
+        if wake_dt <= now:
+            wake_dt += datetime.timedelta(days=1)
+        minutes_until = max(1, int((wake_dt - now).total_seconds() / 60))
+
+        if minutes_until <= 60:
+            logger.info(f'Alarm is {minutes_until} min away - using watchdog instead of RTC alarm (more reliable at low voltage)')
+            loggerIntent.info(f'Alarm is {minutes_until} min away - using watchdog instead of RTC alarm (more reliable at low voltage)')
+            SetWatchdog(minutes_until)
+            return
+
         logger.debug('Setting Alarm...')
         loggerIntent.debug('Setting Alarm...')
 
         alarmSet = False
         while alarmSet == False:
             try:
-                pvpiClient.stop_watchdog()
+                SetWatchdog(0) # stop watchdog if we're using RTC alarm
                 pvpiClient.set_alarm(wakeTime)
                 logger.debug('Alarm set for ' + str(wakeTime))
                 loggerIntent.debug('Alarm set for ' + str(wakeTime))
