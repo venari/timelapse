@@ -2,11 +2,10 @@ import subprocess
 import json
 import pijuice
 import os
+import sys
 import time
 import datetime
 import logging
-# from logging.handlers import TimedRotatingFileHandler
-from logging.handlers import SocketHandler
 import glob
 import pathlib
 
@@ -18,10 +17,7 @@ intentLogFilePath = logFilePath.replace("timelapse.log", "intent.log")
 os.makedirs(os.path.dirname(logFilePath), exist_ok=True)
 
 formatter = logging.Formatter('%(asctime)s %(name)s %(levelname)s %(message)s')
-# handler = TimedRotatingFileHandler(logFilePath, 
-#                                    when='midnight',
-#                                    backupCount=10)
-handler = SocketHandler('localhost', 8000)
+handler = logging.StreamHandler(sys.stderr)
 handler.setFormatter(formatter)
 logger = logging.getLogger("detectHang")
 logger.addHandler(handler)

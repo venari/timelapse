@@ -1,6 +1,6 @@
 [Unit]
 Description=Envirocam Telemetry Service
-After=envirocam-logging-socket.service
+After=multi-user.target
 
 [Service]
 Type=idle
