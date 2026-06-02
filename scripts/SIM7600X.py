@@ -135,7 +135,7 @@ def forceTo4GConnection():
         send_at('AT+CPSI?','LTE,Online',1)
         send_at('AT+CEER','OK',1)
 
-        send_at('AT+CGDCONT?','CGDCONT:1,"IP","internet"',1)
+        send_at('AT+CGDCONT?','+CGDCONT: 1,"IP","internet"',1)
         # send_at('AT+CGDCONT=1,"IP","internet"','OK',1)
         # send_at('AT+COPS=2','OK',1)
         # send_at('AT+COPS=0','OK',1)
