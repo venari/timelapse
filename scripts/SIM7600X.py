@@ -130,30 +130,49 @@ def forceTo4GConnection():
         # AT+COPS=2
         # AT+COPS=0,2,"50503"
 
+        configChanged = False
         send_at('AT+CREG?','OK',1)
-        send_at('AT+CEREG?','+CEREG: 0,1',1)
+        if send_at('AT+CEREG?','+CEREG: 0,1',1):
+            logger.debug('Registered on LTE network.')
+
         send_at('AT+CPSI?','LTE,Online',1)
         send_at('AT+CEER','OK',1)
+
+        if not send_at('AT+CNMP?','+CNMP: 38',1):
+            logger.info('Set for automatic connection, attempting to force 4G connection...')
+            send_at('AT+CNMP=38','OK',1)
+            send_at('AT+CEER','OK',1)
+            logger.info('Waiting 60s for modem to register on network after forcing 4G connection...')
+            sleep(60)
+            configChanged = True
+        else:
+            logger.debug('Set for 3G connection.')
+
 
         if not send_at('AT+CEREG?','+CEREG: 0,1',1):
             logger.info('Not registered on LTE network, attempting to force 4G connection...')
             send_at('AT+CNMP=38','OK',1)
             logger.info('Waiting 60s for modem to register on network after forcing 4G connection...')
             sleep(60)
-            send_at('AT+CREG?','OK',1)
-            send_at('AT+CEREG?','+CEREG: 0,1',1)
-            send_at('AT+CPSI?','LTE,Online',1)
+            configChanged = True
 
         if not send_at('AT+CGDCONT?','+CGDCONT: 1,"IP","internet"',1):
+            logger.info('APN not set correctly, attempting to reset APN...')
             send_at('AT+CGDCONT=1,"IP","internet"','OK',1)
             send_at('AT+COPS=2','OK',1)
             send_at('AT+COPS=0','OK',1)
             logger.info('Waiting 60s after resetting APN...')
             sleep(60)
+            configChanged = True
+        else:
+            logger.debug('APN is set correctly.')
+
+        if configChanged:
+            logger.info('Configuration was changed, checking connection status again...')
             send_at('AT+CREG?','OK',1)
             send_at('AT+CEREG?','+CEREG: 0,1',1)
             send_at('AT+CPSI?','LTE,Online',1)
-                # AT+COPS=0,2,"50503"
+            send_at('AT+CEER','OK',1)
 
     except Exception as e:
         logger.error("forceTo4GConnection() failed.")
