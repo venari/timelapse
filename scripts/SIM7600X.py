@@ -256,12 +256,16 @@ def send_at(command,back,timeout):
     if ser.inWaiting():
         time.sleep(0.01 )
         rec_buff = ser.read(ser.inWaiting())
-    if back not in rec_buff.decode():
+
+    if isinstance(rec_buff, bytes):
+        rec_buff = rec_buff.decode()
+
+    if back not in rec_buff:
         logger.error(command + ' ERROR')
-        logger.error(command + ' back:\t' + rec_buff.decode())
+        logger.error(command + ' back:\t' + rec_buff)
         return 0
     else:
-        logger.info(rec_buff.decode())
+        logger.info(rec_buff)
         return 1
 
 
