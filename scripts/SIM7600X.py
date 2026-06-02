@@ -135,11 +135,20 @@ def forceTo4GConnection():
         send_at('AT+CPSI?','LTE,Online',1)
         send_at('AT+CEER','OK',1)
 
+        if not send_at('AT+CEREG?','+CEREG: 0,1',1):
+            logger.info('Not registered on LTE network, attempting to force 4G connection...')
+            send_at('AT+CNMP=38','OK',1)
+            logger.info('Waiting 60s for modem to register on network after forcing 4G connection...')
+            sleep(60)
+            send_at('AT+CREG?','OK',1)
+            send_at('AT+CEREG?','+CEREG: 0,1',1)
+            send_at('AT+CPSI?','LTE,Online',1)
+
         if not send_at('AT+CGDCONT?','+CGDCONT: 1,"IP","internet"',1):
             send_at('AT+CGDCONT=1,"IP","internet"','OK',1)
             send_at('AT+COPS=2','OK',1)
             send_at('AT+COPS=0','OK',1)
-            logger.info('Waiting 60s for modem to register on network after forcing 4G connection...')
+            logger.info('Waiting 60s after resetting APN...')
             sleep(60)
             send_at('AT+CREG?','OK',1)
             send_at('AT+CEREG?','+CEREG: 0,1',1)
