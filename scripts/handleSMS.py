@@ -1,7 +1,6 @@
 import json
 import logging
-# from logging.handlers import TimedRotatingFileHandler
-from logging.handlers import SocketHandler
+import sys
 import socket
 from SIM7600X import turnOnNDIS, sendSMS, receiveSMS, deleteAllSMS, powerUpSIM7600X
 import time
@@ -13,11 +12,9 @@ import pathlib
 from helpers import internet
 
 config = json.load(open(pathlib.Path(__file__).parent / 'config.json'))
-logFilePath = config["logFilePath"]
 
 formatter = logging.Formatter('%(asctime)s %(name)s %(levelname)s %(message)s')
-# handler = TimedRotatingFileHandler(logFilePath, when='midnight', backupCount=10)
-handler = SocketHandler('localhost', 8000)
+handler = logging.StreamHandler(sys.stderr)
 handler.setFormatter(formatter)
 logger = logging.getLogger("handleSMS")
 logger.addHandler(handler)

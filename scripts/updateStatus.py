@@ -1,7 +1,5 @@
 #!/usr/bin/python
 # -*- coding:utf-8 -*-
-# from logging.handlers import TimedRotatingFileHandler
-from logging.handlers import SocketHandler
 import sys
 import os
 import json
@@ -36,10 +34,7 @@ os.makedirs(os.path.dirname(logFilePath), exist_ok=True)
 logFolder = os.path.dirname(logFilePath)
 
 formatter = logging.Formatter('%(asctime)s %(name)s %(levelname)s %(message)s')
-# handler = TimedRotatingFileHandler(logFilePath, 
-#                                    when='midnight',
-#                                    backupCount=10)
-handler = SocketHandler('localhost', 8000)
+handler = logging.StreamHandler(sys.stderr)
 handler.setFormatter(formatter)
 logger = logging.getLogger("updateStatus")
 logger.addHandler(handler)

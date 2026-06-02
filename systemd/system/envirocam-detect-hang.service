@@ -1,6 +1,6 @@
 [Unit]
 Description=Envirocam Hang Detection Service
-After=envirocam-logging-socket.service
+After=multi-user.target
 
 [Service]
 Type=idle
