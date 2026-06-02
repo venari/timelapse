@@ -23,7 +23,8 @@ if [ $updateApt == "y" ]; then
 fi
 
 echo Installing packages...
-sudo apt-get install -y git pijuice-base python3-pip
+sudo apt-get install -y git python3-pip
+sudo apt-get install -y pijuice-base
 sudo apt-get install -y python3-picamera2 --no-install-recommends
 sudo apt-get install -y vim\
                         byobu\
@@ -46,6 +47,9 @@ else
     pip3 install psutil tabulate --break-system-packages
 fi
 
+if ! grep -q "trixie" /etc/os-release; then
+    echo WARNING - PiJuice not supported in Trixie - install legacy Bookwork instead
+fi
 
 byobu-enable
 
