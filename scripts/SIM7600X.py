@@ -5,6 +5,7 @@ import logging
 # from logging.handlers import TimedRotatingFileHandler
 from logging.handlers import SocketHandler
 import serial
+import sys
 import pathlib
 
 import RPi.GPIO as GPIO
@@ -27,7 +28,7 @@ formatter = logging.Formatter('%(asctime)s %(name)s %(levelname)s %(message)s')
 # handler = TimedRotatingFileHandler(logFilePath, 
 #                                    when='midnight',
 #                                    backupCount=10)
-handler = SocketHandler('localhost', 8000)
+handler = logging.StreamHandler(sys.stderr)
 handler.setFormatter(formatter)
 logger = logging.getLogger("SIM7600X")
 logger.addHandler(handler)
@@ -108,6 +109,43 @@ def turnOnNDIS():
         logger.error("turnOnNDIS() failed.")
         logger.error(e)
 
+def forceTo4GConnection():
+    try:
+        if(config['modem.type']=="thumb"):
+            return
+
+        logger.debug('Attempting to force 4G connection...')
+
+        global ser
+        ser = serial.Serial(config["SIM7600X_port"],115200)
+        ser.flushInput()
+
+        # Check following commands:
+        # AT+CEER
+        # AT+CREG?
+        # AT+CEREG?
+        # AT+CSQ
+        # AT+CPSI?
+        # AT+CNMP=38
+        # AT+CGDCONT=1,"IP","internet"
+        # AT+COPS=2
+        # AT+COPS=0,2,"50503"
+
+        send_at('AT+CREG?','OK',1)
+        send_at('AT+CEREG?','OK',1)
+        send_at('AT+CPSI?','OK',1)
+        send_at('AT+CEER','OK',1)
+
+        send_at('AT+CGDCONT?','OK',1)
+        # send_at('AT+CGDCONT=1,"IP","internet"','OK',1)
+        # send_at('AT+COPS=2','OK',1)
+        # send_at('AT+COPS=0','OK',1)
+        # AT+COPS=0,2,"50503"
+
+    except Exception as e:
+        logger.error("forceTo4GConnection() failed.")
+        logger.error(e)
+
 def sendSMS(phone_number,text_message):
     if(config['modem.type']=="thumb"):
         return
@@ -116,22 +154,22 @@ def sendSMS(phone_number,text_message):
     ser = serial.Serial(config["SIM7600X_port"],115200)
     ser.flushInput()
 
-    print("Setting SMS mode...")
+    logger.info("Setting SMS mode...")
     send_at("AT+CMGF=1","OK",1)
-    print("Sending Short Message")
-    print(phone_number)
-    print(text_message)
+    logger.info("Sending Short Message")
+    logger.info(phone_number)
+    logger.info(text_message)
     answer = send_at("AT+CMGS=\""+phone_number+"\"",">",2)
     if 1 == answer:
         ser.write(text_message.encode())
         ser.write(b'\x1A')
         answer = send_at('','OK',20)
         if 1 == answer:
-            print('send successfully')
+            logger.info('send successfully')
         else:
-            print('error')
+            logger.error('error')
     else:
-        print('error%d'%answer)
+        logger.error('error%d'%answer)
 
 def receiveSMS():
     if(config['modem.type']=="thumb"):
@@ -142,14 +180,14 @@ def receiveSMS():
     ser.flushInput()
 
     rec_buff = ''
-    print('Setting SMS mode...')
+    logger.info('Setting SMS mode...')
     send_at('AT+CMGF=1','OK',1)
     send_at('AT+CPMS=\"SM\",\"SM\",\"SM\"', 'OK', 1)
     # answer = send_at('AT+CMGR=1','+CMGR:',2)
     # answer = send_at('AT+CMGL="REC UNREAD"','+CMGL:',2)
     answer = send_at('AT+CMGL="ALL"','+CMGL:',2)
     if 1 != answer:
-        print('error%d'%answer)
+        logger.error('error%d'%answer)
         return 'error%d'%answer
     return rec_buff
 
@@ -162,7 +200,7 @@ def deleteAllSMS():
     ser.flushInput()
 
     rec_buff = ''
-    print('Setting SMS mode...')
+    logger.info('Setting SMS mode...')
     send_at('AT+CMGF=1','OK',1)
     # send_at('AT+CPMS=\"SM\",\"SM\",\"SM\"', 'OK', 1)
     answer = send_at('AT+CMGD=0,1','OK',2)
@@ -187,11 +225,11 @@ def send_at(command,back,timeout):
         time.sleep(0.01 )
         rec_buff = ser.read(ser.inWaiting())
     if back not in rec_buff.decode():
-        print(command + ' ERROR')
-        print(command + ' back:\t' + rec_buff.decode())
+        logger.error(command + ' ERROR')
+        logger.error(command + ' back:\t' + rec_buff.decode())
         return 0
     else:
-        print(rec_buff.decode())
+        logger.info(rec_buff.decode())
         return 1
 
 

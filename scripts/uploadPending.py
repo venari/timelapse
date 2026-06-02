@@ -14,7 +14,7 @@ import socket
 
 from helpers import internet
 
-from SIM7600X import powerUpSIM7600X, powerDownSIM7600X, turnOnNDIS
+from SIM7600X import powerUpSIM7600X, powerDownSIM7600X, turnOnNDIS, forceTo4GConnection
 
 config = json.load(open(pathlib.Path(__file__).parent / 'config.json'))
 logFilePath = config["logFilePath"]
@@ -222,6 +222,8 @@ def connectToInternet(retries = 3):
             logger.warning('Could not establish network connection after 2 minutes.')
 
             if(config['modem.type']=="SIM7600X"):
+                logger.info('forcing 4G Connection...')
+                forceTo4GConnection()
                 logger.info('Attempting to turn on NDIS...')
                 turnOnNDIS()
 
