@@ -4,7 +4,8 @@ import sys
 import socket
 from SIM7600X import turnOnNDIS, sendSMS, receiveSMS, deleteAllSMS, powerUpSIM7600X
 import time
-import pijuice
+# from pvpi import PvPiClient
+# from pvpi.client import PvPiChargeState
 import os
 import pathlib
 
@@ -64,16 +65,29 @@ for line in rec_lines:
             statusMessage = ""
             uptimeSeconds = int(time.clock_gettime(time.CLOCK_BOOTTIME))
 
-            pj = pijuice.PiJuice(1, 0x14)
+            # pvpiClient = None
+            # try:
+            #     pvpiClient = PvPiClient()
+            # except Exception:
+            #     pass
 
             bCharging = False
-            if (
-                (pj.status.GetStatus()['data']['battery'] == 'CHARGING_FROM_IN' 
-                or pj.status.GetStatus()['data']['battery'] == 'CHARGING_FROM_5V_IO' )
-                and  pj.status.GetStatus()['data']['powerInput'] == 'PRESENT'
-            ):
-                bCharging = True
-
+            batteryPercent = 0
+            temperatureC = 0
+            # if pvpiClient is not None:
+            #     try:
+            #         charging_states = (
+            #             PvPiChargeState.TrickleCharge,
+            #             PvPiChargeState.PreCharge,
+            #             PvPiChargeState.FastCharge,
+            #             PvPiChargeState.TaperCharge,
+            #             PvPiChargeState.TopOffTimerCharge,
+            #         )
+            #         bCharging = pvpiClient.get_charge_state_code() in charging_states
+            #         batteryPercent = pvpiClient.estimated_soc()
+            #         temperatureC = pvpiClient.get_board_temp()
+            #     except Exception:
+            #         pass
 
             outputImageFolder = str(pathlib.Path(__file__).parent / '../output/images/')
             workingImageFolder = os.path.join(outputImageFolder , 'working/')

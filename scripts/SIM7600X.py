@@ -3,7 +3,6 @@ import os
 import time
 import logging
 # from logging.handlers import TimedRotatingFileHandler
-from logging.handlers import SocketHandler
 import serial
 import sys
 import pathlib
