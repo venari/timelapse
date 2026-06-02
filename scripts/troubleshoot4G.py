@@ -28,7 +28,7 @@ logger.info("Starting up troubleshoot4G.py...")
 logger.info("")
 logger.info("******************************************************************************")
 
-def toubleshoot4GConnection():
+def troubleshoot4GConnection():
     try:
         logger.info('Troubleshooting 4G connection...')
 
