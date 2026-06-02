@@ -131,11 +131,11 @@ def forceTo4GConnection():
         # AT+COPS=0,2,"50503"
 
         send_at('AT+CREG?','OK',1)
-        send_at('AT+CEREG?','OK',1)
-        send_at('AT+CPSI?','OK',1)
+        send_at('AT+CEREG?','+CEREG: 0,1',1)
+        send_at('AT+CPSI?','LTE,Online',1)
         send_at('AT+CEER','OK',1)
 
-        send_at('AT+CGDCONT?','OK',1)
+        send_at('AT+CGDCONT?','CGDCONT:1,"IP","internet"',1)
         # send_at('AT+CGDCONT=1,"IP","internet"','OK',1)
         # send_at('AT+COPS=2','OK',1)
         # send_at('AT+COPS=0','OK',1)
