@@ -32,23 +32,23 @@ sudo apt-get install -y vim\
                         python3-RPi.GPIO\
                         python3-serial\
 
-# Enable wakeup logging.
-python3 /usr/bin/pijuice_log.py --enable WAKEUP_EVT
+if ! grep -q "trixie" /etc/os-release; then
+    echo WARNING - PiJuice not supported in Trixie - install legacy Bookwork instead
+else
+    # Enable wakeup logging.
+    python3 /usr/bin/pijuice_log.py --enable WAKEUP_EVT
+fi
 
-# If not bookworm - install waveshare-epaper library with pip3
+# If bullseye - install waveshare-epaper library with pip3
 # sudo pip3 install waveshare-epaper
 # sudo apt-get install python3-waveshare-epaper -y
-if ! grep -q "bookworm" /etc/os-release; then
+if grep -q "bullseye" /etc/os-release; then
     pip3 install waveshare-epaper
     pip3 install suncalc
     pip3 install psutil tabulate
 else
     pip3 install suncalc --break-system-packages
     pip3 install psutil tabulate --break-system-packages
-fi
-
-if ! grep -q "trixie" /etc/os-release; then
-    echo WARNING - PiJuice not supported in Trixie - install legacy Bookwork instead
 fi
 
 byobu-enable
