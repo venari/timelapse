@@ -50,6 +50,8 @@ def troubleshoot4GConnection():
 
         forceTo4GConnection()
 
+        powerDownSIM7600X()
+
 
     except Exception as e:
         logger.error(str(datetime.datetime.now()) + " troubleshoot4GConnection() failed.")
