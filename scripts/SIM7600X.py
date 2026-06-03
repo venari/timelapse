@@ -146,7 +146,7 @@ def forceTo4GConnection():
             sleep(60)
             configChanged = True
         else:
-            logger.debug('Set for 3G connection.')
+            logger.debug('Set for 4G connection.')
 
 
         if not send_at('AT+CEREG?','+CEREG: 0,1',1):
