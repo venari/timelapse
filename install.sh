@@ -141,14 +141,15 @@ crontab -r
 echo Installing systemd services...
 sudo cp /home/pi/dev/timelapse/systemd/system/*.* /etc/systemd/system/
 sudo chmod u+x /etc/systemd/system/enviro*.*
-sudo systemctl enable envirocam-logging.service
+sudo systemctl daemon-reload
+sudo systemctl disable envirocam-logging.service
+sudo systemctl stop envirocam-logging.service
 sudo systemctl enable envirocam-telemetry.service
 sudo systemctl enable envirocam-photos.timer
 sudo systemctl enable envirocam-upload.timer
 sudo systemctl enable envirocam-detect-hang.timer
 
 echo Starting systemd services...
-sudo systemctl start envirocam-logging.service
 sudo systemctl start envirocam-telemetry.service
 sudo systemctl start envirocam-photos.service
 sudo systemctl start envirocam-upload.service
