@@ -245,6 +245,45 @@ def deleteAllSMS():
     return True
 
 
+def getGPSLocation(timeout=60):
+    if config.get('modem.type') == "thumb":
+        return None
+
+    global ser, rec_buff
+    ser = serial.Serial(config["SIM7600X_port"], 115200)
+    ser.flushInput()
+
+    logger.info('Starting GPS...')
+    send_at('AT+CGPS=1,1', 'OK', 1)
+
+    location = None
+    start_time = time.time()
+
+    while time.time() - start_time < timeout:
+        send_at('AT+CGPSINFO', '+CGPSINFO:', 2)
+        for line in rec_buff.splitlines():
+            if line.startswith('+CGPSINFO:'):
+                parts = line[len('+CGPSINFO:'):].strip().split(',')
+                if len(parts) >= 4 and parts[0] and parts[2]:
+                    lat_raw, lat_dir, lon_raw, lon_dir = parts[0], parts[1], parts[2], parts[3]
+                    lat = float(lat_raw[:2]) + float(lat_raw[2:]) / 60
+                    lon = float(lon_raw[:3]) + float(lon_raw[3:]) / 60
+                    if lat_dir == 'S':
+                        lat = -lat
+                    if lon_dir == 'W':
+                        lon = -lon
+                    location = (lat, lon)
+                    break
+        if location:
+            break
+        sleep(5)
+
+    logger.info('Stopping GPS...')
+    send_at('AT+CGPS=0', 'OK', 1)
+
+    return location
+
+
 def send_at(command,back,timeout):
     if(config['modem.type']=="thumb"):
         return
