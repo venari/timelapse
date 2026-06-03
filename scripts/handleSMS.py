@@ -31,6 +31,10 @@ logger.debug('About to call receiveSMS()...')
 rec_buff = receiveSMS()
 logger.debug('Returned from receiveSMS()')
 logger.debug(rec_buff)
+if rec_buff is None:
+    logger.debug('rec_buff is None - is SIM7600 board attached?')
+    exit()
+
 # print('Printed rec_buff')
 
 rec_lines = rec_buff.splitlines()
