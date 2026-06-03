@@ -2,7 +2,7 @@ import json
 import logging
 import sys
 import socket
-from SIM7600X import turnOnNDIS, sendSMS, receiveSMS, deleteAllSMS, powerUpSIM7600X
+from SIM7600X import turnOnNDIS, sendSMS, receiveSMS, deleteAllSMS, powerUpSIM7600X, getGPSLocation
 import time
 # from pvpi import PvPiClient
 # from pvpi.client import PvPiChargeState
@@ -115,6 +115,16 @@ for line in rec_lines:
         if line.upper() == "HELLO":
             logger.info("Hello")
             sendSMS(phone_number, "Hello")
+
+        if line.upper() == "LOCATE":
+            logger.info("Location query")
+            location = getGPSLocation()
+            if location:
+                lat, lon = location
+                maps_url = f"https://maps.google.com/maps?q={lat:.6f},{lon:.6f}"
+                sendSMS(phone_number, f"Location: {lat:.6f},{lon:.6f}\n{maps_url}")
+            else:
+                sendSMS(phone_number, "Unable to get GPS fix")
 
         # Body
 
