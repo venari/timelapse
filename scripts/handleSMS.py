@@ -22,7 +22,8 @@ logger.setLevel(logging.DEBUG)
 
 
 #try:
-#powerUpSIM7600X()
+powerUpSIM7600X()
+time.sleep(20)
 #sendSMS('+64xxxxxxxxx','Testing tesing')
 
 logger.debug('About to call receiveSMS()...')
