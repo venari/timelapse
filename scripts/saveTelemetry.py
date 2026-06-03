@@ -67,8 +67,8 @@ def pj_is_alive():
         return False
 
 if not pj_is_alive():
-    logger.info('PvPi not connected')
-    loggerIntent.info('PvPi not connected')
+    logger.error('PvPi not connected')
+    loggerIntent.error('PvPi not connected')
 else:
     logger.info('PvPi is connected')
     loggerIntent.info('PvPi is connected')
@@ -103,7 +103,8 @@ _CHARGING_STATES = (
 def scheduleShutdown():
     try:
         if not pj_is_alive():
-            logger.info('PvPi not connected')
+            logger.error('PvPi not connected')
+            loggerIntent.error('PvPi not connected')
             return
 
         alarm_time = None
@@ -329,6 +330,7 @@ def SetWatchdog(timeout = 3):
     try:
         if not pj_is_alive():
             logger.error('PvPi not connected')
+            loggerIntent.error('PvPi not connected')
             return
 
         if(timeout == 0):
@@ -363,6 +365,7 @@ def SetAlarm(wakeTime: time):
     try:
         if not pj_is_alive():
             logger.error('PvPi not connected')
+            loggerIntent.error('PvPi not connected')
             return
 
         now = datetime.datetime.now()
