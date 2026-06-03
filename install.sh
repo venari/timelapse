@@ -23,7 +23,8 @@ if [ $updateApt == "y" ]; then
 fi
 
 echo Installing packages...
-sudo apt-get install -y git pijuice-base python3-pip
+sudo apt-get install -y git python3-pip
+sudo apt-get install -y pijuice-base
 sudo apt-get install -y python3-picamera2 --no-install-recommends
 sudo apt-get install -y vim\
                         byobu\
@@ -31,13 +32,17 @@ sudo apt-get install -y vim\
                         python3-RPi.GPIO\
                         python3-serial\
 
-# Enable wakeup logging.
-python3 /usr/bin/pijuice_log.py --enable WAKEUP_EVT
+if ! grep -q "trixie" /etc/os-release; then
+    echo WARNING - PiJuice not supported in Trixie - install legacy Bookwork instead
+else
+    # Enable wakeup logging.
+    python3 /usr/bin/pijuice_log.py --enable WAKEUP_EVT
+fi
 
-# If not bookworm - install waveshare-epaper library with pip3
+# If bullseye - install waveshare-epaper library with pip3
 # sudo pip3 install waveshare-epaper
 # sudo apt-get install python3-waveshare-epaper -y
-if ! grep -q "bookworm" /etc/os-release; then
+if grep -q "bullseye" /etc/os-release; then
     pip3 install waveshare-epaper
     pip3 install suncalc
     pip3 install psutil tabulate
@@ -45,7 +50,6 @@ else
     pip3 install suncalc --break-system-packages
     pip3 install psutil tabulate --break-system-packages
 fi
-
 
 byobu-enable
 
@@ -137,14 +141,15 @@ crontab -r
 echo Installing systemd services...
 sudo cp /home/pi/dev/timelapse/systemd/system/*.* /etc/systemd/system/
 sudo chmod u+x /etc/systemd/system/enviro*.*
-sudo systemctl enable envirocam-logging.service
+sudo systemctl daemon-reload
+sudo systemctl disable envirocam-logging.service
+sudo systemctl stop envirocam-logging.service
 sudo systemctl enable envirocam-telemetry.service
 sudo systemctl enable envirocam-photos.timer
 sudo systemctl enable envirocam-upload.timer
 sudo systemctl enable envirocam-detect-hang.timer
 
 echo Starting systemd services...
-sudo systemctl start envirocam-logging.service
 sudo systemctl start envirocam-telemetry.service
 sudo systemctl start envirocam-photos.service
 sudo systemctl start envirocam-upload.service

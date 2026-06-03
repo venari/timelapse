@@ -1,22 +1,20 @@
 import json
 import logging
-# from logging.handlers import TimedRotatingFileHandler
-from logging.handlers import SocketHandler
+import sys
 import socket
-from SIM7600X import turnOnNDIS, sendSMS, receiveSMS, deleteAllSMS, powerUpSIM7600X
+from SIM7600X import turnOnNDIS, sendSMS, receiveSMS, deleteAllSMS, powerUpSIM7600X, getGPSLocation
 import time
-import pijuice
+# from pvpi import PvPiClient
+# from pvpi.client import PvPiChargeState
 import os
 import pathlib
 
 from helpers import internet
 
 config = json.load(open(pathlib.Path(__file__).parent / 'config.json'))
-logFilePath = config["logFilePath"]
 
 formatter = logging.Formatter('%(asctime)s %(name)s %(levelname)s %(message)s')
-# handler = TimedRotatingFileHandler(logFilePath, when='midnight', backupCount=10)
-handler = SocketHandler('localhost', 8000)
+handler = logging.StreamHandler(sys.stderr)
 handler.setFormatter(formatter)
 logger = logging.getLogger("handleSMS")
 logger.addHandler(handler)
@@ -24,7 +22,8 @@ logger.setLevel(logging.DEBUG)
 
 
 #try:
-#powerUpSIM7600X()
+powerUpSIM7600X()
+time.sleep(20)
 #sendSMS('+64xxxxxxxxx','Testing tesing')
 
 logger.debug('About to call receiveSMS()...')
@@ -41,7 +40,8 @@ logger.debug(rec_lines)
 phone_number=''
 
 for line in rec_lines:
-    line = line.decode()
+    if isinstance(line, bytes):
+        line = line.decode()
     logger.info(line)
     if(line.startswith("+CMGL:")):
         # Header
@@ -66,16 +66,29 @@ for line in rec_lines:
             statusMessage = ""
             uptimeSeconds = int(time.clock_gettime(time.CLOCK_BOOTTIME))
 
-            pj = pijuice.PiJuice(1, 0x14)
+            # pvpiClient = None
+            # try:
+            #     pvpiClient = PvPiClient()
+            # except Exception:
+            #     pass
 
             bCharging = False
-            if (
-                (pj.status.GetStatus()['data']['battery'] == 'CHARGING_FROM_IN' 
-                or pj.status.GetStatus()['data']['battery'] == 'CHARGING_FROM_5V_IO' )
-                and  pj.status.GetStatus()['data']['powerInput'] == 'PRESENT'
-            ):
-                bCharging = True
-
+            batteryPercent = 0
+            temperatureC = 0
+            # if pvpiClient is not None:
+            #     try:
+            #         charging_states = (
+            #             PvPiChargeState.TrickleCharge,
+            #             PvPiChargeState.PreCharge,
+            #             PvPiChargeState.FastCharge,
+            #             PvPiChargeState.TaperCharge,
+            #             PvPiChargeState.TopOffTimerCharge,
+            #         )
+            #         bCharging = pvpiClient.get_charge_state_code() in charging_states
+            #         batteryPercent = pvpiClient.estimated_soc()
+            #         temperatureC = pvpiClient.get_board_temp()
+            #     except Exception:
+            #         pass
 
             outputImageFolder = str(pathlib.Path(__file__).parent / '../output/images/')
             workingImageFolder = os.path.join(outputImageFolder , 'working/')
@@ -105,6 +118,16 @@ for line in rec_lines:
         if line.upper() == "HELLO":
             logger.info("Hello")
             sendSMS(phone_number, "Hello")
+
+        if line.upper() == "LOCATE":
+            logger.info("Location query")
+            location = getGPSLocation()
+            if location:
+                lat, lon = location
+                maps_url = f"https://maps.google.com/maps?q={lat:.6f},{lon:.6f}"
+                sendSMS(phone_number, f"Location: {lat:.6f},{lon:.6f}\n{maps_url}")
+            else:
+                sendSMS(phone_number, "Unable to get GPS fix")
 
         # Body
 

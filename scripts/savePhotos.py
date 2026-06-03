@@ -9,22 +9,15 @@ import datetime
 import sys
 import requests
 import logging
-# from logging.handlers import TimedRotatingFileHandler
-from logging.handlers import SocketHandler
 import pathlib
 
 # from helpers import flashLED
 from helpers import currentPhase
 
 config = json.load(open(pathlib.Path(__file__).parent / 'config.json'))
-logFilePath = config["logFilePath"]
-# logFilePath = logFilePath.replace(".log", ".savePhotos.log")
-os.makedirs(os.path.dirname(logFilePath), exist_ok=True)
-# os.chmod(os.path.dirname(logFilePath), 0o777) # Make sure pijuice user scrip can write to log file.
 
 formatter = logging.Formatter('%(asctime)s %(name)s %(levelname)s %(message)s')
-# handler = TimedRotatingFileHandler(logFilePath, when='midnight', backupCount=10)
-handler = SocketHandler('localhost', 8000)
+handler = logging.StreamHandler(sys.stderr)
 handler.setFormatter(formatter)
 logger = logging.getLogger("savePhotos")
 logger.addHandler(handler)

@@ -8,28 +8,21 @@ import datetime
 import sys
 import requests
 import logging
-# from logging.handlers import TimedRotatingFileHandler
-from logging.handlers import SocketHandler
 import glob
 import pathlib
 import socket
 
 from helpers import flashLED, internet
 
-from SIM7600X import powerUpSIM7600X, powerDownSIM7600X, turnOnNDIS
+from SIM7600X import powerUpSIM7600X, powerDownSIM7600X, turnOnNDIS, forceTo4GConnection
 
 config = json.load(open(pathlib.Path(__file__).parent / 'config.json'))
 logFilePath = config["logFilePath"]
 intentLogFilePath = logFilePath.replace("timelapse.log", "intent.log")
-# logFilePath = logFilePath.replace(".log", ".uploadTelemetry.log")
 os.makedirs(os.path.dirname(logFilePath), exist_ok=True)
-# os.chmod(os.path.dirname(logFilePath), 0o777) # Make sure pijuice user scrip can write to log file.
 
 formatter = logging.Formatter('%(asctime)s %(name)s %(levelname)s %(message)s')
-# handler = TimedRotatingFileHandler(logFilePath, 
-#                                    when='midnight',
-#                                    backupCount=10)
-handler  = SocketHandler('localhost', 8000)
+handler = logging.StreamHandler(sys.stderr)
 handler.setFormatter(formatter)
 logger = logging.getLogger("uploadPending")
 logger.addHandler(handler)
@@ -229,6 +222,8 @@ def connectToInternet(retries = 3):
             logger.warning('Could not establish network connection after 2 minutes.')
 
             if(config['modem.type']=="SIM7600X"):
+                logger.info('forcing 4G Connection...')
+                forceTo4GConnection()
                 logger.info('Attempting to turn on NDIS...')
                 turnOnNDIS()
 

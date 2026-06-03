@@ -3,8 +3,8 @@ import os
 import time
 import logging
 # from logging.handlers import TimedRotatingFileHandler
-from logging.handlers import SocketHandler
 import serial
+import sys
 import pathlib
 
 import RPi.GPIO as GPIO
@@ -27,7 +27,7 @@ formatter = logging.Formatter('%(asctime)s %(name)s %(levelname)s %(message)s')
 # handler = TimedRotatingFileHandler(logFilePath, 
 #                                    when='midnight',
 #                                    backupCount=10)
-handler = SocketHandler('localhost', 8000)
+handler = logging.StreamHandler(sys.stderr)
 handler.setFormatter(formatter)
 logger = logging.getLogger("SIM7600X")
 logger.addHandler(handler)
@@ -108,6 +108,76 @@ def turnOnNDIS():
         logger.error("turnOnNDIS() failed.")
         logger.error(e)
 
+def forceTo4GConnection():
+    try:
+        if(config['modem.type']=="thumb"):
+            return
+
+        logger.debug('Attempting to force 4G connection...')
+
+        global ser
+        ser = serial.Serial(config["SIM7600X_port"],115200)
+        ser.flushInput()
+
+        # Check following commands:
+        # AT+CEER
+        # AT+CREG?
+        # AT+CEREG?
+        # AT+CSQ
+        # AT+CPSI?
+        # AT+CNMP=38
+        # AT+CGDCONT=1,"IP","internet"
+        # AT+COPS=2
+        # AT+COPS=0,2,"50503"
+
+        configChanged = False
+        send_at('AT+CREG?','OK',1)
+        if send_at('AT+CEREG?','+CEREG: 0,1',1):
+            logger.debug('Registered on LTE network.')
+
+        send_at('AT+CPSI?','LTE,Online',1)
+        send_at('AT+CEER','OK',1)
+
+        if not send_at('AT+CNMP?','+CNMP: 38',1):
+            logger.info('Set for automatic connection, attempting to force 4G connection...')
+            send_at('AT+CNMP=38','OK',1)
+            send_at('AT+CEER','OK',1)
+            logger.info('Waiting 60s for modem to register on network after forcing 4G connection...')
+            sleep(60)
+            configChanged = True
+        else:
+            logger.debug('Set for 3G connection.')
+
+
+        if not send_at('AT+CEREG?','+CEREG: 0,1',1):
+            logger.info('Not registered on LTE network, attempting to force 4G connection...')
+            send_at('AT+CNMP=38','OK',1)
+            logger.info('Waiting 60s for modem to register on network after forcing 4G connection...')
+            sleep(60)
+            configChanged = True
+
+        if not send_at('AT+CGDCONT?','+CGDCONT: 1,"IP","internet"',1):
+            logger.info('APN not set correctly, attempting to reset APN...')
+            send_at('AT+CGDCONT=1,"IP","internet"','OK',1)
+            send_at('AT+COPS=2','OK',1)
+            send_at('AT+COPS=0','OK',1)
+            logger.info('Waiting 60s after resetting APN...')
+            sleep(60)
+            configChanged = True
+        else:
+            logger.debug('APN is set correctly.')
+
+        if configChanged:
+            logger.info('Configuration was changed, checking connection status again...')
+            send_at('AT+CREG?','OK',1)
+            send_at('AT+CEREG?','+CEREG: 0,1',1)
+            send_at('AT+CPSI?','LTE,Online',1)
+            send_at('AT+CEER','OK',1)
+
+    except Exception as e:
+        logger.error("forceTo4GConnection() failed.")
+        logger.error(e)
+
 def sendSMS(phone_number,text_message):
     if(config['modem.type']=="thumb"):
         return
@@ -116,22 +186,22 @@ def sendSMS(phone_number,text_message):
     ser = serial.Serial(config["SIM7600X_port"],115200)
     ser.flushInput()
 
-    print("Setting SMS mode...")
+    logger.info("Setting SMS mode...")
     send_at("AT+CMGF=1","OK",1)
-    print("Sending Short Message")
-    print(phone_number)
-    print(text_message)
+    logger.info("Sending Short Message")
+    logger.info(phone_number)
+    logger.info(text_message)
     answer = send_at("AT+CMGS=\""+phone_number+"\"",">",2)
     if 1 == answer:
         ser.write(text_message.encode())
         ser.write(b'\x1A')
         answer = send_at('','OK',20)
         if 1 == answer:
-            print('send successfully')
+            logger.info('send successfully')
         else:
-            print('error')
+            logger.error('error')
     else:
-        print('error%d'%answer)
+        logger.error('error%d'%answer)
 
 def receiveSMS():
     if(config['modem.type']=="thumb"):
@@ -142,14 +212,14 @@ def receiveSMS():
     ser.flushInput()
 
     rec_buff = ''
-    print('Setting SMS mode...')
+    logger.info('Setting SMS mode...')
     send_at('AT+CMGF=1','OK',1)
     send_at('AT+CPMS=\"SM\",\"SM\",\"SM\"', 'OK', 1)
     # answer = send_at('AT+CMGR=1','+CMGR:',2)
     # answer = send_at('AT+CMGL="REC UNREAD"','+CMGL:',2)
     answer = send_at('AT+CMGL="ALL"','+CMGL:',2)
     if 1 != answer:
-        print('error%d'%answer)
+        logger.error('error%d'%answer)
         return 'error%d'%answer
     return rec_buff
 
@@ -162,7 +232,7 @@ def deleteAllSMS():
     ser.flushInput()
 
     rec_buff = ''
-    print('Setting SMS mode...')
+    logger.info('Setting SMS mode...')
     send_at('AT+CMGF=1','OK',1)
     # send_at('AT+CPMS=\"SM\",\"SM\",\"SM\"', 'OK', 1)
     answer = send_at('AT+CMGD=0,1','OK',2)
@@ -173,6 +243,45 @@ def deleteAllSMS():
     # else:
         return False
     return True
+
+
+def getGPSLocation(timeout=60):
+    if config.get('modem.type') == "thumb":
+        return None
+
+    global ser, rec_buff
+    ser = serial.Serial(config["SIM7600X_port"], 115200)
+    ser.flushInput()
+
+    logger.info('Starting GPS...')
+    send_at('AT+CGPS=1,1', 'OK', 1)
+
+    location = None
+    start_time = time.time()
+
+    while time.time() - start_time < timeout:
+        send_at('AT+CGPSINFO', '+CGPSINFO:', 2)
+        for line in rec_buff.splitlines():
+            if line.startswith('+CGPSINFO:'):
+                parts = line[len('+CGPSINFO:'):].strip().split(',')
+                if len(parts) >= 4 and parts[0] and parts[2]:
+                    lat_raw, lat_dir, lon_raw, lon_dir = parts[0], parts[1], parts[2], parts[3]
+                    lat = float(lat_raw[:2]) + float(lat_raw[2:]) / 60
+                    lon = float(lon_raw[:3]) + float(lon_raw[3:]) / 60
+                    if lat_dir == 'S':
+                        lat = -lat
+                    if lon_dir == 'W':
+                        lon = -lon
+                    location = (lat, lon)
+                    break
+        if location:
+            break
+        sleep(5)
+
+    logger.info('Stopping GPS...')
+    send_at('AT+CGPS=0', 'OK', 1)
+
+    return location
 
 
 def send_at(command,back,timeout):
@@ -186,12 +295,16 @@ def send_at(command,back,timeout):
     if ser.inWaiting():
         time.sleep(0.01 )
         rec_buff = ser.read(ser.inWaiting())
-    if back not in rec_buff.decode():
-        print(command + ' ERROR')
-        print(command + ' back:\t' + rec_buff.decode())
+
+    if isinstance(rec_buff, bytes):
+        rec_buff = rec_buff.decode()
+
+    if back not in rec_buff:
+        logger.error(command + ' ERROR')
+        logger.error(command + ' back:\t' + rec_buff)
         return 0
     else:
-        print(rec_buff.decode())
+        logger.info(rec_buff)
         return 1
 
 
