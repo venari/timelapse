@@ -24,6 +24,7 @@ public class DetailModel : PageModel
     public Device Device {get; set;}
     public Event Event {get; set;}
     public string SasToken {get; set;}
+    public string TimelapseSasToken {get; set;}
 
     public ImageSubset[] EventImages {get; private set;}
 
@@ -72,6 +73,7 @@ public class DetailModel : PageModel
         StorageHelper storageHelper;
         storageHelper = new StorageHelper(configuration, logger, memoryCache);
         SasToken = storageHelper.SasToken;
+        TimelapseSasToken = storageHelper.GetSasTokenForContainer("timelapses");
     }
 
 

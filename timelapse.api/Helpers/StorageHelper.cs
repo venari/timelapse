@@ -81,19 +81,25 @@ namespace timelapse.api.Helpers
             }
         }
 
-        public Uri GenerateSasUri(){
+        public Uri GenerateSasUri(string containerName = null){
             try{
-
+                var targetContainerName = containerName ?? azureBlobContainerName;
+                var cacheKey = $"SasUri_{targetContainerName}";
+                
                 Uri sasUri;
-                if(!_memoryCache.TryGetValue("SasUri", out sasUri)){
-                    sasUri = blobContainerClient.GenerateSasUri(Azure.Storage.Sas.BlobContainerSasPermissions.Read, DateTimeOffset.UtcNow.AddHours(48));
-                    _memoryCache.Set("SasUri", sasUri, TimeSpan.FromHours(48));
+                if(!_memoryCache.TryGetValue(cacheKey, out sasUri)){
+                    var containerClient = string.IsNullOrEmpty(containerName) 
+                        ? blobContainerClient 
+                        : new Azure.Storage.Blobs.BlobContainerClient(azureStorageConnectionString, targetContainerName);
+                    
+                    sasUri = containerClient.GenerateSasUri(Azure.Storage.Sas.BlobContainerSasPermissions.Read, DateTimeOffset.UtcNow.AddHours(48));
+                    _memoryCache.Set(cacheKey, sasUri, TimeSpan.FromHours(48));
                 } 
 
                 return sasUri;
             }
             catch(Exception ex){
-                _logger.LogError($"Error trying to GenerateSasUri");
+                _logger.LogError($"Error trying to GenerateSasUri for container {containerName}");
                 _logger.LogError(ex.ToString());
                 throw;
             }
@@ -103,6 +109,10 @@ namespace timelapse.api.Helpers
             get{
                 return GenerateSasUri().Query;
             }
+        }
+        
+        public string GetSasTokenForContainer(string containerName){
+            return GenerateSasUri(containerName).Query;
         }
     }
 }

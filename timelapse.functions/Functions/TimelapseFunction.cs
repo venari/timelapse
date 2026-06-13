@@ -219,6 +219,12 @@ public class TimelapseFunction
         // Get images based on request type
         var images = await GetImagesForRequest(request);
         var deviceInfo = await GetDeviceInfo(request);
+        if(request.EventId.HasValue){
+          var eventData = await _eventService.GetEventAsync(request.EventId.Value);
+          request.Description = eventData.Description;
+          request.StartTime = eventData.StartTime;
+          request.EndTime = eventData.EndTime;
+        }
 
         if (!images.Any())
         {
@@ -299,6 +305,8 @@ public class TimelapseFunction
 //                image.Id, image.BlobUri.AbsolutePath, localPath);
             var blobFilename = Path.GetFileName(image.BlobUri.AbsolutePath);
             var localPath = Path.Combine(tempDir, blobFilename);
+            _logger.LogInformation("Downloading image {ImageId} from blob {BlobUri} to {LocalPath}", 
+                image.Id, image.BlobUri, localPath);
             await _blobService.DownloadFileAsync(blobFilename, localPath);
             imagePaths.Add(localPath);
         }

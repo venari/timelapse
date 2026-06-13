@@ -122,10 +122,14 @@
         {
             <div class="alert alert-success">
                 <strong>Timelapse Available:</strong>
-                <a href="@Model.Event.TimelapseUrl" target="_blank" class="btn btn-sm btn-primary ms-2">
-                    <i class="fas fa-play"></i> View Timelapse
+                <a href="@(Model.Event.TimelapseUrl)@(Model.TimelapseSasToken)" target="_blank" class="btn btn-sm btn-primary ms-2">
+                    <i class="fas fa-external-link-alt"></i> Open in New Tab
                 </a>
-                <small class="text-muted d-block">Created: @Model.Event.TimelapseCreatedDate?.ToString("yyyy-MM-dd HH:mm")</small>
+                <small class="text-muted d-block mb-2">Created: @Model.Event.TimelapseCreatedDate?.ToString("yyyy-MM-dd HH:mm")</small>
+                <video controls class="w-100 mt-2" style="max-width: 800px;">
+                    <source src="@(Model.Event.TimelapseUrl)@(Model.TimelapseSasToken)" type="video/mp4">
+                    Your browser does not support the video tag.
+                </video>
             </div>
         }
         else if (Model.Event.TimelapseStatus == "Processing")

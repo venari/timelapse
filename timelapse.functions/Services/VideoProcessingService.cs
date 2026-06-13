@@ -44,7 +44,7 @@ public class VideoProcessingService
             // Cleanup on error
             if (Directory.Exists(tempDirectory))
             {
-                Directory.Delete(tempDirectory, true);
+//                Directory.Delete(tempDirectory, true);
             }
             throw;
         }
@@ -97,17 +97,34 @@ public class VideoProcessingService
     {
         var textLines = new List<string>();
         
-        textLines.Add($"Camera: {device.Name}");
-        textLines.Add($"Location: {device.Description}");
+        // Escape special characters for ffmpeg drawtext filter
+        // According to ffmpeg docs, these characters need escaping: ' \ : [ ]
+        string EscapeText(string input)
+        {
+            if (string.IsNullOrEmpty(input))
+                return string.Empty;
+                
+            return input
+                .Replace("\\", "\\\\")  // Backslash must be escaped first
+                .Replace("'", "\\'")    // Single quote
+                .Replace(":", "\\:")    // Colon
+                .Replace("[", "\\[")    // Opening bracket
+                .Replace("]", "\\]");   // Closing bracket
+        }
+        
+        textLines.Add($"Camera\\: {EscapeText(device.Name)}");
+        textLines.Add($"Location\\: {EscapeText(device.Description)}");
         
         if (!string.IsNullOrEmpty(description))
         {
-            textLines.Add($"Event: {description}");
+            textLines.Add($"Event\\: {EscapeText(description)}");
         }
         
-        textLines.Add($"Period: {startTime:yyyy-MM-dd} to {endTime:yyyy-MM-dd}");
+        textLines.Add($"Period\\: {startTime:yyyy-MM-dd} to {endTime:yyyy-MM-dd}");
         
         var text = string.Join("\\n", textLines);
+        
+        _logger.LogInformation("FFmpeg drawtext filter text: {Text}", text);
         
         //return $"drawtext=fontfile='/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf':" +
         return $"drawtext=fontfile='/usr/share/fonts/Adwaita/AdwaitaMono-Regular.ttf':" +
@@ -118,6 +135,8 @@ public class VideoProcessingService
 
     private async Task ExecuteFFmpegAsync(string arguments)
     {
+        _logger.LogInformation("Executing FFmpeg with arguments: {Arguments}", arguments);
+        
         var processInfo = new ProcessStartInfo
         {
             FileName = "ffmpeg",
@@ -143,7 +162,7 @@ public class VideoProcessingService
         if (process.ExitCode != 0)
         {
             var error = errorBuilder.ToString();
-            _logger.LogError("FFmpeg failed: {Error}", error);
+            _logger.LogError("FFmpeg failed with exit code {ExitCode}: {Error}", process.ExitCode, error);
             throw new Exception($"FFmpeg processing failed: {error}");
         }
         
