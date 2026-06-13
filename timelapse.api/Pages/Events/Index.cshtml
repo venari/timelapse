@@ -46,6 +46,7 @@
                 <th scope="col"></th>
                 <th scope="col">End</th>
                 <th scope="col"></th>
+                <th scope="col"></th>
                 <th scope="col">Created By</th>
             </tr>
         </thead>
@@ -89,6 +90,9 @@
                         </td>
                         <td>
                             <a href="/Events/Detail/@(deviceEvent.Id)"><img class="img-fluid" src="@(deviceEvent.EndImage.BlobUri + Model.SasToken)"></img></a>
+                        </td>
+                        <td>
+                            @((deviceEvent.EndTime - deviceEvent.StartTime).Humanize(2))
                         </td>
                         @{
                             var user = Model.Users.FirstOrDefault(u => u.Id == deviceEvent.CreatedByUserId);
