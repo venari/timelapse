@@ -53,7 +53,7 @@ public class Event
     public Image EndImage {get; set;}
 
     // Timelapse support
-    public string TimelapseUrl {get; set;}
+    public string? TimelapseUrl {get; set;}
     public DateTime? TimelapseCreatedDate {get; set;}
-    public string TimelapseStatus {get; set;} // "Pending", "Processing", "Completed", "Failed"
+    public string? TimelapseStatus {get; set;} // "Pending", "Processing", "Completed", "Failed"
 }
