@@ -6,6 +6,9 @@
                 "isEnabled": true,
                 "excludedTypes": "Request"
             }
+        },
+        "logLevel": {
+            "Function": "Information"
         }
     },
     "functionTimeout": "00:10:00",

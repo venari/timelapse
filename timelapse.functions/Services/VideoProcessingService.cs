@@ -98,6 +98,7 @@ public class VideoProcessingService
         var textLines = new List<string>();
         
         textLines.Add($"Camera: {device.Name}");
+        textLines.Add($"Location: {device.Description}");
         
         if (!string.IsNullOrEmpty(description))
         {
@@ -108,7 +109,8 @@ public class VideoProcessingService
         
         var text = string.Join("\\n", textLines);
         
-        return $"drawtext=fontfile='/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf':" +
+        //return $"drawtext=fontfile='/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf':" +
+        return $"drawtext=fontfile='/usr/share/fonts/Adwaita/AdwaitaMono-Regular.ttf':" +
                $"text='{text}':" +
                $"fontcolor=white:fontsize=20:box=1:boxcolor=black@0.7:boxborderw=5:" +
                $"x=10:y=10:line_spacing=5";

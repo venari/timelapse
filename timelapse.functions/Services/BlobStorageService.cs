@@ -13,9 +13,13 @@ public class BlobStorageService : IBlobStorageService
     public BlobStorageService(IConfiguration configuration, ILogger<BlobStorageService> logger)
     {
         var connectionString = configuration["STORAGE_CONNECTION_STRING"];
+        logger.LogInformation("Initializing BlobStorageService with connection string: {ConnectionString}", connectionString);
+
         _blobServiceClient = new BlobServiceClient(connectionString);
-        _containerName = configuration["BlobStorage:ContainerName"] ?? "images";
+        _containerName = configuration["STORAGE_CONTAINER_NAME"] ?? "timelapse";
+
         _logger = logger;
+        _logger.LogInformation($"Initializing StorageHelper with connection string: {connectionString} and container name: {_containerName}");
     }
 
     public async Task DownloadFileAsync(string blobPath, string localPath)

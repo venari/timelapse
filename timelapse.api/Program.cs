@@ -53,6 +53,8 @@ builder.Services.AddControllers()
     .AddJsonOptions(options =>{
     options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
     options.JsonSerializerOptions.ReferenceHandler = ReferenceHandler.IgnoreCycles;
+    options.JsonSerializerOptions.PropertyNameCaseInsensitive = true; // Allow case-insensitive deserialization
+    options.JsonSerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase; // Use camelCase for serialization
 });
 
 // builder.Services.AddEnvironmentVariables();
