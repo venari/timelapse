@@ -7,7 +7,7 @@ Type=idle
 User=pi
 #ExecStartPost=/bin/sleep 150
 Environment=LIBCAMERA_LOG_LEVELS=WARN
-ExecStart=/usr/bin/python3 /home/pi/dev/timelapse/scripts/savePhotos.py
+ExecStart=/usr/bin/python3 %h/dev/timelapse/scripts/savePhotos.py
 Restart=always
 RestartSec=60
 #TimeoutStartSec=210
