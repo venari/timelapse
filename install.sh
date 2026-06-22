@@ -114,6 +114,9 @@ else
     sed -i 's/"modem.type": "thumb"/"modem.type": "SIM7600X"/g' $HOME/dev/timelapse/scripts/config.json
 fi
 
+# Update logFilePath to use current user's home directory
+sed -i "s|/home/pi/logs|$HOME/logs|g" $HOME/dev/timelapse/scripts/config.json
+
 echo Checking RTC module is enabled in config.txt
 if [ -e /boot/firmware/config.txt ] ; then
   FIRMWARE=/firmware
