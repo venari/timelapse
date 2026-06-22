@@ -31,6 +31,7 @@ public class Telemetry
             status = status.Replace("'", "\"");
             status = status.Replace(": False", ": \"False\"");
             status = status.Replace(": True", ": \"True\"");
+            status = status.Replace(": None", ": null");
             return status;
         }
         return null;
@@ -97,10 +98,80 @@ public class Telemetry
         }
     }
 
-
-    public string? Status_Battery {
+    public bool? PowerSwitch {
         get{
             if(Status!=null){
+                dynamic status = System.Text.Json.JsonSerializer.Deserialize<dynamic>(FixUpInvalidPiJuiceJSONStatus);
+                
+                if (!status.TryGetProperty("powerSwitch", out System.Text.Json.JsonElement powerSwitch))
+                {
+                    return null;
+                }
+
+                if (!powerSwitch.TryGetProperty("data", out System.Text.Json.JsonElement powerSwitchData))
+                {
+                    return null;
+                }
+
+                return powerSwitchData.GetInt32() > 0?true:null;
+            }
+
+            return null;
+        }
+    }
+
+    public bool? ConnectedToWirelessNetwork {
+        get{
+            if(Status!=null){
+                dynamic status = System.Text.Json.JsonSerializer.Deserialize<dynamic>(FixUpInvalidPiJuiceJSONStatus);
+                if (!status.TryGetProperty("connectedToWirelessNetwork", out System.Text.Json.JsonElement connectedToWireless))
+                {
+                    return null;
+                }
+
+                return connectedToWireless.GetString()=="True"?true:null;
+            }
+
+            return null;
+        }
+    }
+
+    public string? WirelessSSID {
+        get{
+            if(Status!=null){
+                dynamic status = System.Text.Json.JsonSerializer.Deserialize<dynamic>(FixUpInvalidPiJuiceJSONStatus);
+                if (!status.TryGetProperty("wirelessSSID", out System.Text.Json.JsonElement wirelessSSID))
+                {
+                    return null;
+                }
+                return wirelessSSID.GetString();
+            }
+
+            return null;
+        }
+    }
+
+    public bool? ConnectedToInternet {
+        get{
+            if(Status!=null){
+                dynamic status = System.Text.Json.JsonSerializer.Deserialize<dynamic>(FixUpInvalidPiJuiceJSONStatus);
+                if (!status.TryGetProperty("connectedToInternet", out System.Text.Json.JsonElement connectedToInternet))
+                {
+                    return null;
+                }
+                return connectedToInternet.GetString() == "True"?true:null;
+            }
+
+            return null;
+        }
+    }
+
+    public string? Status_Battery
+    {
+        get
+        {
+            if (Status != null)
+            {
                 dynamic status = PiJuiceJSONStatus;
                 return status.GetProperty("battery").ToString()
                     .Replace("CHARGING_FROM_IN", "Charging")

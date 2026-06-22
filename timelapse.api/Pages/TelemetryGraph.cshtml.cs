@@ -10,6 +10,17 @@ using NuGet.Protocol.Core.Types;
 
 namespace timelapse.api.Pages;
 
+
+public class TelemetryWirelessSummary
+{
+    public DateTime TimestampStart { get; set; }
+    public DateTime? TimestampEnd { get; set; }
+    public bool? PowerSwitch { get; set; }
+    public bool? ConnectedToWirelessNetwork { get; set; }
+    public string? WirelessNetworkName { get; set; }
+    public bool? ConnectedToInternet { get; set; }
+}
+
 [Authorize]
 public class TelemetryGraphModel : PageModel
 {
@@ -33,13 +44,15 @@ public class TelemetryGraphModel : PageModel
     //         return _numberOfHoursToDisplay;
     //     }
     // }
+    
+    public List<TelemetryWirelessSummary> WirelessSummary { get; set; } = new List<TelemetryWirelessSummary>();
 
     public TelemetryGraphModel(ILogger<TelemetryGraphModel> logger, AppDbContext appDbContext, IConfiguration configuration, IMemoryCache memoryCache)
     {
         _logger = logger;
         _appDbContext = appDbContext;
         // NumberOfHoursToDisplay = 24;
-        
+
         StartDate = DateTime.Now.AddHours(-24).ToUniversalTime();
         EndDate = DateTime.Now.ToUniversalTime();
 
@@ -152,6 +165,52 @@ public class TelemetryGraphModel : PageModel
         
 
         _logger.LogInformation($"Retrieved latest telemetry data. {stopwatch.ElapsedMilliseconds}ms");
+
+
+        // Populate Wireless Summary, storing start and end timestamps, whether connected to wireless network, the name of the wireless network, and whether connected to internet.
+        var telemetryData = _appDbContext.Telemetry
+            .Where(t => t.DeviceId == id && t.Timestamp >= StartDate && t.Timestamp <= EndDate)
+            .OrderBy(t => t.Timestamp)
+            .ToList();
+
+        WirelessSummary.Clear();
+
+        TelemetryWirelessSummary? currentSummary = null;
+
+        foreach (var t in telemetryData)
+        {
+            bool isChange =
+            currentSummary == null ||
+            currentSummary.PowerSwitch != t.PowerSwitch ||
+            currentSummary.ConnectedToWirelessNetwork != t.ConnectedToWirelessNetwork ||
+            currentSummary.WirelessNetworkName != t.WirelessSSID ||
+            currentSummary.ConnectedToInternet != t.ConnectedToInternet;
+
+            if (isChange)
+            {
+                if (currentSummary != null)
+                {
+                    currentSummary.TimestampEnd = t.Timestamp;
+                    WirelessSummary.Add(currentSummary);
+                }
+
+                currentSummary = new TelemetryWirelessSummary
+                {
+                    TimestampStart = t.Timestamp,
+                    PowerSwitch = t.PowerSwitch,
+                    ConnectedToWirelessNetwork = t.ConnectedToWirelessNetwork,
+                    WirelessNetworkName = t.WirelessSSID,
+                    ConnectedToInternet = t.ConnectedToInternet
+                };
+            }
+        }
+
+        // Add the last summary if present
+        if (currentSummary != null)
+        {
+            currentSummary.TimestampEnd = telemetryData.LastOrDefault()?.Timestamp;
+            WirelessSummary.Add(currentSummary);
+        }
 
         return Page();
 

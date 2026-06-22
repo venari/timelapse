@@ -1,6 +1,6 @@
 import subprocess
 import json
-import pijuice
+# import pijuice
 import os
 import time
 import shutil
@@ -8,28 +8,21 @@ import datetime
 import sys
 import requests
 import logging
-# from logging.handlers import TimedRotatingFileHandler
-from logging.handlers import SocketHandler
 import glob
 import pathlib
 import socket
 
-from helpers import flashLED, internet
+from helpers import internet
 
-from SIM7600X import powerUpSIM7600X, powerDownSIM7600X, turnOnNDIS
+from SIM7600X import powerUpSIM7600X, powerDownSIM7600X, turnOnNDIS, forceTo4GConnection
 
 config = json.load(open(pathlib.Path(__file__).parent / 'config.json'))
 logFilePath = config["logFilePath"]
 intentLogFilePath = logFilePath.replace("timelapse.log", "intent.log")
-# logFilePath = logFilePath.replace(".log", ".uploadTelemetry.log")
 os.makedirs(os.path.dirname(logFilePath), exist_ok=True)
-# os.chmod(os.path.dirname(logFilePath), 0o777) # Make sure pijuice user scrip can write to log file.
 
 formatter = logging.Formatter('%(asctime)s %(name)s %(levelname)s %(message)s')
-# handler = TimedRotatingFileHandler(logFilePath, 
-#                                    when='midnight',
-#                                    backupCount=10)
-handler  = SocketHandler('localhost', 8000)
+handler = logging.StreamHandler(sys.stderr)
 handler.setFormatter(formatter)
 logger = logging.getLogger("uploadPending")
 logger.addHandler(handler)
@@ -78,9 +71,9 @@ def getSerialNumber():
 
 serialNumber = getSerialNumber()
 
-time.sleep(10)
-pj = pijuice.PiJuice(1, 0x14)
-logger.info("Starting up uploadPending.py 2...")
+# time.sleep(10)
+# pj = pijuice.PiJuice(1, 0x14)
+# logger.info("Starting up uploadPending.py 2...")
 
 
 def uploadPendingPhotos():
@@ -132,12 +125,12 @@ def uploadPendingPhotos():
 
             logger.debug(f'Response code: {response.status_code}')
             if response.status_code == 200:
-                flashLED(pj, 'D2', 0, 0, 255, 1, .5)
+                # flashLED(pj, 'D2', 0, 0, 255, 1, .5)
                 logger.debug(f'Image uploaded successfully')
                 shutil.move(IMAGEFILENAME, uploadedImageFolder + pathlib.Path(IMAGEFILENAME).name)
 
             else:
-                flashLED(pj, 'D2', 255, 0, 0, 1, 1)
+                # flashLED(pj, 'D2', 255, 0, 0, 1, 1)
                 logger.error(f'Image upload failed')
 
             logger.debug(f'Response text:')
@@ -229,6 +222,8 @@ def connectToInternet(retries = 3):
             logger.warning('Could not establish network connection after 2 minutes.')
 
             if(config['modem.type']=="SIM7600X"):
+                logger.info('forcing 4G Connection...')
+                forceTo4GConnection()
                 logger.info('Attempting to turn on NDIS...')
                 turnOnNDIS()
 
@@ -245,49 +240,51 @@ def connectToInternet(retries = 3):
         logger.error(e)
 
 def disconnectFromInternet():
-    try:
-        logger.info('Disconnecting from internet...')
-        # loggerIntent.info('Disconnecting from internet...')
-        if(config['modem.type']=="thumb"):
-            logger.info('Current System Power Switch:')
-            logger.info(pj.power.GetSystemPowerSwitch())
-            logger.info('Setting System Power Switch to Off:')
-            pj.power.SetSystemPowerSwitch(0)
-        else:
-            powerDownSIM7600X()
-    except Exception as e:
-        logger.error(str(datetime.datetime.now()) + " disconnectFromInternet() failed.")
-        logger.error(e)
+    logger.info('Not really disconnecting from internet...')
+    # try:
+    #     logger.info('Disconnecting from internet...')
+    #     # loggerIntent.info('Disconnecting from internet...')
+    #     if(config['modem.type']=="thumb"):
+    #         logger.info('Current System Power Switch:')
+    #         logger.info(pj.power.GetSystemPowerSwitch())
+    #         logger.info('Setting System Power Switch to Off:')
+    #         pj.power.SetSystemPowerSwitch(0)
+    #     else:
+    #         powerDownSIM7600X()
+    # except Exception as e:
+    #     logger.error(str(datetime.datetime.now()) + " disconnectFromInternet() failed.")
+    #     logger.error(e)
         
 def turnOnSystemPowerSwitch():
-    try:
-        sysVoltage = pj.status.GetBatteryVoltage()['data']
-        # if sysVoltage < 3.2:  # 3.2V is the minimum voltage for the XL6009
-        #     logger.info('Battery voltage too low for XL6009 - not powering up modem.')
-        #     return
-        if sysVoltage < 3.2:  # 3.0V is a bit on the low side
-            logger.info('Battery voltage too low - not powering up modem.')
-            return
-        logger.info('System Voltage looks good at ' + str(sysVoltage) + 'mV')
+    logger.info('Not really turning on system power switch...')
+#     try:
+#         sysVoltage = pj.status.GetBatteryVoltage()['data']
+#         # if sysVoltage < 3.2:  # 3.2V is the minimum voltage for the XL6009
+#         #     logger.info('Battery voltage too low for XL6009 - not powering up modem.')
+#         #     return
+#         if sysVoltage < 3.2:  # 3.0V is a bit on the low side
+#             logger.info('Battery voltage too low - not powering up modem.')
+#             return
+#         logger.info('System Voltage looks good at ' + str(sysVoltage) + 'mV')
 
-        modemPower = config['modem.power']
-        if modemPower <= 0:
-            logger.info('Modem power is disabled in config.')
-            return
+#         modemPower = config['modem.power']
+#         if modemPower <= 0:
+#             logger.info('Modem power is disabled in config.')
+#             return
         
-        logger.info('Current System Power Switch:')
-        logger.info(pj.power.GetSystemPowerSwitch())
-        logger.info('Setting System Power Switch to ' + str(modemPower) + ':')
-        pj.power.SetSystemPowerSwitch(modemPower)
+#         logger.info('Current System Power Switch:')
+#         logger.info(pj.power.GetSystemPowerSwitch())
+#         logger.info('Setting System Power Switch to ' + str(modemPower) + ':')
+#         pj.power.SetSystemPowerSwitch(modemPower)
 
-        # logger.info('Waiting 50s for modem to warm up...')
-        # time.sleep(50)
+#         # logger.info('Waiting 50s for modem to warm up...')
+#         # time.sleep(50)
 
 
     
-    except Exception as e:
-        logger.error(str(datetime.datetime.now()) + " turnOnSystemPowerSwitch() failed.")
-        logger.error(e)
+#     except Exception as e:
+#         logger.error(str(datetime.datetime.now()) + " turnOnSystemPowerSwitch() failed.")
+#         logger.error(e)
 
 def uploadPendingTelemetry():
 
@@ -333,12 +330,12 @@ def uploadPendingTelemetry():
             #requests.post(config['apiUrl'] + '/Telemetry', json=api_data)
 
             if response.status_code == 200:
-                flashLED(pj, 'D2', 0, 0, 255, 1, .1)
+                # flashLED(pj, 'D2', 0, 0, 255, 1, .1)
                 logger.debug(f'Telemetry uploaded successfully')
                 shutil.move(telemetryFilename, uploadedTelemetryFolder + pathlib.Path(telemetryFilename).name)
                 logger.debug('Logged to API.')
             else:
-                flashLED(pj, 'D2', 255, 0, 0, 1, 1)
+                # flashLED(pj, 'D2', 255, 0, 0, 1, 1)
                 logger.error(f'Telemetry upload failed')
 
             try:
@@ -370,16 +367,16 @@ def uploadPendingTelemetry():
                     json.dump(config, open(pathlib.Path(__file__).parent / 'config.json', 'w'), indent=4)
 
             except json.decoder.JSONDecodeError:
-                flashLED(pj, 'D2', 255, 0, 255, 1, 1)
+                # flashLED(pj, 'D2', 255, 0, 255, 1, 1)
                 logger.debug(response.text)
 
 
     except requests.exceptions.ConnectionError as e:
-        flashLED(pj, 'D2', 255, 0, 255, 1, 1)
+        # flashLED(pj, 'D2', 255, 0, 255, 1, 1)
         logger.error(str(datetime.datetime.now()) + " uploadPendingTelemetry() failed - connection error. Leave in place.")
         logger.error(e)
     except Exception as e:
-        flashLED(pj, 'D2', 255, 0, 255, 1, 1)
+        # flashLED(pj, 'D2', 255, 0, 255, 1, 1)
         logger.error(str(datetime.datetime.now()) + " uploadPendingTelemetry() failed.")
         logger.error(e)
         if lastAttemptedFilename!="":          

@@ -152,6 +152,9 @@
         chart.config.data.datasets[9].data = data.map(d => ({x: new Date(d.timestamp), y: d.charging}));        
         chart.config.data.datasets[10].data = data.map(d => ({x: new Date(d.timestamp), y: d.batteryPercentPerHour}));
         chart.config.data.datasets[11].data = data.map(d => ({x: new Date(d.timestamp), y: d.uptimeSeconds/60}));
+        chart.config.data.datasets[12].data = data.map(d => ({x: new Date(d.timestamp), y: d.connectedToWirelessNetwork ? 4 : null}));
+        chart.config.data.datasets[13].data = data.map(d => ({x: new Date(d.timestamp), y: d.connectedToInternet ? 5 : null}));
+        chart.config.data.datasets[14].data = data.map(d => ({x: new Date(d.timestamp), y: d.powerSwitch ? 3 : null}));
         chart.update();
     }
 
@@ -347,6 +350,24 @@
                                 borderColor: 'rgb(00, 00, 00)',
                                 hidden: true,
                                 yAxisID: 'y',
+                            }, {
+                                label: "Connected to Wireless Network",
+                                backgroundColor: 'rgb(00, 165, 20)',
+                                borderColor: 'rgb(00, 165, 20)',
+                                hidden: true,
+                                yAxisID: 'y',
+                            }, {
+                                label: "Connected to Internet",
+                                backgroundColor: 'rgb(00, 165, 20)',
+                                borderColor: 'rgb(00, 165, 20)',
+                                hidden: true,
+                                yAxisID: 'y',
+                            }, {
+                                label: "Power Switch",
+                                backgroundColor: 'rgb(165, 20, 20)',
+                                borderColor: 'rgb(165, 20, 20)',
+                                hidden: true,
+                                yAxisID: 'y',
                             }]
                         };
 
@@ -366,4 +387,42 @@
             </tr>
         </tbody>
     </table>
+
+    @if (Model.WirelessSummary != null)
+    {
+        <div class="mt-3">
+            <h5>Connection Summary</h5>
+            <table class="table table-bordered" style="border-radius: 6px; overflow: hidden;">
+                <thead>
+                    <tr>
+                        <th style="padding: 8px;">From</th>
+                        <th style="padding: 8px;">To</th>
+                        <th style="padding: 8px;">Power Switch</th>
+                        <th style="padding: 8px;">Connected to Wireless</th>
+                        <th style="padding: 8px;">SSID</th>
+                        <th style="padding: 8px;">Connected to Internet</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var summary in Model.WirelessSummary)
+                    {
+                        <tr>
+                            <td style="padding: 8px;"><script type="text/javascript">localizeDateTime('@(summary.TimestampStart.ToUniversalTime().ToString("s"))');</script></td>
+                            <td style="padding: 8px;"><script type="text/javascript">localizeDateTime('@(summary.TimestampEnd.HasValue ? summary.TimestampEnd.Value.ToUniversalTime().ToString("s") : "---")');</script></td>
+                            <td style="padding: 8px;">@summary.PowerSwitch</td>
+                            <td style="padding: 8px;">@summary.ConnectedToWirelessNetwork</td>
+                            <td style="padding: 8px;">@summary.WirelessNetworkName</td>
+                            <td style="padding: 8px;">@summary.ConnectedToInternet</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+    else
+    {
+        <div class="alert alert-warning mt-3">
+            No telemetry data available for connection summary.
+        </div>
+    }
 </div>

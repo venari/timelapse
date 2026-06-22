@@ -9,22 +9,15 @@ import datetime
 import sys
 import requests
 import logging
-# from logging.handlers import TimedRotatingFileHandler
-from logging.handlers import SocketHandler
 import pathlib
 
 # from helpers import flashLED
 from helpers import currentPhase
 
 config = json.load(open(pathlib.Path(__file__).parent / 'config.json'))
-logFilePath = config["logFilePath"]
-# logFilePath = logFilePath.replace(".log", ".savePhotos.log")
-os.makedirs(os.path.dirname(logFilePath), exist_ok=True)
-# os.chmod(os.path.dirname(logFilePath), 0o777) # Make sure pijuice user scrip can write to log file.
 
 formatter = logging.Formatter('%(asctime)s %(name)s %(levelname)s %(message)s')
-# handler = TimedRotatingFileHandler(logFilePath, when='midnight', backupCount=10)
-handler = SocketHandler('localhost', 8000)
+handler = logging.StreamHandler(sys.stderr)
 handler.setFormatter(formatter)
 logger = logging.getLogger("savePhotos")
 logger.addHandler(handler)
@@ -50,7 +43,7 @@ def reloadConfig():
         # Update the primary config with overrides from the local config
         config.update(local_config)
     except FileNotFoundError:
-        logger.error("config.local.json not found. Using default config.")
+        logger.debug("config.local.json not found. Using default config.")
 
 reloadConfig()
 
@@ -103,13 +96,13 @@ def savePhotos():
                 # # Use sensor mode 2 to give greater max exposure time.
                 # camera_config = camera.create_still_configuration(raw = picam2.sensor_modes[2])
 
-                logger.info(config)
-                logger.info(config['camera.vflip'])
-                logger.info(config['camera.hflip'])
+                # logger.info(config)
+                # logger.info(config['camera.vflip'])
+                # logger.info(config['camera.hflip'])
 
                 camera_config["transform"] = Transform(vflip = config['camera.vflip'], hflip = config['camera.hflip'])
                 camera_config["size"] = (config['camera.resolution.width'], config['camera.resolution.height'])
-                logger.debug(camera_config["size"])
+                # logger.debug(camera_config["size"])
 
                 focus_m = config['camera.focus_m']
 

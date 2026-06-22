@@ -33,13 +33,6 @@ def internet(host="8.8.8.8", port=53, timeout=3):
 
 
 
-def flashLED(pj, led='D2', R=0, G=0, B=255, flashCount=3, flashDelay=0.5):
-    for i in range(0, flashCount):
-        pj.status.SetLedState(led, [R, G, B])
-        time.sleep(flashDelay)
-        pj.status.SetLedState(led, [0, 0, 0])
-        time.sleep(flashDelay)
-
 def currentPhase(now):
     if(config["location.lon"] and config["location.lat"]):
 
