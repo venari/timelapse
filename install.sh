@@ -67,27 +67,27 @@ if [ $waveshare == "y" ]; then
     sudo raspi-config nonint do_serial 2        # Disable serial login shell and enable serial port hardware
 
     # Check if folder SIM7600X-4G-HAT-Demo exists:
-    if [ ! -d "/home/pi/SIM7600X-4G-HAT-Demo" ]; then
+    if [ ! -d "$HOME/SIM7600X-4G-HAT-Demo" ]; then
         #https://core-electronics.com.au/guides/raspberry-pi/raspberry-pi-4g-gps-hat/
         wget https://www.waveshare.com/w/upload/2/29/SIM7600X-4G-HAT-Demo.7z
         sudo apt-get install p7zip-full
-        7z x SIM7600X-4G-HAT-Demo.7z -r -o/home/pi
-        sudo chmod 777 -R /home/pi/SIM7600X-4G-HAT-Demo
+        7z x SIM7600X-4G-HAT-Demo.7z -r -o$HOME
+        sudo chmod 777 -R $HOME/SIM7600X-4G-HAT-Demo
 
 
-        cd /home/pi/SIM7600X-4G-HAT-Demo/Raspberry/c/bcm2835
+        cd $HOME/SIM7600X-4G-HAT-Demo/Raspberry/c/bcm2835
         chmod +x configure && ./configure && sudo make && sudo make install
     fi
 
 
-    # sed -e '$i \sh /home/pi/SIM7600X-4G-HAT-Demo/Raspberry/c/sim7600_4G_hat_init\n' /etc/rc.local
-    grep -qxF 'sh /home/pi/SIM7600X-4G-HAT-Demo/Raspberry/c/sim7600_4G_hat_init' /etc/rc.local || sudo sed -i -e '$i \sh /home/pi/SIM7600X-4G-HAT-Demo/Raspberry/c/sim7600_4G_hat_init\n' /etc/rc.local
+    # sed -e '$i \sh $HOME/SIM7600X-4G-HAT-Demo/Raspberry/c/sim7600_4G_hat_init\n' /etc/rc.local
+    grep -qxF "sh $HOME/SIM7600X-4G-HAT-Demo/Raspberry/c/sim7600_4G_hat_init" /etc/rc.local || sudo sed -i -e "\$i \sh $HOME/SIM7600X-4G-HAT-Demo/Raspberry/c/sim7600_4G_hat_init\n" /etc/rc.local
     ###################
 fi
 
-cd /home/pi
+cd $HOME
 # Check if dev folder exists
-if [ ! -d "/home/pi/dev/timelapse" ]; then
+if [ ! -d "$HOME/dev/timelapse" ]; then
     echo Cloning repo...
     mkdir -p dev
     cd dev
@@ -109,9 +109,9 @@ fi
 
 # If using thumbdrive, not waveshare modem, update 'modem.type' in dev/timelapse/scripts/config.json to 'thumb'
 if [ $waveshare == "n" ]; then
-    sed -i 's/"modem.type": "SIM7600X"/"modem.type": "thumb"/g' /home/pi/dev/timelapse/scripts/config.json
+    sed -i 's/"modem.type": "SIM7600X"/"modem.type": "thumb"/g' $HOME/dev/timelapse/scripts/config.json
 else
-    sed -i 's/"modem.type": "thumb"/"modem.type": "SIM7600X"/g' /home/pi/dev/timelapse/scripts/config.json
+    sed -i 's/"modem.type": "thumb"/"modem.type": "SIM7600X"/g' $HOME/dev/timelapse/scripts/config.json
 fi
 
 echo Checking RTC module is enabled in config.txt
@@ -133,7 +133,7 @@ grep -qxF 'static domain_name_servers=8.8.4.4 8.8.8.8' /etc/dhcpcd.conf || echo 
 crontab -r
 
 echo Installing systemd services...
-sudo cp /home/pi/dev/timelapse/systemd/system/*.* /etc/systemd/system/
+sudo cp $HOME/dev/timelapse/systemd/system/*.* /etc/systemd/system/
 sudo chmod u+x /etc/systemd/system/enviro*.*
 sudo systemctl enable envirocam-logging.service
 sudo systemctl enable envirocam-telemetry.service
@@ -152,14 +152,14 @@ sudo systemctl start envirocam-detect-hang.timer
 
 # If not bookworm - don't have epaper library yet
 if ! grep -q "bookworm" /etc/os-release; then
-    sudo cp /home/pi/dev/timelapse/systemd/system/envirocam-status.timer /etc/systemd/system/
+    sudo cp $HOME/dev/timelapse/systemd/system/envirocam-status.timer /etc/systemd/system/
     sudo systemctl enable envirocam-status.timer
     sudo systemctl start envirocam-status.timer
 fi
 
 # If not waveshare, we can't access SMS messages
 if [ $waveshare == "y" ]; then
-    sudo cp /home/pi/dev/timelapse/systemd/system/envirocam-sms.timer /etc/systemd/system/
+    sudo cp $HOME/dev/timelapse/systemd/system/envirocam-sms.timer /etc/systemd/system/
     sudo systemctl enable envirocam-sms.timer
 fi
 
