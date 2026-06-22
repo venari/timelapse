@@ -47,9 +47,9 @@ def reloadConfig():
 
 reloadConfig()
 
-# clock
-while not os.path.exists('/dev/i2c-1'):
-    time.sleep(0.1)
+## clock
+#while not os.path.exists('/dev/i2c-1'):
+#    time.sleep(0.1)
 
 outputImageFolder = str(pathlib.Path(__file__).parent / '../output/images/')
 workingImageFolder = os.path.join(outputImageFolder , 'working/')

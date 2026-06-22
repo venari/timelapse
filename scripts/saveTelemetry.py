@@ -38,10 +38,10 @@ loggerIntent.setLevel(logging.DEBUG)
 logger.info("Starting up saveTelemetry.py...")
 loggerIntent.info("Starting up saveTelemetry.py...")
 
-# clock
-while not os.path.exists('/dev/i2c-1'):
-    logger.info("dev i2c-1 doesn't exist")
-    time.sleep(0.1)
+## clock
+#while not os.path.exists('/dev/i2c-1'):
+#    logger.info("dev i2c-1 doesn't exist")
+#    time.sleep(0.1)
 
 outputImageFolder = str(pathlib.Path(__file__).parent / '../output/images/')
 workingImageFolder = os.path.join(outputImageFolder , 'working/')
