@@ -44,10 +44,18 @@ def currentPhase(now):
 
         # Convert solar times to the specified timezone
         for key in solar_times:
-            solar_times[key] = solar_times[key].astimezone(timezone)
+            # Localize timezone-naive timestamps to UTC first, then convert
+            if solar_times[key].tzinfo is None:
+                solar_times[key] = solar_times[key].tz_localize('UTC').astimezone(timezone)
+            else:
+                solar_times[key] = solar_times[key].astimezone(timezone)
 
         for key in solar_times_tomorrow:
-            solar_times_tomorrow[key] = solar_times_tomorrow[key].astimezone(timezone)
+            # Localize timezone-naive timestamps to UTC first, then convert
+            if solar_times_tomorrow[key].tzinfo is None:
+                solar_times_tomorrow[key] = solar_times_tomorrow[key].tz_localize('UTC').astimezone(timezone)
+            else:
+                solar_times_tomorrow[key] = solar_times_tomorrow[key].astimezone(timezone)
 
         # print (f"\nsolar_times: {solar_times}")
 
