@@ -133,7 +133,11 @@ grep -qxF 'static domain_name_servers=8.8.4.4 8.8.8.8' /etc/dhcpcd.conf || echo 
 crontab -r
 
 echo Installing systemd services...
-sudo cp $HOME/dev/timelapse/systemd/system/*.* /etc/systemd/system/
+# Copy systemd files and replace 'pi' user with current user
+for file in $HOME/dev/timelapse/systemd/system/*.*; do
+    filename=$(basename "$file")
+    sed "s/User=pi/User=$USER/g" "$file" | sudo tee /etc/systemd/system/"$filename" > /dev/null
+done
 sudo chmod u+x /etc/systemd/system/enviro*.*
 sudo systemctl enable envirocam-logging.service
 sudo systemctl enable envirocam-telemetry.service
@@ -152,14 +156,14 @@ sudo systemctl start envirocam-detect-hang.timer
 
 # If not bookworm - don't have epaper library yet
 if ! grep -q "bookworm" /etc/os-release; then
-    sudo cp $HOME/dev/timelapse/systemd/system/envirocam-status.timer /etc/systemd/system/
+    sed "s/User=pi/User=$USER/g" $HOME/dev/timelapse/systemd/system/envirocam-status.timer | sudo tee /etc/systemd/system/envirocam-status.timer > /dev/null
     sudo systemctl enable envirocam-status.timer
     sudo systemctl start envirocam-status.timer
 fi
 
 # If not waveshare, we can't access SMS messages
 if [ $waveshare == "y" ]; then
-    sudo cp $HOME/dev/timelapse/systemd/system/envirocam-sms.timer /etc/systemd/system/
+    sed "s/User=pi/User=$USER/g" $HOME/dev/timelapse/systemd/system/envirocam-sms.timer | sudo tee /etc/systemd/system/envirocam-sms.timer > /dev/null
     sudo systemctl enable envirocam-sms.timer
 fi
 
