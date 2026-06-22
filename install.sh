@@ -24,20 +24,12 @@ fi
 
 echo Installing packages...
 sudo apt-get install -y git python3-pip
-sudo apt-get install -y pijuice-base
 sudo apt-get install -y python3-picamera2 --no-install-recommends
 sudo apt-get install -y vim\
                         byobu\
                         python3-pil\
                         python3-RPi.GPIO\
                         python3-serial\
-
-if ! grep -q "trixie" /etc/os-release; then
-    echo WARNING - PiJuice not supported in Trixie - install legacy Bookwork instead
-else
-    # Enable wakeup logging.
-    python3 /usr/bin/pijuice_log.py --enable WAKEUP_EVT
-fi
 
 # If bullseye - install waveshare-epaper library with pip3
 # sudo pip3 install waveshare-epaper
@@ -172,19 +164,6 @@ if [ $waveshare == "y" ]; then
 fi
 
 
-
-
-
-
-
-
-
-
-echo Overwriting pijuice config...
-sudo mv /var/lib/pijuice/pijuice_config.JSON /var/lib/pijuice/pijuice_config.JSON.bak
-sudo curl -fsSL -o /var/lib/pijuice/pijuice_config.JSON https://raw.githubusercontent.com/venari/timelapse/main/pijuice_config.JSON
-sudo chown pijuice:pijuice /var/lib/pijuice/pijuice_config.JSON
-
 echo Installing Tailscale...
 curl -fsSL https://tailscale.com/install.sh | sh
 sudo tailscale up
@@ -201,9 +180,6 @@ case $yn in
     * ) echo "Please answer yes or no.";;
 esac
 
-echo ===========================================
-echo Please check battery profile in pijuice_cli
-echo ===========================================
 
 echo We need to reboot to clear out cron jobs if we\'re updating an old camera
 read -p "Do you want to reboot? (y/n)" rebootNow

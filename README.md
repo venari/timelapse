@@ -10,6 +10,12 @@ A set of tools/scripts to automate the taking and creation of timelapse videos a
 > In addition the ability to purchase PiSupply's PiJuice batteries seems to have returned (even if stock has not).
 >
 > TL;DR - as long as not combined with either a LiFePO4 battery chemistry or the Waveshare hat above, the PiJuice seems to perform well.
+>
+> As of June 2026, the PiJuice no longer appears to be being manufactured, an PiSupply appears to have been disolved.
+> 
+> This project is being migrated to use the PvPi 12V LiFePO4 solar battery charger.
+> 
+> Documentation will be updated in the coming months.
 
 # PI Setup
 
