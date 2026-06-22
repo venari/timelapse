@@ -52,7 +52,7 @@ byobu-enable
 # sudo apt-get install locales
 # sudo locale-gen en_NZ.UTF-8
 # sudo update-locale LANG=en
-sudo dpkg-reconfigure locales
+#sudo dpkg-reconfigure locales
 
 
 echo Setting timezone...
