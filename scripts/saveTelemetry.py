@@ -183,8 +183,9 @@ def scheduleShutdown():
 
         # If hibernating, wake up at next 6 hourly interval
         # e.g. midnight, 6am, 12pm, 6pm (UTC)
-        hibernateHoursToWakeAfter = 6 - (datetime.datetime.utcnow().hour % 6)
-        hibernateHourToWakeAt = datetime.datetime.utcnow().hour + hibernateHoursToWakeAfter
+        utcnow = datetime.datetime.now(datetime.timezone.utc)
+        hibernateHoursToWakeAfter = 6 - (utcnow.hour % 6)
+        hibernateHourToWakeAt = utcnow.hour + hibernateHoursToWakeAfter
 
         if hibernateHourToWakeAt >= 24:
             hibernateHourToWakeAt = hibernateHourToWakeAt - 24

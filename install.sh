@@ -1,5 +1,8 @@
 #!/bin/bash
 
+# Ask user if we have a PvPi
+read -p "Does this camera have a PvPi BMS board? (y/n)" pvpi
+
 # Ask user if we have a waveshare modem
 read -p "Does this camera have a waveshare SIM7600X modem? (y/n)" waveshare
 
@@ -58,6 +61,24 @@ byobu-enable
 echo Setting timezone...
 sudo timedatectl set-timezone Pacific/Auckland
 
+if [ $pvpi == "y" ]; then
+    echo "Configuring PvPi serial hardware"
+    
+    # Detect if we're on a Pi 5
+    if sudo raspi-config nonint get_pi_type | grep -q "5"; then
+        echo "Pi 5 detected - disabling serial login shell and enabling serial port hardware"
+        sudo raspi-config nonint do_serial_hw 0
+        sudo raspi-config nonint do_serial_cons 1
+
+        echo "Pi 5 - disabling sudo password"
+        sudo raspi-config nonint do_sudo_pass 1
+
+    else
+        echo "Pi 0-4 detected - disabling serial login shell and enabling serial port hardware"
+        sudo raspi-config nonint do_serial 2
+    fi
+
+fi
 
 if [ $waveshare == "y" ]; then
     echo "Installing waveshare modem"
