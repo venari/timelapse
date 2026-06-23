@@ -292,19 +292,16 @@ def connectToInternet(retries = 3):
 
 def disconnectFromInternet():
     logger.info('Not really disconnecting from internet...')
-    # try:
-    #     logger.info('Disconnecting from internet...')
-    #     # loggerIntent.info('Disconnecting from internet...')
-    #     if(config['modem.type']=="thumb"):
-    #         logger.info('Current System Power Switch:')
-    #         logger.info(pj.power.GetSystemPowerSwitch())
-    #         logger.info('Setting System Power Switch to Off:')
-    #         pj.power.SetSystemPowerSwitch(0)
-    #     else:
-    #         powerDownSIM7600X()
-    # except Exception as e:
-    #     logger.error(str(datetime.datetime.now()) + " disconnectFromInternet() failed.")
-    #     logger.error(e)
+    try:
+        logger.info('Disconnecting from internet...')
+        # loggerIntent.info('Disconnecting from internet...')
+        if(config['modem.type']=="thumb"):
+            turnOffUSBPorts()
+        else:
+            powerDownSIM7600X()
+    except Exception as e:
+        logger.error(str(datetime.datetime.now()) + " disconnectFromInternet() failed.")
+        logger.error(e)
         
 def turnOnUSBPorts():
     try:
@@ -321,20 +318,65 @@ def turnOnUSBPorts():
         
         logger.info('Raspberry Pi 5 detected - powering up USB ports...')
         
-        # On Pi 5, power up USB ports using pinctrl
-        # GPIO 38 controls USB power on Pi 5
-        result = subprocess.run(['pinctrl', 'set', '38', 'op', 'dh'], 
-                              capture_output=True, text=True, timeout=10)
+        # On Pi 5, power up USB ports using uhubctl
+        # Power up USB hub 4
+        result1 = subprocess.run(['sudo', 'uhubctl', '-l', '4', '-a', '1'], 
+                               capture_output=True, text=True, timeout=10)
         
-        if result.returncode == 0:
+        # Power up USB hub 2
+        result2 = subprocess.run(['sudo', 'uhubctl', '-l', '2', '-a', '1'], 
+                               capture_output=True, text=True, timeout=10)
+        
+        if result1.returncode == 0 and result2.returncode == 0:
             logger.info('USB ports powered up successfully.')
         else:
-            logger.error(f'Failed to power up USB ports: {result.stderr}')
+            if result1.returncode != 0:
+                logger.error(f'Failed to power up USB hub 4: {result1.stderr}')
+            if result2.returncode != 0:
+                logger.error(f'Failed to power up USB hub 2: {result2.stderr}')
             
     except subprocess.TimeoutExpired:
         logger.error('Timeout while trying to power up USB ports.')
     except Exception as e:
         logger.error(str(datetime.datetime.now()) + " turnOnUSBPorts() failed.")
+        logger.error(e)
+
+def turnOffUSBPorts():
+    try:
+        # Check if we're on a Raspberry Pi 5
+        try:
+            with open('/proc/device-tree/model', 'r') as f:
+                model = f.read().strip('\0')
+                if 'Raspberry Pi 5' not in model:
+                    logger.info(f'Not a Raspberry Pi 5 (detected: {model}) - skipping USB power-down.')
+                    return
+        except FileNotFoundError:
+            logger.warning('Could not determine Pi model - /proc/device-tree/model not found.')
+            return
+        
+        logger.info('Raspberry Pi 5 detected - powering down USB ports...')
+        
+        # On Pi 5, power down USB ports using uhubctl
+        # Power down USB hub 4
+        result1 = subprocess.run(['sudo', 'uhubctl', '-l', '4', '-a', '0'], 
+                               capture_output=True, text=True, timeout=10)
+        
+        # Power down USB hub 2
+        result2 = subprocess.run(['sudo', 'uhubctl', '-l', '2', '-a', '0'], 
+                               capture_output=True, text=True, timeout=10)
+        
+        if result1.returncode == 0 and result2.returncode == 0:
+            logger.info('USB ports powered down successfully.')
+        else:
+            if result1.returncode != 0:
+                logger.error(f'Failed to power down USB hub 4: {result1.stderr}')
+            if result2.returncode != 0:
+                logger.error(f'Failed to power down USB hub 2: {result2.stderr}')
+            
+    except subprocess.TimeoutExpired:
+        logger.error('Timeout while trying to power down USB ports.')
+    except Exception as e:
+        logger.error(str(datetime.datetime.now()) + " turnOffUSBPorts() failed.")
         logger.error(e)
 
 def uploadTelemetry(telemetryFilename, session):
