@@ -502,17 +502,21 @@ def deleteOldUploadedImagesAndTelemetry():
         logger.error(e)
 
 
-try:
-    
-    connectToInternet()
+def main():
+    """Main entry point for uploadPending script."""
+    try:
+        connectToInternet()
 
-    while True:
+        while True:
+            config = json.load(open(pathlib.Path(__file__).parent / 'config.json'))
+            deleteOldUploadedImagesAndTelemetry()
+            uploadPendingTelemetry()
+            uploadPendingPhotos()
+            time.sleep(30)
 
-      config = json.load(open(pathlib.Path(__file__).parent / 'config.json'))
-      deleteOldUploadedImagesAndTelemetry()
-      uploadPendingTelemetry()
-      uploadPendingPhotos()
-      time.sleep(30)
+    except Exception as e:
+        logger.error(e)
 
-except Exception as e:
-    logger.error(e)
+
+if __name__ == "__main__":
+    main()

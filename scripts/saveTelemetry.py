@@ -471,42 +471,52 @@ def saveTelemetry():
         logger.error("saveTelemetry() failed.")
         logger.error(e)
 
-if pj_is_alive():
-    try:
-        mcu_time = pvpiClient.get_mcu_time()
-        loggerIntent.info('pvpi MCU time: ' + str(mcu_time))
-        loggerIntent.info('system time: ' + str(datetime.datetime.now()))
+def syncClocks():
+    """Synchronize system clock and PvPi MCU clock if needed."""
+    if pj_is_alive():
+        try:
+            mcu_time = pvpiClient.get_mcu_time()
+            loggerIntent.info('pvpi MCU time: ' + str(mcu_time))
+            loggerIntent.info('system time: ' + str(datetime.datetime.now()))
 
-        if(abs((mcu_time - datetime.datetime.now()).total_seconds()) < 5):
-            loggerIntent.info('pvpi MCU time and system time are within 5 seconds of each other, so we will not update either clock.')
-        else:
-
-            if(mcu_time > datetime.datetime.now()):
-                loggerIntent.info('setting sys clock from pvpi MCU time...')
-                if mcu_time.year <= 2025:
-                    loggerIntent.warning("MCU time looks wrong, so we're not setting system clock from it.")
-                    loggerIntent.warning("MCU time looks wrong, so we're not setting system clock from it.")
-                else:
-                    subprocess.call(['sudo', 'date', '-s', mcu_time.strftime('%Y-%m-%d %H:%M:%S')])
+            if(abs((mcu_time - datetime.datetime.now()).total_seconds()) < 5):
+                loggerIntent.info('pvpi MCU time and system time are within 5 seconds of each other, so we will not update either clock.')
             else:
-                loggerIntent.info('pvpi MCU time is behind system time, so we will set mcu from sys clock.')
-                pvpiClient.set_mcu_time(datetime.datetime.now())
 
+                if(mcu_time > datetime.datetime.now()):
+                    loggerIntent.info('setting sys clock from pvpi MCU time...')
+                    if mcu_time.year <= 2025:
+                        loggerIntent.warning("MCU time looks wrong, so we're not setting system clock from it.")
+                        loggerIntent.warning("MCU time looks wrong, so we're not setting system clock from it.")
+                    else:
+                        subprocess.call(['sudo', 'date', '-s', mcu_time.strftime('%Y-%m-%d %H:%M:%S')])
+                else:
+                    loggerIntent.info('pvpi MCU time is behind system time, so we will set mcu from sys clock.')
+                    pvpiClient.set_mcu_time(datetime.datetime.now())
+
+        except Exception as e:
+            loggerIntent.error("Failed to set sys clock from pvpi MCU time")
+            loggerIntent.error(e)
+
+
+def main():
+    """Main entry point for saveTelemetry script."""
+    syncClocks()
+    
+    try:
+        logger.info('In saveTelemetry.py')
+
+        SetWatchdog()
+
+        while True:
+            saveTelemetry()
+            time.sleep(60)
+            scheduleShutdown()
     except Exception as e:
-        loggerIntent.error("Failed to set sys clock from pvpi MCU time")
-        loggerIntent.error(e)
-
-
-try:
-    logger.info('In saveTelemetry.py')
-
-    SetWatchdog()
-
-    while True:
-        saveTelemetry()
-        time.sleep(60)
+        logger.error("Catastrophic failure.")
         scheduleShutdown()
-except Exception as e:
-    logger.error("Catastrophic failure.")
-    scheduleShutdown()
-    logger.error(e)
+        logger.error(e)
+
+
+if __name__ == "__main__":
+    main()
