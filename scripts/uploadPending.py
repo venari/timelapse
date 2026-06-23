@@ -414,29 +414,29 @@ def check_usb_power_status():
                 if powered_ports:
                     logger.debug(f'USB ports detected as powered ON: {len(powered_ports)} port(s)')
                     # return 'ON'
-                    return "{'data': 1, 'error': 'NO_ERROR'}"
+                    return {'data': 1, 'error': 'NO_ERROR'}
                 else:
                     logger.debug('USB ports detected as powered OFF')
                     # return 'OFF'
-                    return "{'data': 0, 'error': 'NO_ERROR'}"
+                    return {'data': 0, 'error': 'NO_ERROR'}
             else:
                 logger.debug('Could not parse uhubctl output for power status')
                 # return 'UNKNOWN'
-                return "{'data': 0, 'error': 'Could not parse uhubctl output'}"
+                return {'data': 0, 'error': 'Could not parse uhubctl output'}
 
         else:
             logger.warning(f'Failed to query USB power status: {result.stderr}')
             # return 'UNKNOWN'
-            return "{'data': 0, 'error': 'Failed to query USB power status'}"
+            return {'data': 0, 'error': 'Failed to query USB power status'}
             
     except subprocess.TimeoutExpired:
         logger.warning('Timeout while checking USB power status')
         #return 'UNKNOWN'
-        return "{'data': 0, 'error': 'Timeout while checking USB power status'}"
+        return {'data': 0, 'error': 'Timeout while checking USB power status'}
     except Exception as e:
         logger.error(f'check_usb_power_status() failed: {e}')
         #return 'UNKNOWN'
-        return "{'data': 0, 'error': 'Exception while checking USB power status'}"
+        return {'data': 0, 'error': 'Exception while checking USB power status'}
 
 def uploadTelemetry(telemetryFilename, session):
     """
