@@ -379,6 +379,57 @@ def turnOffUSBPorts():
         logger.error(str(datetime.datetime.now()) + " turnOffUSBPorts() failed.")
         logger.error(e)
 
+    def check_usb_power_status():
+    """
+    Check if USB ports are powered on using uhubctl (Pi 5 only).
+    Returns 'ON' if powered, 'OFF' if not powered, 'UNKNOWN' if cannot determine or not Pi 5.
+    """
+    try:
+        # Check if we're on a Raspberry Pi 5
+        try:
+            with open('/proc/device-tree/model', 'r') as f:
+                model = f.read().strip('\0')
+                if 'Raspberry Pi 5' not in model:
+                    logger.debug(f'Not a Raspberry Pi 5 (detected: {model}) - USB power status not applicable.')
+                    return 'N/A'
+        except FileNotFoundError:
+            logger.debug('Could not determine Pi model - /proc/device-tree/model not found.')
+            return 'UNKNOWN'
+        
+        # Query USB hub status using uhubctl
+        # Check hub 4 (one of the main USB hubs on Pi 5)
+        result = subprocess.run(['sudo', 'uhubctl', '-l', '4'], 
+                              capture_output=True, text=True, timeout=5)
+        
+        if result.returncode == 0:
+            output = result.stdout
+            # Parse uhubctl output to determine if ports are powered
+            # uhubctl output typically shows "power" in the status line
+            # Example: "Port 1: 0503 power"
+            if 'power' in output.lower():
+                # Check if any port shows as powered on
+                # Look for patterns like "Port X: ... power" (not "off")
+                powered_ports = re.findall(r'Port \d+:.*power(?!\s+off)', output, re.IGNORECASE)
+                if powered_ports:
+                    logger.debug(f'USB ports detected as powered ON: {len(powered_ports)} port(s)')
+                    return 'ON'
+                else:
+                    logger.debug('USB ports detected as powered OFF')
+                    return 'OFF'
+            else:
+                logger.debug('Could not parse uhubctl output for power status')
+                return 'UNKNOWN'
+        else:
+            logger.warning(f'Failed to query USB power status: {result.stderr}')
+            return 'UNKNOWN'
+            
+    except subprocess.TimeoutExpired:
+        logger.warning('Timeout while checking USB power status')
+        return 'UNKNOWN'
+    except Exception as e:
+        logger.error(f'check_usb_power_status() failed: {e}')
+        return 'UNKNOWN'
+
 def uploadTelemetry(telemetryFilename, session):
     """
     Upload a single telemetry file to the API.

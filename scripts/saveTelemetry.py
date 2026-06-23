@@ -16,7 +16,7 @@ from helpers import internet
 
 from SIM7600X import powerUpSIM7600X, powerDownSIM7600X
 from isConnectedToWifi import is_connected_to_wifi_linux, wifiSSID
-from uploadPending import uploadTelemetry
+from uploadPending import uploadTelemetry, check_usb_power_status
 
 config = json.load(open(pathlib.Path(__file__).parent / 'config.json'))
 logFilePath = config["logFilePath"]
@@ -433,6 +433,7 @@ def saveTelemetry():
                                 'connectedToWirelessNetwork': is_connected_to_wifi_linux(),
                                 'wirelessSSID': wifiSSID(),
                                 'connectedToInternet': internet(),
+                                'powerSwitch': check_usb_power_status(),
                             })
         else:
             api_data['batteryPercent'] = round(pvpiClient.estimated_soc())
@@ -450,6 +451,7 @@ def saveTelemetry():
                                 'connectedToWirelessNetwork': is_connected_to_wifi_linux(),
                                 'wirelessSSID': wifiSSID(),
                                 'connectedToInternet': internet(),
+                                'powerSwitch': check_usb_power_status(),
                             })
 
         telemetryFilename = pendingTelemetryFolder + datetime.datetime.now().strftime('%Y-%m-%d_%H%M%S.json')
