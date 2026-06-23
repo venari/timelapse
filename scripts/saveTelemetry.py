@@ -10,11 +10,13 @@ import sys
 import logging
 import pathlib
 import glob
+import requests
 
 from helpers import internet
 
 from SIM7600X import powerUpSIM7600X, powerDownSIM7600X
 from isConnectedToWifi import is_connected_to_wifi_linux, wifiSSID
+from uploadPending import uploadTelemetry
 
 config = json.load(open(pathlib.Path(__file__).parent / 'config.json'))
 logFilePath = config["logFilePath"]
@@ -454,6 +456,16 @@ def saveTelemetry():
         with open(telemetryFilename, 'w') as outfile:
             json.dump(api_data, outfile)
             logger.debug('telemetry saved')
+        
+        # Try to upload immediately if connected to internet
+        if internet():
+            logger.debug('connected to internet - attempting immediate upload')
+            try:
+                session = requests.Session()
+                uploadTelemetry(telemetryFilename, session)
+            except Exception as e:
+                logger.warning(f'immediate upload failed: {e}')
+                logger.debug('will retry via uploadPending.py later')
 
     except Exception as e:
         logger.error("saveTelemetry() failed.")

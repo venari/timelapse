@@ -12,7 +12,8 @@ import logging
 import pathlib
 
 # from helpers import flashLED
-from helpers import currentPhase
+from helpers import currentPhase, internet
+from uploadPending import uploadPhoto
 
 config = json.load(open(pathlib.Path(__file__).parent / 'config.json'))
 
@@ -158,8 +159,18 @@ def savePhotos():
                 IMAGEFILENAME = workingImageFolder + datetime.datetime.now().strftime('%Y-%m-%d_%H%M%S.jpg')
                 camera.capture_file(IMAGEFILENAME)
                 logger.debug('image saved to working folder')
-                shutil.move(IMAGEFILENAME, pendingImageFolder + pathlib.Path(IMAGEFILENAME).name)
+                pendingFilename = pendingImageFolder + pathlib.Path(IMAGEFILENAME).name
+                shutil.move(IMAGEFILENAME, pendingFilename)
                 logger.debug('image moved to pending folder')
+                
+                # Try to upload immediately if connected to internet
+                if internet():
+                    logger.debug('connected to internet - attempting immediate upload')
+                    try:
+                        uploadPhoto(pendingFilename)
+                    except Exception as e:
+                        logger.warning(f'immediate upload failed: {e}')
+                        logger.debug('will retry via uploadPending.py later')
 
             logger.debug('destroying camera object')
             
