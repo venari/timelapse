@@ -379,7 +379,7 @@ def turnOffUSBPorts():
         logger.error(str(datetime.datetime.now()) + " turnOffUSBPorts() failed.")
         logger.error(e)
 
-    def check_usb_power_status():
+def check_usb_power_status():
     """
     Check if USB ports are powered on using uhubctl (Pi 5 only).
     Returns 'ON' if powered, 'OFF' if not powered, 'UNKNOWN' if cannot determine or not Pi 5.
