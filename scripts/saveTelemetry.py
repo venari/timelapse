@@ -317,9 +317,9 @@ def scheduleShutdown():
             if setAlarm == True:
                 SetAlarm(alarm_time)
 
-            logger.info('Power off scheduled for 1 min from now')
-            loggerIntent.info('Power off scheduled for 1 min from now')
-            pvpiClient.power_off(60)
+            logger.info('Power off scheduled for 10 seconds from now')
+            loggerIntent.info('Power off scheduled for 10 seconds from now')
+            pvpiClient.power_off(10)
             powerDownSIM7600X()
             logger.info('Shutting down now...')
             loggerIntent.info('Shutting down now...')

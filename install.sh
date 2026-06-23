@@ -34,6 +34,11 @@ sudo apt-get install -y vim\
                         python3-RPi.GPIO\
                         python3-serial\
 
+# Pi 5 has ability to power off USB ports, which is useful for power cycling the modem, so we need uhubctl to do that
+if sudo raspi-config nonint get_pi_type | grep -q "5"; then
+  sudo apt-get install uhubctl -y
+fi
+
 # If bullseye - install waveshare-epaper library with pip3
 # sudo pip3 install waveshare-epaper
 # sudo apt-get install python3-waveshare-epaper -y
