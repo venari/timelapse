@@ -394,7 +394,8 @@ def check_usb_power_status():
                     return 'N/A'
         except FileNotFoundError:
             logger.debug('Could not determine Pi model - /proc/device-tree/model not found.')
-            return 'UNKNOWN'
+            #return 'UNKNOWN'
+            return "{'data': 0, 'error': 'Not Pi 5'}"
         
         # Query USB hub status using uhubctl
         # Check hub 4 (one of the main USB hubs on Pi 5)
@@ -412,23 +413,30 @@ def check_usb_power_status():
                 powered_ports = re.findall(r'Port \d+:.*power(?!\s+off)', output, re.IGNORECASE)
                 if powered_ports:
                     logger.debug(f'USB ports detected as powered ON: {len(powered_ports)} port(s)')
-                    return 'ON'
+                    # return 'ON'
+                    return "{'data': 1, 'error': 'NO_ERROR'}"
                 else:
                     logger.debug('USB ports detected as powered OFF')
-                    return 'OFF'
+                    # return 'OFF'
+                    return "{'data': 0, 'error': 'NO_ERROR'}"
             else:
                 logger.debug('Could not parse uhubctl output for power status')
-                return 'UNKNOWN'
+                # return 'UNKNOWN'
+                return "{'data': 0, 'error': 'Could not parse uhubctl output'}"
+
         else:
             logger.warning(f'Failed to query USB power status: {result.stderr}')
-            return 'UNKNOWN'
+            # return 'UNKNOWN'
+            return "{'data': 0, 'error': 'Failed to query USB power status'}"
             
     except subprocess.TimeoutExpired:
         logger.warning('Timeout while checking USB power status')
-        return 'UNKNOWN'
+        #return 'UNKNOWN'
+        return "{'data': 0, 'error': 'Timeout while checking USB power status'}"
     except Exception as e:
         logger.error(f'check_usb_power_status() failed: {e}')
-        return 'UNKNOWN'
+        #return 'UNKNOWN'
+        return "{'data': 0, 'error': 'Exception while checking USB power status'}"
 
 def uploadTelemetry(telemetryFilename, session):
     """
