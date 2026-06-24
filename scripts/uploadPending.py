@@ -564,6 +564,7 @@ def deleteOldUploadedImagesAndTelemetry():
 
 def main():
     """Main entry point for uploadPending script."""
+    global config
     try:
         connectToInternet()
 
