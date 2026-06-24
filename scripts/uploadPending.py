@@ -407,7 +407,7 @@ def check_usb_power_status():
             # Parse uhubctl output to determine if ports are powered
             # uhubctl output typically shows "power" in the status line
             # Example: "Port 1: 0503 power"
-            if 'power' in output.lower():
+            if 'power' in output.lower() or 'off' in output.lower():
                 # Check if any port shows as powered on
                 # Look for patterns like "Port X: ... power" (not "off")
                 powered_ports = re.findall(r'Port \d+:.*power(?!\s+off)', output, re.IGNORECASE)
