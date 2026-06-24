@@ -11,6 +11,7 @@ import logging
 import glob
 import pathlib
 import socket
+import re
 
 from helpers import internet
 
