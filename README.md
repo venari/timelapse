@@ -10,6 +10,12 @@ A set of tools/scripts to automate the taking and creation of timelapse videos a
 > In addition the ability to purchase PiSupply's PiJuice batteries seems to have returned (even if stock has not).
 >
 > TL;DR - as long as not combined with either a LiFePO4 battery chemistry or the Waveshare hat above, the PiJuice seems to perform well.
+>
+> As of June 2026, the PiJuice no longer appears to be being manufactured, an PiSupply appears to have been disolved.
+> 
+> This project is being migrated to use the PvPi 12V LiFePO4 solar battery charger.
+> 
+> Documentation will be updated in the coming months.
 
 # PI Setup
 
@@ -533,62 +539,6 @@ Note - Wake up should be automatically enabled in `saveTelemetry.py`, but you wi
 
 ```
 
-# Status Indication script
-
-```
-░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
-░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
-░░░░░┌───────────────────────── PiJuice CLI ────────────────────────┐░░░░
-░░░░░│  User Scripts                                                │░░░░
-░░░░░│                                                              │░░░░
-░░░░░│  USER FUNC1:                                                 │░░░░
-░░░░░│  /home/pi/dev/timelapse/scripts/indicateStatus.sh            │░░░░
-░░░░░│  USER FUNC2:                                                 │░░░░
-░░░░░│  USER FUNC3:                                                 │░░░░
-░░░░░│  USER FUNC4:                                                 │░░░░
-░░░░░│  USER FUNC5:                                                 │░░░░
-░░░░░│  USER FUNC6:                                                 │░░░░
-░░░░░│  USER FUNC7:                                                 │░░░░
-░░░░░│  USER FUNC8:                                                 │░░░░
-░░░░░│  USER FUNC9:                                                 │░░░░
-░░░░░│  USER FUNC10:                                                │░░░░
-░░░░░│  USER FUNC11:                                                │░░░░
-░░░░░│  USER FUNC12:                                                │░░░░
-░░░░░│  USER FUNC13:                                                │░░░░
-░░░░░│  USER FUNC14:                                                │░░░░
-░░░░░│  USER FUNC15:                                                │░░░░
-░░░░░└──────────────────────────────────────────────────────────────┘░░░░
-░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
-░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
-
-
-
-░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
-░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
-░░░░░┌───────────────────────── PiJuice CLI ────────────────────────┐░░░░
-░░░░░│  Settings for SW1                                            │░░░░
-░░░░░│                                                              │░░░░
-░░░░░│  < PRESS: USER_FUNC1, 0                       >              │░░░░
-░░░░░│  < RELEASE: NO_FUNC, 0                        >              │░░░░
-░░░░░│  < SINGLE_PRESS: HARD_FUNC_POWER_ON, 800      >              │░░░░
-░░░░░│  < DOUBLE_PRESS: NO_FUNC, 0                   >              │░░░░
-░░░░░│  < LONG_PRESS1: SYS_FUNC_HALT, 10000          >              │░░░░
-░░░░░│  < LONG_PRESS2: HARD_FUNC_POWER_OFF, 20000    >              │░░░░
-░░░░░│                                                              │░░░░
-░░░░░│  < Back >                                                    │░░░░
-░░░░░│                                                              │░░░░
-░░░░░│                                                              │░░░░
-░░░░░│                                                              │░░░░
-░░░░░│                                                              │░░░░
-░░░░░│                                                              │░░░░
-░░░░░│                                                              │░░░░
-░░░░░│                                                              │░░░░
-░░░░░│                                                              │░░░░
-░░░░░└──────────────────────────────────────────────────────────────┘░░░░
-░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
-░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
-```
-
 # Troubleshooting
 
 ## Troubleshooting PiJuice wakeup:
@@ -596,16 +546,6 @@ Note - Wake up should be automatically enabled in `saveTelemetry.py`, but you wi
 ### Enable wakeup logging
 ```
 python3 /usr/bin/pijuice_log.py --enable WAKEUP_EVT
-```
-
-### Output wakeup logs
-```
-python3 /usr/bin/pijuice_log.py
-```
-
-## Troubleshooting indicateStatus script:
-```
-sudo -u pijuice /home/pi/dev/timelapse/scripts/indicateStatus.sh
 ```
 
 ## Troubleshooting non-connecting camera:

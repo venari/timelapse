@@ -184,9 +184,36 @@ public class Telemetry
         }
     }
 
+    public string Charge_State
+    {
+        get
+        {
+            if (Status != null)
+            {
+                dynamic status = PiJuiceJSONStatus;
+                if(!status.TryGetProperty("chargeState", out System.Text.Json.JsonElement chargeState))
+                {
+                    return "Unknown";
+                }
+
+                return chargeState.GetString()
+                    .Replace("Not charging", "Not charging")
+                    .Replace("Trickle Charge (VBAT < VBAT_SHORT)", "Charging")
+                    .Replace("Pre-Charge (VBAT < VBAT_LOWV)", "Charging")
+                    .Replace("Fast Charge (CC mode)", "Charging")
+                    .Replace("Taper Charge (CV mode)", "Charging")
+                    .Replace("NA", "NA")
+                    .Replace("Top-off Timer Charge", "Charging")
+                    .Replace("Charge Termination Done", "Not charging");
+            }
+
+            return "Unknown";
+        }
+    }
+
     public bool? Charging {
         get{
-            if(Status_Battery == "Charging"){
+            if(Status_Battery == "Charging" || Charge_State == "Charging"){
                 return true;
             } else {
                 return null;
