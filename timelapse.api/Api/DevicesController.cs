@@ -17,6 +17,32 @@ namespace timelapse.api{
         private AppDbContext _appDbContext;
         private ILogger _logger;
 
+        [HttpGet]
+        public ActionResult<IEnumerable<Device>> GetDevices(){
+            _logger.LogInformation("Get all devices");
+            return _appDbContext.Devices
+                .Include(d => d.LatestTelemetry)
+                .Include(d => d.LatestImage)
+                .Include(d => d.DeviceLocations)
+                .ToList();
+        }
+
+        [HttpGet("{id}")]
+        public ActionResult<Device> GetDevice(int id){
+            _logger.LogInformation($"Get device {id}");
+            var device = _appDbContext.Devices
+                .Include(d => d.LatestTelemetry)
+                .Include(d => d.LatestImage)
+                .Include(d => d.DeviceLocations)
+                .FirstOrDefault(d => d.Id == id);
+            
+            if (device == null){
+                return new NotFoundResult();
+            }
+            
+            return device;
+        }
+
         [HttpGet("UnregisteredDevices")]
         public ActionResult<IEnumerable<UnregisteredDevice>> GetUnregisteredDecices(){
             _logger.LogInformation("Get unregistered devices");

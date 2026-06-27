@@ -118,6 +118,22 @@ namespace timelapse.api{
             return image;
 
             // return new RedirectResult(image.BlobUri.ToString() + _storageHelper.SasToken);
-        }        
+        }
+
+        [HttpGet("GetImagesBetweenDates")]
+        public ActionResult<IEnumerable<Image>> GetImagesBetweenDates([FromQuery] int deviceId, DateTime startDate, DateTime endDate){
+            Device device = _appDbContext.Devices.FirstOrDefault(d => d.Id == deviceId);
+
+            if(device==null){
+                return new NotFoundResult();
+            }
+
+            var images = _appDbContext.Images
+                .Where(i => i.DeviceId == device.Id && i.Timestamp >= startDate.ToUniversalTime() && i.Timestamp <= endDate.ToUniversalTime())
+                .OrderBy(i => i.Timestamp)
+                .ToList();
+
+            return images;
+        }
     }
 }
