@@ -135,5 +135,36 @@ namespace timelapse.api{
 
             return images;
         }
+
+        // OPTION 1: Proxy endpoint - serves the image through the API (RECOMMENDED)
+        [HttpGet("Proxy/{imageId}")]
+        public async Task<IActionResult> ProxyImage(int imageId){
+            var image = _appDbContext.Images.FirstOrDefault(i => i.Id == imageId);
+            
+            if(image == null){
+                return new NotFoundResult();
+            }
+
+            // Get the image from blob storage with SAS token
+            var imageUrl = image.BlobUri + _storageHelper.SasToken;
+            
+            using var httpClient = new HttpClient();
+            var response = await httpClient.GetAsync(imageUrl);
+            
+            if (!response.IsSuccessStatusCode){
+                return new StatusCodeResult((int)response.StatusCode);
+            }
+
+            var imageBytes = await response.Content.ReadAsByteArrayAsync();
+            var contentType = response.Content.Headers.ContentType?.ToString() ?? "image/jpeg";
+            
+            return new FileContentResult(imageBytes, contentType);
+        }
+
+        // OPTION 2: Get SAS token endpoint - client appends token to blob URLs
+        [HttpGet("SasToken")]
+        public ActionResult<string> GetSasToken(){
+            return _storageHelper.SasToken;
+        }
     }
 }

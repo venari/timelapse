@@ -4,6 +4,7 @@ import { Battery, Thermometer, HardDrive, Camera } from 'lucide-react';
 import type { Device } from '@/types';
 import { formatDistanceToNow } from 'date-fns';
 import { Link } from 'react-router-dom';
+import { getImageUrl } from '@/lib/imageUtils';
 
 interface DeviceCardProps {
   device: Device;
@@ -63,7 +64,7 @@ export function DeviceCard({ device }: DeviceCardProps) {
               <Link to={`/image-view/${device.id}`}>
                 <div className="aspect-video bg-muted rounded-md overflow-hidden cursor-pointer hover:opacity-80 transition-opacity">
                   <img
-                    src={image.blobUri}
+                    src={getImageUrl(image.id)}
                     alt={`Latest from ${device.name}`}
                     className="w-full h-full object-cover"
                   />

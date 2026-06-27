@@ -8,13 +8,17 @@ import { Slider } from '@/components/ui/slider';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Play, Pause, Loader2, ChevronLeft, ChevronRight } from 'lucide-react';
 import { format, subHours, subDays } from 'date-fns';
+import { getImageUrl } from '@/lib/imageUtils';
 
 export function ImageView() {
   const { deviceId } = useParams<{ deviceId: string }>();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [timeRange, setTimeRange] = useState<'1h' | '24h' | '48h' | '7d'>('24h');
+  const [loadedImages, setLoadedImages] = useState<Set<number>>(new Set());
+  const [preloadProgress, setPreloadProgress] = useState(0);
   const playIntervalRef = useRef<number | null>(null);
+  const imageRefs = useRef<Map<number, HTMLImageElement>>(new Map());
 
   const getTimeRange = () => {
     const now = new Date();
@@ -59,16 +63,64 @@ export function ImageView() {
     refetchInterval: 30000, // Refetch every 30 seconds for new images
   });
 
-  // Auto-play functionality
+  // Preload images when data changes
+  useEffect(() => {
+    if (!images || images.length === 0) {
+      setLoadedImages(new Set());
+      setPreloadProgress(0);
+      imageRefs.current.clear();
+      return;
+    }
+
+    setLoadedImages(new Set());
+    setPreloadProgress(0);
+    imageRefs.current.clear();
+
+    let loadedCount = 0;
+
+    images.forEach((image, index) => {
+      const img = new Image();
+      img.src = getImageUrl(image.id);
+      
+      img.onload = () => {
+        imageRefs.current.set(index, img);
+        setLoadedImages((prev) => {
+          const newSet = new Set(prev);
+          newSet.add(index);
+          return newSet;
+        });
+        loadedCount++;
+        setPreloadProgress((loadedCount / images.length) * 100);
+      };
+
+      img.onerror = () => {
+        console.error(`Failed to load image ${image.id}`);
+        loadedCount++;
+        setPreloadProgress((loadedCount / images.length) * 100);
+      };
+    });
+  }, [images]);
+
+  // Auto-play functionality - only advance when next image is loaded
   useEffect(() => {
     if (isPlaying && images && images.length > 0) {
       playIntervalRef.current = window.setInterval(() => {
         setCurrentIndex((prev) => {
-          if (prev >= images.length - 1) {
+          const nextIndex = prev + 1;
+          
+          // Stop if we're at the end
+          if (nextIndex >= images.length) {
             setIsPlaying(false);
             return prev;
           }
-          return prev + 1;
+          
+          // Only advance if the next image is loaded
+          if (loadedImages.has(nextIndex)) {
+            return nextIndex;
+          }
+          
+          // If next image isn't loaded yet, wait
+          return prev;
         });
       }, 50); // 50ms delay between frames (same as original)
     } else if (playIntervalRef.current) {
@@ -81,7 +133,7 @@ export function ImageView() {
         clearInterval(playIntervalRef.current);
       }
     };
-  }, [isPlaying, images]);
+  }, [isPlaying, images, loadedImages]);
 
   const handlePlayPause = () => {
     setIsPlaying(!isPlaying);
@@ -161,14 +213,25 @@ export function ImageView() {
             <div className="space-y-4">
               {/* Image Display */}
               <div className="relative aspect-video bg-black rounded-lg overflow-hidden">
-                <img
-                  src={currentImage?.blobUri}
-                  alt={`Image ${currentIndex + 1}`}
-                  className="w-full h-full object-contain"
-                />
+                {loadedImages.has(currentIndex) ? (
+                  <img
+                    src={currentImage ? getImageUrl(currentImage.id) : ''}
+                    alt={`Image ${currentIndex + 1}`}
+                    className="w-full h-full object-contain"
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center">
+                    <Loader2 className="h-8 w-8 animate-spin text-white" />
+                  </div>
+                )}
                 <div className="absolute bottom-4 left-4 bg-black/70 text-white px-3 py-1 rounded text-sm">
                   {currentImage && format(new Date(currentImage.timestamp), 'PPpp')}
                 </div>
+                {!loadedImages.has(currentIndex) && (
+                  <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-black/70 text-white px-3 py-1 rounded text-sm">
+                    Loading image...
+                  </div>
+                )}
               </div>
 
               {/* Controls */}
@@ -191,37 +254,64 @@ export function ImageView() {
                   </div>
                 </div>
 
+                {/* Preload Progress */}
+                {preloadProgress < 100 && (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-sm text-muted-foreground">
+                      <span>Loading images...</span>
+                      <span>{Math.round(preloadProgress)}%</span>
+                    </div>
+                    <div className="w-full bg-secondary rounded-full h-2">
+                      <div
+                        className="bg-primary rounded-full h-2 transition-all duration-300"
+                        style={{ width: `${preloadProgress}%` }}
+                      />
+                    </div>
+                  </div>
+                )}
+
                 {/* Playback Controls */}
-                <div className="flex justify-center items-center gap-2">
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={handlePrevious}
-                    disabled={currentIndex === 0}
-                  >
-                    <ChevronLeft className="h-4 w-4" />
-                  </Button>
-                  <Button onClick={handlePlayPause} size="lg">
-                    {isPlaying ? (
-                      <>
-                        <Pause className="h-5 w-5 mr-2" />
-                        Pause
-                      </>
-                    ) : (
-                      <>
-                        <Play className="h-5 w-5 mr-2" />
-                        Play
-                      </>
-                    )}
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={handleNext}
-                    disabled={currentIndex === images.length - 1}
-                  >
-                    <ChevronRight className="h-4 w-4" />
-                  </Button>
+                <div className="flex flex-col items-center gap-2">
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={handlePrevious}
+                      disabled={currentIndex === 0}
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
+                    <Button 
+                      onClick={handlePlayPause} 
+                      size="lg"
+                      disabled={preloadProgress < 100}
+                    >
+                      {isPlaying ? (
+                        <>
+                          <Pause className="h-5 w-5 mr-2" />
+                          Pause
+                        </>
+                      ) : (
+                        <>
+                          <Play className="h-5 w-5 mr-2" />
+                          {preloadProgress < 100 ? 'Loading...' : 'Play'}
+                        </>
+                      )}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={handleNext}
+                      disabled={currentIndex === images.length - 1}
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  {preloadProgress === 100 && (
+                    <p className="text-xs text-muted-foreground">
+                      {loadedImages.size} images ready for playback
+                    </p>
+                  )}
                 </div>
               </div>
             </div>
