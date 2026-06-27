@@ -63,7 +63,7 @@ export function ImageView() {
     refetchInterval: 30000, // Refetch every 30 seconds for new images
   });
 
-  // Preload images when data changes
+  // Preload images when data changes - prioritize latest image first
   useEffect(() => {
     if (!images || images.length === 0) {
       setLoadedImages(new Set());
@@ -72,13 +72,19 @@ export function ImageView() {
       return;
     }
 
+    // Set to latest image (last in sequence)
+    setCurrentIndex(images.length - 1);
     setLoadedImages(new Set());
     setPreloadProgress(0);
     imageRefs.current.clear();
 
     let loadedCount = 0;
 
-    images.forEach((image, index) => {
+    // Load latest image first, then load the rest
+    const latestIndex = images.length - 1;
+    const latestImage = images[latestIndex];
+    
+    const loadImage = (image: typeof images[0], index: number) => {
       const img = new Image();
       img.src = getImageUrl(image.id);
       
@@ -98,6 +104,16 @@ export function ImageView() {
         loadedCount++;
         setPreloadProgress((loadedCount / images.length) * 100);
       };
+    };
+
+    // Load latest image first
+    loadImage(latestImage, latestIndex);
+
+    // Then load all other images
+    images.forEach((image, index) => {
+      if (index !== latestIndex) {
+        loadImage(image, index);
+      }
     });
   }, [images]);
 
@@ -136,7 +152,14 @@ export function ImageView() {
   }, [isPlaying, images, loadedImages]);
 
   const handlePlayPause = () => {
-    setIsPlaying(!isPlaying);
+    if (!isPlaying) {
+      // When starting playback, go to the beginning
+      setCurrentIndex(0);
+      setIsPlaying(true);
+    } else {
+      // When pausing, just stop
+      setIsPlaying(false);
+    }
   };
 
   const handlePrevious = () => {
