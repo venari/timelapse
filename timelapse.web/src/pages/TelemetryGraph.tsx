@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { api } from '@/api/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Loader2, Battery, Thermometer, HardDrive } from 'lucide-react';
+import { Loader2, Battery, Thermometer, HardDrive, Clock, Database } from 'lucide-react';
 import {
   LineChart,
   Line,
@@ -14,6 +14,9 @@ import {
   Tooltip,
   Legend,
   ResponsiveContainer,
+  Area,
+  AreaChart,
+  ComposedChart,
 } from 'recharts';
 import { format, subHours, subDays } from 'date-fns';
 
@@ -36,6 +39,62 @@ export function TelemetryGraph() {
   };
 
   const { start, end } = getTimeRange();
+
+  // Generate tick values aligned to sensible time boundaries
+  const getTickConfig = () => {
+    const ticks: number[] = [];
+    let current: Date;
+    let interval: number;
+    let formatStr: string;
+
+    switch (timeRange) {
+      case '1h':
+        // Align to 10-minute marks
+        current = new Date(start);
+        current.setMinutes(Math.floor(current.getMinutes() / 10) * 10, 0, 0);
+        interval = 10 * 60 * 1000; // 10 minutes in ms
+        formatStr = 'HH:mm';
+        break;
+      case '24h':
+        // Align to hours
+        current = new Date(start);
+        current.setMinutes(0, 0, 0);
+        interval = 2 * 60 * 60 * 1000; // 2 hours in ms
+        formatStr = 'HH:mm';
+        break;
+      case '48h':
+        // Align to 6-hour marks (0, 6, 12, 18)
+        current = new Date(start);
+        current.setHours(Math.floor(current.getHours() / 6) * 6, 0, 0, 0);
+        interval = 6 * 60 * 60 * 1000; // 6 hours in ms
+        formatStr = 'EEE HH:mm';
+        break;
+      case '7d':
+        // Align to midnight
+        current = new Date(start);
+        current.setHours(0, 0, 0, 0);
+        interval = 24 * 60 * 60 * 1000; // 1 day in ms
+        formatStr = 'EEE dd MMM';
+        break;
+      default:
+        current = new Date(start);
+        interval = 60 * 60 * 1000;
+        formatStr = 'HH:mm';
+    }
+
+    // Generate ticks from start to end
+    while (current.getTime() <= end.getTime()) {
+      ticks.push(current.getTime());
+      current = new Date(current.getTime() + interval);
+    }
+
+    return {
+      ticks,
+      format: formatStr,
+    };
+  };
+
+  const tickConfig = getTickConfig();
 
   const {
     data: device,
@@ -93,16 +152,42 @@ export function TelemetryGraph() {
   }
 
   // Prepare chart data
-  const chartData =
+  const rawChartData =
     telemetry?.map((t) => ({
       timestamp: new Date(t.timestamp).getTime(),
       timestampLabel: format(new Date(t.timestamp), 'MMM dd HH:mm'),
       battery: t.batteryPercent,
       temperature: t.temperatureC,
       diskSpace: t.diskSpaceFree ? t.diskSpaceFree / 1024 / 1024 / 1024 : null, // Convert to GB
-      voltage: t.status?.batteryVoltage,
-      current: t.status?.batteryCurrent,
+      voltage: t.batteryVoltage != null ? t.batteryVoltage / 1000 : null, // Convert mV to V
+      current: t.batteryCurrent != null ? t.batteryCurrent : null,
+      // Boolean values
+      charging: t.charging === true ? 1 : 0,
+      powerSwitch: t.powerSwitch === true ? 1 : 0,
+      connectedWifi: t.connectedToWirelessNetwork === true ? 1 : 0,
+      connectedInternet: t.connectedToInternet === true ? 1 : 0,
+      // Numeric values
+      uptimeHours: t.uptimeSeconds != null ? t.uptimeSeconds / 3600 : null, // Convert to hours
+      pendingImages: t.pendingImages != null ? t.pendingImages : null,
+      pendingTelemetry: t.pendingTelemetry != null ? t.pendingTelemetry : null,
     })) || [];
+
+  // Calculate max voltage for full-height charging background
+  const maxVoltage = Math.max(...rawChartData.map(d => d.voltage || 0).filter(v => v > 0), 5); // Default to 5V minimum
+  
+  // Calculate max pending uploads for full-height connection status background
+  const maxPendingUploads = Math.max(
+    ...rawChartData.map(d => Math.max(d.pendingImages || 0, d.pendingTelemetry || 0)),
+    10 // Default minimum
+  );
+  
+  const chartData = rawChartData.map(d => ({
+    ...d,
+    chargingBackground: d.charging === 1 ? maxVoltage * 1.1 : 0, // Extend 10% above max voltage
+    powerNoWifiBackground: d.powerSwitch === 1 && d.connectedWifi === 0 ? maxPendingUploads * 1.1 : 0, // Red for power but no WiFi
+    wifiOnlyBackground: d.connectedWifi === 1 && d.connectedInternet === 0 ? maxPendingUploads * 1.1 : 0, // Yellow for WiFi only
+    internetBackground: d.connectedInternet === 1 ? maxPendingUploads * 1.1 : 0, // Green for Internet
+  }));
 
   return (
     <div className="container mx-auto py-8 px-4">
@@ -144,7 +229,8 @@ export function TelemetryGraph() {
                     dataKey="timestamp"
                     type="number"
                     domain={['dataMin', 'dataMax']}
-                    tickFormatter={(timestamp) => format(new Date(timestamp), 'HH:mm')}
+                    ticks={tickConfig.ticks}
+                    tickFormatter={(timestamp) => format(new Date(timestamp), tickConfig.format)}
                   />
                   <YAxis domain={[0, 100]} unit="%" />
                   <Tooltip
@@ -180,7 +266,8 @@ export function TelemetryGraph() {
                     dataKey="timestamp"
                     type="number"
                     domain={['dataMin', 'dataMax']}
-                    tickFormatter={(timestamp) => format(new Date(timestamp), 'HH:mm')}
+                    ticks={tickConfig.ticks}
+                    tickFormatter={(timestamp) => format(new Date(timestamp), tickConfig.format)}
                   />
                   <YAxis unit="°C" />
                   <Tooltip
@@ -217,7 +304,8 @@ export function TelemetryGraph() {
                       dataKey="timestamp"
                       type="number"
                       domain={['dataMin', 'dataMax']}
-                      tickFormatter={(timestamp) => format(new Date(timestamp), 'HH:mm')}
+                      ticks={tickConfig.ticks}
+                      tickFormatter={(timestamp) => format(new Date(timestamp), tickConfig.format)}
                     />
                     <YAxis unit=" GB" />
                     <Tooltip
@@ -239,10 +327,90 @@ export function TelemetryGraph() {
           )}
 
           {/* Voltage & Current Chart */}
-          {chartData.some((d) => d.voltage !== null || d.current !== null) && (
+          {chartData.some((d) => d.voltage != null || d.current != null) && (
             <Card>
               <CardHeader>
-                <CardTitle>Battery Voltage & Current</CardTitle>
+                <CardTitle className="flex items-center gap-2">
+                  <Battery className="h-5 w-5 text-amber-600" />
+                  Battery Voltage & Current
+                  <span className="text-sm font-normal text-muted-foreground ml-2">
+                    (Green background = Charging)
+                  </span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={300}>
+                  <ComposedChart data={chartData}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis
+                      dataKey="timestamp"
+                      type="number"
+                      domain={['dataMin', 'dataMax']}
+                      ticks={tickConfig.ticks}
+                      tickFormatter={(timestamp) => format(new Date(timestamp), tickConfig.format)}
+                    />
+                    <YAxis yAxisId="left" label={{ value: 'Voltage (V)', angle: -90, position: 'insideLeft' }} />
+                    <YAxis yAxisId="right" orientation="right" label={{ value: 'Current (mA)', angle: 90, position: 'insideRight' }} />
+                    <Tooltip
+                      labelFormatter={(timestamp) => format(new Date(timestamp), 'PPpp')}
+                      formatter={(value: number, name: string) => {
+                        if (name === 'Charging') return null;
+                        if (name === 'Voltage (V)') {
+                          return [`${value.toFixed(2)} V`, name];
+                        }
+                        return [`${value.toFixed(0)} mA`, name];
+                      }}
+                    />
+                    <Legend 
+                      formatter={(value) => {
+                        if (value === 'Charging') return null;
+                        return value;
+                      }}
+                    />
+                    {/* Background area showing charging status - full height */}
+                    <Area
+                      yAxisId="left"
+                      type="stepAfter"
+                      dataKey="chargingBackground"
+                      stroke="none"
+                      fill="#10b981"
+                      fillOpacity={0.15}
+                      name="Charging"
+                      legendType="none"
+                    />
+                    {/* Voltage line */}
+                    <Line
+                      yAxisId="left"
+                      type="monotone"
+                      dataKey="voltage"
+                      stroke="#f59e0b"
+                      strokeWidth={2}
+                      name="Voltage (V)"
+                      dot={false}
+                    />
+                    {/* Current line */}
+                    <Line
+                      yAxisId="right"
+                      type="monotone"
+                      dataKey="current"
+                      stroke="#ef4444"
+                      name="Current (mA)"
+                      dot={false}
+                    />
+                  </ComposedChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Uptime Chart */}
+          {chartData.some((d) => d.uptimeHours != null) && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Clock className="h-5 w-5 text-indigo-600" />
+                  Uptime
+                </CardTitle>
               </CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={300}>
@@ -252,28 +420,20 @@ export function TelemetryGraph() {
                       dataKey="timestamp"
                       type="number"
                       domain={['dataMin', 'dataMax']}
-                      tickFormatter={(timestamp) => format(new Date(timestamp), 'HH:mm')}
+                      ticks={tickConfig.ticks}
+                      tickFormatter={(timestamp) => format(new Date(timestamp), tickConfig.format)}
                     />
-                    <YAxis yAxisId="left" />
-                    <YAxis yAxisId="right" orientation="right" />
+                    <YAxis unit=" hrs" />
                     <Tooltip
                       labelFormatter={(timestamp) => format(new Date(timestamp), 'PPpp')}
+                      formatter={(value: number) => [`${value.toFixed(1)} hours`, 'Uptime']}
                     />
                     <Legend />
                     <Line
-                      yAxisId="left"
-                      type="monotone"
-                      dataKey="voltage"
-                      stroke="#f59e0b"
-                      name="Voltage (V)"
-                      dot={false}
-                    />
-                    <Line
-                      yAxisId="right"
-                      type="monotone"
-                      dataKey="current"
-                      stroke="#ef4444"
-                      name="Current (mA)"
+                      type="linear"
+                      dataKey="uptimeHours"
+                      stroke="#6366f1"
+                      name="Uptime (hours)"
                       dot={false}
                     />
                   </LineChart>
@@ -281,6 +441,98 @@ export function TelemetryGraph() {
               </CardContent>
             </Card>
           )}
+
+          {/* Pending Images & Telemetry Chart */}
+          {chartData.some((d) => d.pendingImages != null || d.pendingTelemetry != null) && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Database className="h-5 w-5 text-orange-600" />
+                  Pending Uploads
+                  <span className="text-sm font-normal text-muted-foreground ml-2">
+                    (Red = Power but no WiFi, Yellow = WiFi only, Green = Internet)
+                  </span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={300}>
+                  <ComposedChart data={chartData}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis
+                      dataKey="timestamp"
+                      type="number"
+                      domain={['dataMin', 'dataMax']}
+                      ticks={tickConfig.ticks}
+                      tickFormatter={(timestamp) => format(new Date(timestamp), tickConfig.format)}
+                    />
+                    <YAxis />
+                    <Tooltip
+                      labelFormatter={(timestamp) => format(new Date(timestamp), 'PPpp')}
+                      formatter={(value: number, name: string) => {
+                        if (name === 'Power No WiFi' || name === 'WiFi Only' || name === 'Internet') return null;
+                        return [`${value}`, name];
+                      }}
+                    />
+                    <Legend 
+                      formatter={(value) => {
+                        if (value === 'Power No WiFi' || value === 'WiFi Only' || value === 'Internet') return null;
+                        return value;
+                      }}
+                    />
+                    {/* Background areas showing connection status */}
+                    {/* Red background for power but no WiFi */}
+                    <Area
+                      type="stepAfter"
+                      dataKey="powerNoWifiBackground"
+                      stroke="none"
+                      fill="#ef4444"
+                      fillOpacity={0.15}
+                      name="Power No WiFi"
+                      legendType="none"
+                    />
+                    {/* Yellow background for WiFi only (no internet) */}
+                    <Area
+                      type="stepAfter"
+                      dataKey="wifiOnlyBackground"
+                      stroke="none"
+                      fill="#eab308"
+                      fillOpacity={0.15}
+                      name="WiFi Only"
+                      legendType="none"
+                    />
+                    {/* Green background for Internet connection */}
+                    <Area
+                      type="stepAfter"
+                      dataKey="internetBackground"
+                      stroke="none"
+                      fill="#10b981"
+                      fillOpacity={0.15}
+                      name="Internet"
+                      legendType="none"
+                    />
+                    {/* Data lines */}
+                    <Line
+                      type="linear"
+                      dataKey="pendingImages"
+                      stroke="#f97316"
+                      strokeWidth={2}
+                      name="Pending Images"
+                      dot={false}
+                    />
+                    <Line
+                      type="linear"
+                      dataKey="pendingTelemetry"
+                      stroke="#fb923c"
+                      strokeWidth={2}
+                      name="Pending Telemetry"
+                      dot={false}
+                    />
+                  </ComposedChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+          )}
+
         </div>
       ) : (
         <Card>

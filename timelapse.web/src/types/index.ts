@@ -21,7 +21,7 @@ export interface Telemetry {
   timestamp: string;
   temperatureC: number;
   batteryPercent: number;
-  status?: TelemetryStatus;
+  status?: string; // Raw JSON string from backend
   diskSpaceFree?: number;
   uptimeSeconds?: number;
   pendingImages?: number;
@@ -29,9 +29,7 @@ export interface Telemetry {
   pendingTelemetry?: number;
   uploadedTelemetry?: number;
   deviceId: number;
-}
-
-export interface TelemetryStatus {
+  // Computed properties from backend
   batteryVoltage?: number;
   batteryCurrent?: number;
   ioVoltage?: number;
