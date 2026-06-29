@@ -110,7 +110,7 @@ export function DeviceCard({ device }: DeviceCardProps) {
                       <span className="text-sm">Disk Space</span>
                     </div>
                     <span className="text-sm font-semibold">
-                      {(telemetry.diskSpaceFree / 1024 / 1024 / 1024).toFixed(1)} GB
+                      {(telemetry.diskSpaceFree ).toFixed(1)} GB
                     </span>
                   </div>
                 )}

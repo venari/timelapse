@@ -158,7 +158,7 @@ export function TelemetryGraph() {
       timestampLabel: format(new Date(t.timestamp), 'MMM dd HH:mm'),
       battery: t.batteryPercent,
       temperature: t.temperatureC,
-      diskSpace: t.diskSpaceFree ? t.diskSpaceFree / 1024 / 1024 / 1024 : null, // Convert to GB
+      diskSpace: t.diskSpaceFree ? t.diskSpaceFree : null, // Convert to GB
       voltage: t.batteryVoltage != null ? t.batteryVoltage / 1000 : null, // Convert mV to V
       current: t.batteryCurrent != null ? t.batteryCurrent : null,
       // Boolean values
