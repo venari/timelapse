@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/api/client';
@@ -20,28 +20,29 @@ import {
 } from 'recharts';
 import { format, subHours, subDays } from 'date-fns';
 
+// Helper function moved outside component to prevent recreation on every render
+function getTimeRange(timeRange: '1h' | '24h' | '48h' | '7d') {
+  const now = new Date();
+  switch (timeRange) {
+    case '1h':
+      return { start: subHours(now, 1), end: now };
+    case '24h':
+      return { start: subHours(now, 24), end: now };
+    case '48h':
+      return { start: subHours(now, 48), end: now };
+    case '7d':
+      return { start: subDays(now, 7), end: now };
+  }
+}
+
 export function TelemetryGraph() {
   const { deviceId } = useParams<{ deviceId: string }>();
   const [timeRange, setTimeRange] = useState<'1h' | '24h' | '48h' | '7d'>('24h');
 
-  const getTimeRange = () => {
-    const now = new Date();
-    switch (timeRange) {
-      case '1h':
-        return { start: subHours(now, 1), end: now };
-      case '24h':
-        return { start: subHours(now, 24), end: now };
-      case '48h':
-        return { start: subHours(now, 48), end: now };
-      case '7d':
-        return { start: subDays(now, 7), end: now };
-    }
-  };
+  const { start, end } = getTimeRange(timeRange);
 
-  const { start, end } = getTimeRange();
-
-  // Generate tick values aligned to sensible time boundaries
-  const getTickConfig = () => {
+  // Generate tick values aligned to sensible time boundaries - memoized
+  const tickConfig = useMemo(() => {
     const ticks: number[] = [];
     let current: Date;
     let interval: number;
@@ -92,9 +93,7 @@ export function TelemetryGraph() {
       ticks,
       format: formatStr,
     };
-  };
-
-  const tickConfig = getTickConfig();
+  }, [timeRange, start, end]);
 
   const {
     data: device,
@@ -120,7 +119,59 @@ export function TelemetryGraph() {
       ),
     enabled: !!deviceId,
     refetchInterval: 30000, // Refetch every 30 seconds for real-time updates
+    staleTime: 25000, // Consider data stale after 25 seconds (just before refetch)
+    gcTime: 60000, // Keep unused data in cache for only 1 minute before garbage collection
   });
+
+  // Prepare chart data - memoized to prevent memory leaks from recreating large arrays
+  // Must be called before any conditional returns (Rules of Hooks)
+  const { chartData, voltageMin, voltageMax } = useMemo(() => {
+    const rawChartData =
+      telemetry?.map((t) => ({
+        timestamp: new Date(t.timestamp).getTime(),
+        timestampLabel: format(new Date(t.timestamp), 'MMM dd HH:mm'),
+        battery: t.batteryPercent,
+        temperature: t.temperatureC,
+        diskSpace: t.diskSpaceFree ? t.diskSpaceFree : null, // Convert to GB
+        voltage: t.batteryVoltage != null ? t.batteryVoltage / 1000 : null, // Convert mV to V
+        current: t.batteryCurrent != null ? t.batteryCurrent : null,
+        // Boolean values
+        charging: t.charging === true ? 1 : 0,
+        powerSwitch: t.powerSwitch === true ? 1 : 0,
+        connectedWifi: t.connectedToWirelessNetwork === true ? 1 : 0,
+        connectedInternet: t.connectedToInternet === true ? 1 : 0,
+        // Numeric values
+        uptimeHours: t.uptimeSeconds != null ? t.uptimeSeconds / 3600 : null, // Convert to hours
+        pendingImages: t.pendingImages != null ? t.pendingImages : null,
+        pendingTelemetry: t.pendingTelemetry != null ? t.pendingTelemetry : null,
+      })) || [];
+
+    // Calculate min and max voltage for y-axis domain
+    const voltageValues = rawChartData.map(d => d.voltage).filter((v): v is number => v != null && v > 0);
+    const minVoltage = voltageValues.length > 0 ? Math.min(...voltageValues) : 0;
+    const maxVoltage = voltageValues.length > 0 ? Math.max(...voltageValues) : 5;
+    
+    // Add 5% padding to voltage range for better visualization
+    const voltagePadding = (maxVoltage - minVoltage) * 0.05;
+    const voltageMin = Math.max(0, minVoltage - voltagePadding);
+    const voltageMax = maxVoltage + voltagePadding;
+    
+    // Calculate max pending uploads for full-height connection status background
+    const maxPendingUploads = Math.max(
+      ...rawChartData.map(d => Math.max(d.pendingImages || 0, d.pendingTelemetry || 0)),
+      10 // Default minimum
+    );
+    
+    const chartData = rawChartData.map(d => ({
+      ...d,
+      chargingBackground: d.charging === 1 ? voltageMax : null, // Use voltageMax for full-height background
+      powerNoWifiBackground: d.powerSwitch === 1 && d.connectedWifi === 0 ? maxPendingUploads * 1.1 : 0, // Red for power but no WiFi
+      wifiOnlyBackground: d.connectedWifi === 1 && d.connectedInternet === 0 ? maxPendingUploads * 1.1 : 0, // Yellow for WiFi only
+      internetBackground: d.connectedInternet === 1 ? maxPendingUploads * 1.1 : 0, // Green for Internet
+    }));
+
+    return { chartData, voltageMin, voltageMax };
+  }, [telemetry]);
 
   const handleTimeRangeChange = (value: string) => {
     setTimeRange(value as '1h' | '24h' | '48h' | '7d');
@@ -150,51 +201,6 @@ export function TelemetryGraph() {
       </div>
     );
   }
-
-  // Prepare chart data
-  const rawChartData =
-    telemetry?.map((t) => ({
-      timestamp: new Date(t.timestamp).getTime(),
-      timestampLabel: format(new Date(t.timestamp), 'MMM dd HH:mm'),
-      battery: t.batteryPercent,
-      temperature: t.temperatureC,
-      diskSpace: t.diskSpaceFree ? t.diskSpaceFree : null, // Convert to GB
-      voltage: t.batteryVoltage != null ? t.batteryVoltage / 1000 : null, // Convert mV to V
-      current: t.batteryCurrent != null ? t.batteryCurrent : null,
-      // Boolean values
-      charging: t.charging === true ? 1 : 0,
-      powerSwitch: t.powerSwitch === true ? 1 : 0,
-      connectedWifi: t.connectedToWirelessNetwork === true ? 1 : 0,
-      connectedInternet: t.connectedToInternet === true ? 1 : 0,
-      // Numeric values
-      uptimeHours: t.uptimeSeconds != null ? t.uptimeSeconds / 3600 : null, // Convert to hours
-      pendingImages: t.pendingImages != null ? t.pendingImages : null,
-      pendingTelemetry: t.pendingTelemetry != null ? t.pendingTelemetry : null,
-    })) || [];
-
-  // Calculate min and max voltage for y-axis domain
-  const voltageValues = rawChartData.map(d => d.voltage).filter((v): v is number => v != null && v > 0);
-  const minVoltage = voltageValues.length > 0 ? Math.min(...voltageValues) : 0;
-  const maxVoltage = voltageValues.length > 0 ? Math.max(...voltageValues) : 5;
-  
-  // Add 5% padding to voltage range for better visualization
-  const voltagePadding = (maxVoltage - minVoltage) * 0.05;
-  const voltageMin = Math.max(0, minVoltage - voltagePadding);
-  const voltageMax = maxVoltage + voltagePadding;
-  
-  // Calculate max pending uploads for full-height connection status background
-  const maxPendingUploads = Math.max(
-    ...rawChartData.map(d => Math.max(d.pendingImages || 0, d.pendingTelemetry || 0)),
-    10 // Default minimum
-  );
-  
-  const chartData = rawChartData.map(d => ({
-    ...d,
-    chargingBackground: d.charging === 1 ? voltageMax : null, // Use voltageMax for full-height background
-    powerNoWifiBackground: d.powerSwitch === 1 && d.connectedWifi === 0 ? maxPendingUploads * 1.1 : 0, // Red for power but no WiFi
-    wifiOnlyBackground: d.connectedWifi === 1 && d.connectedInternet === 0 ? maxPendingUploads * 1.1 : 0, // Yellow for WiFi only
-    internetBackground: d.connectedInternet === 1 ? maxPendingUploads * 1.1 : 0, // Green for Internet
-  }));
 
   return (
     <div className="container mx-auto py-8 px-4">
