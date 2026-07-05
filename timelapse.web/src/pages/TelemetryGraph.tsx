@@ -172,8 +172,15 @@ export function TelemetryGraph() {
       pendingTelemetry: t.pendingTelemetry != null ? t.pendingTelemetry : null,
     })) || [];
 
-  // Calculate max voltage for full-height charging background
-  const maxVoltage = Math.max(...rawChartData.map(d => d.voltage || 0).filter(v => v > 0), 5); // Default to 5V minimum
+  // Calculate min and max voltage for y-axis domain
+  const voltageValues = rawChartData.map(d => d.voltage).filter((v): v is number => v != null && v > 0);
+  const minVoltage = voltageValues.length > 0 ? Math.min(...voltageValues) : 0;
+  const maxVoltage = voltageValues.length > 0 ? Math.max(...voltageValues) : 5;
+  
+  // Add 5% padding to voltage range for better visualization
+  const voltagePadding = (maxVoltage - minVoltage) * 0.05;
+  const voltageMin = Math.max(0, minVoltage - voltagePadding);
+  const voltageMax = maxVoltage + voltagePadding;
   
   // Calculate max pending uploads for full-height connection status background
   const maxPendingUploads = Math.max(
@@ -183,7 +190,7 @@ export function TelemetryGraph() {
   
   const chartData = rawChartData.map(d => ({
     ...d,
-    chargingBackground: d.charging === 1 ? maxVoltage * 1.1 : 0, // Extend 10% above max voltage
+    chargingBackground: d.charging === 1 ? voltageMax : null, // Use voltageMax for full-height background
     powerNoWifiBackground: d.powerSwitch === 1 && d.connectedWifi === 0 ? maxPendingUploads * 1.1 : 0, // Red for power but no WiFi
     wifiOnlyBackground: d.connectedWifi === 1 && d.connectedInternet === 0 ? maxPendingUploads * 1.1 : 0, // Yellow for WiFi only
     internetBackground: d.connectedInternet === 1 ? maxPendingUploads * 1.1 : 0, // Green for Internet
@@ -349,7 +356,7 @@ export function TelemetryGraph() {
                       ticks={tickConfig.ticks}
                       tickFormatter={(timestamp) => format(new Date(timestamp), tickConfig.format)}
                     />
-                    <YAxis yAxisId="left" label={{ value: 'Voltage (V)', angle: -90, position: 'insideLeft' }} />
+                    <YAxis yAxisId="left" domain={[voltageMin, voltageMax]} label={{ value: 'Voltage (V)', angle: -90, position: 'insideLeft' }} />
                     <YAxis yAxisId="right" orientation="right" label={{ value: 'Current (mA)', angle: 90, position: 'insideRight' }} />
                     <Tooltip
                       labelFormatter={(timestamp) => format(new Date(timestamp), 'PPpp')}
