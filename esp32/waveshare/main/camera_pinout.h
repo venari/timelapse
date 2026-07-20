@@ -120,6 +120,11 @@
 #define CAM_PIN_VSYNC 36
 #define CAM_PIN_HREF 35
 #define CAM_PIN_PCLK 37
+
+// TF/SD card (SDMMC 1-bit mode), same on V1 and V2
+#define SD_PIN_CLK 5
+#define SD_PIN_CMD 4
+#define SD_PIN_D0 6
 #endif
 
 // Waveshare ESP32-S3-SIM7670G-4G, hardware V2
@@ -141,4 +146,9 @@
 #define CAM_PIN_VSYNC 42
 #define CAM_PIN_HREF 41
 #define CAM_PIN_PCLK 46
+
+// TF/SD card (SDMMC 1-bit mode), same on V1 and V2
+#define SD_PIN_CLK 5
+#define SD_PIN_CMD 4
+#define SD_PIN_D0 6
 #endif
