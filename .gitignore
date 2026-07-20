@@ -142,4 +142,4 @@ arduino_secrets.cpp
 timelapse.functions/local.settings.json
 
 # esp-idf build artefacts
-sdkconfig*
+managed_components/
