@@ -100,3 +100,45 @@
 #define CAM_PIN_D6 11
 #define CAM_PIN_D7 48
 #endif
+
+// Waveshare ESP32-S3-SIM7670G-4G, hardware V1
+// https://docs.waveshare.com/ESP32-S3-SIM7670G-4G/Arduino
+#ifdef BOARD_WAVESHARE_SIM7670G_V1
+#define CAM_PIN_PWDN -1
+#define CAM_PIN_RESET -1   //software reset will be performed
+#define CAM_PIN_XCLK 34
+#define CAM_PIN_SIOD 15
+#define CAM_PIN_SIOC 16
+#define CAM_PIN_D0 7
+#define CAM_PIN_D1 8
+#define CAM_PIN_D2 9
+#define CAM_PIN_D3 10
+#define CAM_PIN_D4 11
+#define CAM_PIN_D5 12
+#define CAM_PIN_D6 13
+#define CAM_PIN_D7 14
+#define CAM_PIN_VSYNC 36
+#define CAM_PIN_HREF 35
+#define CAM_PIN_PCLK 37
+#endif
+
+// Waveshare ESP32-S3-SIM7670G-4G, hardware V2
+// https://docs.waveshare.com/ESP32-S3-SIM7670G-4G/Arduino
+#ifdef BOARD_WAVESHARE_SIM7670G_V2
+#define CAM_PIN_PWDN -1
+#define CAM_PIN_RESET -1   //software reset will be performed
+#define CAM_PIN_XCLK 39
+#define CAM_PIN_SIOD 15
+#define CAM_PIN_SIOC 16
+#define CAM_PIN_D0 7
+#define CAM_PIN_D1 8
+#define CAM_PIN_D2 9
+#define CAM_PIN_D3 10
+#define CAM_PIN_D4 11
+#define CAM_PIN_D5 12
+#define CAM_PIN_D6 13
+#define CAM_PIN_D7 14
+#define CAM_PIN_VSYNC 42
+#define CAM_PIN_HREF 41
+#define CAM_PIN_PCLK 46
+#endif

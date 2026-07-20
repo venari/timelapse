@@ -55,7 +55,10 @@
 #include "esp_camera_af.h"
 #endif
 
-#define BOARD_WROVER_KIT 1
+// Waveshare ESP32-S3-SIM7670G-4G — pick the macro matching your board's hardware revision
+// (V1: XCLK=34/VSYNC=36/HREF=35/PCLK=37, V2: XCLK=39/VSYNC=42/HREF=41/PCLK=46)
+#define BOARD_WAVESHARE_SIM7670G_V1 1
+// #define BOARD_WAVESHARE_SIM7670G_V2 1
 
 #include "camera_pinout.h"
 
