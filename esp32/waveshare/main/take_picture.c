@@ -37,9 +37,16 @@
 
 #include <esp_log.h>
 #include <esp_system.h>
+#include <esp_timer.h>
 #include <nvs_flash.h>
 #include <sys/param.h>
 #include <string.h>
+#include <stdio.h>
+#include <inttypes.h>
+
+#include "esp_vfs_fat.h"
+#include "sdmmc_cmd.h"
+#include "driver/sdmmc_host.h"
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -63,6 +70,68 @@
 #include "camera_pinout.h"
 
 static const char *TAG = "example:take_picture";
+
+#define SD_MOUNT_POINT "/sdcard"
+#define LOG_FILE_PATH SD_MOUNT_POINT "/log.txt"
+
+static esp_err_t init_sdcard(void)
+{
+    esp_vfs_fat_sdmmc_mount_config_t mount_config = {
+        .format_if_mount_failed = false,
+        .max_files = 5,
+        .allocation_unit_size = 16 * 1024,
+    };
+
+    sdmmc_host_t host = SDMMC_HOST_DEFAULT();
+
+    sdmmc_slot_config_t slot_config = SDMMC_SLOT_CONFIG_DEFAULT();
+    slot_config.clk = SD_PIN_CLK;
+    slot_config.cmd = SD_PIN_CMD;
+    slot_config.d0 = SD_PIN_D0;
+    slot_config.width = 1;
+    // Internal pull-ups are too weak for reliable SD identification (see
+    // esp-idf/examples/storage/sd_card/sdmmc). If mounting keeps timing out
+    // with a card known to be good, add real 10k external pull-ups on CMD/D0.
+    slot_config.flags |= SDMMC_SLOT_FLAG_INTERNAL_PULLUP;
+
+    sdmmc_card_t *card = NULL;
+    esp_err_t err = ESP_FAIL;
+    const int max_attempts = 3;
+    for (int attempt = 1; attempt <= max_attempts; attempt++)
+    {
+        err = esp_vfs_fat_sdmmc_mount(SD_MOUNT_POINT, &host, &slot_config, &mount_config, &card);
+        if (err == ESP_OK)
+        {
+            break;
+        }
+        ESP_LOGW(TAG, "SD mount attempt %d/%d failed: %s", attempt, max_attempts, esp_err_to_name(err));
+        vTaskDelay(pdMS_TO_TICKS(200));
+    }
+
+    if (err != ESP_OK)
+    {
+        ESP_LOGE(TAG, "Failed to mount SD card: %s", esp_err_to_name(err));
+        return err;
+    }
+
+    sdmmc_card_print_info(stdout, card);
+    ESP_LOGI(TAG, "SD card mounted at %s", SD_MOUNT_POINT);
+    return ESP_OK;
+}
+
+static void log_picture_taken(unsigned pic_index, size_t pic_size)
+{
+    FILE *f = fopen(LOG_FILE_PATH, "a");
+    if (!f)
+    {
+        ESP_LOGE(TAG, "Failed to open %s for appending", LOG_FILE_PATH);
+        return;
+    }
+
+    fprintf(f, "[%" PRId64 " ms] picture #%u taken, size=%zu bytes\n",
+            esp_timer_get_time() / 1000, pic_index, pic_size);
+    fclose(f);
+}
 
 #if ESP_CAMERA_SUPPORTED
 static camera_config_t camera_config = {
@@ -148,12 +217,21 @@ void app_main(void)
         return;
     }
 
+    if (ESP_OK != init_sdcard())
+    {
+        return;
+    }
+
+    printf("SD OK");
+    return;
+
 #if defined(CONFIG_CAMERA_AF_SUPPORT) && CONFIG_CAMERA_AF_SUPPORT
     // Initialize autofocus if configured and supported by the sensor.
     // In menuconfig: Component config → Camera configuration → Enable autofocus support
     maybe_init_autofocus();
 #endif
 
+    unsigned pic_count = 0;
     while (1)
     {
         ESP_LOGI(TAG, "Taking picture...");
@@ -161,6 +239,7 @@ void app_main(void)
 
         // use pic->buf to access the image
         ESP_LOGI(TAG, "Picture taken! Its size was: %zu bytes", pic->len);
+        log_picture_taken(pic_count++, pic->len);
         esp_camera_fb_return(pic);
 
         vTaskDelay(5000 / portTICK_RATE_MS);
