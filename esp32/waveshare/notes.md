@@ -1,6 +1,7 @@
+# esp-idf enviroment
 Unfortunately, the espressif ESP-IDF extension isn't working well with my VS Code installation, so I'm just using the ESP-IDF cli
 
-To do so, first run the export shell script:
+To do so, first run the export shell script from your esp-idf installation:
 ```bash
 export ~/.espressif/v6.0.2/esp-idf/export.sh
 ```
@@ -21,3 +22,9 @@ Was having difficulties building the xtensa library with `idf.py build`, so swit
 idf.py fullclean
 idf.py -G "Unix Makefiles" build
 ```
+
+Installed esp32-camera through
+```bash
+idf.py add-dependency "espressif/esp32-camera"
+```
+Example code found at [https://github.com/espressif/esp32-camera/blob/master/examples/camera_example/main/take_picture.c](https://github.com/espressif/esp32-camera/blob/master/examples/camera_example/main/take_picture.c)
