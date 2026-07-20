@@ -1,2 +1,2 @@
-idf_component_register(SRCS "waveshare.c"
+idf_component_register(SRCS "take_picture.c"
                     INCLUDE_DIRS ".")
