@@ -80,7 +80,7 @@
 // SIMCOM standard interface series
 // #define LILYGO_SIM7000G_S3_STAN
 // #define LILYGO_SIM7080G_S3_STAN
-// #define LILYGO_SIM7670G_S3_STAN
+#define LILYGO_SIM7670G_S3_STAN
 // #define LILYGO_A7670X_S3_STAN
 // #define LILYGO_SIM7600X_S3_STAN
 

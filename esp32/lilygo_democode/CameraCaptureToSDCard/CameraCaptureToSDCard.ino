@@ -19,6 +19,8 @@
 #include <FS.h>
 #include <SD.h>
 
+#include "utilities.h"
+
 #if !defined(LILYGO_SIM7000G_S3_STAN) && !defined(LILYGO_SIM7080G_S3_STAN) \
     && !defined(LILYGO_SIM7670G_S3_STAN) && !defined(LILYGO_A7670X_S3_STAN)  && !defined(LILYGO_SIM7600X_S3_STAN)
 #error "This sketch is only applicable to the T-A7670X-S3-Standard,T-SIM7000G-S3-Standard,T-SIM7080G-S3-Standard,T-SIM7670G-S3-Standard,T-SIM7600X-S3-Standard"
@@ -27,10 +29,10 @@
 #define ENABLE_BATTERY_MON
 
 #include <Wire.h>
-#include "utilities.h"
 
 #define uS_TO_S_FACTOR          1000000ULL  /* Conversion factor for micro seconds to seconds */
-#define TIME_TO_SLEEP           180          /* Time ESP32 will go to sleep (in seconds) */
+// #define TIME_TO_SLEEP           180          /* Time ESP32 will go to sleep (in seconds) */
+#define TIME_TO_SLEEP           10          /* Time ESP32 will go to sleep (in seconds) */
 #define BATTERY_VOLTAGE_LOW     3000        // Set low voltage to sleep mode
 
 RTC_DATA_ATTR int bootCount = 0;
