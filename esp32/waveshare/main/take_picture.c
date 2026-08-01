@@ -74,8 +74,27 @@ static const char *TAG = "example:take_picture";
 #define SD_MOUNT_POINT "/sdcard"
 #define LOG_FILE_PATH SD_MOUNT_POINT "/log.txt"
 
+static void enable_sdmmc_debug_logging(void)
+{
+    // Global level stays at INFO (see sdkconfig); only the SD/MMC stack is
+    // bumped to DEBUG so we can see the raw controller status/error codes
+    // behind failures like "sdmmc_init_ocr: send_op_cond returned 0x107"
+    // without drowning the log in WiFi/BT/etc. debug output.
+    const char *sdmmc_tags[] = {
+        "sdmmc_common", "sdmmc_init", "sdmmc_cmd", "sdmmc_sd",
+        "sdmmc_mmc", "sdmmc_io", "sdmmc_req", "sdmmc_periph",
+        "SD_TRANS", "SD_HOST", "vfs_fat_sdmmc",
+    };
+    for (size_t i = 0; i < sizeof(sdmmc_tags) / sizeof(sdmmc_tags[0]); i++)
+    {
+        esp_log_level_set(sdmmc_tags[i], ESP_LOG_DEBUG);
+    }
+}
+
 static esp_err_t init_sdcard(void)
 {
+    enable_sdmmc_debug_logging();
+
     esp_vfs_fat_sdmmc_mount_config_t mount_config = {
         .format_if_mount_failed = false,
         .max_files = 5,
@@ -213,16 +232,19 @@ static void maybe_init_autofocus(void)
 void app_main(void)
 {
 #if ESP_CAMERA_SUPPORTED
-    if(ESP_OK != init_camera()) {
-        return;
-    }
-
+    
     if (ESP_OK != init_sdcard())
     {
         return;
     }
 
     printf("SD OK");
+    return;
+
+    if(ESP_OK != init_camera()) {
+        return;
+    }
+    printf("CAMERA OK");
     return;
 
 #if defined(CONFIG_CAMERA_AF_SUPPORT) && CONFIG_CAMERA_AF_SUPPORT
