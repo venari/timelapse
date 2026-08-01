@@ -10,4 +10,4 @@ Documentation here: https://github.com/Xinyuan-LILYGO/LilyGo-Modem-Series/blob/m
 - For serial, specify  baud, NL&CR.
 - To trigger upload if in deep sleep, press & hold **Boot**. press & release **Reset**, and then release **Boot**.
 - Board was attached on COM10 for me on Windows.
-- Follow notes in top level Readme.md regarding using `uspipd` to share if using `WSL`.
+- Follow notes in top level [README.md](/README.md) regarding using `uspipd` to share if using `WSL`.
