@@ -18,8 +18,11 @@
 #include <Wire.h>
 #include <FS.h>
 #include <SD.h>
+#include <WiFi.h>
+#include <time.h>
 
 #include "utilities.h"
+#include "secrets.h"
 
 #if !defined(LILYGO_SIM7000G_S3_STAN) && !defined(LILYGO_SIM7080G_S3_STAN) \
     && !defined(LILYGO_SIM7670G_S3_STAN) && !defined(LILYGO_A7670X_S3_STAN)  && !defined(LILYGO_SIM7600X_S3_STAN)
@@ -34,6 +37,11 @@
 // #define TIME_TO_SLEEP           180          /* Time ESP32 will go to sleep (in seconds) */
 #define TIME_TO_SLEEP           10          /* Time ESP32 will go to sleep (in seconds) */
 #define BATTERY_VOLTAGE_LOW     3000        // Set low voltage to sleep mode
+
+#define WIFI_CONNECT_TIMEOUT_MS 15000       // Give up on WiFi after this long
+#define NTP_SERVER              "pool.ntp.org"
+#define GMT_OFFSET_SEC           0          // Adjust for local timezone
+#define DAY_LIGHT_OFFSET_SEC     0          // Adjust for daylight saving
 
 RTC_DATA_ATTR int bootCount = 0;
 
@@ -136,6 +144,50 @@ bool setupSD()
     return true;
 }
 
+bool connectWiFiAndSyncTime()
+{
+    Serial.printf("Connecting to WiFi: %s\n", WIFI_SSID);
+    WiFi.mode(WIFI_STA);
+    WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+
+    uint32_t startTime = millis();
+    while (WiFi.status() != WL_CONNECTED) {
+        if (millis() - startTime > WIFI_CONNECT_TIMEOUT_MS) {
+            Serial.println("WiFi connect timed out!");
+            return false;
+        }
+        delay(250);
+        Serial.print(".");
+    }
+    Serial.printf("\nWiFi connected, IP: %s\n", WiFi.localIP().toString().c_str());
+
+    configTime(GMT_OFFSET_SEC, DAY_LIGHT_OFFSET_SEC, NTP_SERVER);
+
+    struct tm timeinfo;
+    if (!getLocalTime(&timeinfo)) {
+        Serial.println("Failed to obtain time from NTP server!");
+        return false;
+    }
+    Serial.printf("Time synced: %04d-%02d-%02d %02d:%02d:%02d\n",
+                   timeinfo.tm_year + 1900, timeinfo.tm_mon + 1, timeinfo.tm_mday,
+                   timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
+    return true;
+}
+
+// Builds "yyyymmdd-hhmmss" from the current system time
+String getTimestampString()
+{
+    struct tm timeinfo;
+    char buf[16];
+    if (!getLocalTime(&timeinfo, 0)) {
+        // Fall back to boot count if time was never synced
+        snprintf(buf, sizeof(buf), "boot-%d", bootCount);
+        return String(buf);
+    }
+    strftime(buf, sizeof(buf), "%Y%m%d-%H%M%S", &timeinfo);
+    return String(buf);
+}
+
 void setup()
 {
     Serial.begin(115200);
@@ -167,6 +219,11 @@ void setup()
     // Initialize sd card
     if (!setupSD()) {
         Serial.println("Failed to initialize SD card! Please check SD card!"); return;
+    }
+
+    // Connect to WiFi and sync the RTC from NTP so captured images can be timestamped
+    if (!connectWiFiAndSyncTime()) {
+        Serial.println("Continuing without synced time, filenames will use boot count!");
     }
 
     // Enable / disable power save mode (1 disabled, 0 enabled)
@@ -231,7 +288,7 @@ void setup()
         }
 
         String filename = "/camera/";
-        filename.concat(bootCount);
+        filename.concat(getTimestampString());
         filename.concat(".jpg");
 
         uint32_t startTime = millis();
@@ -257,6 +314,9 @@ void loop()
 
     Serial.println("Power off camera");
     setCameraPower(false);
+
+    WiFi.disconnect(true);
+    WiFi.mode(WIFI_OFF);
 
     Serial.println("Enter esp32 goto deepsleep!");
     esp_sleep_enable_timer_wakeup(TIME_TO_SLEEP * uS_TO_S_FACTOR);
