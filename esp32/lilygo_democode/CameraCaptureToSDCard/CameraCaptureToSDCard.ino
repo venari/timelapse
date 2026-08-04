@@ -57,7 +57,17 @@
 #define CAMERA_DIR               "/camera"
 #define CAMERA_UPLOADED_DIR      "/camera/uploaded"  // Nothing moves images here yet - reserved for a future upload step
 
+#define COUNTS_FILE              "/counts.txt"  // Running pending/uploaded totals, kept up to date incrementally
+                                                 // instead of scanning directories (which gets slow with thousands of files)
+
 RTC_DATA_ATTR int bootCount = 0;
+
+struct TelemetryCounts {
+    int pendingImages;
+    int uploadedImages;
+    int pendingTelemetry;
+    int uploadedTelemetry;
+};
 
 WiFiClient mqttNetClient;
 PubSubClient mqttClient(mqttNetClient);
@@ -184,6 +194,34 @@ void writeLastSyncTime(time_t t)
     }
 }
 
+// Returns all-zero counts if never written yet (no file, or unreadable)
+TelemetryCounts readCounts()
+{
+    TelemetryCounts counts = {0, 0, 0, 0};
+    File file = SD.open(COUNTS_FILE, "r");
+    if (!file) {
+        return counts;
+    }
+    String line = file.readStringUntil('\n');
+    file.close();
+    sscanf(line.c_str(), "%d,%d,%d,%d",
+           &counts.pendingImages, &counts.uploadedImages,
+           &counts.pendingTelemetry, &counts.uploadedTelemetry);
+    return counts;
+}
+
+void writeCounts(const TelemetryCounts &counts)
+{
+    File file = SD.open(COUNTS_FILE, "w");
+    if (file) {
+        file.printf("%d,%d,%d,%d\n", counts.pendingImages, counts.uploadedImages,
+                     counts.pendingTelemetry, counts.uploadedTelemetry);
+        file.close();
+    } else {
+        Serial.println("Failed to write counts file!");
+    }
+}
+
 bool connectWiFiAndSyncTime()
 {
     Serial.printf("Connecting to WiFi: %s\n", WIFI_SSID);
@@ -251,42 +289,17 @@ String getDeviceId()
     return String(buf);
 }
 
-// Counts regular files (not subdirectories) directly inside path. Returns 0 if path doesn't exist.
-int countFilesInDir(const char *path)
-{
-    File dir = SD.open(path);
-    if (!dir) {
-        return 0;
-    }
-    int count = 0;
-    File entry = dir.openNextFile();
-    while (entry) {
-        if (!entry.isDirectory()) {
-            count++;
-        }
-        entry.close();
-        entry = dir.openNextFile();
-    }
-    dir.close();
-    return count;
-}
-
-String buildTelemetryJson(const String &timestamp, const String &deviceId, uint16_t voltageMv)
+String buildTelemetryJson(const String &timestamp, const String &deviceId, uint16_t voltageMv, const TelemetryCounts &counts)
 {
     // ESP32-S3 internal die temperature sensor, not ambient temperature
     float temperatureC = temperatureRead();
-
-    int pendingImages = countFilesInDir(CAMERA_DIR);
-    int uploadedImages = countFilesInDir(CAMERA_UPLOADED_DIR);
-    int pendingTelemetry = countFilesInDir(TELEMETRY_DIR);
-    int uploadedTelemetry = countFilesInDir(TELEMETRY_UPLOADED_DIR);
 
     char json[320];
     snprintf(json, sizeof(json),
              "{\"device_id\":\"%s\",\"timestamp\":\"%s\",\"boot_count\":%d,\"voltage_mv\":%u,\"temperature_c\":%.2f,"
              "\"pendingImages\":%d,\"uploadedImages\":%d,\"pendingTelemetry\":%d,\"uploadedTelemetry\":%d}",
              deviceId.c_str(), timestamp.c_str(), bootCount, voltageMv, temperatureC,
-             pendingImages, uploadedImages, pendingTelemetry, uploadedTelemetry);
+             counts.pendingImages, counts.uploadedImages, counts.pendingTelemetry, counts.uploadedTelemetry);
     return String(json);
 }
 
@@ -313,7 +326,7 @@ void writeTelemetryFile(const String &timestamp, const String &json)
 // Publishes every telemetry file still sitting in TELEMETRY_DIR (including ones saved
 // during earlier offline cycles), moving each one to TELEMETRY_UPLOADED_DIR once its
 // publish is acknowledged. Anything that fails to publish is left in place to retry next time.
-void publishPendingTelemetry(const String &deviceId)
+void publishPendingTelemetry(const String &deviceId, TelemetryCounts &counts)
 {
     if (WiFi.status() != WL_CONNECTED) {
         return;
@@ -349,6 +362,8 @@ void publishPendingTelemetry(const String &deviceId)
         if (mqttClient.publish(topic.c_str(), payload.c_str())) {
             String uploadedPath = String(TELEMETRY_UPLOADED_DIR) + "/" + baseName;
             SD.rename(filePath, uploadedPath);
+            counts.pendingTelemetry--;
+            counts.uploadedTelemetry++;
             Serial.printf("Published and archived %s\n", filePath.c_str());
         } else {
             Serial.printf("Failed to publish %s, will retry next time\n", filePath.c_str());
@@ -393,6 +408,10 @@ void setup()
     if (!setupSD()) {
         Serial.println("Failed to initialize SD card! Please check SD card!"); return;
     }
+
+    // Kept up to date incrementally below rather than re-scanned from disk each wake,
+    // since scanning directories with thousands of backlogged files gets slow
+    TelemetryCounts counts = readCounts();
 
     // Deep sleep keeps the RTC running, so the clock usually survives between wake-ups.
     // Only reconnect to WiFi if the clock looks like it was reset by a power interruption
@@ -483,6 +502,7 @@ void setup()
             Serial.printf("JPG created successfully,filename:%s write image data,framesize:%u * %u", filename.c_str(), frame->width, frame->height);
             jpg.write(frame->buf, frame->len);
             Serial.printf("JPG was written successfully, taking %lu ms\n", millis() - startTime);
+            counts.pendingImages++;
         } else {
             Serial.printf("JPG created failed!");
         }
@@ -492,10 +512,12 @@ void setup()
         Serial.println("Capturing camera failed!");
     }
 
+    counts.pendingTelemetry++;
     String deviceId = getDeviceId();
-    String telemetryJson = buildTelemetryJson(getISO8601Timestamp(), deviceId, get_battery_voltage());
+    String telemetryJson = buildTelemetryJson(getISO8601Timestamp(), deviceId, get_battery_voltage(), counts);
     writeTelemetryFile(timestamp, telemetryJson);
-    publishPendingTelemetry(deviceId);
+    publishPendingTelemetry(deviceId, counts);
+    writeCounts(counts);
 }
 
 void loop()
