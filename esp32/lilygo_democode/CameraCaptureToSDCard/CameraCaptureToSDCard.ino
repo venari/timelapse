@@ -51,6 +51,12 @@
 #define MQTT_BROKER_PORT         1883
 #define MQTT_TOPIC_PREFIX        "camera"     // Telemetry is published to <prefix>/<device_id>/telemetry
 
+#define TELEMETRY_DIR            "/telemetry"
+#define TELEMETRY_UPLOADED_DIR   "/uploaded"        // Successfully published telemetry is moved here
+
+#define CAMERA_DIR               "/camera"
+#define CAMERA_UPLOADED_DIR      "/camera/uploaded"  // Nothing moves images here yet - reserved for a future upload step
+
 RTC_DATA_ATTR int bootCount = 0;
 
 WiFiClient mqttNetClient;
@@ -208,7 +214,8 @@ bool connectWiFiAndSyncTime()
     return true;
 }
 
-// Builds "yyyymmdd-hhmmss" from the current system time
+// Builds "yyyymmdd-hhmmss" from the current system time - filesystem-safe, used for filenames
+// (FAT doesn't allow ':' in names, so this can't be true ISO8601)
 String getTimestampString()
 {
     struct tm timeinfo;
@@ -222,6 +229,19 @@ String getTimestampString()
     return String(buf);
 }
 
+// Builds an ISO8601 timestamp, e.g. "2026-08-04T05:30:45Z" - used in telemetry payloads.
+// The "Z" assumes GMT_OFFSET_SEC/DAY_LIGHT_OFFSET_SEC are left at 0 (UTC)
+String getISO8601Timestamp()
+{
+    struct tm timeinfo;
+    char buf[25];
+    if (!getLocalTime(&timeinfo, 0)) {
+        return String("unknown");
+    }
+    strftime(buf, sizeof(buf), "%Y-%m-%dT%H:%M:%SZ", &timeinfo);
+    return String(buf);
+}
+
 // Derived from the efuse base MAC, so it's stable and unique per board without needing WiFi to be up
 String getDeviceId()
 {
@@ -231,29 +251,54 @@ String getDeviceId()
     return String(buf);
 }
 
+// Counts regular files (not subdirectories) directly inside path. Returns 0 if path doesn't exist.
+int countFilesInDir(const char *path)
+{
+    File dir = SD.open(path);
+    if (!dir) {
+        return 0;
+    }
+    int count = 0;
+    File entry = dir.openNextFile();
+    while (entry) {
+        if (!entry.isDirectory()) {
+            count++;
+        }
+        entry.close();
+        entry = dir.openNextFile();
+    }
+    dir.close();
+    return count;
+}
+
 String buildTelemetryJson(const String &timestamp, const String &deviceId, uint16_t voltageMv)
 {
     // ESP32-S3 internal die temperature sensor, not ambient temperature
     float temperatureC = temperatureRead();
 
-    char json[220];
+    int pendingImages = countFilesInDir(CAMERA_DIR);
+    int uploadedImages = countFilesInDir(CAMERA_UPLOADED_DIR);
+    int pendingTelemetry = countFilesInDir(TELEMETRY_DIR);
+    int uploadedTelemetry = countFilesInDir(TELEMETRY_UPLOADED_DIR);
+
+    char json[320];
     snprintf(json, sizeof(json),
-             "{\"device_id\":\"%s\",\"timestamp\":\"%s\",\"boot_count\":%d,\"voltage_mv\":%u,\"temperature_c\":%.2f}",
-             deviceId.c_str(), timestamp.c_str(), bootCount, voltageMv, temperatureC);
+             "{\"device_id\":\"%s\",\"timestamp\":\"%s\",\"boot_count\":%d,\"voltage_mv\":%u,\"temperature_c\":%.2f,"
+             "\"pendingImages\":%d,\"uploadedImages\":%d,\"pendingTelemetry\":%d,\"uploadedTelemetry\":%d}",
+             deviceId.c_str(), timestamp.c_str(), bootCount, voltageMv, temperatureC,
+             pendingImages, uploadedImages, pendingTelemetry, uploadedTelemetry);
     return String(json);
 }
 
 void writeTelemetryFile(const String &timestamp, const String &json)
 {
-    if (!SD.exists("/telemetry")) {
-        if (SD.mkdir("/telemetry")) {
+    if (!SD.exists(TELEMETRY_DIR)) {
+        if (SD.mkdir(TELEMETRY_DIR)) {
             Serial.println("Created telemetry directory!");
         }
     }
 
-    String filename = "/telemetry/";
-    filename.concat(timestamp);
-    filename.concat(".json");
+    String filename = String(TELEMETRY_DIR) + "/" + timestamp + ".json";
 
     File file = SD.open(filename, "w");
     if (file) {
@@ -265,23 +310,55 @@ void writeTelemetryFile(const String &timestamp, const String &json)
     file.close();
 }
 
-bool publishTelemetryMQTT(const String &deviceId, const String &json)
+// Publishes every telemetry file still sitting in TELEMETRY_DIR (including ones saved
+// during earlier offline cycles), moving each one to TELEMETRY_UPLOADED_DIR once its
+// publish is acknowledged. Anything that fails to publish is left in place to retry next time.
+void publishPendingTelemetry(const String &deviceId)
 {
     if (WiFi.status() != WL_CONNECTED) {
-        return false;
+        return;
     }
 
     mqttClient.setServer(MQTT_BROKER_HOST, MQTT_BROKER_PORT);
     if (!mqttClient.connected() && !mqttClient.connect(deviceId.c_str())) {
         Serial.printf("MQTT connect to %s failed, state:%d\n", MQTT_BROKER_HOST, mqttClient.state());
-        return false;
+        return;
+    }
+
+    if (!SD.exists(TELEMETRY_UPLOADED_DIR)) {
+        SD.mkdir(TELEMETRY_UPLOADED_DIR);
     }
 
     String topic = String(MQTT_TOPIC_PREFIX) + "/" + deviceId + "/telemetry";
-    bool ok = mqttClient.publish(topic.c_str(), json.c_str());
-    Serial.printf("MQTT publish to %s: %s\n", topic.c_str(), ok ? "ok" : "failed");
+
+    File dir = SD.open(TELEMETRY_DIR);
+    File entry = dir.openNextFile();
+    while (entry) {
+        if (entry.isDirectory()) {
+            entry.close();
+            entry = dir.openNextFile();
+            continue;
+        }
+
+        String entryName = entry.name();
+        String baseName = entryName.substring(entryName.lastIndexOf('/') + 1);
+        String filePath = String(TELEMETRY_DIR) + "/" + baseName;
+        String payload = entry.readString();
+        entry.close();
+
+        if (mqttClient.publish(topic.c_str(), payload.c_str())) {
+            String uploadedPath = String(TELEMETRY_UPLOADED_DIR) + "/" + baseName;
+            SD.rename(filePath, uploadedPath);
+            Serial.printf("Published and archived %s\n", filePath.c_str());
+        } else {
+            Serial.printf("Failed to publish %s, will retry next time\n", filePath.c_str());
+        }
+
+        entry = dir.openNextFile();
+    }
+    dir.close();
+
     mqttClient.disconnect();
-    return ok;
 }
 
 void setup()
@@ -392,15 +469,13 @@ void setup()
     if (frame) {
 
         // Stored in the camera directory
-        if (!SD.exists("/camera")) {
-            if (SD.mkdir("/camera")) {
+        if (!SD.exists(CAMERA_DIR)) {
+            if (SD.mkdir(CAMERA_DIR)) {
                 Serial.println("Created camera directory!");
             }
         }
 
-        String filename = "/camera/";
-        filename.concat(timestamp);
-        filename.concat(".jpg");
+        String filename = String(CAMERA_DIR) + "/" + timestamp + ".jpg";
 
         uint32_t startTime = millis();
         File jpg = SD.open(filename, "w");
@@ -418,9 +493,9 @@ void setup()
     }
 
     String deviceId = getDeviceId();
-    String telemetryJson = buildTelemetryJson(timestamp, deviceId, get_battery_voltage());
+    String telemetryJson = buildTelemetryJson(getISO8601Timestamp(), deviceId, get_battery_voltage());
     writeTelemetryFile(timestamp, telemetryJson);
-    publishTelemetryMQTT(deviceId, telemetryJson);
+    publishPendingTelemetry(deviceId);
 }
 
 void loop()
