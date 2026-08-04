@@ -43,6 +43,9 @@
 #define GMT_OFFSET_SEC           0          // Adjust for local timezone
 #define DAY_LIGHT_OFFSET_SEC     0          // Adjust for daylight saving
 
+#define LAST_SYNC_FILE           "/last_sync.txt"
+#define AUTO_SYNC_PERIOD_SEC     (5 * 60)     // Force a resync after this long, to correct clock drift
+
 RTC_DATA_ATTR int bootCount = 0;
 
 bool setCameraPower(bool enable)
@@ -144,6 +147,29 @@ bool setupSD()
     return true;
 }
 
+// Returns 0 if never synced (no file yet, or unreadable)
+time_t readLastSyncTime()
+{
+    File file = SD.open(LAST_SYNC_FILE, "r");
+    if (!file) {
+        return 0;
+    }
+    time_t lastSync = (time_t)file.readStringUntil('\n').toInt();
+    file.close();
+    return lastSync;
+}
+
+void writeLastSyncTime(time_t t)
+{
+    File file = SD.open(LAST_SYNC_FILE, "w");
+    if (file) {
+        file.println((long)t);
+        file.close();
+    } else {
+        Serial.println("Failed to write last sync time!");
+    }
+}
+
 bool connectWiFiAndSyncTime()
 {
     Serial.printf("Connecting to WiFi: %s\n", WIFI_SSID);
@@ -188,6 +214,36 @@ String getTimestampString()
     return String(buf);
 }
 
+void writeTelemetry(const String &timestamp, uint16_t voltageMv)
+{
+    if (!SD.exists("/telemetry")) {
+        if (SD.mkdir("/telemetry")) {
+            Serial.println("Created telemetry directory!");
+        }
+    }
+
+    String filename = "/telemetry/";
+    filename.concat(timestamp);
+    filename.concat(".json");
+
+    // ESP32-S3 internal die temperature sensor, not ambient temperature
+    float temperatureC = temperatureRead();
+
+    char json[160];
+    snprintf(json, sizeof(json),
+             "{\"timestamp\":\"%s\",\"boot_count\":%d,\"voltage_mv\":%u,\"temperature_c\":%.2f}\n",
+             timestamp.c_str(), bootCount, voltageMv, temperatureC);
+
+    File file = SD.open(filename, "w");
+    if (file) {
+        file.print(json);
+        Serial.printf("Telemetry written: %s", json);
+    } else {
+        Serial.println("Failed to write telemetry file!");
+    }
+    file.close();
+}
+
 void setup()
 {
     Serial.begin(115200);
@@ -221,9 +277,22 @@ void setup()
         Serial.println("Failed to initialize SD card! Please check SD card!"); return;
     }
 
-    // Connect to WiFi and sync the RTC from NTP so captured images can be timestamped
-    if (!connectWiFiAndSyncTime()) {
-        Serial.println("Continuing without synced time, filenames will use boot count!");
+    // Deep sleep keeps the RTC running, so the clock usually survives between wake-ups.
+    // Only reconnect to WiFi if the clock looks like it was reset by a power interruption
+    // (i.e. it's now earlier than the last time we successfully synced), or if it's been
+    // longer than AUTO_SYNC_PERIOD_SEC since the last sync, to correct clock drift.
+    time_t lastSyncTime = readLastSyncTime();
+    time_t now = time(nullptr);
+    bool needsSync = (lastSyncTime == 0) || (now < lastSyncTime) || (now - lastSyncTime >= AUTO_SYNC_PERIOD_SEC);
+    if (needsSync) {
+        Serial.println("Clock needs sync, connecting to WiFi...");
+        if (connectWiFiAndSyncTime()) {
+            writeLastSyncTime(time(nullptr));
+        } else {
+            Serial.println("Continuing without synced time, filenames will use boot count!");
+        }
+    } else {
+        Serial.println("Clock already synced, skipping WiFi connection");
     }
 
     // Enable / disable power save mode (1 disabled, 0 enabled)
@@ -275,6 +344,8 @@ void setup()
     // s->set_vflip(s, 1);
     // s->set_hmirror(s, 1);
 
+    String timestamp = getTimestampString();
+
     // Capture camera photo
     camera_fb_t *frame = esp_camera_fb_get();
 
@@ -288,7 +359,7 @@ void setup()
         }
 
         String filename = "/camera/";
-        filename.concat(getTimestampString());
+        filename.concat(timestamp);
         filename.concat(".jpg");
 
         uint32_t startTime = millis();
@@ -305,6 +376,8 @@ void setup()
     } else {
         Serial.println("Capturing camera failed!");
     }
+
+    writeTelemetry(timestamp, get_battery_voltage());
 }
 
 void loop()
