@@ -20,6 +20,7 @@
 #include <SD.h>
 #include <WiFi.h>
 #include <time.h>
+#include <PubSubClient.h>
 
 #include "utilities.h"
 #include "secrets.h"
@@ -46,7 +47,14 @@
 #define LAST_SYNC_FILE           "/last_sync.txt"
 #define AUTO_SYNC_PERIOD_SEC     (5 * 60)     // Force a resync after this long, to correct clock drift
 
+#define MQTT_BROKER_HOST         "mqtt.venari.co.nz"
+#define MQTT_BROKER_PORT         1883
+#define MQTT_TOPIC_PREFIX        "camera"     // Telemetry is published to <prefix>/<device_id>/telemetry
+
 RTC_DATA_ATTR int bootCount = 0;
+
+WiFiClient mqttNetClient;
+PubSubClient mqttClient(mqttNetClient);
 
 bool setCameraPower(bool enable)
 {
@@ -214,7 +222,28 @@ String getTimestampString()
     return String(buf);
 }
 
-void writeTelemetry(const String &timestamp, uint16_t voltageMv)
+// Derived from the efuse base MAC, so it's stable and unique per board without needing WiFi to be up
+String getDeviceId()
+{
+    uint64_t chipId = ESP.getEfuseMac();
+    char buf[13];
+    snprintf(buf, sizeof(buf), "%04X%08X", (uint16_t)(chipId >> 32), (uint32_t)chipId);
+    return String(buf);
+}
+
+String buildTelemetryJson(const String &timestamp, const String &deviceId, uint16_t voltageMv)
+{
+    // ESP32-S3 internal die temperature sensor, not ambient temperature
+    float temperatureC = temperatureRead();
+
+    char json[220];
+    snprintf(json, sizeof(json),
+             "{\"device_id\":\"%s\",\"timestamp\":\"%s\",\"boot_count\":%d,\"voltage_mv\":%u,\"temperature_c\":%.2f}",
+             deviceId.c_str(), timestamp.c_str(), bootCount, voltageMv, temperatureC);
+    return String(json);
+}
+
+void writeTelemetryFile(const String &timestamp, const String &json)
 {
     if (!SD.exists("/telemetry")) {
         if (SD.mkdir("/telemetry")) {
@@ -226,22 +255,33 @@ void writeTelemetry(const String &timestamp, uint16_t voltageMv)
     filename.concat(timestamp);
     filename.concat(".json");
 
-    // ESP32-S3 internal die temperature sensor, not ambient temperature
-    float temperatureC = temperatureRead();
-
-    char json[160];
-    snprintf(json, sizeof(json),
-             "{\"timestamp\":\"%s\",\"boot_count\":%d,\"voltage_mv\":%u,\"temperature_c\":%.2f}\n",
-             timestamp.c_str(), bootCount, voltageMv, temperatureC);
-
     File file = SD.open(filename, "w");
     if (file) {
-        file.print(json);
-        Serial.printf("Telemetry written: %s", json);
+        file.println(json);
+        Serial.printf("Telemetry written: %s\n", json.c_str());
     } else {
         Serial.println("Failed to write telemetry file!");
     }
     file.close();
+}
+
+bool publishTelemetryMQTT(const String &deviceId, const String &json)
+{
+    if (WiFi.status() != WL_CONNECTED) {
+        return false;
+    }
+
+    mqttClient.setServer(MQTT_BROKER_HOST, MQTT_BROKER_PORT);
+    if (!mqttClient.connected() && !mqttClient.connect(deviceId.c_str())) {
+        Serial.printf("MQTT connect to %s failed, state:%d\n", MQTT_BROKER_HOST, mqttClient.state());
+        return false;
+    }
+
+    String topic = String(MQTT_TOPIC_PREFIX) + "/" + deviceId + "/telemetry";
+    bool ok = mqttClient.publish(topic.c_str(), json.c_str());
+    Serial.printf("MQTT publish to %s: %s\n", topic.c_str(), ok ? "ok" : "failed");
+    mqttClient.disconnect();
+    return ok;
 }
 
 void setup()
@@ -377,7 +417,10 @@ void setup()
         Serial.println("Capturing camera failed!");
     }
 
-    writeTelemetry(timestamp, get_battery_voltage());
+    String deviceId = getDeviceId();
+    String telemetryJson = buildTelemetryJson(timestamp, deviceId, get_battery_voltage());
+    writeTelemetryFile(timestamp, telemetryJson);
+    publishTelemetryMQTT(deviceId, telemetryJson);
 }
 
 void loop()
