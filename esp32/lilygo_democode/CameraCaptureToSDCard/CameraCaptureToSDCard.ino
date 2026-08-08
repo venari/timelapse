@@ -21,6 +21,8 @@
 #include <WiFi.h>
 #include <time.h>
 #include <PubSubClient.h>
+#include <vector>
+#include <algorithm>
 
 #include "utilities.h"
 #include "secrets.h"
@@ -36,7 +38,8 @@
 
 #define uS_TO_S_FACTOR          1000000ULL  /* Conversion factor for micro seconds to seconds */
 // #define TIME_TO_SLEEP           180          /* Time ESP32 will go to sleep (in seconds) */
-#define TIME_TO_SLEEP           10          /* Time ESP32 will go to sleep (in seconds) */
+// #define TIME_TO_SLEEP           10          /* Time ESP32 will go to sleep (in seconds) */
+#define TIME_TO_SLEEP           300          /* Time ESP32 will go to sleep (in seconds) */
 #define BATTERY_VOLTAGE_LOW     3000        // Set low voltage to sleep mode
 
 #define WIFI_CONNECT_TIMEOUT_MS 15000       // Give up on WiFi after this long
@@ -324,8 +327,11 @@ void writeTelemetryFile(const String &timestamp, const String &json)
 }
 
 // Publishes every telemetry file still sitting in TELEMETRY_DIR (including ones saved
-// during earlier offline cycles), moving each one to TELEMETRY_UPLOADED_DIR once its
-// publish is acknowledged. Anything that fails to publish is left in place to retry next time.
+// during earlier offline cycles), oldest first, moving each one to TELEMETRY_UPLOADED_DIR
+// once its publish is acknowledged. Published retained, so the broker holds onto the most
+// recently published telemetry and serves it immediately to anyone who queries/subscribes
+// later. Stops at the first failure, leaving it and everything after it in place to retry
+// next time.
 void publishPendingTelemetry(const String &deviceId, TelemetryCounts &counts)
 {
     if (WiFi.status() != WL_CONNECTED) {
@@ -344,22 +350,39 @@ void publishPendingTelemetry(const String &deviceId, TelemetryCounts &counts)
 
     String topic = String(MQTT_TOPIC_PREFIX) + "/" + deviceId + "/telemetry";
 
+    // List pending filenames first and sort them, rather than publishing in whatever
+    // order openNextFile() happens to return (directory entry order isn't guaranteed
+    // to be chronological once files have been created/renamed/deleted over time).
+    // Filenames are "yyyymmdd-hhmmss.json", so a lexical sort is a chronological sort.
+    std::vector<String> baseNames;
     File dir = SD.open(TELEMETRY_DIR);
     File entry = dir.openNextFile();
     while (entry) {
-        if (entry.isDirectory()) {
-            entry.close();
-            entry = dir.openNextFile();
+        if (!entry.isDirectory()) {
+            String entryName = entry.name();
+            baseNames.push_back(entryName.substring(entryName.lastIndexOf('/') + 1));
+        }
+        entry.close();
+        entry = dir.openNextFile();
+    }
+    dir.close();
+
+    std::sort(baseNames.begin(), baseNames.end());
+
+    // Publish oldest first, retained, so that if we stop partway through (or the
+    // connection drops), the most recent telemetry published is always the last
+    // one - and being retained, it's the value anyone querying MQTT will see,
+    // rather than an older reading it happens to have published successfully.
+    for (const String &baseName : baseNames) {
+        String filePath = String(TELEMETRY_DIR) + "/" + baseName;
+        File file = SD.open(filePath, "r");
+        if (!file) {
             continue;
         }
+        String payload = file.readString();
+        file.close();
 
-        String entryName = entry.name();
-        String baseName = entryName.substring(entryName.lastIndexOf('/') + 1);
-        String filePath = String(TELEMETRY_DIR) + "/" + baseName;
-        String payload = entry.readString();
-        entry.close();
-
-        if (mqttClient.publish(topic.c_str(), payload.c_str())) {
+        if (mqttClient.publish(topic.c_str(), payload.c_str(), true)) {
             String uploadedPath = String(TELEMETRY_UPLOADED_DIR) + "/" + baseName;
             SD.rename(filePath, uploadedPath);
             counts.pendingTelemetry--;
@@ -367,11 +390,12 @@ void publishPendingTelemetry(const String &deviceId, TelemetryCounts &counts)
             Serial.printf("Published and archived %s\n", filePath.c_str());
         } else {
             Serial.printf("Failed to publish %s, will retry next time\n", filePath.c_str());
+            // Stop here rather than skipping ahead to newer files: if the broker/connection
+            // is the problem, later publishes would fail too, and any that then made it through
+            // in a gap could become the retained message ahead of this older, still-pending one.
+            break;
         }
-
-        entry = dir.openNextFile();
     }
-    dir.close();
 
     mqttClient.disconnect();
 }
