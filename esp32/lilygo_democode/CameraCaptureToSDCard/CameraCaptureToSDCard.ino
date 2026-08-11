@@ -39,7 +39,7 @@
 #define uS_TO_S_FACTOR          1000000ULL  /* Conversion factor for micro seconds to seconds */
 // #define TIME_TO_SLEEP           180          /* Time ESP32 will go to sleep (in seconds) */
 // #define TIME_TO_SLEEP           10          /* Time ESP32 will go to sleep (in seconds) */
-#define TIME_TO_SLEEP           300          /* Time ESP32 will go to sleep (in seconds) */
+#define TIME_TO_SLEEP           60          /* Time ESP32 will go to sleep (in seconds) */
 #define BATTERY_VOLTAGE_LOW     3000        // Set low voltage to sleep mode
 
 #define WIFI_CONNECT_TIMEOUT_MS 15000       // Give up on WiFi after this long
@@ -130,6 +130,18 @@ uint16_t get_battery_voltage()
     uint16_t vol = analogReadMilliVolts(BOARD_BAT_ADC_PIN) * 2;
     Serial.printf("Voltage:%u\n", vol);
     return vol;
+}
+
+// Returns 0 if the board has no solar ADC pin wired up
+uint16_t get_solar_voltage()
+{
+#ifdef BOARD_SOLAR_ADC_PIN
+    uint16_t vol = analogReadMilliVolts(BOARD_SOLAR_ADC_PIN) * 2;
+    Serial.printf("Solar voltage:%u\n", vol);
+    return vol;
+#else
+    return 0;
+#endif
 }
 
 void set_device_to_sleep()
@@ -292,16 +304,16 @@ String getDeviceId()
     return String(buf);
 }
 
-String buildTelemetryJson(const String &timestamp, const String &deviceId, uint16_t voltageMv, const TelemetryCounts &counts)
+String buildTelemetryJson(const String &timestamp, const String &deviceId, uint16_t voltageMv, uint16_t solarVoltageMv, const TelemetryCounts &counts)
 {
     // ESP32-S3 internal die temperature sensor, not ambient temperature
     float temperatureC = temperatureRead();
 
-    char json[320];
+    char json[350];
     snprintf(json, sizeof(json),
-             "{\"device_id\":\"%s\",\"timestamp\":\"%s\",\"boot_count\":%d,\"voltage_mv\":%u,\"temperature_c\":%.2f,"
+             "{\"device_id\":\"%s\",\"timestamp\":\"%s\",\"boot_count\":%d,\"voltage_mv\":%u,\"solar_voltage_mv\":%u,\"temperature_c\":%.2f,"
              "\"pendingImages\":%d,\"uploadedImages\":%d,\"pendingTelemetry\":%d,\"uploadedTelemetry\":%d}",
-             deviceId.c_str(), timestamp.c_str(), bootCount, voltageMv, temperatureC,
+             deviceId.c_str(), timestamp.c_str(), bootCount, voltageMv, solarVoltageMv, temperatureC,
              counts.pendingImages, counts.uploadedImages, counts.pendingTelemetry, counts.uploadedTelemetry);
     return String(json);
 }
@@ -538,7 +550,7 @@ void setup()
 
     counts.pendingTelemetry++;
     String deviceId = getDeviceId();
-    String telemetryJson = buildTelemetryJson(getISO8601Timestamp(), deviceId, get_battery_voltage(), counts);
+    String telemetryJson = buildTelemetryJson(getISO8601Timestamp(), deviceId, get_battery_voltage(), get_solar_voltage(), counts);
     writeTelemetryFile(timestamp, telemetryJson);
     publishPendingTelemetry(deviceId, counts);
     writeCounts(counts);
