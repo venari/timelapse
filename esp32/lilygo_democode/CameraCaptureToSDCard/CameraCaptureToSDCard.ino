@@ -120,6 +120,40 @@ const VoltagePercentPoint BATTERY_CURVE[] = {
 };
 const size_t BATTERY_CURVE_LAST = sizeof(BATTERY_CURVE) / sizeof(BATTERY_CURVE[0]) - 1;
 
+// Struct definitions used in function signatures below are kept up here, ahead of every
+// function that uses them - the Arduino IDE auto-generates forward declarations for every
+// function and inserts them near the top of the file, ahead of code that (in source order)
+// comes later. A struct defined further down than the functions using it would otherwise be
+// unknown to the compiler at the point that auto-generated declaration lands ("'Foo' does not
+// name a type"). DeviceConfig above is fine because it's already up here for the same reason.
+
+// Where telemetry/images get filed under TELEMETRY_DIR/CAMERA_DIR - bucketed by
+// yyyy/mm/dd/hh so no single directory ever accumulates more than a handful of entries no
+// matter how large the backlog grows (a flat directory gets linearly slower to scan *and* to
+// create new files in, on FAT, as it fills up - this is what was causing the slowdown).
+// mmss (not just mm) is the leaf name, since the capture interval has been as low as 10s in
+// the past and two captures inside the same minute would otherwise collide.
+// Falls back to a flat "unsynced/boot-N" name if the clock was never synced.
+struct DatedPath {
+    String dirPath;    // e.g. "2026/08/13/14", or "unsynced"
+    String leafName;   // e.g. "0530", or "boot-3"
+};
+
+// Pieces of a parsed apiUrl (e.g. "https://timelapse-dev.azurewebsites.net/api/") - what
+// WiFiClient(Secure)::connect() and the manually-built HTTP request need.
+struct ParsedUrl {
+    bool https;
+    String host;
+    uint16_t port;
+    String path;   // includes leading '/', excludes the endpoint name (e.g. "Image")
+};
+
+// One name/value pair of a multipart/form-data POST.
+struct HttpFormField {
+    String name;
+    String value;
+};
+
 bool setCameraPower(bool enable)
 {
     static bool started = false;
@@ -478,18 +512,6 @@ String fileBaseName(const String &path)
     return (slashIdx >= 0) ? path.substring(slashIdx + 1) : path;
 }
 
-// Where telemetry/images get filed under TELEMETRY_DIR/CAMERA_DIR - bucketed by
-// yyyy/mm/dd/hh so no single directory ever accumulates more than a handful of entries no
-// matter how large the backlog grows (a flat directory gets linearly slower to scan *and* to
-// create new files in, on FAT, as it fills up - this is what was causing the slowdown).
-// mmss (not just mm) is the leaf name, since the capture interval has been as low as 10s in
-// the past and two captures inside the same minute would otherwise collide.
-// Falls back to a flat "unsynced/boot-N" name if the clock was never synced.
-struct DatedPath {
-    String dirPath;    // e.g. "2026/08/13/14", or "unsynced"
-    String leafName;   // e.g. "0530", or "boot-3"
-};
-
 DatedPath getDatedPath()
 {
     struct tm timeinfo;
@@ -620,13 +642,6 @@ void writeTelemetryFile(const DatedPath &datedPath, const String &json)
     file.close();
 }
 
-struct ParsedUrl {
-    bool https;
-    String host;
-    uint16_t port;
-    String path;   // includes leading '/', excludes the endpoint name (e.g. "Image")
-};
-
 // Splits apiUrl (e.g. "https://timelapse-dev.azurewebsites.net/api/") into the pieces
 // WiFiClient(Secure)::connect() and the manually-built HTTP request need.
 ParsedUrl parseApiUrl(const String &url)
@@ -658,11 +673,6 @@ ParsedUrl parseApiUrl(const String &url)
     }
     return parsed;
 }
-
-struct HttpFormField {
-    String name;
-    String value;
-};
 
 // Performs a multipart/form-data POST to <apiUrl><endpoint>, with the given form fields plus
 // an optional file streamed from SD (pass file=nullptr to omit). Returns the HTTP status code
