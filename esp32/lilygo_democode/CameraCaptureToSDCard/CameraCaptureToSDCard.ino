@@ -351,6 +351,10 @@ void publishPendingTelemetry(const String &deviceId, TelemetryCounts &counts)
     }
 
     mqttClient.setServer(MQTT_BROKER_HOST, MQTT_BROKER_PORT);
+    // Default PubSubClient buffer is 256 bytes, which the telemetry JSON (plus topic)
+    // now exceeds now that solar_voltage_mv is included - bump it so publish() doesn't
+    // just silently return false for being "too long".
+    mqttClient.setBufferSize(384);
     if (!mqttClient.connected() && !mqttClient.connect(deviceId.c_str())) {
         Serial.printf("MQTT connect to %s failed, state:%d\n", MQTT_BROKER_HOST, mqttClient.state());
         return;
