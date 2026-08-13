@@ -19,8 +19,10 @@
 #include <FS.h>
 #include <SD.h>
 #include <WiFi.h>
+#include <WiFiClientSecure.h>
 #include <time.h>
 #include <PubSubClient.h>
+#include <ArduinoJson.h>
 #include <vector>
 #include <algorithm>
 
@@ -52,28 +54,83 @@
 
 #define MQTT_BROKER_HOST         "mqtt.venari.co.nz"
 #define MQTT_BROKER_PORT         1883
-#define MQTT_TOPIC_PREFIX        "camera"     // Telemetry is published to <prefix>/<device_id>/telemetry
+#define MQTT_TOPIC_PREFIX        "camera"     // Telemetry is published to <prefix>/<device_id>/telemetry,
+                                               // and config is read from <prefix>/<device_id>/config
+#define MQTT_CONFIG_WAIT_MS      3000         // How long to wait, after subscribing, for the retained
+                                               // config message to arrive before giving up for this cycle
 
 #define TELEMETRY_DIR            "/telemetry"
 #define TELEMETRY_UPLOADED_DIR   "/uploaded"        // Successfully published telemetry is moved here
 
 #define CAMERA_DIR               "/camera"
-#define CAMERA_UPLOADED_DIR      "/camera/uploaded"  // Nothing moves images here yet - reserved for a future upload step
+#define CAMERA_UPLOADED_DIR      "/camera/uploaded"  // Successfully uploaded images are moved here
 
 #define COUNTS_FILE              "/counts.txt"  // Running pending/uploaded totals, kept up to date incrementally
                                                  // instead of scanning directories (which gets slow with thousands of files)
+
+#define CONFIG_FILE              "/config.json" // Local cache of config received on the MQTT config topic
+
+// Defaults used until a config.json exists (i.e. before the first config message has ever
+// been received). Field names deliberately match the ones already used in scripts/config.json
+// on the Raspberry Pi units, so the two are easy to reconcile.
+#define DEFAULT_SLEEP_DURING_NIGHT   false
+#define DEFAULT_DAYTIME_STARTS_AT_H  7
+#define DEFAULT_DAYTIME_ENDS_AT_H    17
+#define DEFAULT_CAMERA_INTERVAL_S    300
+#define DEFAULT_API_URL              "https://timelapse-dev.azurewebsites.net/api/"
 
 RTC_DATA_ATTR int bootCount = 0;
 
 struct TelemetryCounts {
     int pendingImages;
+
     int uploadedImages;
     int pendingTelemetry;
     int uploadedTelemetry;
 };
 
+// Config received on camera/<deviceId>/config and cached to CONFIG_FILE. Reloaded fresh from
+// SD every boot (deep sleep doesn't preserve normal RAM), then refreshed from MQTT each cycle
+// WiFi comes up - see syncDeviceConfigFromMqtt().
+struct DeviceConfig {
+    bool sleepDuringNight = DEFAULT_SLEEP_DURING_NIGHT;
+    int daytimeStartsAtH = DEFAULT_DAYTIME_STARTS_AT_H;
+    int daytimeEndsAtH = DEFAULT_DAYTIME_ENDS_AT_H;
+    uint32_t cameraIntervalS = DEFAULT_CAMERA_INTERVAL_S;
+    String apiUrl = DEFAULT_API_URL;
+};
+
+DeviceConfig deviceConfig;
+
 WiFiClient mqttNetClient;
 PubSubClient mqttClient(mqttNetClient);
+
+// Set by mqttCallback() when a message arrives on the config topic we've subscribed to.
+String pendingConfigPayload;
+volatile bool pendingConfigReceived = false;
+
+// Piecewise-linear state-of-charge curve for a single-cell 3.7V Li-ion (these boards run off a
+// single 3400mAh cell). Mirrors VoltageToPercentageHelper.cs on the API side, so a percentage
+// computed here lines up with one the API would compute from raw voltage.
+struct VoltagePercentPoint {
+    uint16_t mv;
+    uint8_t percent;
+};
+
+const VoltagePercentPoint BATTERY_CURVE[] = {
+    {4200, 100},
+    {3880, 90},
+    {3750, 80},
+    {3650, 70},
+    {3535, 60},
+    {3475, 50},
+    {3435, 40},
+    {3385, 30},
+    {3280, 20},
+    {3000, 10},
+    {2800, 0},
+};
+const size_t BATTERY_CURVE_LAST = sizeof(BATTERY_CURVE) / sizeof(BATTERY_CURVE[0]) - 1;
 
 bool setCameraPower(bool enable)
 {
@@ -142,6 +199,26 @@ uint16_t get_solar_voltage()
 #else
     return 0;
 #endif
+}
+
+// Converts a raw battery voltage reading to an estimated state-of-charge percentage, via
+// BATTERY_CURVE above.
+uint8_t get_battery_percent(uint16_t mv)
+{
+    if (mv >= BATTERY_CURVE[0].mv) {
+        return 100;
+    }
+    if (mv <= BATTERY_CURVE[BATTERY_CURVE_LAST].mv) {
+        return 0;
+    }
+
+    for (size_t i = 0; i < BATTERY_CURVE_LAST; i++) {
+        if (mv <= BATTERY_CURVE[i].mv && mv > BATTERY_CURVE[i + 1].mv) {
+            float ratio = (float)(mv - BATTERY_CURVE[i].mv) / (float)(BATTERY_CURVE[i + 1].mv - BATTERY_CURVE[i].mv);
+            return (uint8_t)(BATTERY_CURVE[i].percent + ratio * (BATTERY_CURVE[i + 1].percent - BATTERY_CURVE[i].percent));
+        }
+    }
+    return 0;
 }
 
 void set_device_to_sleep()
@@ -237,6 +314,64 @@ void writeCounts(const TelemetryCounts &counts)
     }
 }
 
+// Applies fields present in a parsed config JsonDocument on top of an existing DeviceConfig.
+// Used both for CONFIG_FILE (on disk) and for messages received on the MQTT config topic, so
+// a partial payload (e.g. just {"camera.interval": 120}) only touches the fields it mentions.
+void applyConfigJson(JsonDocument &doc, DeviceConfig &config)
+{
+    config.sleepDuringNight = doc["sleep_during_night"] | config.sleepDuringNight;
+    config.daytimeStartsAtH = doc["daytime_starts_at_h"] | config.daytimeStartsAtH;
+    config.daytimeEndsAtH   = doc["daytime_ends_at_h"] | config.daytimeEndsAtH;
+    config.cameraIntervalS  = doc["camera.interval"] | config.cameraIntervalS;
+    if (!doc["apiUrl"].isNull()) {
+        config.apiUrl = doc["apiUrl"].as<String>();
+    }
+}
+
+// Returns DEFAULT_* values (see DeviceConfig) if CONFIG_FILE doesn't exist yet or won't parse -
+// i.e. before any config has ever been received over MQTT.
+DeviceConfig readDeviceConfig()
+{
+    DeviceConfig config;
+
+    File file = SD.open(CONFIG_FILE, "r");
+    if (!file) {
+        Serial.println(CONFIG_FILE " not found - using default config");
+        return config;
+    }
+
+    DynamicJsonDocument doc(512);
+    DeserializationError err = deserializeJson(doc, file);
+    file.close();
+
+    if (err) {
+        Serial.printf("Failed to parse " CONFIG_FILE ": %s - using default config\n", err.c_str());
+        return config;
+    }
+
+    applyConfigJson(doc, config);
+    return config;
+}
+
+void writeDeviceConfig(const DeviceConfig &config)
+{
+    DynamicJsonDocument doc(512);
+    doc["sleep_during_night"] = config.sleepDuringNight;
+    doc["daytime_starts_at_h"] = config.daytimeStartsAtH;
+    doc["daytime_ends_at_h"] = config.daytimeEndsAtH;
+    doc["camera.interval"] = config.cameraIntervalS;
+    doc["apiUrl"] = config.apiUrl;
+
+    File file = SD.open(CONFIG_FILE, "w");
+    if (file) {
+        serializeJson(doc, file);
+        file.close();
+        Serial.println("Config written to " CONFIG_FILE);
+    } else {
+        Serial.println("Failed to write config file!");
+    }
+}
+
 bool connectWiFiAndSyncTime()
 {
     Serial.printf("Connecting to WiFi: %s\n", WIFI_SSID);
@@ -306,14 +441,18 @@ String getDeviceId()
 
 String buildTelemetryJson(const String &timestamp, const String &deviceId, uint16_t voltageMv, uint16_t solarVoltageMv, const TelemetryCounts &counts)
 {
-    // ESP32-S3 internal die temperature sensor, not ambient temperature
+    // ESP32-S3 internal die temperature sensor, not ambient temperature.
+    // Named temperatureC (rather than temperature_c) to match the field name used for the
+    // same quantity elsewhere (API's TelemetryPostModel, Pi's saveTelemetry.py).
     float temperatureC = temperatureRead();
+    uint8_t batteryPercent = get_battery_percent(voltageMv);
 
-    char json[350];
+    char json[400];
     snprintf(json, sizeof(json),
-             "{\"device_id\":\"%s\",\"timestamp\":\"%s\",\"boot_count\":%d,\"voltage_mv\":%u,\"solar_voltage_mv\":%u,\"temperature_c\":%.2f,"
+             "{\"device_id\":\"%s\",\"timestamp\":\"%s\",\"boot_count\":%d,\"voltage_mv\":%u,\"solar_voltage_mv\":%u,\"temperatureC\":%.2f,"
+             "\"batteryPercent\":%u,"
              "\"pendingImages\":%d,\"uploadedImages\":%d,\"pendingTelemetry\":%d,\"uploadedTelemetry\":%d}",
-             deviceId.c_str(), timestamp.c_str(), bootCount, voltageMv, solarVoltageMv, temperatureC,
+             deviceId.c_str(), timestamp.c_str(), bootCount, voltageMv, solarVoltageMv, temperatureC, batteryPercent,
              counts.pendingImages, counts.uploadedImages, counts.pendingTelemetry, counts.uploadedTelemetry);
     return String(json);
 }
@@ -338,27 +477,94 @@ void writeTelemetryFile(const String &timestamp, const String &json)
     file.close();
 }
 
+// Registered as the PubSubClient message callback - just stashes the payload for
+// syncDeviceConfigFromMqtt() to pick up, since we only ever subscribe to one topic (config).
+void mqttCallback(char *topic, byte *payload, unsigned int length)
+{
+    pendingConfigPayload = "";
+    pendingConfigPayload.reserve(length);
+    for (unsigned int i = 0; i < length; i++) {
+        pendingConfigPayload += (char)payload[i];
+    }
+    pendingConfigReceived = true;
+}
+
+// Subscribes to camera/<deviceId>/config and waits briefly for a message to arrive. Config is
+// published retained, so the broker delivers the last known config right after SUBSCRIBE - no
+// need to stay connected for long. Updates config and CONFIG_FILE if anything changed.
+// Assumes mqttClient is already connected.
+void syncDeviceConfigFromMqtt(const String &deviceId, DeviceConfig &config)
+{
+    pendingConfigReceived = false;
+
+    String topic = String(MQTT_TOPIC_PREFIX) + "/" + deviceId + "/config";
+    if (!mqttClient.subscribe(topic.c_str())) {
+        Serial.println("Failed to subscribe to config topic");
+        return;
+    }
+
+    uint32_t start = millis();
+    while (!pendingConfigReceived && millis() - start < MQTT_CONFIG_WAIT_MS) {
+        mqttClient.loop();
+        delay(50);
+    }
+
+    mqttClient.unsubscribe(topic.c_str());
+
+    if (!pendingConfigReceived) {
+        Serial.println("No config waiting on MQTT");
+        return;
+    }
+
+    Serial.printf("Received config: %s\n", pendingConfigPayload.c_str());
+
+    DynamicJsonDocument doc(512);
+    DeserializationError err = deserializeJson(doc, pendingConfigPayload);
+    if (err) {
+        Serial.printf("Failed to parse config received over MQTT: %s\n", err.c_str());
+        return;
+    }
+
+    DeviceConfig newConfig = config;
+    applyConfigJson(doc, newConfig);
+
+    if (newConfig.sleepDuringNight != config.sleepDuringNight ||
+        newConfig.daytimeStartsAtH != config.daytimeStartsAtH ||
+        newConfig.daytimeEndsAtH != config.daytimeEndsAtH ||
+        newConfig.cameraIntervalS != config.cameraIntervalS ||
+        newConfig.apiUrl != config.apiUrl) {
+        config = newConfig;
+        writeDeviceConfig(config);
+        Serial.println("Config updated from MQTT");
+    } else {
+        Serial.println("Config from MQTT matches current config - not rewriting");
+    }
+}
+
 // Publishes every telemetry file still sitting in TELEMETRY_DIR (including ones saved
 // during earlier offline cycles), oldest first, moving each one to TELEMETRY_UPLOADED_DIR
 // once its publish is acknowledged. Published retained, so the broker holds onto the most
 // recently published telemetry and serves it immediately to anyone who queries/subscribes
 // later. Stops at the first failure, leaving it and everything after it in place to retry
-// next time.
-void publishPendingTelemetry(const String &deviceId, TelemetryCounts &counts)
+// next time. Also syncs deviceConfig from the MQTT config topic over the same connection.
+void publishPendingTelemetry(const String &deviceId, TelemetryCounts &counts, DeviceConfig &config)
 {
     if (WiFi.status() != WL_CONNECTED) {
         return;
     }
 
     mqttClient.setServer(MQTT_BROKER_HOST, MQTT_BROKER_PORT);
-    // Default PubSubClient buffer is 256 bytes, which the telemetry JSON (plus topic)
-    // now exceeds now that solar_voltage_mv is included - bump it so publish() doesn't
-    // just silently return false for being "too long".
-    mqttClient.setBufferSize(384);
+    mqttClient.setCallback(mqttCallback);
+    // Default PubSubClient buffer is 256 bytes, which the telemetry JSON (plus topic) now
+    // exceeds, and isn't enough for an incoming config message either - bump it so publish()/
+    // incoming messages don't just silently get dropped for being "too long".
+    mqttClient.setBufferSize(512);
     if (!mqttClient.connected() && !mqttClient.connect(deviceId.c_str())) {
         Serial.printf("MQTT connect to %s failed, state:%d\n", MQTT_BROKER_HOST, mqttClient.state());
         return;
     }
+
+    syncDeviceConfigFromMqtt(deviceId, config);
 
     if (!SD.exists(TELEMETRY_UPLOADED_DIR)) {
         SD.mkdir(TELEMETRY_UPLOADED_DIR);
@@ -416,6 +622,219 @@ void publishPendingTelemetry(const String &deviceId, TelemetryCounts &counts)
     mqttClient.disconnect();
 }
 
+struct ParsedUrl {
+    bool https;
+    String host;
+    uint16_t port;
+    String path;   // includes leading '/', excludes the endpoint name (e.g. "Image")
+};
+
+// Splits apiUrl (e.g. "https://timelapse-dev.azurewebsites.net/api/") into the pieces
+// WiFiClient(Secure)::connect() and the manually-built HTTP request need.
+ParsedUrl parseApiUrl(const String &url)
+{
+    ParsedUrl parsed;
+    String rest = url;
+
+    if (rest.startsWith("https://")) {
+        parsed.https = true;
+        rest = rest.substring(8);
+    } else if (rest.startsWith("http://")) {
+        parsed.https = false;
+        rest = rest.substring(7);
+    } else {
+        parsed.https = true;   // no scheme given - assume https
+    }
+
+    int slashIdx = rest.indexOf('/');
+    String hostPort = (slashIdx >= 0) ? rest.substring(0, slashIdx) : rest;
+    parsed.path = (slashIdx >= 0) ? rest.substring(slashIdx) : "/";
+
+    int colonIdx = hostPort.indexOf(':');
+    if (colonIdx >= 0) {
+        parsed.host = hostPort.substring(0, colonIdx);
+        parsed.port = hostPort.substring(colonIdx + 1).toInt();
+    } else {
+        parsed.host = hostPort;
+        parsed.port = parsed.https ? 443 : 80;
+    }
+    return parsed;
+}
+
+// Uploads every image still sitting in CAMERA_DIR (not the "uploaded" subfolder), oldest
+// first, over HTTP to the same API endpoint the Raspberry Pi units already post to - imagery
+// isn't published over MQTT, since message brokers aren't a great fit for large binary
+// payloads, especially once this moves to cellular. Moves each file to CAMERA_UPLOADED_DIR
+// once the API acknowledges it with 200 OK; stops at the first failure so a flaky connection
+// doesn't reorder the backlog (same approach as publishPendingTelemetry()).
+void uploadPendingImages(const String &deviceId, TelemetryCounts &counts, const String &apiUrl)
+{
+    if (WiFi.status() != WL_CONNECTED) {
+        return;
+    }
+
+    if (!SD.exists(CAMERA_UPLOADED_DIR)) {
+        SD.mkdir(CAMERA_UPLOADED_DIR);
+    }
+
+    ParsedUrl api = parseApiUrl(apiUrl);
+    String imagePath = api.path;
+    if (!imagePath.endsWith("/")) {
+        imagePath += "/";
+    }
+    imagePath += "Image";
+
+    std::vector<String> baseNames;
+    File dir = SD.open(CAMERA_DIR);
+    File entry = dir.openNextFile();
+    while (entry) {
+        if (!entry.isDirectory()) {
+            String entryName = entry.name();
+            baseNames.push_back(entryName.substring(entryName.lastIndexOf('/') + 1));
+        }
+        entry.close();
+        entry = dir.openNextFile();
+    }
+    dir.close();
+
+    std::sort(baseNames.begin(), baseNames.end());
+
+    int filesUploaded = 0;
+    for (const String &baseName : baseNames) {
+        // Process in batches of 10, same as the Pi's uploadPendingPhotos()
+        if (filesUploaded >= 10) {
+            Serial.println("Hit upload batch limit - remaining images will upload next cycle");
+            break;
+        }
+
+        String filePath = String(CAMERA_DIR) + "/" + baseName;
+        File file = SD.open(filePath, "r");
+        if (!file) {
+            continue;
+        }
+
+        size_t fileLength = file.size();
+        if (fileLength == 0) {
+            Serial.println("Empty file - deleting " + filePath);
+            file.close();
+            SD.remove(filePath);
+            continue;
+        }
+
+        // Filenames are "yyyymmdd-hhmmss.jpg" -> ISO8601 "yyyy-mm-ddThh:mm:ssZ"
+        String stem = baseName.substring(0, baseName.lastIndexOf('.'));
+        String timestamp = stem.substring(0, 4) + "-" + stem.substring(4, 6) + "-" + stem.substring(6, 8)
+                            + "T" + stem.substring(9, 11) + ":" + stem.substring(11, 13) + ":" + stem.substring(13, 15) + "Z";
+
+        String boundary = "----ESP32Boundary" + String((uint32_t)millis(), HEX);
+
+        String startPart = "--" + boundary + "\r\n"
+                            "Content-Disposition: form-data; name=\"SerialNumber\"\r\n\r\n" + deviceId + "\r\n"
+                            "--" + boundary + "\r\n"
+                            "Content-Disposition: form-data; name=\"Timestamp\"\r\n\r\n" + timestamp + "\r\n"
+                            "--" + boundary + "\r\n"
+                            "Content-Disposition: form-data; name=\"File\"; filename=\"" + baseName + "\"\r\n"
+                            "Content-Type: image/jpeg\r\n\r\n";
+        String endPart = "\r\n--" + boundary + "--\r\n";
+
+        size_t contentLength = startPart.length() + fileLength + endPart.length();
+
+        WiFiClientSecure secureClient;
+        WiFiClient plainClient;
+        if (api.https) {
+            secureClient.setInsecure();   // No cert store on-device - trust whatever's presented
+        }
+        Client &client = api.https ? (Client &)secureClient : (Client &)plainClient;
+
+        Serial.printf("Uploading %s to %s://%s:%u%s\n", filePath.c_str(), api.https ? "https" : "http", api.host.c_str(), api.port, imagePath.c_str());
+
+        if (!client.connect(api.host.c_str(), api.port)) {
+            Serial.printf("Connection to %s:%u failed\n", api.host.c_str(), api.port);
+            file.close();
+            break;
+        }
+
+        client.printf("POST %s HTTP/1.1\r\n", imagePath.c_str());
+        client.printf("Host: %s\r\n", api.host.c_str());
+        client.printf("Content-Type: multipart/form-data; boundary=%s\r\n", boundary.c_str());
+        client.printf("Content-Length: %u\r\n", (unsigned)contentLength);
+        client.print("Connection: close\r\n\r\n");
+        client.print(startPart);
+
+        uint8_t buffer[1024];
+        while (file.available()) {
+            size_t len = file.read(buffer, sizeof(buffer));
+            client.write(buffer, len);
+        }
+        client.print(endPart);
+        file.close();
+
+        bool ok = false;
+        uint32_t start = millis();
+        while ((client.connected() || client.available()) && millis() - start < 15000) {
+            if (client.available()) {
+                String line = client.readStringUntil('\n');
+                if (line.startsWith("HTTP/1.1") && line.indexOf("200") != -1) {
+                    ok = true;
+                }
+                if (line == "\r") {
+                    break;   // end of headers - no need to read the body
+                }
+            }
+        }
+        client.stop();
+
+        if (ok) {
+            String uploadedPath = String(CAMERA_UPLOADED_DIR) + "/" + baseName;
+            SD.rename(filePath, uploadedPath);
+            counts.pendingImages--;
+            counts.uploadedImages++;
+            filesUploaded++;
+            Serial.printf("Uploaded and archived %s\n", filePath.c_str());
+        } else {
+            Serial.printf("Failed to upload %s, will retry next time\n", filePath.c_str());
+            break;
+        }
+    }
+}
+
+// Decides how long to deep-sleep for, in seconds. Normally just config.cameraIntervalS, but
+// when sleep_during_night is enabled and it's currently outside daytime hours, sleeps through
+// until daytimeStartsAtH instead of waking every cameraIntervalS to take a photo in the dark.
+// Hours are compared in UTC, since GMT_OFFSET_SEC/DAY_LIGHT_OFFSET_SEC are left at 0.
+uint32_t computeSleepSeconds(const DeviceConfig &config)
+{
+    if (!config.sleepDuringNight) {
+        return config.cameraIntervalS;
+    }
+
+    struct tm timeinfo;
+    if (!getLocalTime(&timeinfo, 0)) {
+        // No synced clock to judge night from - fall back to the regular interval
+        return config.cameraIntervalS;
+    }
+
+    bool isNight = (timeinfo.tm_hour >= config.daytimeEndsAtH) || (timeinfo.tm_hour < config.daytimeStartsAtH);
+    if (!isNight) {
+        return config.cameraIntervalS;
+    }
+
+    struct tm wake = timeinfo;
+    wake.tm_hour = config.daytimeStartsAtH;
+    wake.tm_min = 0;
+    wake.tm_sec = 0;
+
+    time_t now = mktime(&timeinfo);
+    time_t wakeTime = mktime(&wake);
+    if (wakeTime <= now) {
+        wakeTime += 24 * 60 * 60;
+    }
+
+    uint32_t sleepSeconds = (uint32_t)difftime(wakeTime, now);
+    Serial.printf("Night mode - sleeping %u seconds until %02d:00 UTC\n", sleepSeconds, config.daytimeStartsAtH);
+    return sleepSeconds;
+}
+
 void setup()
 {
     Serial.begin(115200);
@@ -452,6 +871,10 @@ void setup()
     // Kept up to date incrementally below rather than re-scanned from disk each wake,
     // since scanning directories with thousands of backlogged files gets slow
     TelemetryCounts counts = readCounts();
+
+    // Reloaded fresh every boot - deep sleep doesn't preserve normal RAM - then refreshed
+    // from the MQTT config topic further down, once WiFi is up.
+    deviceConfig = readDeviceConfig();
 
     // Deep sleep keeps the RTC running, so the clock usually survives between wake-ups.
     // Only reconnect to WiFi if the clock looks like it was reset by a power interruption
@@ -556,7 +979,8 @@ void setup()
     String deviceId = getDeviceId();
     String telemetryJson = buildTelemetryJson(getISO8601Timestamp(), deviceId, get_battery_voltage(), get_solar_voltage(), counts);
     writeTelemetryFile(timestamp, telemetryJson);
-    publishPendingTelemetry(deviceId, counts);
+    publishPendingTelemetry(deviceId, counts, deviceConfig);
+    uploadPendingImages(deviceId, counts, deviceConfig.apiUrl);
     writeCounts(counts);
 }
 
@@ -571,8 +995,9 @@ void loop()
     WiFi.disconnect(true);
     WiFi.mode(WIFI_OFF);
 
-    Serial.println("Enter esp32 goto deepsleep!");
-    esp_sleep_enable_timer_wakeup(TIME_TO_SLEEP * uS_TO_S_FACTOR);
+    uint32_t sleepSeconds = computeSleepSeconds(deviceConfig);
+    Serial.printf("Enter esp32 goto deepsleep for %u seconds!\n", sleepSeconds);
+    esp_sleep_enable_timer_wakeup((uint64_t)sleepSeconds * uS_TO_S_FACTOR);
     delay(200);
     esp_deep_sleep_start();
 }

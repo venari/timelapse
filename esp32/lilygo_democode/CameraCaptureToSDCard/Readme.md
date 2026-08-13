@@ -11,3 +11,19 @@ Documentation here: https://github.com/Xinyuan-LILYGO/LilyGo-Modem-Series/blob/m
 - To trigger upload if in deep sleep, press & hold **Boot**. press & release **Reset**, and then release **Boot**.
 - Board was attached on COM10 for me on Windows.
 - Follow notes in top level [README.md](/README.md) regarding using `uspipd` to share if using `WSL`.
+
+## Telemetry, config and images
+
+- Telemetry is published (retained) to MQTT topic `camera/<deviceId>/telemetry`. `deviceId` is derived from the efuse MAC, printed on boot.
+- Device config is read from MQTT topic `camera/<deviceId>/config` (also retained - publish it once and every future boot/reconnect picks it up). Sent as JSON, any subset of:
+  ```json
+  {
+    "sleep_during_night": true,
+    "daytime_starts_at_h": 7,
+    "daytime_ends_at_h": 17,
+    "camera.interval": 300,
+    "apiUrl": "https://timelapse-dev.azurewebsites.net/api/"
+  }
+  ```
+  Hours are UTC. Received config is cached to `/config.json` on the SD card and reloaded on every boot, so it survives deep sleep/power loss and applies even on cycles where WiFi doesn't come up. `sleep_during_night` makes the device sleep straight through to `daytime_starts_at_h` instead of waking every `camera.interval` seconds overnight.
+- Images are uploaded over HTTP (not MQTT - not a good fit for large binary payloads, especially once this moves to cellular) as a multipart POST to `<apiUrl>Image`, matching the endpoint the Raspberry Pi units already post to via `scripts/uploadPending.py`.
