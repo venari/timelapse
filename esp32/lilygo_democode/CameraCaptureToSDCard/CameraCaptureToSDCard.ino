@@ -21,7 +21,6 @@
 #include <WiFi.h>
 #include <WiFiClientSecure.h>
 #include <time.h>
-#include <PubSubClient.h>
 #include <ArduinoJson.h>
 #include <vector>
 #include <algorithm>
@@ -52,27 +51,23 @@
 #define LAST_SYNC_FILE           "/last_sync.txt"
 #define AUTO_SYNC_PERIOD_SEC     (5 * 60)     // Force a resync after this long, to correct clock drift
 
-#define MQTT_BROKER_HOST         "mqtt.venari.co.nz"
-#define MQTT_BROKER_PORT         1883
-#define MQTT_TOPIC_PREFIX        "camera"     // Telemetry is published to <prefix>/<device_id>/telemetry,
-                                               // and config is read from <prefix>/<device_id>/config
-#define MQTT_CONFIG_WAIT_MS      3000         // How long to wait, after subscribing, for the retained
-                                               // config message to arrive before giving up for this cycle
-
 #define TELEMETRY_DIR            "/telemetry"
-#define TELEMETRY_UPLOADED_DIR   "/uploaded"        // Successfully published telemetry is moved here
+#define TELEMETRY_UPLOADED_DIR   "/uploaded"        // Successfully uploaded telemetry is moved here
 
-#define CAMERA_DIR               "/camera"
+#define CAMERA_DIR               "/camera/pending"    // Sibling of CAMERA_UPLOADED_DIR, not a parent of it -
+                                                       // otherwise a recursive walk of CAMERA_DIR (see
+                                                       // listFilesRecursive) would wander into "uploaded" and
+                                                       // re-discover already-uploaded images as pending forever.
 #define CAMERA_UPLOADED_DIR      "/camera/uploaded"  // Successfully uploaded images are moved here
 
 #define COUNTS_FILE              "/counts.txt"  // Running pending/uploaded totals, kept up to date incrementally
                                                  // instead of scanning directories (which gets slow with thousands of files)
 
-#define CONFIG_FILE              "/config.json" // Local cache of config received on the MQTT config topic
+#define CONFIG_FILE              "/config.json" // Local cache of the device config the API hands back on every upload
 
-// Defaults used until a config.json exists (i.e. before the first config message has ever
-// been received). Field names deliberately match the ones already used in scripts/config.json
-// on the Raspberry Pi units, so the two are easy to reconcile.
+// Defaults used until a config.json exists (i.e. before the API has ever handed back a
+// Device row - see applyDeviceConfigFromApiResponse). Names match the Device model's JSON
+// property names on the API side (System.Text.Json defaults to camelCase).
 #define DEFAULT_SLEEP_DURING_NIGHT   false
 #define DEFAULT_DAYTIME_STARTS_AT_H  7
 #define DEFAULT_DAYTIME_ENDS_AT_H    17
@@ -89,9 +84,9 @@ struct TelemetryCounts {
     int uploadedTelemetry;
 };
 
-// Config received on camera/<deviceId>/config and cached to CONFIG_FILE. Reloaded fresh from
-// SD every boot (deep sleep doesn't preserve normal RAM), then refreshed from MQTT each cycle
-// WiFi comes up - see syncDeviceConfigFromMqtt().
+// Config handed back by the API in the Device object nested in every Image/Telemetry POST
+// response (see applyDeviceConfigFromApiResponse), and cached to CONFIG_FILE. Reloaded fresh
+// from SD every boot (deep sleep doesn't preserve normal RAM).
 struct DeviceConfig {
     bool sleepDuringNight = DEFAULT_SLEEP_DURING_NIGHT;
     int daytimeStartsAtH = DEFAULT_DAYTIME_STARTS_AT_H;
@@ -101,13 +96,6 @@ struct DeviceConfig {
 };
 
 DeviceConfig deviceConfig;
-
-WiFiClient mqttNetClient;
-PubSubClient mqttClient(mqttNetClient);
-
-// Set by mqttCallback() when a message arrives on the config topic we've subscribed to.
-String pendingConfigPayload;
-volatile bool pendingConfigReceived = false;
 
 // Piecewise-linear state-of-charge curve for a single-cell 3.7V Li-ion (these boards run off a
 // single 3400mAh cell). Mirrors VoltageToPercentageHelper.cs on the API side, so a percentage
@@ -314,22 +302,26 @@ void writeCounts(const TelemetryCounts &counts)
     }
 }
 
-// Applies fields present in a parsed config JsonDocument on top of an existing DeviceConfig.
-// Used both for CONFIG_FILE (on disk) and for messages received on the MQTT config topic, so
-// a partial payload (e.g. just {"camera.interval": 120}) only touches the fields it mentions.
-void applyConfigJson(JsonDocument &doc, DeviceConfig &config)
+// Applies whichever of sleepDuringNight/daytimeStartsAtH/daytimeEndsAtH/cameraIntervalS/apiUrl
+// are present in `fields` on top of an existing DeviceConfig - used for both CONFIG_FILE (on
+// disk) and the Device object nested in an Image/Telemetry API response, so a partial payload
+// only touches the fields it mentions.
+void applyConfigFields(JsonVariantConst fields, DeviceConfig &config)
 {
-    config.sleepDuringNight = doc["sleep_during_night"] | config.sleepDuringNight;
-    config.daytimeStartsAtH = doc["daytime_starts_at_h"] | config.daytimeStartsAtH;
-    config.daytimeEndsAtH   = doc["daytime_ends_at_h"] | config.daytimeEndsAtH;
-    config.cameraIntervalS  = doc["camera.interval"] | config.cameraIntervalS;
-    if (!doc["apiUrl"].isNull()) {
-        config.apiUrl = doc["apiUrl"].as<String>();
+    config.sleepDuringNight = fields["sleepDuringNight"] | config.sleepDuringNight;
+    config.daytimeStartsAtH = fields["daytimeStartsAtH"] | config.daytimeStartsAtH;
+    config.daytimeEndsAtH   = fields["daytimeEndsAtH"] | config.daytimeEndsAtH;
+    config.cameraIntervalS  = fields["cameraIntervalS"] | config.cameraIntervalS;
+    if (!fields["apiUrl"].isNull()) {
+        String apiUrl = fields["apiUrl"].as<String>();
+        if (apiUrl.length() > 0) {
+            config.apiUrl = apiUrl;
+        }
     }
 }
 
 // Returns DEFAULT_* values (see DeviceConfig) if CONFIG_FILE doesn't exist yet or won't parse -
-// i.e. before any config has ever been received over MQTT.
+// i.e. before the API has ever handed back a Device config.
 DeviceConfig readDeviceConfig()
 {
     DeviceConfig config;
@@ -349,17 +341,17 @@ DeviceConfig readDeviceConfig()
         return config;
     }
 
-    applyConfigJson(doc, config);
+    applyConfigFields(doc, config);
     return config;
 }
 
 void writeDeviceConfig(const DeviceConfig &config)
 {
     DynamicJsonDocument doc(512);
-    doc["sleep_during_night"] = config.sleepDuringNight;
-    doc["daytime_starts_at_h"] = config.daytimeStartsAtH;
-    doc["daytime_ends_at_h"] = config.daytimeEndsAtH;
-    doc["camera.interval"] = config.cameraIntervalS;
+    doc["sleepDuringNight"] = config.sleepDuringNight;
+    doc["daytimeStartsAtH"] = config.daytimeStartsAtH;
+    doc["daytimeEndsAtH"] = config.daytimeEndsAtH;
+    doc["cameraIntervalS"] = config.cameraIntervalS;
     doc["apiUrl"] = config.apiUrl;
 
     File file = SD.open(CONFIG_FILE, "w");
@@ -369,6 +361,39 @@ void writeDeviceConfig(const DeviceConfig &config)
         Serial.println("Config written to " CONFIG_FILE);
     } else {
         Serial.println("Failed to write config file!");
+    }
+}
+
+// Parses the JSON body of an Image/Telemetry POST response and refreshes config + CONFIG_FILE
+// if the device's config in the API has changed. ImageController/TelemetryController return
+// the created row plus its related Device - the same place supportMode/hibernateMode/etc.
+// already live for the Raspberry Pi units (see scripts/uploadPending.py).
+void applyDeviceConfigFromApiResponse(const String &responseBody, DeviceConfig &config)
+{
+    DynamicJsonDocument doc(1024);
+    DeserializationError err = deserializeJson(doc, responseBody);
+    if (err) {
+        Serial.printf("Failed to parse API response: %s\n", err.c_str());
+        return;
+    }
+
+    JsonVariant device = doc["device"];
+    if (device.isNull()) {
+        Serial.println("API response had no device config to apply");
+        return;
+    }
+
+    DeviceConfig newConfig = config;
+    applyConfigFields(device, newConfig);
+
+    if (newConfig.sleepDuringNight != config.sleepDuringNight ||
+        newConfig.daytimeStartsAtH != config.daytimeStartsAtH ||
+        newConfig.daytimeEndsAtH != config.daytimeEndsAtH ||
+        newConfig.cameraIntervalS != config.cameraIntervalS ||
+        newConfig.apiUrl != config.apiUrl) {
+        config = newConfig;
+        writeDeviceConfig(config);
+        Serial.println("Config updated from API");
     }
 }
 
@@ -402,19 +427,140 @@ bool connectWiFiAndSyncTime()
     return true;
 }
 
-// Builds "yyyymmdd-hhmmss" from the current system time - filesystem-safe, used for filenames
-// (FAT doesn't allow ':' in names, so this can't be true ISO8601)
-String getTimestampString()
+// Splits an absolute path into its non-empty segments, e.g. "/a/b/c" -> ["a","b","c"].
+std::vector<String> splitPath(const String &path)
+{
+    std::vector<String> segments;
+    int start = 0;
+    while (start < (int)path.length()) {
+        int slashIdx = path.indexOf('/', start);
+        String segment = (slashIdx >= 0) ? path.substring(start, slashIdx) : path.substring(start);
+        if (segment.length() > 0) {
+            segments.push_back(segment);
+        }
+        if (slashIdx < 0) {
+            break;
+        }
+        start = slashIdx + 1;
+    }
+    return segments;
+}
+
+// SD.mkdir() on this SD library only creates one level at a time - unlike "mkdir -p", it fails
+// if the parent doesn't already exist. Walks `path` component by component, creating whichever
+// levels are missing.
+void ensureDirExists(const String &path)
+{
+    String current = "";
+    for (const String &segment : splitPath(path)) {
+        current += "/" + segment;
+        if (!SD.exists(current)) {
+            if (!SD.mkdir(current)) {
+                Serial.printf("Failed to create directory %s\n", current.c_str());
+            }
+        }
+    }
+}
+
+// Everything before the final '/' in `path` - used to make sure a destination's parent
+// directories exist before SD.rename() into it (rename, like mkdir, doesn't create missing
+// parents on this SD library).
+String parentDir(const String &path)
+{
+    int slashIdx = path.lastIndexOf('/');
+    return (slashIdx > 0) ? path.substring(0, slashIdx) : "/";
+}
+
+// The last path segment, e.g. "/a/b/c.jpg" -> "c.jpg".
+String fileBaseName(const String &path)
+{
+    int slashIdx = path.lastIndexOf('/');
+    return (slashIdx >= 0) ? path.substring(slashIdx + 1) : path;
+}
+
+// Where telemetry/images get filed under TELEMETRY_DIR/CAMERA_DIR - bucketed by
+// yyyy/mm/dd/hh so no single directory ever accumulates more than a handful of entries no
+// matter how large the backlog grows (a flat directory gets linearly slower to scan *and* to
+// create new files in, on FAT, as it fills up - this is what was causing the slowdown).
+// mmss (not just mm) is the leaf name, since the capture interval has been as low as 10s in
+// the past and two captures inside the same minute would otherwise collide.
+// Falls back to a flat "unsynced/boot-N" name if the clock was never synced.
+struct DatedPath {
+    String dirPath;    // e.g. "2026/08/13/14", or "unsynced"
+    String leafName;   // e.g. "0530", or "boot-3"
+};
+
+DatedPath getDatedPath()
 {
     struct tm timeinfo;
-    char buf[16];
     if (!getLocalTime(&timeinfo, 0)) {
-        // Fall back to boot count if time was never synced
-        snprintf(buf, sizeof(buf), "boot-%d", bootCount);
-        return String(buf);
+        DatedPath fallback;
+        fallback.dirPath = "unsynced";
+        fallback.leafName = "boot-" + String(bootCount);
+        return fallback;
     }
-    strftime(buf, sizeof(buf), "%Y%m%d-%H%M%S", &timeinfo);
-    return String(buf);
+
+    char dirBuf[16];
+    snprintf(dirBuf, sizeof(dirBuf), "%04d/%02d/%02d/%02d",
+              timeinfo.tm_year + 1900, timeinfo.tm_mon + 1, timeinfo.tm_mday, timeinfo.tm_hour);
+
+    char leafBuf[8];
+    snprintf(leafBuf, sizeof(leafBuf), "%02d%02d", timeinfo.tm_min, timeinfo.tm_sec);
+
+    DatedPath result;
+    result.dirPath = String(dirBuf);
+    result.leafName = String(leafBuf);
+    return result;
+}
+
+// Parses a path built from a DatedPath (e.g. ".../2026/08/13/14/0530.jpg") back into an
+// ISO8601 timestamp, from its last 5 segments (yyyy/mm/dd/hh/mmss.ext) - the inverse of
+// getDatedPath(), needed when uploading images (unlike telemetry, which already carries its
+// own timestamp inside the file).
+String parseTimestampFromPath(const String &path)
+{
+    std::vector<String> segments = splitPath(path);
+    if (segments.size() < 5) {
+        return "unknown";
+    }
+
+    size_t n = segments.size();
+    String leaf = segments[n - 1];
+    int dotIdx = leaf.lastIndexOf('.');
+    String mmss = (dotIdx >= 0) ? leaf.substring(0, dotIdx) : leaf;
+    if (mmss.length() < 4) {
+        return "unknown";
+    }
+
+    return segments[n - 5] + "-" + segments[n - 4] + "-" + segments[n - 3]
+           + "T" + segments[n - 2] + ":" + mmss.substring(0, 2) + ":" + mmss.substring(2, 4) + "Z";
+}
+
+// Recursively walks `root` (an absolute SD path), collecting every regular file's full path
+// into `paths`. Needed now that telemetry/images live under yyyy/mm/dd/hh buckets rather than
+// one flat directory.
+void listFilesRecursive(const String &root, std::vector<String> &paths)
+{
+    File dir = SD.open(root);
+    if (!dir) {
+        return;
+    }
+
+    File entry = dir.openNextFile();
+    while (entry) {
+        String fullPath = root + "/" + fileBaseName(entry.name());
+        bool isDirectory = entry.isDirectory();
+        entry.close();
+
+        if (isDirectory) {
+            listFilesRecursive(fullPath, paths);
+        } else {
+            paths.push_back(fullPath);
+        }
+
+        entry = dir.openNextFile();
+    }
+    dir.close();
 }
 
 // Builds an ISO8601 timestamp, e.g. "2026-08-04T05:30:45Z" - used in telemetry payloads.
@@ -457,15 +603,12 @@ String buildTelemetryJson(const String &timestamp, const String &deviceId, uint1
     return String(json);
 }
 
-void writeTelemetryFile(const String &timestamp, const String &json)
+void writeTelemetryFile(const DatedPath &datedPath, const String &json)
 {
-    if (!SD.exists(TELEMETRY_DIR)) {
-        if (SD.mkdir(TELEMETRY_DIR)) {
-            Serial.println("Created telemetry directory!");
-        }
-    }
+    String dirPath = String(TELEMETRY_DIR) + "/" + datedPath.dirPath;
+    ensureDirExists(dirPath);
 
-    String filename = String(TELEMETRY_DIR) + "/" + timestamp + ".json";
+    String filename = dirPath + "/" + datedPath.leafName + ".json";
 
     File file = SD.open(filename, "w");
     if (file) {
@@ -475,151 +618,6 @@ void writeTelemetryFile(const String &timestamp, const String &json)
         Serial.println("Failed to write telemetry file!");
     }
     file.close();
-}
-
-// Registered as the PubSubClient message callback - just stashes the payload for
-// syncDeviceConfigFromMqtt() to pick up, since we only ever subscribe to one topic (config).
-void mqttCallback(char *topic, byte *payload, unsigned int length)
-{
-    pendingConfigPayload = "";
-    pendingConfigPayload.reserve(length);
-    for (unsigned int i = 0; i < length; i++) {
-        pendingConfigPayload += (char)payload[i];
-    }
-    pendingConfigReceived = true;
-}
-
-// Subscribes to camera/<deviceId>/config and waits briefly for a message to arrive. Config is
-// published retained, so the broker delivers the last known config right after SUBSCRIBE - no
-// need to stay connected for long. Updates config and CONFIG_FILE if anything changed.
-// Assumes mqttClient is already connected.
-void syncDeviceConfigFromMqtt(const String &deviceId, DeviceConfig &config)
-{
-    pendingConfigReceived = false;
-
-    String topic = String(MQTT_TOPIC_PREFIX) + "/" + deviceId + "/config";
-    if (!mqttClient.subscribe(topic.c_str())) {
-        Serial.println("Failed to subscribe to config topic");
-        return;
-    }
-
-    uint32_t start = millis();
-    while (!pendingConfigReceived && millis() - start < MQTT_CONFIG_WAIT_MS) {
-        mqttClient.loop();
-        delay(50);
-    }
-
-    mqttClient.unsubscribe(topic.c_str());
-
-    if (!pendingConfigReceived) {
-        Serial.println("No config waiting on MQTT");
-        return;
-    }
-
-    Serial.printf("Received config: %s\n", pendingConfigPayload.c_str());
-
-    DynamicJsonDocument doc(512);
-    DeserializationError err = deserializeJson(doc, pendingConfigPayload);
-    if (err) {
-        Serial.printf("Failed to parse config received over MQTT: %s\n", err.c_str());
-        return;
-    }
-
-    DeviceConfig newConfig = config;
-    applyConfigJson(doc, newConfig);
-
-    if (newConfig.sleepDuringNight != config.sleepDuringNight ||
-        newConfig.daytimeStartsAtH != config.daytimeStartsAtH ||
-        newConfig.daytimeEndsAtH != config.daytimeEndsAtH ||
-        newConfig.cameraIntervalS != config.cameraIntervalS ||
-        newConfig.apiUrl != config.apiUrl) {
-        config = newConfig;
-        writeDeviceConfig(config);
-        Serial.println("Config updated from MQTT");
-    } else {
-        Serial.println("Config from MQTT matches current config - not rewriting");
-    }
-}
-
-// Publishes every telemetry file still sitting in TELEMETRY_DIR (including ones saved
-// during earlier offline cycles), oldest first, moving each one to TELEMETRY_UPLOADED_DIR
-// once its publish is acknowledged. Published retained, so the broker holds onto the most
-// recently published telemetry and serves it immediately to anyone who queries/subscribes
-// later. Stops at the first failure, leaving it and everything after it in place to retry
-// next time. Also syncs deviceConfig from the MQTT config topic over the same connection.
-void publishPendingTelemetry(const String &deviceId, TelemetryCounts &counts, DeviceConfig &config)
-{
-    if (WiFi.status() != WL_CONNECTED) {
-        return;
-    }
-
-    mqttClient.setServer(MQTT_BROKER_HOST, MQTT_BROKER_PORT);
-    mqttClient.setCallback(mqttCallback);
-    // Default PubSubClient buffer is 256 bytes, which the telemetry JSON (plus topic) now
-    // exceeds, and isn't enough for an incoming config message either - bump it so publish()/
-    // incoming messages don't just silently get dropped for being "too long".
-    mqttClient.setBufferSize(512);
-    if (!mqttClient.connected() && !mqttClient.connect(deviceId.c_str())) {
-        Serial.printf("MQTT connect to %s failed, state:%d\n", MQTT_BROKER_HOST, mqttClient.state());
-        return;
-    }
-
-    syncDeviceConfigFromMqtt(deviceId, config);
-
-    if (!SD.exists(TELEMETRY_UPLOADED_DIR)) {
-        SD.mkdir(TELEMETRY_UPLOADED_DIR);
-    }
-
-    String topic = String(MQTT_TOPIC_PREFIX) + "/" + deviceId + "/telemetry";
-
-    // List pending filenames first and sort them, rather than publishing in whatever
-    // order openNextFile() happens to return (directory entry order isn't guaranteed
-    // to be chronological once files have been created/renamed/deleted over time).
-    // Filenames are "yyyymmdd-hhmmss.json", so a lexical sort is a chronological sort.
-    std::vector<String> baseNames;
-    File dir = SD.open(TELEMETRY_DIR);
-    File entry = dir.openNextFile();
-    while (entry) {
-        if (!entry.isDirectory()) {
-            String entryName = entry.name();
-            baseNames.push_back(entryName.substring(entryName.lastIndexOf('/') + 1));
-        }
-        entry.close();
-        entry = dir.openNextFile();
-    }
-    dir.close();
-
-    std::sort(baseNames.begin(), baseNames.end());
-
-    // Publish oldest first, retained, so that if we stop partway through (or the
-    // connection drops), the most recent telemetry published is always the last
-    // one - and being retained, it's the value anyone querying MQTT will see,
-    // rather than an older reading it happens to have published successfully.
-    for (const String &baseName : baseNames) {
-        String filePath = String(TELEMETRY_DIR) + "/" + baseName;
-        File file = SD.open(filePath, "r");
-        if (!file) {
-            continue;
-        }
-        String payload = file.readString();
-        file.close();
-
-        if (mqttClient.publish(topic.c_str(), payload.c_str(), true)) {
-            String uploadedPath = String(TELEMETRY_UPLOADED_DIR) + "/" + baseName;
-            SD.rename(filePath, uploadedPath);
-            counts.pendingTelemetry--;
-            counts.uploadedTelemetry++;
-            Serial.printf("Published and archived %s\n", filePath.c_str());
-        } else {
-            Serial.printf("Failed to publish %s, will retry next time\n", filePath.c_str());
-            // Stop here rather than skipping ahead to newer files: if the broker/connection
-            // is the problem, later publishes would fail too, and any that then made it through
-            // in a gap could become the retained message ahead of this older, still-pending one.
-            break;
-        }
-    }
-
-    mqttClient.disconnect();
 }
 
 struct ParsedUrl {
@@ -661,138 +659,255 @@ ParsedUrl parseApiUrl(const String &url)
     return parsed;
 }
 
-// Uploads every image still sitting in CAMERA_DIR (not the "uploaded" subfolder), oldest
-// first, over HTTP to the same API endpoint the Raspberry Pi units already post to - imagery
-// isn't published over MQTT, since message brokers aren't a great fit for large binary
-// payloads, especially once this moves to cellular. Moves each file to CAMERA_UPLOADED_DIR
-// once the API acknowledges it with 200 OK; stops at the first failure so a flaky connection
-// doesn't reorder the backlog (same approach as publishPendingTelemetry()).
-void uploadPendingImages(const String &deviceId, TelemetryCounts &counts, const String &apiUrl)
+struct HttpFormField {
+    String name;
+    String value;
+};
+
+// Performs a multipart/form-data POST to <apiUrl><endpoint>, with the given form fields plus
+// an optional file streamed from SD (pass file=nullptr to omit). Returns the HTTP status code
+// (0 if the connection itself failed) and, via responseBody, whatever the server sent back -
+// the Image/Telemetry endpoints return the saved row plus its related Device, which is how
+// config changes get back to the device (see applyDeviceConfigFromApiResponse) without a
+// separate polling mechanism.
+int postMultipartForm(const String &apiUrl, const String &endpoint, const std::vector<HttpFormField> &fields,
+                       const String &fileFieldName, const String &fileName, File *file, String &responseBody)
+{
+    ParsedUrl api = parseApiUrl(apiUrl);
+    String path = api.path;
+    if (!path.endsWith("/")) {
+        path += "/";
+    }
+    path += endpoint;
+
+    String boundary = "----ESP32Boundary" + String((uint32_t)millis(), HEX);
+
+    String startPart;
+    for (const HttpFormField &field : fields) {
+        startPart += "--" + boundary + "\r\n";
+        startPart += "Content-Disposition: form-data; name=\"" + field.name + "\"\r\n\r\n";
+        startPart += field.value + "\r\n";
+    }
+
+    size_t fileLength = 0;
+    if (file != nullptr) {
+        fileLength = file->size();
+        startPart += "--" + boundary + "\r\n";
+        startPart += "Content-Disposition: form-data; name=\"" + fileFieldName + "\"; filename=\"" + fileName + "\"\r\n";
+        startPart += "Content-Type: image/jpeg\r\n\r\n";
+    }
+    String endPart = "\r\n--" + boundary + "--\r\n";
+
+    size_t contentLength = startPart.length() + fileLength + endPart.length();
+
+    WiFiClientSecure secureClient;
+    WiFiClient plainClient;
+    if (api.https) {
+        secureClient.setInsecure();   // No cert store on-device - trust whatever's presented
+    }
+    Client &client = api.https ? (Client &)secureClient : (Client &)plainClient;
+
+    Serial.printf("POST %s://%s:%u%s\n", api.https ? "https" : "http", api.host.c_str(), api.port, path.c_str());
+
+    if (!client.connect(api.host.c_str(), api.port)) {
+        Serial.printf("Connection to %s:%u failed\n", api.host.c_str(), api.port);
+        return 0;
+    }
+
+    client.printf("POST %s HTTP/1.1\r\n", path.c_str());
+    client.printf("Host: %s\r\n", api.host.c_str());
+    client.printf("Content-Type: multipart/form-data; boundary=%s\r\n", boundary.c_str());
+    client.printf("Content-Length: %u\r\n", (unsigned)contentLength);
+    client.print("Connection: close\r\n\r\n");
+    client.print(startPart);
+
+    if (file != nullptr) {
+        uint8_t buffer[1024];
+        while (file->available()) {
+            size_t len = file->read(buffer, sizeof(buffer));
+            client.write(buffer, len);
+        }
+    }
+    client.print(endPart);
+
+    uint32_t start = millis();
+    int statusCode = 0;
+
+    // Status line + headers
+    while ((client.connected() || client.available()) && millis() - start < 15000) {
+        if (!client.available()) {
+            continue;
+        }
+        String line = client.readStringUntil('\n');
+        if (line.startsWith("HTTP/1.1")) {
+            statusCode = line.substring(9, 12).toInt();
+        }
+        if (line == "\r") {
+            break;   // blank line - end of headers, body follows
+        }
+    }
+
+    // Body
+    responseBody = "";
+    while ((client.connected() || client.available()) && millis() - start < 15000) {
+        if (client.available()) {
+            responseBody += (char)client.read();
+        }
+    }
+
+    client.stop();
+    return statusCode;
+}
+
+// Uploads every telemetry file still sitting in TELEMETRY_DIR (including ones saved during
+// earlier offline cycles), oldest first, moving each one to TELEMETRY_UPLOADED_DIR once the
+// API acknowledges it with 200 OK. Stops at the first failure, leaving it and everything after
+// it in place to retry next time. Also refreshes deviceConfig from the response.
+void uploadPendingTelemetry(const String &deviceId, TelemetryCounts &counts, DeviceConfig &config)
 {
     if (WiFi.status() != WL_CONNECTED) {
         return;
     }
 
-    if (!SD.exists(CAMERA_UPLOADED_DIR)) {
-        SD.mkdir(CAMERA_UPLOADED_DIR);
-    }
-
-    ParsedUrl api = parseApiUrl(apiUrl);
-    String imagePath = api.path;
-    if (!imagePath.endsWith("/")) {
-        imagePath += "/";
-    }
-    imagePath += "Image";
-
-    std::vector<String> baseNames;
-    File dir = SD.open(CAMERA_DIR);
-    File entry = dir.openNextFile();
-    while (entry) {
-        if (!entry.isDirectory()) {
-            String entryName = entry.name();
-            baseNames.push_back(entryName.substring(entryName.lastIndexOf('/') + 1));
-        }
-        entry.close();
-        entry = dir.openNextFile();
-    }
-    dir.close();
-
-    std::sort(baseNames.begin(), baseNames.end());
+    // List pending files first and sort them, rather than uploading in whatever order the walk
+    // happens to return. Paths are ".../yyyy/mm/dd/hh/mmss.json", so a lexical sort of the full
+    // path is still a chronological sort.
+    std::vector<String> filePaths;
+    listFilesRecursive(TELEMETRY_DIR, filePaths);
+    std::sort(filePaths.begin(), filePaths.end());
 
     int filesUploaded = 0;
-    for (const String &baseName : baseNames) {
-        // Process in batches of 10, same as the Pi's uploadPendingPhotos()
-        if (filesUploaded >= 10) {
-            Serial.println("Hit upload batch limit - remaining images will upload next cycle");
+    for (const String &filePath : filePaths) {
+        // Process in batches of 100, same as the Pi's uploadPendingTelemetry()
+        if (filesUploaded >= 100) {
+            Serial.println("Hit upload batch limit - remaining telemetry will upload next cycle");
             break;
         }
 
-        String filePath = String(CAMERA_DIR) + "/" + baseName;
         File file = SD.open(filePath, "r");
         if (!file) {
             continue;
         }
 
-        size_t fileLength = file.size();
-        if (fileLength == 0) {
+        if (file.size() == 0) {
             Serial.println("Empty file - deleting " + filePath);
             file.close();
             SD.remove(filePath);
             continue;
         }
 
-        // Filenames are "yyyymmdd-hhmmss.jpg" -> ISO8601 "yyyy-mm-ddThh:mm:ssZ"
-        String stem = baseName.substring(0, baseName.lastIndexOf('.'));
-        String timestamp = stem.substring(0, 4) + "-" + stem.substring(4, 6) + "-" + stem.substring(6, 8)
-                            + "T" + stem.substring(9, 11) + ":" + stem.substring(11, 13) + ":" + stem.substring(13, 15) + "Z";
+        DynamicJsonDocument doc(400);
+        DeserializationError err = deserializeJson(doc, file);
+        file.close();
 
-        String boundary = "----ESP32Boundary" + String((uint32_t)millis(), HEX);
-
-        String startPart = "--" + boundary + "\r\n"
-                            "Content-Disposition: form-data; name=\"SerialNumber\"\r\n\r\n" + deviceId + "\r\n"
-                            "--" + boundary + "\r\n"
-                            "Content-Disposition: form-data; name=\"Timestamp\"\r\n\r\n" + timestamp + "\r\n"
-                            "--" + boundary + "\r\n"
-                            "Content-Disposition: form-data; name=\"File\"; filename=\"" + baseName + "\"\r\n"
-                            "Content-Type: image/jpeg\r\n\r\n";
-        String endPart = "\r\n--" + boundary + "--\r\n";
-
-        size_t contentLength = startPart.length() + fileLength + endPart.length();
-
-        WiFiClientSecure secureClient;
-        WiFiClient plainClient;
-        if (api.https) {
-            secureClient.setInsecure();   // No cert store on-device - trust whatever's presented
+        if (err) {
+            Serial.printf("Failed to parse %s: %s - discarding\n", filePath.c_str(), err.c_str());
+            SD.remove(filePath);
+            continue;
         }
-        Client &client = api.https ? (Client &)secureClient : (Client &)plainClient;
 
-        Serial.printf("Uploading %s to %s://%s:%u%s\n", filePath.c_str(), api.https ? "https" : "http", api.host.c_str(), api.port, imagePath.c_str());
+        // Packs the fields that don't have a place of their own in TelemetryPostModel into
+        // Status, the same way the Pi's saveTelemetry.py packs PiJuice detail in there.
+        char status[128];
+        snprintf(status, sizeof(status), "{\"boot_count\":%d,\"voltage_mv\":%u,\"solar_voltage_mv\":%u}",
+                 doc["boot_count"].as<int>(), doc["voltage_mv"].as<unsigned>(), doc["solar_voltage_mv"].as<unsigned>());
 
-        if (!client.connect(api.host.c_str(), api.port)) {
-            Serial.printf("Connection to %s:%u failed\n", api.host.c_str(), api.port);
-            file.close();
+        std::vector<HttpFormField> fields = {
+            {"SerialNumber", deviceId},
+            {"Timestamp", doc["timestamp"].as<String>()},
+            {"TemperatureC", String((int)doc["temperatureC"].as<float>())},
+            {"BatteryPercent", doc["batteryPercent"].as<String>()},
+            {"Status", String(status)},
+            {"UptimeSeconds", String((uint32_t)(millis() / 1000))},
+            {"PendingImages", doc["pendingImages"].as<String>()},
+            {"UploadedImages", doc["uploadedImages"].as<String>()},
+            {"PendingTelemetry", doc["pendingTelemetry"].as<String>()},
+            {"UploadedTelemetry", doc["uploadedTelemetry"].as<String>()},
+        };
+
+        String responseBody;
+        int statusCode = postMultipartForm(config.apiUrl, "Telemetry", fields, "", "", nullptr, responseBody);
+
+        if (statusCode == 200) {
+            // Mirrors the same yyyy/mm/dd/hh bucketing into TELEMETRY_UPLOADED_DIR - otherwise
+            // we'd just relocate the flat-directory slowdown from "pending" to "uploaded".
+            String relativePath = filePath.substring(String(TELEMETRY_DIR).length());
+            String uploadedPath = String(TELEMETRY_UPLOADED_DIR) + relativePath;
+            ensureDirExists(parentDir(uploadedPath));
+            SD.rename(filePath, uploadedPath);
+            counts.pendingTelemetry--;
+            counts.uploadedTelemetry++;
+            filesUploaded++;
+            applyDeviceConfigFromApiResponse(responseBody, config);
+            Serial.printf("Uploaded and archived %s\n", filePath.c_str());
+        } else {
+            Serial.printf("Failed to upload %s (status %d), will retry next time\n", filePath.c_str(), statusCode);
+            break;
+        }
+    }
+}
+
+// Uploads every image still sitting in CAMERA_DIR (not the "uploaded" subfolder), oldest
+// first, over HTTP to the same API endpoint the Raspberry Pi units already post to - imagery
+// isn't published over MQTT, since message brokers aren't a great fit for large binary
+// payloads, especially once this moves to cellular. Moves each file to CAMERA_UPLOADED_DIR
+// once the API acknowledges it with 200 OK; stops at the first failure so a flaky connection
+// doesn't reorder the backlog (same approach as uploadPendingTelemetry()).
+void uploadPendingImages(const String &deviceId, TelemetryCounts &counts, DeviceConfig &config)
+{
+    if (WiFi.status() != WL_CONNECTED) {
+        return;
+    }
+
+    std::vector<String> filePaths;
+    listFilesRecursive(CAMERA_DIR, filePaths);
+    std::sort(filePaths.begin(), filePaths.end());
+
+    int filesUploaded = 0;
+    for (const String &filePath : filePaths) {
+        // Process in batches of 10, same as the Pi's uploadPendingPhotos()
+        if (filesUploaded >= 10) {
+            Serial.println("Hit upload batch limit - remaining images will upload next cycle");
             break;
         }
 
-        client.printf("POST %s HTTP/1.1\r\n", imagePath.c_str());
-        client.printf("Host: %s\r\n", api.host.c_str());
-        client.printf("Content-Type: multipart/form-data; boundary=%s\r\n", boundary.c_str());
-        client.printf("Content-Length: %u\r\n", (unsigned)contentLength);
-        client.print("Connection: close\r\n\r\n");
-        client.print(startPart);
-
-        uint8_t buffer[1024];
-        while (file.available()) {
-            size_t len = file.read(buffer, sizeof(buffer));
-            client.write(buffer, len);
+        File file = SD.open(filePath, "r");
+        if (!file) {
+            continue;
         }
-        client.print(endPart);
+
+        if (file.size() == 0) {
+            Serial.println("Empty file - deleting " + filePath);
+            file.close();
+            SD.remove(filePath);
+            continue;
+        }
+
+        String timestamp = parseTimestampFromPath(filePath);
+
+        std::vector<HttpFormField> fields = {
+            {"SerialNumber", deviceId},
+            {"Timestamp", timestamp},
+        };
+
+        String responseBody;
+        int statusCode = postMultipartForm(config.apiUrl, "Image", fields, "File", fileBaseName(filePath), &file, responseBody);
         file.close();
 
-        bool ok = false;
-        uint32_t start = millis();
-        while ((client.connected() || client.available()) && millis() - start < 15000) {
-            if (client.available()) {
-                String line = client.readStringUntil('\n');
-                if (line.startsWith("HTTP/1.1") && line.indexOf("200") != -1) {
-                    ok = true;
-                }
-                if (line == "\r") {
-                    break;   // end of headers - no need to read the body
-                }
-            }
-        }
-        client.stop();
-
-        if (ok) {
-            String uploadedPath = String(CAMERA_UPLOADED_DIR) + "/" + baseName;
+        if (statusCode == 200) {
+            // Mirrors the same yyyy/mm/dd/hh bucketing into CAMERA_UPLOADED_DIR - otherwise
+            // we'd just relocate the flat-directory slowdown from "pending" to "uploaded".
+            String relativePath = filePath.substring(String(CAMERA_DIR).length());
+            String uploadedPath = String(CAMERA_UPLOADED_DIR) + relativePath;
+            ensureDirExists(parentDir(uploadedPath));
             SD.rename(filePath, uploadedPath);
             counts.pendingImages--;
             counts.uploadedImages++;
             filesUploaded++;
+            applyDeviceConfigFromApiResponse(responseBody, config);
             Serial.printf("Uploaded and archived %s\n", filePath.c_str());
         } else {
-            Serial.printf("Failed to upload %s, will retry next time\n", filePath.c_str());
+            Serial.printf("Failed to upload %s (status %d), will retry next time\n", filePath.c_str(), statusCode);
             break;
         }
     }
@@ -873,7 +988,7 @@ void setup()
     TelemetryCounts counts = readCounts();
 
     // Reloaded fresh every boot - deep sleep doesn't preserve normal RAM - then refreshed
-    // from the MQTT config topic further down, once WiFi is up.
+    // from the API response further down, once WiFi is up.
     deviceConfig = readDeviceConfig();
 
     // Deep sleep keeps the RTC running, so the clock usually survives between wake-ups.
@@ -943,21 +1058,19 @@ void setup()
     // s->set_vflip(s, 1);
     // s->set_hmirror(s, 1);
 
-    String timestamp = getTimestampString();
+    DatedPath datedPath = getDatedPath();
 
     // Capture camera photo
     camera_fb_t *frame = esp_camera_fb_get();
 
     if (frame) {
 
-        // Stored in the camera directory
-        if (!SD.exists(CAMERA_DIR)) {
-            if (SD.mkdir(CAMERA_DIR)) {
-                Serial.println("Created camera directory!");
-            }
-        }
+        // Stored under CAMERA_DIR/yyyy/mm/dd/hh/ rather than directly in CAMERA_DIR - keeps
+        // any single directory small no matter how large the backlog grows.
+        String dirPath = String(CAMERA_DIR) + "/" + datedPath.dirPath;
+        ensureDirExists(dirPath);
 
-        String filename = String(CAMERA_DIR) + "/" + timestamp + ".jpg";
+        String filename = dirPath + "/" + datedPath.leafName + ".jpg";
 
         uint32_t startTime = millis();
         File jpg = SD.open(filename, "w");
@@ -978,9 +1091,9 @@ void setup()
     counts.pendingTelemetry++;
     String deviceId = getDeviceId();
     String telemetryJson = buildTelemetryJson(getISO8601Timestamp(), deviceId, get_battery_voltage(), get_solar_voltage(), counts);
-    writeTelemetryFile(timestamp, telemetryJson);
-    publishPendingTelemetry(deviceId, counts, deviceConfig);
-    uploadPendingImages(deviceId, counts, deviceConfig.apiUrl);
+    writeTelemetryFile(datedPath, telemetryJson);
+    uploadPendingTelemetry(deviceId, counts, deviceConfig);
+    uploadPendingImages(deviceId, counts, deviceConfig);
     writeCounts(counts);
 }
 

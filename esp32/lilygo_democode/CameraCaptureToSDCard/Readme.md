@@ -14,16 +14,9 @@ Documentation here: https://github.com/Xinyuan-LILYGO/LilyGo-Modem-Series/blob/m
 
 ## Telemetry, config and images
 
-- Telemetry is published (retained) to MQTT topic `camera/<deviceId>/telemetry`. `deviceId` is derived from the efuse MAC, printed on boot.
-- Device config is read from MQTT topic `camera/<deviceId>/config` (also retained - publish it once and every future boot/reconnect picks it up). Sent as JSON, any subset of:
-  ```json
-  {
-    "sleep_during_night": true,
-    "daytime_starts_at_h": 7,
-    "daytime_ends_at_h": 17,
-    "camera.interval": 300,
-    "apiUrl": "https://timelapse-dev.azurewebsites.net/api/"
-  }
-  ```
-  Hours are UTC. Received config is cached to `/config.json` on the SD card and reloaded on every boot, so it survives deep sleep/power loss and applies even on cycles where WiFi doesn't come up. `sleep_during_night` makes the device sleep straight through to `daytime_starts_at_h` instead of waking every `camera.interval` seconds overnight.
-- Images are uploaded over HTTP (not MQTT - not a good fit for large binary payloads, especially once this moves to cellular) as a multipart POST to `<apiUrl>Image`, matching the endpoint the Raspberry Pi units already post to via `scripts/uploadPending.py`.
+Both telemetry and images go over HTTP to the same API the Raspberry Pi units already use (`scripts/uploadPending.py`) - no MQTT. `deviceId` is derived from the efuse MAC, printed on boot, and sent as `SerialNumber`.
+
+- Telemetry is a multipart POST to `<apiUrl>Telemetry`; images to `<apiUrl>Image`.
+- Both endpoints return the saved row plus its related `Device` (see `ImageController`/`TelemetryController`), and the device config lives on that `Device` object - `sleepDuringNight`, `daytimeStartsAtH`, `daytimeEndsAtH`, `cameraIntervalS`, `apiUrl` (edit them on a device's page in the API's admin UI). Every successful upload re-reads these and, if anything changed, rewrites `/config.json` on the SD card. That cache is reloaded on every boot, so config survives deep sleep/power loss and applies even on cycles where WiFi doesn't come up.
+- Hours are UTC. `sleepDuringNight` makes the device sleep straight through to `daytimeStartsAtH` instead of waking every `cameraIntervalS` seconds overnight.
+- `apiUrl` is itself one of the config fields, so pointing a device at a different API deployment is just an admin-side edit - the device picks it up next time it successfully uploads.
