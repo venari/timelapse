@@ -686,6 +686,21 @@ ParsedUrl parseApiUrl(const String &url)
     return parsed;
 }
 
+// Renders form fields as a JSON object, purely for Serial logging - what's actually sent on the
+// wire is multipart/form-data, not JSON, but JSON is a much easier shape to eyeball when
+// troubleshooting why a POST is being rejected (e.g. a field holding a value the API's model
+// binder won't accept).
+String fieldsToJson(const std::vector<HttpFormField> &fields)
+{
+    DynamicJsonDocument doc(1024);
+    for (const HttpFormField &field : fields) {
+        doc[field.name] = field.value;
+    }
+    String json;
+    serializeJson(doc, json);
+    return json;
+}
+
 // Performs a multipart/form-data POST to <apiUrl><endpoint>, with the given form fields plus
 // an optional file streamed from SD (pass file=nullptr to omit). Returns the HTTP status code
 // (0 if the connection itself failed) and, via responseBody, whatever the server sent back -
@@ -842,6 +857,7 @@ void uploadPendingTelemetry(const String &deviceId, TelemetryCounts &counts, Dev
             // have a decimal value on disk, and TemperatureC is an int column server-side.
             {"TemperatureC", String((int)lroundf(doc["temperatureC"].as<float>()))},
             {"BatteryPercent", doc["batteryPercent"].as<String>()},
+            // {"BatteryVoltage", doc["voltage_mv"].as<String>()},
             {"Status", String(status)},
             {"UptimeSeconds", String((uint32_t)(millis() / 1000))},
             {"PendingImages", doc["pendingImages"].as<String>()},
@@ -850,8 +866,12 @@ void uploadPendingTelemetry(const String &deviceId, TelemetryCounts &counts, Dev
             {"UploadedTelemetry", doc["uploadedTelemetry"].as<String>()},
         };
 
+        Serial.printf("Posting Telemetry: %s\n", fieldsToJson(fields).c_str());
+
         String responseBody;
         int statusCode = postMultipartForm(config.apiUrl, "Telemetry", fields, "", "", nullptr, responseBody);
+
+        Serial.printf("Telemetry response (status %d): %s\n", statusCode, responseBody.c_str());
 
         if (statusCode == 200) {
             // Mirrors the same yyyy/mm/dd/hh bucketing into TELEMETRY_UPLOADED_DIR - otherwise
@@ -915,9 +935,13 @@ void uploadPendingImages(const String &deviceId, TelemetryCounts &counts, Device
             {"Timestamp", timestamp},
         };
 
+        Serial.printf("Posting Image: %s\n", fieldsToJson(fields).c_str());
+
         String responseBody;
         int statusCode = postMultipartForm(config.apiUrl, "Image", fields, "File", fileBaseName(filePath), &file, responseBody);
         file.close();
+
+        Serial.printf("Image response (status %d): %s\n", statusCode, responseBody.c_str());
 
         if (statusCode == 200) {
             // Mirrors the same yyyy/mm/dd/hh bucketing into CAMERA_UPLOADED_DIR - otherwise
