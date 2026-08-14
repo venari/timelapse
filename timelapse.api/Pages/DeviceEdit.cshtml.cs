@@ -115,6 +115,13 @@ namespace timelapse.api.Pages
             device.Service = Device.Service;
             device.WideAngle = Device.WideAngle;
             device.Retired = Device.Retired;
+            device.SleepDuringNight = Device.SleepDuringNight;
+            device.DaytimeStartsAtH = Device.DaytimeStartsAtH;
+            device.DaytimeEndsAtH = Device.DaytimeEndsAtH;
+            device.CameraIntervalS = Device.CameraIntervalS;
+            device.ApiUrl = Device.ApiUrl;
+            device.Hflip = Device.Hflip;
+            device.Vflip = Device.Vflip;
 
             if(Latitude.HasValue && Longitude.HasValue){
 

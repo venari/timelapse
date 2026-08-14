@@ -33,13 +33,6 @@ def internet(host="8.8.8.8", port=53, timeout=3):
 
 
 
-def flashLED(pj, led='D2', R=0, G=0, B=255, flashCount=3, flashDelay=0.5):
-    for i in range(0, flashCount):
-        pj.status.SetLedState(led, [R, G, B])
-        time.sleep(flashDelay)
-        pj.status.SetLedState(led, [0, 0, 0])
-        time.sleep(flashDelay)
-
 def currentPhase(now):
     if(config["location.lon"] and config["location.lat"]):
 
@@ -51,10 +44,18 @@ def currentPhase(now):
 
         # Convert solar times to the specified timezone
         for key in solar_times:
-            solar_times[key] = solar_times[key].astimezone(timezone)
+            # Localize timezone-naive timestamps to UTC first, then convert
+            if solar_times[key].tzinfo is None:
+                solar_times[key] = solar_times[key].tz_localize('UTC').astimezone(timezone)
+            else:
+                solar_times[key] = solar_times[key].astimezone(timezone)
 
         for key in solar_times_tomorrow:
-            solar_times_tomorrow[key] = solar_times_tomorrow[key].astimezone(timezone)
+            # Localize timezone-naive timestamps to UTC first, then convert
+            if solar_times_tomorrow[key].tzinfo is None:
+                solar_times_tomorrow[key] = solar_times_tomorrow[key].tz_localize('UTC').astimezone(timezone)
+            else:
+                solar_times_tomorrow[key] = solar_times_tomorrow[key].astimezone(timezone)
 
         # print (f"\nsolar_times: {solar_times}")
 

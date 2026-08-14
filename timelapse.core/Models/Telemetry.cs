@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using System.Text.Json;
 
 namespace timelapse.core.models;
 
@@ -11,7 +12,7 @@ public class Telemetry
     public int TemperatureC {get; set;}
     [Required]
     public int BatteryPercent {get; set;}
-    
+
     public string? Status {get; set;}
 
     public int? DiskSpaceFree {get; set;}
@@ -25,7 +26,10 @@ public class Telemetry
     public int DeviceId {get; set;}
     public Device Device {get; set;}
 
-    public string FixUpInvalidPiJuiceJSONStatus {get {
+    // The Raspberry Pi's saveTelemetry.py writes a Python dict repr rather than valid JSON
+    // (single quotes, True/False/None). These replacements are no-ops for ESP32 firmware, which
+    // already sends well-formed JSON (e.g. {"boot_count":1,"voltage_mv":3940,"solar_voltage_mv":6}).
+    public string? FixUpInvalidPiJuiceJSONStatus {get {
         if(Status!=null){
             var status = Status;
             status = status.Replace("'", "\"");
@@ -37,175 +41,154 @@ public class Telemetry
         return null;
     }}
 
-    private dynamic PiJuiceJSONStatus {
-        get{
-            if(Status!=null){
-                dynamic status = System.Text.Json.JsonSerializer.Deserialize<dynamic>(FixUpInvalidPiJuiceJSONStatus);
-                dynamic status2 = System.Text.Json.JsonSerializer.Deserialize<dynamic>(status.GetProperty("status"));
-                return status2;
+    // Parses Status defensively. Returns null - never throws - if Status is missing, blank, or
+    // not valid JSON once fixed up, so a device sending an unexpected/truncated status doesn't
+    // take down every other Telemetry property.
+    private JsonElement? ParsedStatus {
+        get {
+            var fixedUpStatus = FixUpInvalidPiJuiceJSONStatus;
+            if (string.IsNullOrWhiteSpace(fixedUpStatus)) {
+                return null;
             }
 
-            return null;
-        }
-    }
-
-
-    public int? BatteryVoltage {
-        get{
-            if(Status!=null){
-                dynamic status = System.Text.Json.JsonSerializer.Deserialize<dynamic>(FixUpInvalidPiJuiceJSONStatus);
-                int batteryVoltage = System.Text.Json.JsonSerializer.Deserialize<int>(status.GetProperty("batteryVoltage"));
-                return batteryVoltage;
-            }
-
-            return null;
-        }
-    }
-
-    public int? BatteryCurrent {
-        get{
-            if(Status!=null){
-                dynamic status = System.Text.Json.JsonSerializer.Deserialize<dynamic>(FixUpInvalidPiJuiceJSONStatus);
-                int batteryCurrent = System.Text.Json.JsonSerializer.Deserialize<int>(status.GetProperty("batteryCurrent"));
-                return batteryCurrent;
-            }
-
-            return null;
-        }
-    }
-
-    public int? IOVoltage {
-        get{
-            if(Status!=null){
-                dynamic status = System.Text.Json.JsonSerializer.Deserialize<dynamic>(FixUpInvalidPiJuiceJSONStatus);
-                int ioVoltage = System.Text.Json.JsonSerializer.Deserialize<int>(status.GetProperty("ioVoltage"));
-                return ioVoltage;
-            }
-
-            return null;
-        }
-    }
-
-    public int? IOCurrent {
-        get{
-            if(Status!=null){
-                dynamic status = System.Text.Json.JsonSerializer.Deserialize<dynamic>(FixUpInvalidPiJuiceJSONStatus);
-                int ioCurrent = System.Text.Json.JsonSerializer.Deserialize<int>(status.GetProperty("ioCurrent"));
-                return ioCurrent;
-            }
-
-            return null;
-        }
-    }
-
-    public bool? PowerSwitch {
-        get{
-            if(Status!=null){
-                dynamic status = System.Text.Json.JsonSerializer.Deserialize<dynamic>(FixUpInvalidPiJuiceJSONStatus);
-                
-                if (!status.TryGetProperty("powerSwitch", out System.Text.Json.JsonElement powerSwitch))
-                {
-                    return null;
-                }
-
-                if (!powerSwitch.TryGetProperty("data", out System.Text.Json.JsonElement powerSwitchData))
-                {
-                    return null;
-                }
-
-                return powerSwitchData.GetInt32() > 0?true:null;
-            }
-
-            return null;
-        }
-    }
-
-    public bool? ConnectedToWirelessNetwork {
-        get{
-            if(Status!=null){
-                dynamic status = System.Text.Json.JsonSerializer.Deserialize<dynamic>(FixUpInvalidPiJuiceJSONStatus);
-                if (!status.TryGetProperty("connectedToWirelessNetwork", out System.Text.Json.JsonElement connectedToWireless))
-                {
-                    return null;
-                }
-
-                return connectedToWireless.GetString()=="True"?true:null;
-            }
-
-            return null;
-        }
-    }
-
-    public string? WirelessSSID {
-        get{
-            if(Status!=null){
-                dynamic status = System.Text.Json.JsonSerializer.Deserialize<dynamic>(FixUpInvalidPiJuiceJSONStatus);
-                if (!status.TryGetProperty("wirelessSSID", out System.Text.Json.JsonElement wirelessSSID))
-                {
-                    return null;
-                }
-                return wirelessSSID.GetString();
-            }
-
-            return null;
-        }
-    }
-
-    public bool? ConnectedToInternet {
-        get{
-            if(Status!=null){
-                dynamic status = System.Text.Json.JsonSerializer.Deserialize<dynamic>(FixUpInvalidPiJuiceJSONStatus);
-                if (!status.TryGetProperty("connectedToInternet", out System.Text.Json.JsonElement connectedToInternet))
-                {
-                    return null;
-                }
-                return connectedToInternet.GetString() == "True"?true:null;
-            }
-
-            return null;
-        }
-    }
-
-    public string? Status_Battery
-    {
-        get
-        {
-            if (Status != null)
-            {
-                dynamic status = PiJuiceJSONStatus;
-                return status.GetProperty("battery").ToString()
-                    .Replace("CHARGING_FROM_IN", "Charging")
-                    .Replace("CHARGING_FROM_5V_IO", "Charging")
-                    .Replace("NOT_PRESENT", "Not Present")
-                    .Replace("NORMAL", "Normal");
-            }
-
-            return null;
-        }
-    }
-
-    public bool? Charging {
-        get{
-            if(Status_Battery == "Charging"){
-                return true;
-            } else {
+            try {
+                return JsonSerializer.Deserialize<JsonElement>(fixedUpStatus);
+            } catch (JsonException) {
                 return null;
             }
         }
     }
 
-    public string? Status_PowerInput {
-        get{
-            if(Status!=null){
-                dynamic status = PiJuiceJSONStatus;
-                return status.GetProperty("powerInput").ToString()
-                    .Replace("WEAK", "Weak")
-                    .Replace("BAD", "Bad")
-                    .Replace("NOT_PRESENT", "Not Present")
-                    .Replace("PRESENT", "Present");
+    // Raspberry Pi devices nest PiJuice detail under a "status" property, e.g.
+    // {"status": {"chargeState": "...", "battery": "...", "powerInput": "..."}, "batteryVoltage": ...}.
+    // ESP32 devices don't have one at all - returns null for either an absent property or a
+    // value that isn't an object.
+    private JsonElement? PiJuiceStatusDetail {
+        get {
+            var status = ParsedStatus;
+            if (status is not { ValueKind: JsonValueKind.Object } root) {
+                return null;
             }
 
+            if (!root.TryGetProperty("status", out var detail) || detail.ValueKind != JsonValueKind.Object) {
+                return null;
+            }
+
+            return detail;
+        }
+    }
+
+    private static int? TryGetInt(JsonElement? element, string propertyName)
+    {
+        if (element is not { ValueKind: JsonValueKind.Object } obj) {
             return null;
+        }
+
+        if (!obj.TryGetProperty(propertyName, out var value)) {
+            return null;
+        }
+
+        return value.ValueKind switch {
+            JsonValueKind.Number when value.TryGetInt32(out var number) => number,
+            JsonValueKind.String when int.TryParse(value.GetString(), out var number) => number,
+            _ => null
+        };
+    }
+
+    private static string? TryGetString(JsonElement? element, string propertyName)
+    {
+        if (element is not { ValueKind: JsonValueKind.Object } obj) {
+            return null;
+        }
+
+        if (!obj.TryGetProperty(propertyName, out var value) || value.ValueKind != JsonValueKind.String) {
+            return null;
+        }
+
+        return value.GetString();
+    }
+
+    // Pi-only fields (ESP32 status has no "batteryVoltage"/"batteryCurrent"/"ioVoltage"/"ioCurrent") -
+    // simply absent for ESP32 devices rather than throwing.
+    public int? BatteryVoltage => TryGetInt(ParsedStatus, "batteryVoltage");
+
+    public int? BatteryCurrent => TryGetInt(ParsedStatus, "batteryCurrent");
+
+    public int? IOVoltage => TryGetInt(ParsedStatus, "ioVoltage");
+
+    public int? IOCurrent => TryGetInt(ParsedStatus, "ioCurrent");
+
+    public bool? PowerSwitch {
+        get{
+            var status = ParsedStatus;
+            if (status is not { ValueKind: JsonValueKind.Object } root) {
+                return null;
+            }
+
+            if (!root.TryGetProperty("powerSwitch", out var powerSwitch) || powerSwitch.ValueKind != JsonValueKind.Object) {
+                return null;
+            }
+
+            if (!powerSwitch.TryGetProperty("data", out var powerSwitchData) || powerSwitchData.ValueKind != JsonValueKind.Number) {
+                return null;
+            }
+
+            return powerSwitchData.GetInt32() > 0 ? true : null;
+        }
+    }
+
+    public bool? ConnectedToWirelessNetwork => TryGetString(ParsedStatus, "connectedToWirelessNetwork") == "True" ? true : null;
+
+    public string? WirelessSSID => TryGetString(ParsedStatus, "wirelessSSID");
+
+    public bool? ConnectedToInternet => TryGetString(ParsedStatus, "connectedToInternet") == "True" ? true : null;
+
+    public string? Status_Battery {
+        get {
+            var battery = TryGetString(PiJuiceStatusDetail, "battery");
+            if (battery == null) {
+                return null;
+            }
+
+            return battery
+                .Replace("CHARGING_FROM_IN", "Charging")
+                .Replace("CHARGING_FROM_5V_IO", "Charging")
+                .Replace("NOT_PRESENT", "Not Present")
+                .Replace("NORMAL", "Normal");
+        }
+    }
+
+    public string Charge_State {
+        get {
+            var chargeState = TryGetString(PiJuiceStatusDetail, "chargeState");
+            if (chargeState == null) {
+                return "Unknown";
+            }
+
+            return chargeState
+                .Replace("Trickle Charge (VBAT < VBAT_SHORT)", "Charging")
+                .Replace("Pre-Charge (VBAT < VBAT_LOWV)", "Charging")
+                .Replace("Fast Charge (CC mode)", "Charging")
+                .Replace("Taper Charge (CV mode)", "Charging")
+                .Replace("Top-off Timer Charge", "Charging")
+                .Replace("Charge Termination Done", "Not charging");
+        }
+    }
+
+    public bool? Charging => (Status_Battery == "Charging" || Charge_State == "Charging") ? true : null;
+
+    public string? Status_PowerInput {
+        get{
+            var powerInput = TryGetString(PiJuiceStatusDetail, "powerInput");
+            if (powerInput == null) {
+                return null;
+            }
+
+            return powerInput
+                .Replace("WEAK", "Weak")
+                .Replace("BAD", "Bad")
+                .Replace("NOT_PRESENT", "Not Present")
+                .Replace("PRESENT", "Present");
         }
     }
 }

@@ -298,10 +298,31 @@ namespace timelapse.api.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
+                    b.Property<string>("ApiUrl")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("api_url");
+
+                    b.Property<int>("CameraIntervalS")
+                        .HasColumnType("integer")
+                        .HasColumnName("camera_interval_s");
+
+                    b.Property<int>("DaytimeEndsAtH")
+                        .HasColumnType("integer")
+                        .HasColumnName("daytime_ends_at_h");
+
+                    b.Property<int>("DaytimeStartsAtH")
+                        .HasColumnType("integer")
+                        .HasColumnName("daytime_starts_at_h");
+
                     b.Property<string>("Description")
                         .IsRequired()
                         .HasColumnType("text")
                         .HasColumnName("description");
+
+                    b.Property<bool>("Hflip")
+                        .HasColumnType("boolean")
+                        .HasColumnName("hflip");
 
                     b.Property<bool>("HibernateMode")
                         .HasColumnType("boolean")
@@ -338,9 +359,17 @@ namespace timelapse.api.Migrations
                         .HasColumnType("text")
                         .HasColumnName("short_description");
 
+                    b.Property<bool>("SleepDuringNight")
+                        .HasColumnType("boolean")
+                        .HasColumnName("sleep_during_night");
+
                     b.Property<bool>("SupportMode")
                         .HasColumnType("boolean")
                         .HasColumnName("support_mode");
+
+                    b.Property<bool>("Vflip")
+                        .HasColumnType("boolean")
+                        .HasColumnName("vflip");
 
                     b.Property<bool>("WideAngle")
                         .HasColumnType("boolean")

@@ -9,22 +9,16 @@ import datetime
 import sys
 import requests
 import logging
-# from logging.handlers import TimedRotatingFileHandler
-from logging.handlers import SocketHandler
 import pathlib
 
 # from helpers import flashLED
-from helpers import currentPhase
+from helpers import currentPhase, internet
+from uploadPending import uploadPhoto
 
 config = json.load(open(pathlib.Path(__file__).parent / 'config.json'))
-logFilePath = config["logFilePath"]
-# logFilePath = logFilePath.replace(".log", ".savePhotos.log")
-os.makedirs(os.path.dirname(logFilePath), exist_ok=True)
-# os.chmod(os.path.dirname(logFilePath), 0o777) # Make sure pijuice user scrip can write to log file.
 
 formatter = logging.Formatter('%(asctime)s %(name)s %(levelname)s %(message)s')
-# handler = TimedRotatingFileHandler(logFilePath, when='midnight', backupCount=10)
-handler = SocketHandler('localhost', 8000)
+handler = logging.StreamHandler(sys.stderr)
 handler.setFormatter(formatter)
 logger = logging.getLogger("savePhotos")
 logger.addHandler(handler)
@@ -54,9 +48,9 @@ def reloadConfig():
 
 reloadConfig()
 
-# clock
-while not os.path.exists('/dev/i2c-1'):
-    time.sleep(0.1)
+## clock
+#while not os.path.exists('/dev/i2c-1'):
+#    time.sleep(0.1)
 
 outputImageFolder = str(pathlib.Path(__file__).parent / '../output/images/')
 workingImageFolder = os.path.join(outputImageFolder , 'working/')
@@ -128,7 +122,7 @@ def savePhotos():
                 # camera.rotation = config['camera.rotation']
                 camera.configure(camera_config)
 
-                phase = currentPhase(datetime.datetime.utcnow())
+                phase = currentPhase(datetime.datetime.now(datetime.timezone.utc))
                 logger.debug('current phase is ' + phase)
 
                 camera.set_controls({"AfMode": controls.AfModeEnum.Manual, "LensPosition": lensposition, "AeExposureMode": controls.AeExposureModeEnum.Normal})
@@ -165,8 +159,18 @@ def savePhotos():
                 IMAGEFILENAME = workingImageFolder + datetime.datetime.now().strftime('%Y-%m-%d_%H%M%S.jpg')
                 camera.capture_file(IMAGEFILENAME)
                 logger.debug('image saved to working folder')
-                shutil.move(IMAGEFILENAME, pendingImageFolder + pathlib.Path(IMAGEFILENAME).name)
+                pendingFilename = pendingImageFolder + pathlib.Path(IMAGEFILENAME).name
+                shutil.move(IMAGEFILENAME, pendingFilename)
                 logger.debug('image moved to pending folder')
+                
+                # Try to upload immediately if connected to internet
+                if internet():
+                    logger.debug('connected to internet - attempting immediate upload')
+                    try:
+                        uploadPhoto(pendingFilename)
+                    except Exception as e:
+                        logger.warning(f'immediate upload failed: {e}')
+                        logger.debug('will retry via uploadPending.py later')
 
             logger.debug('destroying camera object')
             
@@ -184,17 +188,23 @@ def savePhotos():
         logger.error(e)
 
 
-try:
-    logger.info('In savePhotos.py')
+def main():
+    """Main entry point for savePhotos script."""
+    try:
+        logger.info('In savePhotos.py')
 
-    while True:
-        savePhotos()
+        while True:
+            savePhotos()
 
-        if not config['shutdown']:
-            logger.warning("Bailed out of savePhotos() - let's pause to catch our breath...")
-            # If we get here something went wrong. Let's pause for a bit and try again.
-            time.sleep(30)
-            
-except Exception as e:
-    logger.error("Catastrophic failure.")
-    logger.error(e)
+            if not config['shutdown']:
+                logger.warning("Bailed out of savePhotos() - let's pause to catch our breath...")
+                # If we get here something went wrong. Let's pause for a bit and try again.
+                time.sleep(30)
+                
+    except Exception as e:
+        logger.error("Catastrophic failure.")
+        logger.error(e)
+
+
+if __name__ == "__main__":
+    main()

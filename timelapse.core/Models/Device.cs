@@ -22,6 +22,25 @@ public class Device
     public bool Service {get; set;} = false;
     public bool WideAngle {get; set;} = false;
 
+    // ESP32 camera config, pushed to the device over the Device object nested in every
+    // Image/Telemetry POST response (see ImageController/TelemetryController) - the same
+    // mechanism SupportMode etc. above already use. The ESP32 caches these on its SD card
+    // and re-applies them each boot, so a change here takes effect next time it phones home.
+    public bool SleepDuringNight {get; set;} = false;
+    public int DaytimeStartsAtH {get; set;} = 7;
+    public int DaytimeEndsAtH {get; set;} = 17;
+    public int CameraIntervalS {get; set;} = 300;
+    public bool Hflip {get; set;} = false;
+    public bool Vflip {get; set;} = false;
+
+    // Deliberately blank, not defaulted to a real URL: the ESP32 only overwrites its local
+    // apiUrl when this is non-empty (see applyConfigFields in the .ino). A real default here
+    // would mean every device - including ones seeded via SD card to point at a different
+    // environment - gets redirected back to whatever URL this says the first time it uploads,
+    // since a freshly-created Device row would otherwise already have an opinion. Leaving it
+    // blank means the API stays silent on this field until someone deliberately sets it here.
+    public string ApiUrl {get; set;} = "";
+
     [System.Text.Json.Serialization.JsonIgnore]
     public List<Telemetry> Telemetries {get;} = new List<Telemetry>();
 

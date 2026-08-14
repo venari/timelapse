@@ -10,6 +10,12 @@ A set of tools/scripts to automate the taking and creation of timelapse videos a
 > In addition the ability to purchase PiSupply's PiJuice batteries seems to have returned (even if stock has not).
 >
 > TL;DR - as long as not combined with either a LiFePO4 battery chemistry or the Waveshare hat above, the PiJuice seems to perform well.
+>
+> As of June 2026, the PiJuice no longer appears to be being manufactured, an PiSupply appears to have been disolved.
+> 
+> This project is being migrated to use the PvPi 12V LiFePO4 solar battery charger.
+> 
+> Documentation will be updated in the coming months.
 
 # PI Setup
 
@@ -307,6 +313,46 @@ brew install pgadmin4
 dotnet tool install --global dotnet-ef
 ```
 
+# Azure CLI install
+```
+curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
+```
+
+# Running creation script
+This will create the infrastructure to run the API and web interface
+```
+az login
+./azure-helpers/create-enviroeyes-dev.sh
+```
+
+# Configure users
+- Browse to [AZURE_APP_NAME].azurewebsite.net, and log in as user `admin@enviroeyes`, password `Enviroeyes123!`.
+- Register new accounts at [AZURE_APP_NAME].azurewebsite.net/Identity/Account/Register
+  - A confirmation email will be sent to this account, click on the link and login as the new user.
+  
+
+# Update camera to enviroeyes-dev
+```
+cd dev/timelapse
+git fetch; git stash; git checkout release/zookeeper; git pull; git stash pop
+sudo systemctl restart envirocam-upload.service envirocam-telemetry.service
+```
+
+```
+sudo hostnamectl set-hostname [hostname]
+sudo tailscale up
+```
+
+# Copy preconfigured local config
+```
+scp ~/config.local.[project-name].json pi@[pi name]:~/dev/timelapse/scripts/config.local.json
+```
+
+# GitHub CLI install
+```
+sudo apt install gh
+```
+
 Postgres DB Server:
 ```
 
@@ -493,73 +539,13 @@ Note - Wake up should be automatically enabled in `saveTelemetry.py`, but you wi
 
 ```
 
-# Status Indication script
-
-```
-░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
-░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
-░░░░░┌───────────────────────── PiJuice CLI ────────────────────────┐░░░░
-░░░░░│  User Scripts                                                │░░░░
-░░░░░│                                                              │░░░░
-░░░░░│  USER FUNC1:                                                 │░░░░
-░░░░░│  /home/pi/dev/timelapse/scripts/indicateStatus.sh            │░░░░
-░░░░░│  USER FUNC2:                                                 │░░░░
-░░░░░│  USER FUNC3:                                                 │░░░░
-░░░░░│  USER FUNC4:                                                 │░░░░
-░░░░░│  USER FUNC5:                                                 │░░░░
-░░░░░│  USER FUNC6:                                                 │░░░░
-░░░░░│  USER FUNC7:                                                 │░░░░
-░░░░░│  USER FUNC8:                                                 │░░░░
-░░░░░│  USER FUNC9:                                                 │░░░░
-░░░░░│  USER FUNC10:                                                │░░░░
-░░░░░│  USER FUNC11:                                                │░░░░
-░░░░░│  USER FUNC12:                                                │░░░░
-░░░░░│  USER FUNC13:                                                │░░░░
-░░░░░│  USER FUNC14:                                                │░░░░
-░░░░░│  USER FUNC15:                                                │░░░░
-░░░░░└──────────────────────────────────────────────────────────────┘░░░░
-░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
-░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
-
-
-
-░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
-░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
-░░░░░┌───────────────────────── PiJuice CLI ────────────────────────┐░░░░
-░░░░░│  Settings for SW1                                            │░░░░
-░░░░░│                                                              │░░░░
-░░░░░│  < PRESS: USER_FUNC1, 0                       >              │░░░░
-░░░░░│  < RELEASE: NO_FUNC, 0                        >              │░░░░
-░░░░░│  < SINGLE_PRESS: HARD_FUNC_POWER_ON, 800      >              │░░░░
-░░░░░│  < DOUBLE_PRESS: NO_FUNC, 0                   >              │░░░░
-░░░░░│  < LONG_PRESS1: SYS_FUNC_HALT, 10000          >              │░░░░
-░░░░░│  < LONG_PRESS2: HARD_FUNC_POWER_OFF, 20000    >              │░░░░
-░░░░░│                                                              │░░░░
-░░░░░│  < Back >                                                    │░░░░
-░░░░░│                                                              │░░░░
-░░░░░│                                                              │░░░░
-░░░░░│                                                              │░░░░
-░░░░░│                                                              │░░░░
-░░░░░│                                                              │░░░░
-░░░░░│                                                              │░░░░
-░░░░░│                                                              │░░░░
-░░░░░│                                                              │░░░░
-░░░░░└──────────────────────────────────────────────────────────────┘░░░░
-░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
-░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
-```
-
 # Troubleshooting
 
 ## Troubleshooting PiJuice wakeup:
 
+### Enable wakeup logging
 ```
 python3 /usr/bin/pijuice_log.py --enable WAKEUP_EVT
-```
-
-## Troubleshooting indicateStatus script:
-```
-sudo -u pijuice /home/pi/dev/timelapse/scripts/indicateStatus.sh
 ```
 
 ## Troubleshooting non-connecting camera:
@@ -578,8 +564,9 @@ sudo -u pijuice /home/pi/dev/timelapse/scripts/indicateStatus.sh
       - List devices: `nmcli device`
       - List known networks: `nmcli connection`
       - Check wireless is on: `nmcli radio`
-      - List available wireless networks: `nmcli device wifi list`
+      - List available wireless networks: `sudo nmcli device wifi list`
       - Connect to CameraAP network: `nmcli device wifi connect CameraAP password GiveMeTheInternets`
+      - Connect to network that's not present: `sudo nmcli connection add type wifi con-name <name> ssid <SSID> 802-11-wireless-security.key-mgmt WPA-PSK 802-11-wireless-security.psk <PASSWORD>`
     - If `nmcli` isn't available:
       - List wireless networks: `sudo iwlist wlan0 scan | grep ESSID`
       - To connect to network, edit the `/etc/wpa_supplicant/wpa_supplicant.conf` file to add a section, and then `sudo reboot` to restart:
@@ -601,6 +588,7 @@ sudo -u pijuice /home/pi/dev/timelapse/scripts/indicateStatus.sh
       - `tail -f logs/timelapse.log`
       - `tail -f logs/intent.log`
       - `journalctl -u envirocam-telemetry.service`
+      - Copy logs to local machine: `ssh pi@envirocam 'journalctl --since today' > journalctl.txt`
     - Disconnect modem (to rule out data issues) and connect to working WiFi network, with SSID: `CameraAP`, password: `GiveMeTheInternets`.
     - Disconnect PiJuice to determine if that is causing issues.
     - Try fresh install of Raspbian on new SD card to rule out Pi Zero hardware issue.
@@ -695,3 +683,79 @@ Terminal attach to serial port:
 ```
 screen /dev/cu.wchusbserial585A0118141 115200
 ```
+
+
+Setting up ESP-IDF on Windows & WSL
+
+https://docs.espressif.com/projects/vscode-esp-idf-extension/en/latest/additionalfeatures/wsl.html
+
+Windows:
+```
+usbipd list
+```
+
+```
+C:\Users\LeighHunt>usbipd list
+Connected:
+BUSID  VID:PID    DEVICE                                                        STATE
+2-1    25a4:9311  USB C Video Adaptor                                           Not shared
+2-3    413c:301a  USB Input Device                                              Not shared
+2-4    045e:07f8  USB Input Device                                              Not shared
+3-6    04f2:b829  Integrated Camera, Integrated IR Camera, Camera DFU Device    Not shared
+3-9    27c6:659a  Goodix MOC Fingerprint                                        Not shared
+3-10   8087:0033  Intel(R) Wireless Bluetooth(R)                                Not shared
+
+Persisted:
+GUID                                  DEVICE
+
+
+C:\Users\LeighHunt>usbipd list
+Connected:
+BUSID  VID:PID    DEVICE                                                        STATE
+2-1    25a4:9311  USB C Video Adaptor                                           Not shared
+2-3    413c:301a  USB Input Device                                              Not shared
+2-4    045e:07f8  USB Input Device                                              Not shared
+3-6    04f2:b829  Integrated Camera, Integrated IR Camera, Camera DFU Device    Not shared
+3-9    27c6:659a  Goodix MOC Fingerprint                                        Not shared
+3-10   8087:0033  Intel(R) Wireless Bluetooth(R)                                Not shared
+5-3    19d1:0001  Remote NDIS based Internet Sharing Device, USB Serial Dev...  Not shared    <<<<< ~~~
+5-4    1a86:55d3  USB Serial Device (COM3)                                      Not shared    <<<<< ===
+
+Persisted:
+GUID                                  DEVICE
+
+```
+
+In admin command prompt:
+```
+Microsoft Windows [Version 10.0.26200.8893]
+(c) Microsoft Corporation. All rights reserved.
+
+C:\Windows\System32>usbipd bind --busid 5-4
+
+C:\Windows\System32>usbipd attach --wsl --busid 5-4
+usbipd: info: Using WSL distribution 'Ubuntu' to attach; the device will be available in all WSL 2 distributions.
+usbipd: info: Loading vhci_hcd module.
+usbipd: info: Detected networking mode 'nat'.
+usbipd: info: Using IP address 172.23.80.1 to reach the host.
+```
+
+In WSL/Ubuntu:
+
+```
+at 14:09:03 ~
+✗ dmesg | tail
+[ 1813.225907] vhci_hcd vhci_hcd.0: pdev(0) rhport(0) sockfd(3)
+[ 1813.225914] vhci_hcd vhci_hcd.0: devid(327684) speed(2) speed_str(full-speed)
+[ 1813.225966] vhci_hcd vhci_hcd.0: Device attached
+[ 1813.390953] vhci_hcd: vhci_device speed not set
+[ 1813.446912] usb 1-1: new full-speed USB device number 2 using vhci_hcd
+[ 1813.510937] vhci_hcd: vhci_device speed not set
+[ 1813.567064] usb 1-1: SetAddress Request (2) to port 0
+[ 1813.598657] cdc_acm 1-1:1.0: ttyACM0: USB ACM device                                   <<<<< ===
+[ 1813.598688] usbcore: registered new interface driver cdc_acm
+[ 1813.598689] cdc_acm: USB Abstract Control Model driver for USB modems and ISDN adapters
+```
+
+
+sudo usermod -a -G dialout $USER
