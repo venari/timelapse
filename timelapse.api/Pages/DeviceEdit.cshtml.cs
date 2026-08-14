@@ -120,6 +120,8 @@ namespace timelapse.api.Pages
             device.DaytimeEndsAtH = Device.DaytimeEndsAtH;
             device.CameraIntervalS = Device.CameraIntervalS;
             device.ApiUrl = Device.ApiUrl;
+            device.Hflip = Device.Hflip;
+            device.Vflip = Device.Vflip;
 
             if(Latitude.HasValue && Longitude.HasValue){
 

@@ -73,6 +73,8 @@
 #define DEFAULT_DAYTIME_ENDS_AT_H    17
 #define DEFAULT_CAMERA_INTERVAL_S    300
 #define DEFAULT_API_URL              "https://timelapse-dev.azurewebsites.net/api/"
+#define DEFAULT_HFLIP                false
+#define DEFAULT_VFLIP                false
 
 RTC_DATA_ATTR int bootCount = 0;
 
@@ -93,6 +95,8 @@ struct DeviceConfig {
     int daytimeEndsAtH = DEFAULT_DAYTIME_ENDS_AT_H;
     uint32_t cameraIntervalS = DEFAULT_CAMERA_INTERVAL_S;
     String apiUrl = DEFAULT_API_URL;
+    bool hflip = DEFAULT_HFLIP;
+    bool vflip = DEFAULT_VFLIP;
 };
 
 DeviceConfig deviceConfig;
@@ -336,16 +340,18 @@ void writeCounts(const TelemetryCounts &counts)
     }
 }
 
-// Applies whichever of sleepDuringNight/daytimeStartsAtH/daytimeEndsAtH/cameraIntervalS/apiUrl
-// are present in `fields` on top of an existing DeviceConfig - used for both CONFIG_FILE (on
-// disk) and the Device object nested in an Image/Telemetry API response, so a partial payload
-// only touches the fields it mentions.
+// Applies whichever of sleepDuringNight/daytimeStartsAtH/daytimeEndsAtH/cameraIntervalS/apiUrl/
+// hflip/vflip are present in `fields` on top of an existing DeviceConfig - used for both
+// CONFIG_FILE (on disk) and the Device object nested in an Image/Telemetry API response, so a
+// partial payload only touches the fields it mentions.
 void applyConfigFields(JsonVariantConst fields, DeviceConfig &config)
 {
     config.sleepDuringNight = fields["sleepDuringNight"] | config.sleepDuringNight;
     config.daytimeStartsAtH = fields["daytimeStartsAtH"] | config.daytimeStartsAtH;
     config.daytimeEndsAtH   = fields["daytimeEndsAtH"] | config.daytimeEndsAtH;
     config.cameraIntervalS  = fields["cameraIntervalS"] | config.cameraIntervalS;
+    config.hflip            = fields["hflip"] | config.hflip;
+    config.vflip            = fields["vflip"] | config.vflip;
     if (!fields["apiUrl"].isNull()) {
         String apiUrl = fields["apiUrl"].as<String>();
         if (apiUrl.length() > 0) {
@@ -387,6 +393,8 @@ void writeDeviceConfig(const DeviceConfig &config)
     doc["daytimeEndsAtH"] = config.daytimeEndsAtH;
     doc["cameraIntervalS"] = config.cameraIntervalS;
     doc["apiUrl"] = config.apiUrl;
+    doc["hflip"] = config.hflip;
+    doc["vflip"] = config.vflip;
 
     File file = SD.open(CONFIG_FILE, "w");
     if (file) {
@@ -424,7 +432,9 @@ void applyDeviceConfigFromApiResponse(const String &responseBody, DeviceConfig &
         newConfig.daytimeStartsAtH != config.daytimeStartsAtH ||
         newConfig.daytimeEndsAtH != config.daytimeEndsAtH ||
         newConfig.cameraIntervalS != config.cameraIntervalS ||
-        newConfig.apiUrl != config.apiUrl) {
+        newConfig.apiUrl != config.apiUrl ||
+        newConfig.hflip != config.hflip ||
+        newConfig.vflip != config.vflip) {
         config = newConfig;
         writeDeviceConfig(config);
         Serial.println("Config updated from API");
@@ -1065,8 +1075,12 @@ void setup()
         s->set_saturation(s, -2);  // lower the saturation
     }
 
-    // s->set_vflip(s, 1);
-    // s->set_hmirror(s, 1);
+    // Mounting-orientation correction, set centrally on the server (see DeviceConfig /
+    // applyConfigFields) - lets a camera be physically mounted upside down or mirrored without
+    // a firmware change. Applied after the OV3660 fixup above, so it's the final word on
+    // orientation regardless of sensor variant.
+    s->set_vflip(s, deviceConfig.vflip ? 1 : 0);
+    s->set_hmirror(s, deviceConfig.hflip ? 1 : 0);
 
     DatedPath datedPath = getDatedPath();
 

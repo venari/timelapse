@@ -30,6 +30,8 @@ public class Device
     public int DaytimeStartsAtH {get; set;} = 7;
     public int DaytimeEndsAtH {get; set;} = 17;
     public int CameraIntervalS {get; set;} = 300;
+    public bool Hflip {get; set;} = false;
+    public bool Vflip {get; set;} = false;
 
     // Deliberately blank, not defaulted to a real URL: the ESP32 only overwrites its local
     // apiUrl when this is non-empty (see applyConfigFields in the .ino). A real default here
