@@ -621,13 +621,16 @@ String buildTelemetryJson(const String &timestamp, const String &deviceId, uint1
 {
     // ESP32-S3 internal die temperature sensor, not ambient temperature.
     // Named temperatureC (rather than temperature_c) to match the field name used for the
-    // same quantity elsewhere (API's TelemetryPostModel, Pi's saveTelemetry.py).
-    float temperatureC = temperatureRead();
+    // same quantity elsewhere (API's TelemetryPostModel, Pi's saveTelemetry.py). Rounded to an
+    // int here (rather than kept as the raw float reading) since that's what both of those
+    // actually store/accept - TemperatureC is an int column, and a decimal value posted to it
+    // gets rejected.
+    int temperatureC = (int)lroundf(temperatureRead());
     uint8_t batteryPercent = get_battery_percent(voltageMv);
 
     char json[400];
     snprintf(json, sizeof(json),
-             "{\"device_id\":\"%s\",\"timestamp\":\"%s\",\"boot_count\":%d,\"voltage_mv\":%u,\"solar_voltage_mv\":%u,\"temperatureC\":%.2f,"
+             "{\"device_id\":\"%s\",\"timestamp\":\"%s\",\"boot_count\":%d,\"voltage_mv\":%u,\"solar_voltage_mv\":%u,\"temperatureC\":%d,"
              "\"batteryPercent\":%u,"
              "\"pendingImages\":%d,\"uploadedImages\":%d,\"pendingTelemetry\":%d,\"uploadedTelemetry\":%d}",
              deviceId.c_str(), timestamp.c_str(), bootCount, voltageMv, solarVoltageMv, temperatureC, batteryPercent,
@@ -835,7 +838,10 @@ void uploadPendingTelemetry(const String &deviceId, TelemetryCounts &counts, Dev
         std::vector<HttpFormField> fields = {
             {"SerialNumber", deviceId},
             {"Timestamp", doc["timestamp"].as<String>()},
-            {"TemperatureC", String((int)doc["temperatureC"].as<float>())},
+            // Defensively rounds rather than trusting the file to already hold an int - older
+            // backlog files written before temperatureC was rounded at capture time may still
+            // have a decimal value on disk, and TemperatureC is an int column server-side.
+            {"TemperatureC", String((int)lroundf(doc["temperatureC"].as<float>()))},
             {"BatteryPercent", doc["batteryPercent"].as<String>()},
             {"Status", String(status)},
             {"UptimeSeconds", String((uint32_t)(millis() / 1000))},
