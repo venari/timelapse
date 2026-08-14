@@ -8,6 +8,7 @@ using Microsoft.Extensions.Configuration;
 using timelapse.api.Areas.Identity.Data;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata.Conventions;
 
 namespace timelapse.infrastructure
 {
@@ -32,12 +33,24 @@ namespace timelapse.infrastructure
         public DbSet<Organisation> Organisations { get; set; }
         public DbSet<OrganisationUserJoinEntry> OrganisationUserJoinEntry { get; set; } // DEVDO refactor code to change ORganisationUserJoinEntry to OrganisationUserJoinEntries
 
-        public DbSet<Event> Events {get; set;}
-        public DbSet<EventType> EventTypes {get; set;}
+        public DbSet<Event> Events { get; set; }
+        public DbSet<EventType> EventTypes { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
+
+            // Explicitly map entity names to plural table names to match existing database
+            modelBuilder.Entity<Device>().ToTable("devices");
+            modelBuilder.Entity<UnregisteredDevice>().ToTable("unregistered_devices");
+            modelBuilder.Entity<Telemetry>().ToTable("telemetry");
+            modelBuilder.Entity<Image>().ToTable("images");
+            modelBuilder.Entity<Project>().ToTable("projects");
+            modelBuilder.Entity<DeviceProjectContract>().ToTable("device_project_contracts");
+            modelBuilder.Entity<Organisation>().ToTable("organisations");
+            modelBuilder.Entity<OrganisationUserJoinEntry>().ToTable("organisation_user_join_entry");
+            modelBuilder.Entity<Event>().ToTable("events");
+            modelBuilder.Entity<EventType>().ToTable("event_types");
 
             modelBuilder.Entity<Event>()
                 .HasMany(e => e.EventTypes)
@@ -68,7 +81,7 @@ namespace timelapse.infrastructure
 
             var connectionString = _configuration.GetConnectionString("DefaultConnection");
             // _logger.LogInformation(connectionString);
-            optionsBuilder.UseNpgsql(connectionString) 
+            optionsBuilder.UseNpgsql(connectionString)
             // , npgsqlOptions => npgsqlOptions.CommandTimeout(300)) // If we're running a particularly slow migration - e.g. adding missing indexes
             .UseSnakeCaseNamingConvention();
         }

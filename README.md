@@ -313,6 +313,46 @@ brew install pgadmin4
 dotnet tool install --global dotnet-ef
 ```
 
+# Azure CLI install
+```
+curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
+```
+
+# Running creation script
+This will create the infrastructure to run the API and web interface
+```
+az login
+./azure-helpers/create-enviroeyes-dev.sh
+```
+
+# Configure users
+- Browse to [AZURE_APP_NAME].azurewebsite.net, and log in as user `admin@enviroeyes`, password `Enviroeyes123!`.
+- Register new accounts at [AZURE_APP_NAME].azurewebsite.net/Identity/Account/Register
+  - A confirmation email will be sent to this account, click on the link and login as the new user.
+  
+
+# Update camera to enviroeyes-dev
+```
+cd dev/timelapse
+git fetch; git stash; git checkout release/zookeeper; git pull; git stash pop
+sudo systemctl restart envirocam-upload.service envirocam-telemetry.service
+```
+
+```
+sudo hostnamectl set-hostname [hostname]
+sudo tailscale up
+```
+
+# Copy preconfigured local config
+```
+scp ~/config.local.[project-name].json pi@[pi name]:~/dev/timelapse/scripts/config.local.json
+```
+
+# GitHub CLI install
+```
+sudo apt install gh
+```
+
 Postgres DB Server:
 ```
 
@@ -503,6 +543,7 @@ Note - Wake up should be automatically enabled in `saveTelemetry.py`, but you wi
 
 ## Troubleshooting PiJuice wakeup:
 
+### Enable wakeup logging
 ```
 python3 /usr/bin/pijuice_log.py --enable WAKEUP_EVT
 ```
@@ -523,8 +564,9 @@ python3 /usr/bin/pijuice_log.py --enable WAKEUP_EVT
       - List devices: `nmcli device`
       - List known networks: `nmcli connection`
       - Check wireless is on: `nmcli radio`
-      - List available wireless networks: `nmcli device wifi list`
+      - List available wireless networks: `sudo nmcli device wifi list`
       - Connect to CameraAP network: `nmcli device wifi connect CameraAP password GiveMeTheInternets`
+      - Connect to network that's not present: `sudo nmcli connection add type wifi con-name <name> ssid <SSID> 802-11-wireless-security.key-mgmt WPA-PSK 802-11-wireless-security.psk <PASSWORD>`
     - If `nmcli` isn't available:
       - List wireless networks: `sudo iwlist wlan0 scan | grep ESSID`
       - To connect to network, edit the `/etc/wpa_supplicant/wpa_supplicant.conf` file to add a section, and then `sudo reboot` to restart:
@@ -546,6 +588,7 @@ python3 /usr/bin/pijuice_log.py --enable WAKEUP_EVT
       - `tail -f logs/timelapse.log`
       - `tail -f logs/intent.log`
       - `journalctl -u envirocam-telemetry.service`
+      - Copy logs to local machine: `ssh pi@envirocam 'journalctl --since today' > journalctl.txt`
     - Disconnect modem (to rule out data issues) and connect to working WiFi network, with SSID: `CameraAP`, password: `GiveMeTheInternets`.
     - Disconnect PiJuice to determine if that is causing issues.
     - Try fresh install of Raspbian on new SD card to rule out Pi Zero hardware issue.

@@ -22,6 +22,7 @@ using timelapse.api.Areas.Identity.Data;
 
 namespace timelapse.api.Areas.Identity.Pages.Account
 {
+    [Authorize(Roles = "Admin")]
     public class RegisterModel : PageModel
     {
         private readonly SignInManager<AppUser> _signInManager;
