@@ -135,12 +135,14 @@ const size_t BATTERY_CURVE_LAST = sizeof(BATTERY_CURVE) / sizeof(BATTERY_CURVE[0
 // yyyy/mm/dd/hh so no single directory ever accumulates more than a handful of entries no
 // matter how large the backlog grows (a flat directory gets linearly slower to scan *and* to
 // create new files in, on FAT, as it fills up - this is what was causing the slowdown).
-// mmss (not just mm) is the leaf name, since the capture interval has been as low as 10s in
-// the past and two captures inside the same minute would otherwise collide.
+// The leaf name carries the full yyyymmdd-hhmmss (not just mmss) so a file is still
+// unambiguous if it ever ends up copied out of its yyyy/mm/dd/hh bucket - e.g. into a flat
+// backup folder - and so two captures inside the same minute don't collide (the capture
+// interval has been as low as 10s in the past).
 // Falls back to a flat "unsynced/boot-N" name if the clock was never synced.
 struct DatedPath {
     String dirPath;    // e.g. "2026/08/13/14", or "unsynced"
-    String leafName;   // e.g. "0530", or "boot-3"
+    String leafName;   // e.g. "20260813-140530", or "boot-3"
 };
 
 // Pieces of a parsed apiUrl (e.g. "https://timelapse-dev.azurewebsites.net/api/") - what
@@ -536,8 +538,10 @@ DatedPath getDatedPath()
     snprintf(dirBuf, sizeof(dirBuf), "%04d/%02d/%02d/%02d",
               timeinfo.tm_year + 1900, timeinfo.tm_mon + 1, timeinfo.tm_mday, timeinfo.tm_hour);
 
-    char leafBuf[8];
-    snprintf(leafBuf, sizeof(leafBuf), "%02d%02d", timeinfo.tm_min, timeinfo.tm_sec);
+    char leafBuf[20];
+    snprintf(leafBuf, sizeof(leafBuf), "%04d%02d%02d-%02d%02d%02d",
+              timeinfo.tm_year + 1900, timeinfo.tm_mon + 1, timeinfo.tm_mday,
+              timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
 
     DatedPath result;
     result.dirPath = String(dirBuf);
@@ -545,27 +549,22 @@ DatedPath getDatedPath()
     return result;
 }
 
-// Parses a path built from a DatedPath (e.g. ".../2026/08/13/14/0530.jpg") back into an
-// ISO8601 timestamp, from its last 5 segments (yyyy/mm/dd/hh/mmss.ext) - the inverse of
-// getDatedPath(), needed when uploading images (unlike telemetry, which already carries its
-// own timestamp inside the file).
+// Parses a path built from a DatedPath (e.g. ".../2026/08/13/14/20260813-140530.jpeg") back into
+// an ISO8601 timestamp - the inverse of getDatedPath(), needed when uploading images (unlike
+// telemetry, which already carries its own timestamp inside the file). The leaf name alone
+// carries the full yyyymmdd-hhmmss, so this doesn't need to consult the yyyy/mm/dd/hh
+// directory segments at all.
 String parseTimestampFromPath(const String &path)
 {
-    std::vector<String> segments = splitPath(path);
-    if (segments.size() < 5) {
-        return "unknown";
-    }
-
-    size_t n = segments.size();
-    String leaf = segments[n - 1];
+    String leaf = fileBaseName(path);
     int dotIdx = leaf.lastIndexOf('.');
-    String mmss = (dotIdx >= 0) ? leaf.substring(0, dotIdx) : leaf;
-    if (mmss.length() < 4) {
-        return "unknown";
+    String stamp = (dotIdx >= 0) ? leaf.substring(0, dotIdx) : leaf;   // "yyyymmdd-hhmmss"
+    if (stamp.length() < 15) {
+        return "unknown";   // e.g. the "unsynced/boot-N" fallback name
     }
 
-    return segments[n - 5] + "-" + segments[n - 4] + "-" + segments[n - 3]
-           + "T" + segments[n - 2] + ":" + mmss.substring(0, 2) + ":" + mmss.substring(2, 4) + "Z";
+    return stamp.substring(0, 4) + "-" + stamp.substring(4, 6) + "-" + stamp.substring(6, 8)
+           + "T" + stamp.substring(9, 11) + ":" + stamp.substring(11, 13) + ":" + stamp.substring(13, 15) + "Z";
 }
 
 // Recursively walks `root` (an absolute SD path), collecting every regular file's full path
@@ -793,8 +792,8 @@ void uploadPendingTelemetry(const String &deviceId, TelemetryCounts &counts, Dev
     }
 
     // List pending files first and sort them, rather than uploading in whatever order the walk
-    // happens to return. Paths are ".../yyyy/mm/dd/hh/mmss.json", so a lexical sort of the full
-    // path is still a chronological sort.
+    // happens to return. Paths are ".../yyyy/mm/dd/hh/yyyymmdd-hhmmss.json", so a lexical sort
+    // of the full path is still a chronological sort.
     std::vector<String> filePaths;
     listFilesRecursive(TELEMETRY_DIR, filePaths);
     std::sort(filePaths.begin(), filePaths.end());
@@ -1100,7 +1099,7 @@ void setup()
         String dirPath = String(CAMERA_DIR) + "/" + datedPath.dirPath;
         ensureDirExists(dirPath);
 
-        String filename = dirPath + "/" + datedPath.leafName + ".jpg";
+        String filename = dirPath + "/" + datedPath.leafName + ".jpeg";
 
         uint32_t startTime = millis();
         File jpg = SD.open(filename, "w");
