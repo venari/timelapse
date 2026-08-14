@@ -10,11 +10,13 @@ import sys
 import logging
 import pathlib
 import glob
+import requests
 
 from helpers import internet
 
 from SIM7600X import powerUpSIM7600X, powerDownSIM7600X
 from isConnectedToWifi import is_connected_to_wifi_linux, wifiSSID
+from uploadPending import uploadTelemetry, check_usb_power_status
 
 config = json.load(open(pathlib.Path(__file__).parent / 'config.json'))
 logFilePath = config["logFilePath"]
@@ -100,7 +102,13 @@ _CHARGING_STATES = (
     PvPiChargeState.TopOffTimerCharge,
 )
 
+# Track consecutive low voltage readings
+low_voltage_count = 0
+LOW_VOLTAGE_THRESHOLD = 5
+
 def scheduleShutdown():
+    global low_voltage_count
+    
     try:
         if not pj_is_alive():
             logger.error('PvPi not connected')
@@ -223,35 +231,49 @@ def scheduleShutdown():
 
                 # Also let's give it a chance to upload once an hour to catch up and avoid anxiety that camera has been stolen
 
-                if config['low_battery_voltage'] > 0 \
-                and round(pvpiClient.get_battery_voltage()*1000) <= config['low_battery_voltage'] \
-                and datetime.datetime.now().minute >= 10 \
-                and bCharging == False:
+                # Check if voltage is currently low
+                voltage_is_low = (config['low_battery_voltage'] > 0 
+                                  and round(pvpiClient.get_battery_voltage()*1000) <= config['low_battery_voltage'] 
+                                  and datetime.datetime.now().minute >= 10 
+                                  and bCharging == False)
 
-                    if round(pvpiClient.get_battery_voltage()*1000) > config['pvpi_low_battery_voltage']:
-                        logger.info('scheduling 10 minute sleep due to low battery')
-                        loggerIntent.info('scheduling 10 minute sleep due to low battery')
-                        logger.info(f"Battery voltage: {round(pvpiClient.get_battery_voltage()*1000)} mV")
-                        logger.info(f"State of charge: {pvpiClient.estimated_soc()}%")
-                        logger.info(f"Charge state: {pvpiClient.get_charge_state()}")
+                if voltage_is_low:
+                    low_voltage_count += 1
+                    logger.debug(f"Low voltage detected (count: {low_voltage_count}/{LOW_VOLTAGE_THRESHOLD})")
+                    loggerIntent.debug(f"Low voltage detected (count: {low_voltage_count}/{LOW_VOLTAGE_THRESHOLD})")
+                else:
+                    if low_voltage_count > 0:
+                        logger.debug(f"Voltage returned to normal, resetting count from {low_voltage_count}")
+                        loggerIntent.debug(f"Voltage returned to normal, resetting count from {low_voltage_count}")
+                    low_voltage_count = 0
 
-                        time.sleep(30)
+                # Only take action after 5 consecutive low voltage readings
+                if low_voltage_count >= LOW_VOLTAGE_THRESHOLD:
 
-                        wake_time = datetime.datetime.now() + datetime.timedelta(minutes=10)
-                        alarm_time = datetime.time(wake_time.hour, wake_time.minute, 0)
+                    # if round(pvpiClient.get_battery_voltage()*1000) > config['pvpi_low_battery_voltage']:
+                    logger.info(f'scheduling 10 minute sleep due to {LOW_VOLTAGE_THRESHOLD} consecutive low battery readings')
+                    loggerIntent.info(f'scheduling 10 minute sleep due to {LOW_VOLTAGE_THRESHOLD} consecutive low battery readings')
+                    logger.info(f"Battery voltage: {round(pvpiClient.get_battery_voltage()*1000)} mV")
+                    logger.info(f"State of charge: {pvpiClient.estimated_soc()}%")
+                    logger.info(f"Charge state: {pvpiClient.get_charge_state()}")
 
-                    # If we're down at hibernate level, let's just hibernate.
-                    else:
-                        logger.info('Hibernating due to very low battery')
-                        loggerIntent.info('Hibernating due to very low battery')
-                        logger.info(f"Battery voltage: {round(pvpiClient.get_battery_voltage()*1000)} mV")
-                        logger.info(f"State of charge: {pvpiClient.estimated_soc()}%")
-                        logger.info(f"Charge state: {pvpiClient.get_charge_state()}")
-                        alarm_time = datetime.time(hibernateHourToWakeAt, 0, 0)
+                    time.sleep(30)
+
+                    wake_time = datetime.datetime.now() + datetime.timedelta(minutes=10)
+                    alarm_time = datetime.time(wake_time.hour, wake_time.minute, 0)
+
+                    # # If we're down at hibernate level, let's just hibernate.
+                    # else:
+                    #     logger.info(f'Hibernating due to {LOW_VOLTAGE_THRESHOLD} consecutive very low battery readings')
+                    #     loggerIntent.info(f'Hibernating due to {LOW_VOLTAGE_THRESHOLD} consecutive very low battery readings')
+                    #     logger.info(f"Battery voltage: {round(pvpiClient.get_battery_voltage()*1000)} mV")
+                    #     logger.info(f"State of charge: {pvpiClient.estimated_soc()}%")
+                    #     logger.info(f"Charge state: {pvpiClient.get_charge_state()}")
+                    #     alarm_time = datetime.time(hibernateHourToWakeAt, 0, 0)
 
                     setAlarm = True
 
-                else:
+                if not voltage_is_low or low_voltage_count < LOW_VOLTAGE_THRESHOLD:
 
                     # If we've been up for more than 2 modem cycles or 30 minutes, and the most recently captured image is older than 10 minutes, or the most recently uploaded image is older than 30 minutes,
                     # either network is out, or we can't get a cellular signal, DNS is messing around, or camera isn't capturing.
@@ -315,9 +337,9 @@ def scheduleShutdown():
             if setAlarm == True:
                 SetAlarm(alarm_time)
 
-            logger.info('Power off scheduled for 1 min from now')
-            loggerIntent.info('Power off scheduled for 1 min from now')
-            pvpiClient.power_off(60)
+            logger.info('Power off scheduled for 10 seconds from now')
+            loggerIntent.info('Power off scheduled for 10 seconds from now')
+            pvpiClient.power_off(10)
             powerDownSIM7600X()
             logger.info('Shutting down now...')
             loggerIntent.info('Shutting down now...')
@@ -431,6 +453,7 @@ def saveTelemetry():
                                 'connectedToWirelessNetwork': is_connected_to_wifi_linux(),
                                 'wirelessSSID': wifiSSID(),
                                 'connectedToInternet': internet(),
+                                'powerSwitch': check_usb_power_status(),
                             })
         else:
             api_data['batteryPercent'] = round(pvpiClient.estimated_soc())
@@ -448,53 +471,74 @@ def saveTelemetry():
                                 'connectedToWirelessNetwork': is_connected_to_wifi_linux(),
                                 'wirelessSSID': wifiSSID(),
                                 'connectedToInternet': internet(),
+                                'powerSwitch': check_usb_power_status(),
                             })
 
         telemetryFilename = pendingTelemetryFolder + datetime.datetime.now().strftime('%Y-%m-%d_%H%M%S.json')
         with open(telemetryFilename, 'w') as outfile:
             json.dump(api_data, outfile)
             logger.debug('telemetry saved')
+        
+        # Try to upload immediately if connected to internet
+        if internet():
+            logger.debug('connected to internet - attempting immediate upload')
+            try:
+                session = requests.Session()
+                uploadTelemetry(telemetryFilename, session)
+            except Exception as e:
+                logger.warning(f'immediate upload failed: {e}')
+                logger.debug('will retry via uploadPending.py later')
 
     except Exception as e:
         logger.error("saveTelemetry() failed.")
         logger.error(e)
 
-if pj_is_alive():
-    try:
-        mcu_time = pvpiClient.get_mcu_time()
-        loggerIntent.info('pvpi MCU time: ' + str(mcu_time))
-        loggerIntent.info('system time: ' + str(datetime.datetime.now()))
+def syncClocks():
+    """Synchronize system clock and PvPi MCU clock if needed."""
+    if pj_is_alive():
+        try:
+            mcu_time = pvpiClient.get_mcu_time()
+            loggerIntent.info('pvpi MCU time: ' + str(mcu_time))
+            loggerIntent.info('system time: ' + str(datetime.datetime.now()))
 
-        if(abs((mcu_time - datetime.datetime.now()).total_seconds()) < 5):
-            loggerIntent.info('pvpi MCU time and system time are within 5 seconds of each other, so we will not update either clock.')
-        else:
-
-            if(mcu_time > datetime.datetime.now()):
-                loggerIntent.info('setting sys clock from pvpi MCU time...')
-                if mcu_time.year <= 2025:
-                    loggerIntent.warning("MCU time looks wrong, so we're not setting system clock from it.")
-                    loggerIntent.warning("MCU time looks wrong, so we're not setting system clock from it.")
-                else:
-                    subprocess.call(['sudo', 'date', '-s', mcu_time.strftime('%Y-%m-%d %H:%M:%S')])
+            if(abs((mcu_time - datetime.datetime.now()).total_seconds()) < 5):
+                loggerIntent.info('pvpi MCU time and system time are within 5 seconds of each other, so we will not update either clock.')
             else:
-                loggerIntent.info('pvpi MCU time is behind system time, so we will set mcu from sys clock.')
-                pvpiClient.set_mcu_time(datetime.datetime.now())
 
+                if(mcu_time > datetime.datetime.now()):
+                    loggerIntent.info('setting sys clock from pvpi MCU time...')
+                    if mcu_time.year <= 2025:
+                        loggerIntent.warning("MCU time looks wrong, so we're not setting system clock from it.")
+                        loggerIntent.warning("MCU time looks wrong, so we're not setting system clock from it.")
+                    else:
+                        subprocess.call(['sudo', 'date', '-s', mcu_time.strftime('%Y-%m-%d %H:%M:%S')])
+                else:
+                    loggerIntent.info('pvpi MCU time is behind system time, so we will set mcu from sys clock.')
+                    pvpiClient.set_mcu_time(datetime.datetime.now())
+
+        except Exception as e:
+            loggerIntent.error("Failed to set sys clock from pvpi MCU time")
+            loggerIntent.error(e)
+
+
+def main():
+    """Main entry point for saveTelemetry script."""
+    syncClocks()
+    
+    try:
+        logger.info('In saveTelemetry.py')
+
+        SetWatchdog()
+
+        while True:
+            saveTelemetry()
+            time.sleep(60)
+            scheduleShutdown()
     except Exception as e:
-        loggerIntent.error("Failed to set sys clock from pvpi MCU time")
-        loggerIntent.error(e)
-
-
-try:
-    logger.info('In saveTelemetry.py')
-
-    SetWatchdog()
-
-    while True:
-        saveTelemetry()
-        time.sleep(60)
+        logger.error("Catastrophic failure.")
         scheduleShutdown()
-except Exception as e:
-    logger.error("Catastrophic failure.")
-    scheduleShutdown()
-    logger.error(e)
+        logger.error(e)
+
+
+if __name__ == "__main__":
+    main()

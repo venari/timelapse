@@ -11,6 +11,7 @@ import logging
 import glob
 import pathlib
 import socket
+import re
 
 from helpers import internet
 
@@ -76,6 +77,126 @@ serialNumber = getSerialNumber()
 # logger.info("Starting up uploadPending.py 2...")
 
 
+def updateConfigFromResponse(response):
+    """
+    Check API response for config changes and update local config if needed.
+    
+    Args:
+        response: requests.Response object from API call
+        
+    Returns:
+        None
+    """
+    try:
+        responseData = json.loads(response.text)
+        
+        if 'device' not in responseData:
+            return
+            
+        device = responseData['device']
+        configChanged = False
+        
+        # Check supportMode
+        if 'supportMode' in device and device['supportMode'] != config['supportMode']:
+            logger.info('Support mode changed to ' + str(device['supportMode']))
+            loggerIntent.info('Support mode changed to ' + str(device['supportMode']))
+            config['supportMode'] = device['supportMode']
+            configChanged = True
+        
+        # Check monitoringMode
+        if 'monitoringMode' in device and device['monitoringMode'] != config['monitoringMode']:
+            logger.info('Monitoring mode changed to ' + str(device['monitoringMode']))
+            loggerIntent.info('Monitoring mode changed to ' + str(device['monitoringMode']))
+            config['monitoringMode'] = device['monitoringMode']
+            configChanged = True
+        
+        # Check hibernateMode
+        if 'hibernateMode' in device and device['hibernateMode'] != config['hibernateMode']:
+            logger.info('Hibernate mode changed to ' + str(device['hibernateMode']))
+            loggerIntent.info('Hibernate mode changed to ' + str(device['hibernateMode']))
+            config['hibernateMode'] = device['hibernateMode']
+            configChanged = True
+        
+        # Check powerOff
+        if 'powerOff' in device and device['powerOff'] != config['powerOff']:
+            logger.info('Power Off changed to ' + str(device['powerOff']))
+            loggerIntent.info('Power Off changed to ' + str(device['powerOff']))
+            config['powerOff'] = device['powerOff']
+            configChanged = True
+        
+        # Save config if anything changed
+        if configChanged:
+            json.dump(config, open(pathlib.Path(__file__).parent / 'config.json', 'w'), indent=4)
+            
+    except json.decoder.JSONDecodeError:
+        logger.debug(response.text)
+    except KeyError as e:
+        logger.debug(f'Missing key in response: {e}')
+    except Exception as e:
+        logger.error(f'updateConfigFromResponse() failed: {e}')
+
+
+def uploadPhoto(imageFilename):
+    """
+    Upload a single photo file to the API.
+    
+    Args:
+        imageFilename: Path to the image file to upload
+        
+    Returns:
+        bool: True if upload was successful, False otherwise
+    """
+    try:
+        logger.info(' uploading ' + imageFilename)
+
+        imageTimestamp = datetime.datetime.strptime(pathlib.Path(imageFilename).stem, '%Y-%m-%d_%H%M%S')
+        logger.debug('imageTimestamp:')
+        logger.debug(imageTimestamp)
+
+        if os.stat(imageFilename).st_size == 0:
+            logger.error('Empty file - deleting')
+            os.remove(imageFilename)
+            return False
+
+        files = {
+            'File': open(imageFilename, 'rb'),
+        }
+
+        data = {
+            'SerialNumber': serialNumber,
+            'Timestamp': imageTimestamp.astimezone().isoformat()
+        }
+
+        logger.debug('data:')
+        logger.debug(data)
+
+        session = requests.Session()
+        logger.debug('Posting image to API...')
+        response = session.post(config['apiUrl'] + 'Image', files=files, data=data, timeout=config['upload.image.timeout'])
+
+        logger.debug(f'Response code: {response.status_code}')
+        if response.status_code == 200:
+            logger.debug(f'Image uploaded successfully')
+            shutil.move(imageFilename, uploadedImageFolder + pathlib.Path(imageFilename).name)
+            success = True
+        else:
+            logger.error(f'Image upload failed')
+            success = False
+
+        logger.debug(f'Response text:')
+        logger.debug(json.dumps(json.loads(response.text), indent = 4) if response.text else 'Empty response')
+        
+        # Update config from API response
+        updateConfigFromResponse(response)
+        
+        return success
+        
+    except Exception as e:
+        logger.error(f'uploadPhoto() failed for {imageFilename}')
+        logger.error(e)
+        return False
+
+
 def uploadPendingPhotos():
     try:
         global bInSupportWindow
@@ -94,76 +215,7 @@ def uploadPendingPhotos():
             if pendingFilesProcessed > 10:
                 break
 
-
-            logger.info(' uploading ' + IMAGEFILENAME)
-
-            imageTimestamp = datetime.datetime.strptime(pathlib.Path(IMAGEFILENAME).stem, '%Y-%m-%d_%H%M%S')
-            logger.debug('imageTimestamp:')
-            logger.debug(imageTimestamp)
-
-            if os.stat(IMAGEFILENAME).st_size == 0:
-              logger.error('Empty file - deleting')
-              os.remove(IMAGEFILENAME)
-              continue
-
-            files = {
-                'File': open(IMAGEFILENAME, 'rb'),
-            }
-
-            data = {
-                'SerialNumber': serialNumber,
-                # 'Timestamp': (datetime.datetime.utcfromtimestamp(imageTimestamp.timestamp)).strftime('%Y-%m-%d %H:%M:%S')
-                'Timestamp': imageTimestamp.astimezone().isoformat()
-            }
-
-            logger.debug('data:')
-            logger.debug(data)
-
-            session = requests.Session()
-            logger.debug('Posting image to API...')
-            response = session.post(config['apiUrl'] + 'Image', files=files, data=data, timeout=config['upload.image.timeout'])
-
-            logger.debug(f'Response code: {response.status_code}')
-            if response.status_code == 200:
-                # flashLED(pj, 'D2', 0, 0, 255, 1, .5)
-                logger.debug(f'Image uploaded successfully')
-                shutil.move(IMAGEFILENAME, uploadedImageFolder + pathlib.Path(IMAGEFILENAME).name)
-
-            else:
-                # flashLED(pj, 'D2', 255, 0, 0, 1, 1)
-                logger.error(f'Image upload failed')
-
-            logger.debug(f'Response text:')
-            try:
-                logger.debug(json.dumps(json.loads(response.text), indent = 4))
-
-                if json.loads(response.text)['device']['supportMode'] != config['supportMode']:
-                    logger.info('Support mode changed to ' + str(json.loads(response.text)['device']['supportMode']))
-                    loggerIntent.info('Support mode changed to ' + str(json.loads(response.text)['device']['supportMode']))
-                    config['supportMode'] = json.loads(response.text)['device']['supportMode']
-                    json.dump(config, open(pathlib.Path(__file__).parent / 'config.json', 'w'), indent=4)
-
-                if json.loads(response.text)['device']['monitoringMode'] != config['monitoringMode']:
-                    logger.info('Monitoring mode changed to ' + str(json.loads(response.text)['device']['monitoringMode']))
-                    loggerIntent.info('Monitoring mode changed to ' + str(json.loads(response.text)['device']['monitoringMode']))
-                    config['monitoringMode'] = json.loads(response.text)['device']['monitoringMode']
-                    json.dump(config, open(pathlib.Path(__file__).parent / 'config.json', 'w'), indent=4)
-
-                if json.loads(response.text)['device']['hibernateMode'] != config['hibernateMode']:
-                    logger.info('Hibernate mode changed to ' + str(json.loads(response.text)['device']['hibernateMode']))
-                    loggerIntent.info('Hibernate mode changed to ' + str(json.loads(response.text)['device']['hibernateMode']))
-                    config['hibernateMode'] = json.loads(response.text)['device']['hibernateMode']
-                    json.dump(config, open(pathlib.Path(__file__).parent / 'config.json', 'w'), indent=4)
-
-                   
-                if json.loads(response.text)['device']['powerOff'] != config['powerOff']:
-                    logger.info('Power Off changed to ' + str(json.loads(response.text)['device']['powerOff']))
-                    loggerIntent.info('Power Off changed to ' + str(json.loads(response.text)['device']['powerOff']))
-                    config['powerOff'] = json.loads(response.text)['device']['powerOff']
-                    json.dump(config, open(pathlib.Path(__file__).parent / 'config.json', 'w'), indent=4)
-
-            except json.decoder.JSONDecodeError:
-                logger.debug(response.text)
+            uploadPhoto(IMAGEFILENAME)
 
         if pendingFilesProcessed < 10:
             logger.info('No more pending images to upload.')
@@ -203,7 +255,7 @@ def connectToInternet(retries = 3):
         # loggerIntent.info('Connecting to internet...')
 
         if(config['modem.type']=="thumb"):
-            turnOnSystemPowerSwitch()
+            turnOnUSBPorts()
         else:
             powerUpSIM7600X()
 
@@ -241,50 +293,209 @@ def connectToInternet(retries = 3):
 
 def disconnectFromInternet():
     logger.info('Not really disconnecting from internet...')
-    # try:
-    #     logger.info('Disconnecting from internet...')
-    #     # loggerIntent.info('Disconnecting from internet...')
-    #     if(config['modem.type']=="thumb"):
-    #         logger.info('Current System Power Switch:')
-    #         logger.info(pj.power.GetSystemPowerSwitch())
-    #         logger.info('Setting System Power Switch to Off:')
-    #         pj.power.SetSystemPowerSwitch(0)
-    #     else:
-    #         powerDownSIM7600X()
-    # except Exception as e:
-    #     logger.error(str(datetime.datetime.now()) + " disconnectFromInternet() failed.")
-    #     logger.error(e)
+    try:
+        logger.info('Disconnecting from internet...')
+        # loggerIntent.info('Disconnecting from internet...')
+        if(config['modem.type']=="thumb"):
+            turnOffUSBPorts()
+        else:
+            powerDownSIM7600X()
+    except Exception as e:
+        logger.error(str(datetime.datetime.now()) + " disconnectFromInternet() failed.")
+        logger.error(e)
         
-def turnOnSystemPowerSwitch():
-    logger.info('Not really turning on system power switch...')
-#     try:
-#         sysVoltage = pj.status.GetBatteryVoltage()['data']
-#         # if sysVoltage < 3.2:  # 3.2V is the minimum voltage for the XL6009
-#         #     logger.info('Battery voltage too low for XL6009 - not powering up modem.')
-#         #     return
-#         if sysVoltage < 3.2:  # 3.0V is a bit on the low side
-#             logger.info('Battery voltage too low - not powering up modem.')
-#             return
-#         logger.info('System Voltage looks good at ' + str(sysVoltage) + 'mV')
-
-#         modemPower = config['modem.power']
-#         if modemPower <= 0:
-#             logger.info('Modem power is disabled in config.')
-#             return
+def turnOnUSBPorts():
+    try:
+        # Check if we're on a Raspberry Pi 5
+        try:
+            with open('/proc/device-tree/model', 'r') as f:
+                model = f.read().strip('\0')
+                if 'Raspberry Pi 5' not in model:
+                    logger.info(f'Not a Raspberry Pi 5 (detected: {model}) - skipping USB power-up.')
+                    return
+        except FileNotFoundError:
+            logger.warning('Could not determine Pi model - /proc/device-tree/model not found.')
+            return
         
-#         logger.info('Current System Power Switch:')
-#         logger.info(pj.power.GetSystemPowerSwitch())
-#         logger.info('Setting System Power Switch to ' + str(modemPower) + ':')
-#         pj.power.SetSystemPowerSwitch(modemPower)
+        logger.info('Raspberry Pi 5 detected - powering up USB ports...')
+        
+        # On Pi 5, power up USB ports using uhubctl
+        # Power up USB hub 4
+        result1 = subprocess.run(['sudo', 'uhubctl', '-l', '4', '-a', '1'], 
+                               capture_output=True, text=True, timeout=10)
+        
+        # Power up USB hub 2
+        result2 = subprocess.run(['sudo', 'uhubctl', '-l', '2', '-a', '1'], 
+                               capture_output=True, text=True, timeout=10)
+        
+        if result1.returncode == 0 and result2.returncode == 0:
+            logger.info('USB ports powered up successfully.')
+        else:
+            if result1.returncode != 0:
+                logger.error(f'Failed to power up USB hub 4: {result1.stderr}')
+            if result2.returncode != 0:
+                logger.error(f'Failed to power up USB hub 2: {result2.stderr}')
+            
+    except subprocess.TimeoutExpired:
+        logger.error('Timeout while trying to power up USB ports.')
+    except Exception as e:
+        logger.error(str(datetime.datetime.now()) + " turnOnUSBPorts() failed.")
+        logger.error(e)
 
-#         # logger.info('Waiting 50s for modem to warm up...')
-#         # time.sleep(50)
+def turnOffUSBPorts():
+    try:
+        # Check if we're on a Raspberry Pi 5
+        try:
+            with open('/proc/device-tree/model', 'r') as f:
+                model = f.read().strip('\0')
+                if 'Raspberry Pi 5' not in model:
+                    logger.info(f'Not a Raspberry Pi 5 (detected: {model}) - skipping USB power-down.')
+                    return
+        except FileNotFoundError:
+            logger.warning('Could not determine Pi model - /proc/device-tree/model not found.')
+            return
+        
+        logger.info('Raspberry Pi 5 detected - powering down USB ports...')
+        
+        # On Pi 5, power down USB ports using uhubctl
+        # Power down USB hub 4
+        result1 = subprocess.run(['sudo', 'uhubctl', '-l', '4', '-a', '0'], 
+                               capture_output=True, text=True, timeout=10)
+        
+        # Power down USB hub 2
+        result2 = subprocess.run(['sudo', 'uhubctl', '-l', '2', '-a', '0'], 
+                               capture_output=True, text=True, timeout=10)
+        
+        if result1.returncode == 0 and result2.returncode == 0:
+            logger.info('USB ports powered down successfully.')
+        else:
+            if result1.returncode != 0:
+                logger.error(f'Failed to power down USB hub 4: {result1.stderr}')
+            if result2.returncode != 0:
+                logger.error(f'Failed to power down USB hub 2: {result2.stderr}')
+            
+    except subprocess.TimeoutExpired:
+        logger.error('Timeout while trying to power down USB ports.')
+    except Exception as e:
+        logger.error(str(datetime.datetime.now()) + " turnOffUSBPorts() failed.")
+        logger.error(e)
 
+def check_usb_power_status():
+    """
+    Check if USB ports are powered on using uhubctl (Pi 5 only).
+    Returns 'ON' if powered, 'OFF' if not powered, 'UNKNOWN' if cannot determine or not Pi 5.
+    """
+    try:
+        # Check if we're on a Raspberry Pi 5
+        try:
+            with open('/proc/device-tree/model', 'r') as f:
+                model = f.read().strip('\0')
+                if 'Raspberry Pi 5' not in model:
+                    logger.debug(f'Not a Raspberry Pi 5 (detected: {model}) - USB power status not applicable.')
+                    return {'data': 0, 'error': 'Not Pi 5'}
+        except FileNotFoundError:
+            logger.debug('Could not determine Pi model - /proc/device-tree/model not found.')
+            #return 'UNKNOWN'
+            return {'data': 0, 'error': 'Not Pi 5'}
+        
+        # Query USB hub status using uhubctl
+        # Check hub 4 (one of the main USB hubs on Pi 5)
+        result = subprocess.run(['sudo', 'uhubctl', '-l', '4'], 
+                              capture_output=True, text=True, timeout=5)
+        
+        if result.returncode == 0:
+            output = result.stdout
+            # Parse uhubctl output to determine if ports are powered
+            # uhubctl output typically shows "power" in the status line
+            # Example: "Port 1: 0503 power"
+            if 'power' in output.lower() or 'off' in output.lower():
+                # Check if any port shows as powered on
+                # Look for patterns like "Port X: ... power" (not "off")
+                powered_ports = re.findall(r'Port \d+:.*power(?!\s+off)', output, re.IGNORECASE)
+                if powered_ports:
+                    logger.debug(f'USB ports detected as powered ON: {len(powered_ports)} port(s)')
+                    # return 'ON'
+                    return {'data': 1, 'error': 'NO_ERROR'}
+                else:
+                    logger.debug('USB ports detected as powered OFF')
+                    # return 'OFF'
+                    return {'data': 0, 'error': 'NO_ERROR'}
+            else:
+                logger.debug('Could not parse uhubctl output for power status')
+                # return 'UNKNOWN'
+                return {'data': 0, 'error': 'Could not parse uhubctl output'}
 
+        else:
+            logger.warning(f'Failed to query USB power status: {result.stderr}')
+            # return 'UNKNOWN'
+            return {'data': 0, 'error': 'Failed to query USB power status'}
+            
+    except subprocess.TimeoutExpired:
+        logger.warning('Timeout while checking USB power status')
+        #return 'UNKNOWN'
+        return {'data': 0, 'error': 'Timeout while checking USB power status'}
+    except Exception as e:
+        logger.error(f'check_usb_power_status() failed: {e}')
+        #return 'UNKNOWN'
+        return {'data': 0, 'error': 'Exception while checking USB power status'}
+
+def uploadTelemetry(telemetryFilename, session):
+    """
+    Upload a single telemetry file to the API.
     
-#     except Exception as e:
-#         logger.error(str(datetime.datetime.now()) + " turnOnSystemPowerSwitch() failed.")
-#         logger.error(e)
+    Args:
+        telemetryFilename: Path to the telemetry file to upload
+        session: requests.Session object to use for the upload
+        
+    Returns:
+        bool: True if upload was successful, False otherwise
+    """
+    try:
+        logger.info(' uploading ' + telemetryFilename)
+
+        telemetryTimestamp = datetime.datetime.strptime(pathlib.Path(telemetryFilename).stem, '%Y-%m-%d_%H%M%S')
+        logger.debug('telemetryTimestamp:')
+        logger.debug(telemetryTimestamp)
+
+        if os.stat(telemetryFilename).st_size == 0:
+            os.remove(telemetryFilename)
+            # empty file, will throw JSONDecodeError
+            return False
+
+        api_data = json.load(open(telemetryFilename, 'rb'))
+
+        api_data['Timestamp'] = telemetryTimestamp.astimezone().isoformat()
+
+        logger.debug(api_data)
+
+        response = session.post(config['apiUrl'] + 'Telemetry',data=api_data, timeout=config['upload.telemetry.timeout'])
+        logger.debug(response)
+        assert response.status_code == 200, "API returned error code"
+        #requests.post(config['apiUrl'] + '/Telemetry', json=api_data)
+
+        if response.status_code == 200:
+            # flashLED(pj, 'D2', 0, 0, 255, 1, .1)
+            logger.debug(f'Telemetry uploaded successfully')
+            shutil.move(telemetryFilename, uploadedTelemetryFolder + pathlib.Path(telemetryFilename).name)
+            logger.debug('Logged to API.')
+            success = True
+        else:
+            # flashLED(pj, 'D2', 255, 0, 0, 1, 1)
+            logger.error(f'Telemetry upload failed')
+            success = False
+
+        logger.debug(json.dumps(json.loads(response.text), indent = 4) if response.text else 'Empty response')
+        
+        # Update config from API response
+        updateConfigFromResponse(response)
+        
+        return success
+        
+    except Exception as e:
+        logger.error(f'uploadTelemetry() failed for {telemetryFilename}')
+        logger.error(e)
+        raise  # Re-raise to allow caller to handle
+
 
 def uploadPendingTelemetry():
 
@@ -307,68 +518,7 @@ def uploadPendingTelemetry():
             if pendingFilesProcessed > 100:
                 break
 
-            logger.info(' uploading ' + telemetryFilename)
-
-            telemetryTimestamp = datetime.datetime.strptime(pathlib.Path(telemetryFilename).stem, '%Y-%m-%d_%H%M%S')
-            logger.debug('telemetryTimestamp:')
-            logger.debug(telemetryTimestamp)
-
-            if os.stat(telemetryFilename).st_size == 0:
-                os.remove(telemetryFilename)
-                # empty file, will throw JSONDecodeError
-                continue
-
-            api_data = json.load(open(telemetryFilename, 'rb'))
-
-            api_data['Timestamp'] = telemetryTimestamp.astimezone().isoformat()
-
-            logger.debug(api_data)
-
-            response = session.post(config['apiUrl'] + 'Telemetry',data=api_data, timeout=config['upload.telemetry.timeout'])
-            logger.debug(response)
-            assert response.status_code == 200, "API returned error code"
-            #requests.post(config['apiUrl'] + '/Telemetry', json=api_data)
-
-            if response.status_code == 200:
-                # flashLED(pj, 'D2', 0, 0, 255, 1, .1)
-                logger.debug(f'Telemetry uploaded successfully')
-                shutil.move(telemetryFilename, uploadedTelemetryFolder + pathlib.Path(telemetryFilename).name)
-                logger.debug('Logged to API.')
-            else:
-                # flashLED(pj, 'D2', 255, 0, 0, 1, 1)
-                logger.error(f'Telemetry upload failed')
-
-            try:
-                logger.debug(json.dumps(json.loads(response.text), indent = 4))
-
-                if json.loads(response.text)['device']['supportMode'] != config['supportMode']:
-                    logger.info('Support mode changed to ' + str(json.loads(response.text)['device']['supportMode']))
-                    loggerIntent.info('Support mode changed to ' + str(json.loads(response.text)['device']['supportMode']))
-                    config['supportMode'] = json.loads(response.text)['device']['supportMode']
-                    json.dump(config, open(pathlib.Path(__file__).parent / 'config.json', 'w'), indent=4)
-
-                if json.loads(response.text)['device']['monitoringMode'] != config['monitoringMode']:
-                    logger.info('Monitoring mode changed to ' + str(json.loads(response.text)['device']['monitoringMode']))
-                    loggerIntent.info('Monitoring mode changed to ' + str(json.loads(response.text)['device']['monitoringMode']))
-                    config['monitoringMode'] = json.loads(response.text)['device']['monitoringMode']
-                    json.dump(config, open(pathlib.Path(__file__).parent / 'config.json', 'w'), indent=4)
-
-                if json.loads(response.text)['device']['hibernateMode'] != config['hibernateMode']:
-                    logger.info('Hibernate mode changed to ' + str(json.loads(response.text)['device']['hibernateMode']))
-                    loggerIntent.info('Hibernate mode changed to ' + str(json.loads(response.text)['device']['hibernateMode']))
-                    config['hibernateMode'] = json.loads(response.text)['device']['hibernateMode']
-                    json.dump(config, open(pathlib.Path(__file__).parent / 'config.json', 'w'), indent=4)
-
-                   
-                if json.loads(response.text)['device']['powerOff'] != config['powerOff']:
-                    logger.info('Power Off changed to ' + str(json.loads(response.text)['device']['powerOff']))
-                    loggerIntent.info('Power Off changed to ' + str(json.loads(response.text)['device']['powerOff']))
-                    config['powerOff'] = json.loads(response.text)['device']['powerOff']
-                    json.dump(config, open(pathlib.Path(__file__).parent / 'config.json', 'w'), indent=4)
-
-            except json.decoder.JSONDecodeError:
-                # flashLED(pj, 'D2', 255, 0, 255, 1, 1)
-                logger.debug(response.text)
+            uploadTelemetry(telemetryFilename, session)
 
 
     except requests.exceptions.ConnectionError as e:
@@ -412,17 +562,22 @@ def deleteOldUploadedImagesAndTelemetry():
         logger.error(e)
 
 
-try:
-    
-    connectToInternet()
+def main():
+    """Main entry point for uploadPending script."""
+    global config
+    try:
+        connectToInternet()
 
-    while True:
+        while True:
+            config = json.load(open(pathlib.Path(__file__).parent / 'config.json'))
+            deleteOldUploadedImagesAndTelemetry()
+            uploadPendingTelemetry()
+            uploadPendingPhotos()
+            time.sleep(30)
 
-      config = json.load(open(pathlib.Path(__file__).parent / 'config.json'))
-      deleteOldUploadedImagesAndTelemetry()
-      uploadPendingTelemetry()
-      uploadPendingPhotos()
-      time.sleep(30)
+    except Exception as e:
+        logger.error(e)
 
-except Exception as e:
-    logger.error(e)
+
+if __name__ == "__main__":
+    main()
