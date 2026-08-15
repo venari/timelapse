@@ -24,6 +24,7 @@
 #include <ArduinoJson.h>
 #include <vector>
 #include <algorithm>
+#include <cstdarg>
 
 #include "utilities.h"
 #include "secrets.h"
@@ -64,6 +65,10 @@
                                                  // instead of scanning directories (which gets slow with thousands of files)
 
 #define CONFIG_FILE              "/config.json" // Local cache of the device config the API hands back on every upload
+
+#define LOG_DIR                  "/logs"
+#define LOG_FILE                 "/logs/envirocam.log"  // Active day's log - see rotateLogIfNeeded()
+#define LOG_RETENTION_DAYS       30                      // Rotated logs older than this get deleted
 
 // Defaults used until a config.json exists (i.e. before the API has ever handed back a
 // Device row - see applyDeviceConfigFromApiResponse). Names match the Device model's JSON
@@ -160,6 +165,61 @@ struct HttpFormField {
     String value;
 };
 
+// Guards the file-write half of logLine()/logf() - false until setupSD() confirms the card is
+// mounted and LOG_DIR exists. Serial output happens either way, so nothing is lost before then.
+bool sdReady = false;
+
+// Prints `line` to Serial and, once the SD card is ready, appends it to LOG_FILE prefixed with
+// the current date/time - lets a field unit's whole history be pulled off the SD card and
+// grepped by date without ever needing a serial connection to it. See rotateLogIfNeeded() for
+// the once-a-day file rollover, and logf() below for a printf-style version of this.
+void logLine(const String &line)
+{
+    Serial.println(line);
+
+    if (!sdReady) {
+        return;
+    }
+
+    char timestamp[20] = "unsynced";
+    struct tm timeinfo;
+    if (getLocalTime(&timeinfo, 0)) {
+        strftime(timestamp, sizeof(timestamp), "%Y-%m-%d %H:%M:%S", &timeinfo);
+    }
+
+    File file = SD.open(LOG_FILE, FILE_APPEND);
+    if (!file) {
+        Serial.println("Failed to open " LOG_FILE " for writing");
+        return;
+    }
+    file.println(String(timestamp) + " " + line);
+    file.close();
+}
+
+// printf-style version of logLine() - sized to fit the formatted message rather than truncated
+// at some fixed stack buffer, since a few callers (e.g. full API response bodies) can run well
+// past 1KB.
+void logf(const char *format, ...)
+{
+    va_list args;
+    va_start(args, format);
+    va_list argsCopy;
+    va_copy(argsCopy, args);
+    int needed = vsnprintf(nullptr, 0, format, argsCopy);
+    va_end(argsCopy);
+
+    if (needed < 0) {
+        va_end(args);
+        return;
+    }
+
+    std::vector<char> buf(needed + 1);
+    vsnprintf(buf.data(), buf.size(), format, args);
+    va_end(args);
+
+    logLine(String(buf.data()));
+}
+
 bool setCameraPower(bool enable)
 {
     static bool started = false;
@@ -168,7 +228,7 @@ bool setCameraPower(bool enable)
         Wire.begin(BOARD_SDA_PIN, BOARD_SCL_PIN);
         Wire.beginTransmission(0x28);
         if (Wire.endTransmission() != 0) {
-            Serial.println("Camera power chip not found!");
+            logLine("Camera power chip not found!");
             return false;
         }
     }
@@ -213,7 +273,7 @@ bool setCameraPower(bool enable)
 uint16_t get_battery_voltage()
 {
     uint16_t vol = analogReadMilliVolts(BOARD_BAT_ADC_PIN) * 2;
-    Serial.printf("Voltage:%u\n", vol);
+    logf("Voltage:%u", vol);
     return vol;
 }
 
@@ -222,7 +282,7 @@ uint16_t get_solar_voltage()
 {
 #ifdef BOARD_SOLAR_ADC_PIN
     uint16_t vol = analogReadMilliVolts(BOARD_SOLAR_ADC_PIN) * 2;
-    Serial.printf("Solar voltage:%u\n", vol);
+    logf("Solar voltage:%u", vol);
     return vol;
 #else
     return 0;
@@ -251,7 +311,7 @@ uint8_t get_battery_percent(uint16_t mv)
 
 void set_device_to_sleep()
 {
-    Serial.println("Enter esp32 goto deepsleep!");
+    logLine("Enter esp32 goto deepsleep!");
     esp_sleep_enable_timer_wakeup(TIME_TO_SLEEP * uS_TO_S_FACTOR);
     delay(200);
     esp_deep_sleep_start();
@@ -275,19 +335,24 @@ bool setupSD()
         return false;
     }
 
-    Serial.print("SD Card Type: ");
+    // Everything above can't go through logLine() yet - the card isn't confirmed writable until
+    // this point, and logLine()'s file-write half depends on LOG_DIR already existing.
+    ensureDirExists(LOG_DIR);
+    sdReady = true;
+    rotateLogIfNeeded();
+
+    String cardTypeStr = "UNKNOWN";
     if (cardType == CARD_MMC) {
-        Serial.println("MMC");
+        cardTypeStr = "MMC";
     } else if (cardType == CARD_SD) {
-        Serial.println("SDSC");
+        cardTypeStr = "SDSC";
     } else if (cardType == CARD_SDHC) {
-        Serial.println("SDHC");
-    } else {
-        Serial.println("UNKNOWN");
+        cardTypeStr = "SDHC";
     }
+    logLine("SD Card Type: " + cardTypeStr);
 
     uint64_t cardSize = SD.cardSize() / (1024 * 1024);
-    Serial.printf("SD Card Size: %lluMB\n", cardSize);
+    logf("SD Card Size: %lluMB", cardSize);
     return true;
 }
 
@@ -310,7 +375,7 @@ void writeLastSyncTime(time_t t)
         file.println((long)t);
         file.close();
     } else {
-        Serial.println("Failed to write last sync time!");
+        logLine("Failed to write last sync time!");
     }
 }
 
@@ -338,7 +403,7 @@ void writeCounts(const TelemetryCounts &counts)
                      counts.pendingTelemetry, counts.uploadedTelemetry);
         file.close();
     } else {
-        Serial.println("Failed to write counts file!");
+        logLine("Failed to write counts file!");
     }
 }
 
@@ -370,7 +435,7 @@ DeviceConfig readDeviceConfig()
 
     File file = SD.open(CONFIG_FILE, "r");
     if (!file) {
-        Serial.println(CONFIG_FILE " not found - using default config");
+        logLine(CONFIG_FILE " not found - using default config");
         return config;
     }
 
@@ -379,7 +444,7 @@ DeviceConfig readDeviceConfig()
     file.close();
 
     if (err) {
-        Serial.printf("Failed to parse " CONFIG_FILE ": %s - using default config\n", err.c_str());
+        logf("Failed to parse " CONFIG_FILE ": %s - using default config", err.c_str());
         return config;
     }
 
@@ -402,9 +467,9 @@ void writeDeviceConfig(const DeviceConfig &config)
     if (file) {
         serializeJson(doc, file);
         file.close();
-        Serial.println("Config written to " CONFIG_FILE);
+        logLine("Config written to " CONFIG_FILE);
     } else {
-        Serial.println("Failed to write config file!");
+        logLine("Failed to write config file!");
     }
 }
 
@@ -417,13 +482,13 @@ void applyDeviceConfigFromApiResponse(const String &responseBody, DeviceConfig &
     DynamicJsonDocument doc(1024);
     DeserializationError err = deserializeJson(doc, responseBody);
     if (err) {
-        Serial.printf("Failed to parse API response: %s\n", err.c_str());
+        logf("Failed to parse API response: %s", err.c_str());
         return;
     }
 
     JsonVariant device = doc["device"];
     if (device.isNull()) {
-        Serial.println("API response had no device config to apply");
+        logLine("API response had no device config to apply");
         return;
     }
 
@@ -439,37 +504,38 @@ void applyDeviceConfigFromApiResponse(const String &responseBody, DeviceConfig &
         newConfig.vflip != config.vflip) {
         config = newConfig;
         writeDeviceConfig(config);
-        Serial.println("Config updated from API");
+        logLine("Config updated from API");
     }
 }
 
 bool connectWiFiAndSyncTime()
 {
-    Serial.printf("Connecting to WiFi: %s\n", WIFI_SSID);
+    logf("Connecting to WiFi: %s", WIFI_SSID);
     WiFi.mode(WIFI_STA);
     WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
 
     uint32_t startTime = millis();
     while (WiFi.status() != WL_CONNECTED) {
         if (millis() - startTime > WIFI_CONNECT_TIMEOUT_MS) {
-            Serial.println("WiFi connect timed out!");
+            logLine("WiFi connect timed out!");
             return false;
         }
         delay(250);
-        Serial.print(".");
+        Serial.print(".");   // progress dots - serial only, not worth a timestamped line each
     }
-    Serial.printf("\nWiFi connected, IP: %s\n", WiFi.localIP().toString().c_str());
+    Serial.println();
+    logf("WiFi connected, IP: %s", WiFi.localIP().toString().c_str());
 
     configTime(GMT_OFFSET_SEC, DAY_LIGHT_OFFSET_SEC, NTP_SERVER);
 
     struct tm timeinfo;
     if (!getLocalTime(&timeinfo)) {
-        Serial.println("Failed to obtain time from NTP server!");
+        logLine("Failed to obtain time from NTP server!");
         return false;
     }
-    Serial.printf("Time synced: %04d-%02d-%02d %02d:%02d:%02d\n",
-                   timeinfo.tm_year + 1900, timeinfo.tm_mon + 1, timeinfo.tm_mday,
-                   timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
+    logf("Time synced: %04d-%02d-%02d %02d:%02d:%02d",
+         timeinfo.tm_year + 1900, timeinfo.tm_mon + 1, timeinfo.tm_mday,
+         timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
     return true;
 }
 
@@ -502,7 +568,7 @@ void ensureDirExists(const String &path)
         current += "/" + segment;
         if (!SD.exists(current)) {
             if (!SD.mkdir(current)) {
-                Serial.printf("Failed to create directory %s\n", current.c_str());
+                logf("Failed to create directory %s", current.c_str());
             }
         }
     }
@@ -594,6 +660,79 @@ void listFilesRecursive(const String &root, std::vector<String> &paths)
     dir.close();
 }
 
+// Deletes rotated log files (LOG_DIR/envirocam-YYYY-MM-DD.log) older than LOG_RETENTION_DAYS -
+// keeps a field unit's SD card from slowly filling up with a whole deployment's worth of daily
+// logs. Only called once a day, from rotateLogIfNeeded(), right after that day's file rolls over.
+void pruneOldLogs(const struct tm &today)
+{
+    struct tm todayMidnight = today;
+    todayMidnight.tm_hour = todayMidnight.tm_min = todayMidnight.tm_sec = 0;
+    time_t todayEpoch = mktime(&todayMidnight);
+
+    std::vector<String> filePaths;
+    listFilesRecursive(LOG_DIR, filePaths);
+
+    for (const String &path : filePaths) {
+        String name = fileBaseName(path);
+        if (!name.startsWith("envirocam-") || !name.endsWith(".log")) {
+            continue;   // not a rotated log - e.g. the active LOG_FILE itself
+        }
+
+        String datePart = name.substring(String("envirocam-").length(), name.length() - 4);   // strip ".log"
+        struct tm fileDate = {};
+        if (sscanf(datePart.c_str(), "%d-%d-%d", &fileDate.tm_year, &fileDate.tm_mon, &fileDate.tm_mday) != 3) {
+            continue;   // unexpected name - leave it alone rather than guess
+        }
+        fileDate.tm_year -= 1900;
+        fileDate.tm_mon -= 1;
+        time_t fileEpoch = mktime(&fileDate);
+
+        int ageDays = (int)((todayEpoch - fileEpoch) / 86400);
+        if (ageDays > LOG_RETENTION_DAYS) {
+            logLine("Deleting expired log: " + path);
+            SD.remove(path);
+        }
+    }
+}
+
+// Rotates LOG_FILE to LOG_DIR/envirocam-YYYY-MM-DD.log once its contents are no longer from
+// today, then prunes anything past LOG_RETENTION_DAYS. Kept as plain, uncompressed daily files
+// rather than zipped on-device - this unit runs off battery/solar and deep-sleeps almost
+// immediately every cycle, so spending CPU-awake time compressing logs isn't worth it; zip them
+// up later, off-device, the same way the Raspberry Pi units' logs already get pulled (see
+// grabLogs.sh) and rotated (see logs/envirocam-2w-a/timelapse.log.YYYY-MM-DD for that
+// convention).
+void rotateLogIfNeeded()
+{
+    struct tm timeinfo;
+    if (!getLocalTime(&timeinfo, 0)) {
+        return;   // clock not synced yet - retry on a later boot once it is
+    }
+
+    char today[11];
+    strftime(today, sizeof(today), "%Y-%m-%d", &timeinfo);
+
+    // The first line of the active log always starts with the date it was opened on (see
+    // logLine()) - reading it back tells us whether today's entries would land in yesterday's
+    // file, without needing a separate marker file to track it.
+    File file = SD.open(LOG_FILE, "r");
+    if (!file) {
+        return;   // no log yet - nothing to rotate
+    }
+    String firstLine = file.readStringUntil('\n');
+    file.close();
+
+    if (firstLine.length() < 10 || firstLine.startsWith(today)) {
+        return;   // already logging under today's date
+    }
+
+    String rotatedPath = String(LOG_DIR) + "/envirocam-" + firstLine.substring(0, 10) + ".log";
+    SD.rename(LOG_FILE, rotatedPath);
+    logLine("Rotated previous day's log to " + rotatedPath);
+
+    pruneOldLogs(timeinfo);
+}
+
 // Builds an ISO8601 timestamp, e.g. "2026-08-04T05:30:45Z" - used in telemetry payloads.
 // The "Z" assumes GMT_OFFSET_SEC/DAY_LIGHT_OFFSET_SEC are left at 0 (UTC)
 String getISO8601Timestamp()
@@ -647,9 +786,9 @@ void writeTelemetryFile(const DatedPath &datedPath, const String &json)
     File file = SD.open(filename, "w");
     if (file) {
         file.println(json);
-        Serial.printf("Telemetry written: %s\n", json.c_str());
+        logf("Telemetry written: %s", json.c_str());
     } else {
-        Serial.println("Failed to write telemetry file!");
+        logLine("Failed to write telemetry file!");
     }
     file.close();
 }
@@ -744,10 +883,10 @@ int postMultipartForm(const String &apiUrl, const String &endpoint, const std::v
     }
     Client &client = api.https ? (Client &)secureClient : (Client &)plainClient;
 
-    Serial.printf("POST %s://%s:%u%s\n", api.https ? "https" : "http", api.host.c_str(), api.port, path.c_str());
+    logf("POST %s://%s:%u%s", api.https ? "https" : "http", api.host.c_str(), api.port, path.c_str());
 
     if (!client.connect(api.host.c_str(), api.port)) {
-        Serial.printf("Connection to %s:%u failed\n", api.host.c_str(), api.port);
+        logf("Connection to %s:%u failed", api.host.c_str(), api.port);
         return 0;
     }
 
@@ -861,7 +1000,7 @@ void uploadPendingTelemetry(const String &deviceId, TelemetryCounts &counts, Dev
     for (const String &filePath : filePaths) {
         // Process in batches of 100, same as the Pi's uploadPendingTelemetry()
         if (filesUploaded >= 100) {
-            Serial.println("Hit upload batch limit - remaining telemetry will upload next cycle");
+            logLine("Hit upload batch limit - remaining telemetry will upload next cycle");
             break;
         }
 
@@ -871,7 +1010,7 @@ void uploadPendingTelemetry(const String &deviceId, TelemetryCounts &counts, Dev
         }
 
         if (file.size() == 0) {
-            Serial.println("Empty file - deleting " + filePath);
+            logLine("Empty file - deleting " + filePath);
             file.close();
             SD.remove(filePath);
             continue;
@@ -882,7 +1021,7 @@ void uploadPendingTelemetry(const String &deviceId, TelemetryCounts &counts, Dev
         file.close();
 
         if (err) {
-            Serial.printf("Failed to parse %s: %s - discarding\n", filePath.c_str(), err.c_str());
+            logf("Failed to parse %s: %s - discarding", filePath.c_str(), err.c_str());
             SD.remove(filePath);
             continue;
         }
@@ -910,12 +1049,12 @@ void uploadPendingTelemetry(const String &deviceId, TelemetryCounts &counts, Dev
             {"UploadedTelemetry", doc["uploadedTelemetry"].as<String>()},
         };
 
-        Serial.printf("Posting Telemetry: %s\n", fieldsToJson(fields).c_str());
+        logf("Posting Telemetry: %s", fieldsToJson(fields).c_str());
 
         String responseBody;
         int statusCode = postMultipartForm(config.apiUrl, "Telemetry", fields, "", "", nullptr, responseBody);
 
-        Serial.printf("Telemetry response (status %d): %s\n", statusCode, responseBody.c_str());
+        logf("Telemetry response (status %d): %s", statusCode, responseBody.c_str());
 
         if (statusCode == 200) {
             // Mirrors the same yyyy/mm/dd/hh bucketing into TELEMETRY_UPLOADED_DIR - otherwise
@@ -928,9 +1067,9 @@ void uploadPendingTelemetry(const String &deviceId, TelemetryCounts &counts, Dev
             counts.uploadedTelemetry++;
             filesUploaded++;
             applyDeviceConfigFromApiResponse(responseBody, config);
-            Serial.printf("Uploaded and archived %s\n", filePath.c_str());
+            logf("Uploaded and archived %s", filePath.c_str());
         } else {
-            Serial.printf("Failed to upload %s (status %d), will retry next time\n", filePath.c_str(), statusCode);
+            logf("Failed to upload %s (status %d), will retry next time", filePath.c_str(), statusCode);
             break;
         }
     }
@@ -956,7 +1095,7 @@ void uploadPendingImages(const String &deviceId, TelemetryCounts &counts, Device
     for (const String &filePath : filePaths) {
         // Process in batches of 10, same as the Pi's uploadPendingPhotos()
         if (filesUploaded >= 10) {
-            Serial.println("Hit upload batch limit - remaining images will upload next cycle");
+            logLine("Hit upload batch limit - remaining images will upload next cycle");
             break;
         }
 
@@ -966,7 +1105,7 @@ void uploadPendingImages(const String &deviceId, TelemetryCounts &counts, Device
         }
 
         if (file.size() == 0) {
-            Serial.println("Empty file - deleting " + filePath);
+            logLine("Empty file - deleting " + filePath);
             file.close();
             SD.remove(filePath);
             continue;
@@ -979,13 +1118,13 @@ void uploadPendingImages(const String &deviceId, TelemetryCounts &counts, Device
             {"Timestamp", timestamp},
         };
 
-        Serial.printf("Posting Image: %s\n", fieldsToJson(fields).c_str());
+        logf("Posting Image: %s", fieldsToJson(fields).c_str());
 
         String responseBody;
         int statusCode = postMultipartForm(config.apiUrl, "Image", fields, "File", fileBaseName(filePath), &file, responseBody);
         file.close();
 
-        Serial.printf("Image response (status %d): %s\n", statusCode, responseBody.c_str());
+        logf("Image response (status %d): %s", statusCode, responseBody.c_str());
 
         if (statusCode == 200) {
             // Mirrors the same yyyy/mm/dd/hh bucketing into CAMERA_UPLOADED_DIR - otherwise
@@ -998,9 +1137,9 @@ void uploadPendingImages(const String &deviceId, TelemetryCounts &counts, Device
             counts.uploadedImages++;
             filesUploaded++;
             applyDeviceConfigFromApiResponse(responseBody, config);
-            Serial.printf("Uploaded and archived %s\n", filePath.c_str());
+            logf("Uploaded and archived %s", filePath.c_str());
         } else {
-            Serial.printf("Failed to upload %s (status %d), will retry next time\n", filePath.c_str(), statusCode);
+            logf("Failed to upload %s (status %d), will retry next time", filePath.c_str(), statusCode);
             break;
         }
     }
@@ -1039,7 +1178,7 @@ uint32_t computeSleepSeconds(const DeviceConfig &config)
     }
 
     uint32_t sleepSeconds = (uint32_t)difftime(wakeTime, now);
-    Serial.printf("Night mode - sleeping %u seconds until %02d:00 UTC\n", sleepSeconds, config.daytimeStartsAtH);
+    logf("Night mode - sleeping %u seconds until %02d:00 UTC", sleepSeconds, config.daytimeStartsAtH);
     return sleepSeconds;
 }
 
@@ -1051,7 +1190,7 @@ void setup()
 
     //Increment boot number and print it every reboot
     ++bootCount;
-    Serial.println("Boot number: " + String(bootCount));
+    logLine("Boot number: " + String(bootCount));
 
 
 #ifdef ENABLE_BATTERY_MON
@@ -1060,7 +1199,7 @@ void setup()
         if (get_battery_voltage() < (BATTERY_VOLTAGE_LOW + 100)) {
             set_device_to_sleep();
         } else {
-            Serial.println("Battery voltage is normal");
+            logLine("Battery voltage is normal");
         }
         delay(500);
     }
@@ -1068,12 +1207,12 @@ void setup()
 
     // Turn on the camera power
     if (!setCameraPower(true)) {
-        Serial.println("Failed to initialize Camera power chip!"); return;
+        logLine("Failed to initialize Camera power chip!"); return;
     }
 
     // Initialize sd card
     if (!setupSD()) {
-        Serial.println("Failed to initialize SD card! Please check SD card!"); return;
+        logLine("Failed to initialize SD card! Please check SD card!"); return;
     }
 
     // Kept up to date incrementally below rather than re-scanned from disk each wake,
@@ -1092,14 +1231,14 @@ void setup()
     time_t now = time(nullptr);
     bool needsSync = (lastSyncTime == 0) || (now < lastSyncTime) || (now - lastSyncTime >= AUTO_SYNC_PERIOD_SEC);
     if (needsSync) {
-        Serial.println("Clock needs sync, connecting to WiFi...");
+        logLine("Clock needs sync, connecting to WiFi...");
         if (connectWiFiAndSyncTime()) {
             writeLastSyncTime(time(nullptr));
         } else {
-            Serial.println("Continuing without synced time, filenames will use boot count!");
+            logLine("Continuing without synced time, filenames will use boot count!");
         }
     } else {
-        Serial.println("Clock already synced, skipping WiFi connection");
+        logLine("Clock already synced, skipping WiFi connection");
     }
 
     // Enable / disable power save mode (1 disabled, 0 enabled)
@@ -1136,7 +1275,7 @@ void setup()
     // camera init
     esp_err_t err = esp_camera_init(&config);
     if (err != ESP_OK) {
-        Serial.printf("Camera init failed with error 0x%x\n", err);
+        logf("Camera init failed with error 0x%x", err);
         return;
     }
 
@@ -1172,17 +1311,17 @@ void setup()
         uint32_t startTime = millis();
         File jpg = SD.open(filename, "w");
         if (jpg) {
-            Serial.printf("JPG created successfully,filename:%s write image data,framesize:%u * %u", filename.c_str(), frame->width, frame->height);
+            logf("JPG created successfully,filename:%s write image data,framesize:%u * %u", filename.c_str(), frame->width, frame->height);
             jpg.write(frame->buf, frame->len);
-            Serial.printf("JPG was written successfully, taking %lu ms\n", millis() - startTime);
+            logf("JPG was written successfully, taking %lu ms", millis() - startTime);
             counts.pendingImages++;
         } else {
-            Serial.printf("JPG created failed!");
+            logLine("JPG created failed!");
         }
         jpg.close();
         esp_camera_fb_return(frame);
     } else {
-        Serial.println("Capturing camera failed!");
+        logLine("Capturing camera failed!");
     }
 
     counts.pendingTelemetry++;
@@ -1196,17 +1335,17 @@ void setup()
 
 void loop()
 {
-    Serial.println("Disbale camera");
+    logLine("Disbale camera");
     esp_camera_deinit();
 
-    Serial.println("Power off camera");
+    logLine("Power off camera");
     setCameraPower(false);
 
     WiFi.disconnect(true);
     WiFi.mode(WIFI_OFF);
 
     uint32_t sleepSeconds = computeSleepSeconds(deviceConfig);
-    Serial.printf("Enter esp32 goto deepsleep for %u seconds!\n", sleepSeconds);
+    logf("Enter esp32 goto deepsleep for %u seconds!", sleepSeconds);
     esp_sleep_enable_timer_wakeup((uint64_t)sleepSeconds * uS_TO_S_FACTOR);
     delay(200);
     esp_deep_sleep_start();
