@@ -29,6 +29,11 @@
 #include "utilities.h"
 #include "secrets.h"
 
+// TINY_GSM_MODEM_* is set by utilities.h based on the board #define above - must come after it.
+// Used here purely for the SIM7670G's onboard GNSS receiver (see updateGeoLocationIfDue()) - this
+// sketch still uploads over the ESP32's own WiFi radio, same as ever, not over cellular.
+#include <TinyGsmClient.h>
+
 #if !defined(LILYGO_SIM7000G_S3_STAN) && !defined(LILYGO_SIM7080G_S3_STAN) \
     && !defined(LILYGO_SIM7670G_S3_STAN) && !defined(LILYGO_A7670X_S3_STAN)  && !defined(LILYGO_SIM7600X_S3_STAN)
 #error "This sketch is only applicable to the T-A7670X-S3-Standard,T-SIM7000G-S3-Standard,T-SIM7080G-S3-Standard,T-SIM7670G-S3-Standard,T-SIM7600X-S3-Standard"
@@ -50,7 +55,6 @@
 #define DAY_LIGHT_OFFSET_SEC     0          // Adjust for daylight saving
 
 #define LAST_SYNC_FILE           "/last_sync.txt"
-#define AUTO_SYNC_PERIOD_SEC     (5 * 60)     // Force a resync after this long, to correct clock drift
 
 #define TELEMETRY_DIR            "/telemetry/pending"   // Uploaded telemetry is deleted, not archived - see uploadPendingTelemetry()
 
@@ -75,6 +79,15 @@
 #define DEFAULT_API_URL              "https://timelapse-dev.azurewebsites.net/api/"
 #define DEFAULT_HFLIP                false
 #define DEFAULT_VFLIP                false
+#define DEFAULT_GEO_INTERVAL_S       (60 * 60)   // Check GPS position once an hour by default
+#define DEFAULT_AUTO_SYNC_PERIOD_S   (5 * 60)    // Force a WiFi resync/upload after this long, to correct clock drift
+
+// utilities.h defines MODEM_GPS_ENABLE_GPIO/MODEM_GPS_ENABLE_LEVEL etc. per board, but not this -
+// matches LilyGo's own reference examples for the SIM7670G-S3 (e.g. LilyGo-Modem-Series/examples/Traccar).
+#define MODEM_POWERON_PULSE_WIDTH_MS 100
+
+#define GEO_MODEM_BOOT_RETRIES       30      // testAT() attempts before re-pulsing PWRKEY
+#define GEO_FIX_TIMEOUT_MS           120000  // Give up on a GPS fix after this long, this cycle
 
 RTC_DATA_ATTR int bootCount = 0;
 
@@ -94,9 +107,24 @@ struct DeviceConfig {
     String apiUrl = DEFAULT_API_URL;
     bool hflip = DEFAULT_HFLIP;
     bool vflip = DEFAULT_VFLIP;
+    uint32_t autoSyncPeriodS = DEFAULT_AUTO_SYNC_PERIOD_S;
+
+    // Locally-determined (see updateGeoLocationIfDue()) - never handed back by the API, unlike
+    // everything above, so applyConfigFields() only ever touches these when reading CONFIG_FILE
+    // back, never from an API response. Kept here (rather than only in RAM) so a device that's
+    // deep-sleeping most of the time still has a last-known position to work from - e.g. for
+    // sunrise/sunset - without needing a fresh fix on every single boot.
+    uint32_t geoIntervalS = DEFAULT_GEO_INTERVAL_S;
+    double geoLat = 0;
+    double geoLon = 0;
+    String geoTimeRecorded = "";   // ISO8601 - empty means never recorded
 };
 
 DeviceConfig deviceConfig;
+
+// The SIM7670G's cellular/GNSS modem, talked to over the UART wired up as SerialAT (see
+// utilities.h) - used only for GPS here (see updateGeoLocationIfDue()).
+TinyGsm modem(SerialAT);
 
 // Piecewise-linear state-of-charge curve for a single-cell 3.7V Li-ion (these boards run off a
 // single 3400mAh cell). Mirrors VoltageToPercentageHelper.cs on the API side, so a percentage
@@ -399,9 +427,12 @@ void writeCounts(const TelemetryCounts &counts)
 }
 
 // Applies whichever of sleepDuringNight/daytimeStartsAtH/daytimeEndsAtH/cameraIntervalS/apiUrl/
-// hflip/vflip are present in `fields` on top of an existing DeviceConfig - used for both
-// CONFIG_FILE (on disk) and the Device object nested in an Image/Telemetry API response, so a
-// partial payload only touches the fields it mentions.
+// hflip/vflip/autoSyncPeriodS/geoIntervalS/geoLat/geoLon/geoTimeRecorded are present in `fields`
+// on top of an existing DeviceConfig - used for both CONFIG_FILE (on disk) and the Device object
+// nested in an Image/Telemetry API response, so a partial payload only touches the fields it
+// mentions. In practice the geo* fields only ever come from CONFIG_FILE - the API has no way to
+// know a device's GPS position, so its Device object never carries them, and applyConfigFields()
+// just leaves the current in-memory values alone when called with API JSON.
 void applyConfigFields(JsonVariantConst fields, DeviceConfig &config)
 {
     config.sleepDuringNight = fields["sleepDuringNight"] | config.sleepDuringNight;
@@ -410,11 +441,18 @@ void applyConfigFields(JsonVariantConst fields, DeviceConfig &config)
     config.cameraIntervalS  = fields["cameraIntervalS"] | config.cameraIntervalS;
     config.hflip            = fields["hflip"] | config.hflip;
     config.vflip            = fields["vflip"] | config.vflip;
+    config.autoSyncPeriodS  = fields["autoSyncPeriodS"] | config.autoSyncPeriodS;
+    config.geoIntervalS     = fields["geoIntervalS"] | config.geoIntervalS;
+    config.geoLat           = fields["geoLat"] | config.geoLat;
+    config.geoLon           = fields["geoLon"] | config.geoLon;
     if (!fields["apiUrl"].isNull()) {
         String apiUrl = fields["apiUrl"].as<String>();
         if (apiUrl.length() > 0) {
             config.apiUrl = apiUrl;
         }
+    }
+    if (!fields["geoTimeRecorded"].isNull()) {
+        config.geoTimeRecorded = fields["geoTimeRecorded"].as<String>();
     }
 }
 
@@ -453,6 +491,11 @@ void writeDeviceConfig(const DeviceConfig &config)
     doc["apiUrl"] = config.apiUrl;
     doc["hflip"] = config.hflip;
     doc["vflip"] = config.vflip;
+    doc["autoSyncPeriodS"] = config.autoSyncPeriodS;
+    doc["geoIntervalS"] = config.geoIntervalS;
+    doc["geoLat"] = config.geoLat;
+    doc["geoLon"] = config.geoLon;
+    doc["geoTimeRecorded"] = config.geoTimeRecorded;
 
     File file = SD.open(CONFIG_FILE, "w");
     if (file) {
@@ -750,6 +793,22 @@ String getISO8601Timestamp()
     return String(buf);
 }
 
+// Inverse of getISO8601Timestamp() - used to work out how long it's been since the last GPS fix
+// (see updateGeoLocationIfDue()). Anything that doesn't parse - e.g. geoTimeRecorded's initial
+// empty "never recorded yet" value - maps to 0, same convention as readLastSyncTime()'s "never
+// synced".
+time_t parseISO8601Timestamp(const String &iso)
+{
+    struct tm t = {};
+    if (sscanf(iso.c_str(), "%d-%d-%dT%d:%d:%dZ",
+               &t.tm_year, &t.tm_mon, &t.tm_mday, &t.tm_hour, &t.tm_min, &t.tm_sec) != 6) {
+        return 0;
+    }
+    t.tm_year -= 1900;
+    t.tm_mon -= 1;
+    return mktime(&t);
+}
+
 // Derived from the efuse base MAC, so it's stable and unique per board without needing WiFi to be up
 String getDeviceId()
 {
@@ -759,7 +818,15 @@ String getDeviceId()
     return String(buf);
 }
 
-String buildTelemetryJson(const String &timestamp, const String &deviceId, uint16_t voltageMv, uint16_t solarVoltageMv, uint32_t uptimeSeconds, const TelemetryCounts &counts)
+// geoLat/geoLon/geoTimeRecorded are recorded here - at capture time - rather than read fresh from
+// deviceConfig at upload time, same reasoning as uptimeSeconds: a GPS fix only actually refreshes
+// every geoIntervalS (e.g. hourly), which can be much longer than cameraIntervalS (e.g. every
+// minute) or the interval telemetry actually gets uploaded on (see autoSyncPeriodS) - if a moving
+// camera captures several telemetry records between GPS fixes and between uploads, each one
+// should carry whatever position was current *when it was captured*, not whatever's current when
+// the whole backlog finally gets uploaded.
+String buildTelemetryJson(const String &timestamp, const String &deviceId, uint16_t voltageMv, uint16_t solarVoltageMv, uint32_t uptimeSeconds,
+                          double geoLat, double geoLon, const String &geoTimeRecorded, const TelemetryCounts &counts)
 {
     // ESP32-S3 internal die temperature sensor, not ambient temperature.
     // Named temperatureC (rather than temperature_c) to match the field name used for the
@@ -770,12 +837,14 @@ String buildTelemetryJson(const String &timestamp, const String &deviceId, uint1
     int temperatureC = (int)lroundf(temperatureRead());
     uint8_t batteryPercent = get_battery_percent(voltageMv);
 
-    char json[400];
+    char json[500];
     snprintf(json, sizeof(json),
              "{\"device_id\":\"%s\",\"timestamp\":\"%s\",\"boot_count\":%d,\"voltage_mv\":%u,\"solar_voltage_mv\":%u,\"temperatureC\":%d,"
              "\"batteryPercent\":%u,\"uptimeSeconds\":%u,"
+             "\"geoLat\":%.6f,\"geoLon\":%.6f,\"geoTimeRecorded\":\"%s\","
              "\"pendingImages\":%d,\"pendingTelemetry\":%d}",
              deviceId.c_str(), timestamp.c_str(), bootCount, voltageMv, solarVoltageMv, temperatureC, batteryPercent, uptimeSeconds,
+             geoLat, geoLon, geoTimeRecorded.c_str(),
              counts.pendingImages, counts.pendingTelemetry);
     return String(json);
 }
@@ -1037,10 +1106,23 @@ void uploadPendingTelemetry(const String &deviceId, TelemetryCounts &counts, Dev
         }
 
         // Packs the fields that don't have a place of their own in TelemetryPostModel into
-        // Status, the same way the Pi's saveTelemetry.py packs PiJuice detail in there.
-        char status[128];
-        snprintf(status, sizeof(status), "{\"boot_count\":%d,\"voltage_mv\":%u,\"solar_voltage_mv\":%u}",
-                 doc["boot_count"].as<int>(), doc["voltage_mv"].as<unsigned>(), doc["solar_voltage_mv"].as<unsigned>());
+        // Status, the same way the Pi's saveTelemetry.py packs PiJuice detail in there. geo.lat/
+        // geo.lon/geo.time-recorded come from THIS record's own geoLat/geoLon/geoTimeRecorded
+        // (see buildTelemetryJson()) rather than the live `config` - a moving camera can capture
+        // several telemetry records between GPS fixes and between uploads, so each one needs to
+        // report the position it actually had at capture time, not whatever's current by the
+        // time the backlog gets uploaded.
+        // geoLat/geoLon fall back to 0 automatically (ArduinoJson's .as<double>() on a missing
+        // key) for telemetry files backlogged from before geo tracking was added; geoTimeRecorded
+        // needs an explicit isNull() guard, same as uptimeSeconds above, since .as<String>() on a
+        // missing key would otherwise post the literal string "null".
+        char status[256];
+        snprintf(status, sizeof(status),
+                 "{\"boot_count\":%d,\"voltage_mv\":%u,\"solar_voltage_mv\":%u,"
+                 "\"geo.lat\":%.6f,\"geo.lon\":%.6f,\"geo.time-recorded\":\"%s\"}",
+                 doc["boot_count"].as<int>(), doc["voltage_mv"].as<unsigned>(), doc["solar_voltage_mv"].as<unsigned>(),
+                 doc["geoLat"].as<double>(), doc["geoLon"].as<double>(),
+                 doc["geoTimeRecorded"].isNull() ? "" : doc["geoTimeRecorded"].as<String>().c_str());
 
         std::vector<HttpFormField> fields = {
             {"SerialNumber", deviceId},
@@ -1196,6 +1278,108 @@ uint32_t computeSleepSeconds(const DeviceConfig &config)
     return sleepSeconds;
 }
 
+// TinyGsmClientSIM7672.h (the SIM7670G implementation) reports +CGNSSINFO's latitude/longitude
+// as raw NMEA-style ddmm.mmmmmm (degrees followed by minutes-with-fraction), same as every other
+// SIMCom modem, but - unlike TinyGsmClientSIM7600.h, which does this same conversion for that
+// modem - only applies the hemisphere sign and passes the ddmm value straight through as if it
+// were already decimal degrees. This does the actual degrees-and-minutes conversion so
+// config.geoLat/geoLon end up as plain decimal degrees.
+double nmeaDegMinToDecimalDegrees(double ddmm)
+{
+    double degrees = trunc(ddmm / 100.0);
+    double minutes = ddmm - degrees * 100.0;
+    return degrees + minutes / 60.0;
+}
+
+// Powers on the SIM7670G's modem/GNSS chip (a separate radio from the ESP32's own WiFi, which is
+// still what uploads go out over), waits for a GPS fix, and updates
+// config.geoLat/geoLon/geoTimeRecorded - but only once config.geoIntervalS has actually elapsed
+// since the last fix (or none has ever been recorded). Persists straight to CONFIG_FILE on
+// success, independent of the API-driven config fields (see applyDeviceConfigFromApiResponse) -
+// a GPS fix is determined locally and the API has no way to hand one back.
+//
+// Bounded by GEO_FIX_TIMEOUT_MS throughout, so a unit with poor sky visibility (or none, e.g.
+// deployed indoors during testing) can't block a whole wake cycle indefinitely - it just keeps
+// the last known position and tries again next time this interval elapses.
+void updateGeoLocationIfDue(DeviceConfig &config)
+{
+    time_t now = time(nullptr);
+    time_t lastFix = parseISO8601Timestamp(config.geoTimeRecorded);
+    if (lastFix != 0 && now >= lastFix && (uint32_t)(now - lastFix) < config.geoIntervalS) {
+        return;   // not due yet
+    }
+
+    logLine("Checking GPS position...");
+    SerialAT.begin(MODEM_BAUDRATE, SERIAL_8N1, MODEM_RX_PIN, MODEM_TX_PIN);
+
+    pinMode(BOARD_PWRKEY_PIN, OUTPUT);
+    digitalWrite(BOARD_PWRKEY_PIN, LOW);
+    delay(100);
+    digitalWrite(BOARD_PWRKEY_PIN, HIGH);
+    delay(MODEM_POWERON_PULSE_WIDTH_MS);
+    digitalWrite(BOARD_PWRKEY_PIN, LOW);
+
+    uint32_t start = millis();
+    int retry = 0;
+    while (!modem.testAT(1000)) {
+        if (millis() - start > GEO_FIX_TIMEOUT_MS) {
+            logLine("Modem never responded to AT - giving up on this cycle's GPS fix");
+            return;
+        }
+        if (++retry > GEO_MODEM_BOOT_RETRIES) {
+            logLine("Modem not responding yet - re-pulsing PWRKEY");
+            digitalWrite(BOARD_PWRKEY_PIN, LOW);
+            delay(100);
+            digitalWrite(BOARD_PWRKEY_PIN, HIGH);
+            delay(MODEM_POWERON_PULSE_WIDTH_MS);
+            digitalWrite(BOARD_PWRKEY_PIN, LOW);
+            retry = 0;
+        }
+    }
+
+    bool gpsEnabled = false;
+    while (millis() - start < GEO_FIX_TIMEOUT_MS) {
+        if (modem.enableGPS(MODEM_GPS_ENABLE_GPIO, MODEM_GPS_ENABLE_LEVEL)) {
+            gpsEnabled = true;
+            break;
+        }
+        delay(500);
+    }
+
+    bool haveFix = false;
+    GPSInfo info;
+    if (gpsEnabled) {
+        while (millis() - start < GEO_FIX_TIMEOUT_MS) {
+            if (modem.getGPS_Ex(info)) {
+                haveFix = true;
+                break;
+            }
+            delay(2000);
+        }
+    } else {
+        logLine("Failed to enable GPS - giving up on this cycle's GPS fix");
+    }
+
+    if (haveFix) {
+        config.geoLat = copysign(nmeaDegMinToDecimalDegrees(fabs(info.latitude)), info.latitude);
+        config.geoLon = copysign(nmeaDegMinToDecimalDegrees(fabs(info.longitude)), info.longitude);
+        config.geoTimeRecorded = getISO8601Timestamp();
+        writeDeviceConfig(config);
+        logf("GPS fix recorded: %.6f, %.6f", config.geoLat, config.geoLon);
+    } else if (gpsEnabled) {
+        logLine("No GPS fix within timeout - keeping last known location");
+    }
+
+    // AT+CPOF cleanly powers the whole modem down (documented SIMCom behaviour) rather than
+    // fumbling with PWRKEY pulse timing again, which differs between power-on and power-off and
+    // isn't worth the risk of getting wrong on hardware this sketch can't test against. Sent
+    // best-effort, without waiting on/parsing a response - the ESP32 is about to deep-sleep
+    // regardless, at which point SerialAT goes away either way.
+    modem.disableGPS(MODEM_GPS_ENABLE_GPIO, 0);
+    SerialAT.println("AT+CPOF");
+    delay(2000);
+}
+
 void setup()
 {
     Serial.begin(115200);
@@ -1240,10 +1424,13 @@ void setup()
     // Deep sleep keeps the RTC running, so the clock usually survives between wake-ups.
     // Only reconnect to WiFi if the clock looks like it was reset by a power interruption
     // (i.e. it's now earlier than the last time we successfully synced), or if it's been
-    // longer than AUTO_SYNC_PERIOD_SEC since the last sync, to correct clock drift.
+    // longer than deviceConfig.autoSyncPeriodS since the last sync, to correct clock drift. This
+    // is also the only time telemetry/images actually get uploaded (see uploadPendingTelemetry/
+    // uploadPendingImages's WiFi.status() check) - so with cameraIntervalS shorter than
+    // autoSyncPeriodS, several captures can build up between uploads.
     time_t lastSyncTime = readLastSyncTime();
     time_t now = time(nullptr);
-    bool needsSync = (lastSyncTime == 0) || (now < lastSyncTime) || (now - lastSyncTime >= AUTO_SYNC_PERIOD_SEC);
+    bool needsSync = (lastSyncTime == 0) || (now < lastSyncTime) || (now - lastSyncTime >= deviceConfig.autoSyncPeriodS);
     if (needsSync) {
         logLine("Clock needs sync, connecting to WiFi...");
         if (connectWiFiAndSyncTime()) {
@@ -1338,10 +1525,17 @@ void setup()
         logLine("Capturing camera failed!");
     }
 
+    // Only actually powers on the modem and takes a fix once deviceConfig.geoIntervalS has
+    // elapsed since the last one - see updateGeoLocationIfDue(). Checked here (after the photo,
+    // before telemetry/uploads) so a freshly-updated position makes it into this cycle's Status
+    // field below rather than waiting for the next wake.
+    updateGeoLocationIfDue(deviceConfig);
+
     counts.pendingTelemetry++;
     String deviceId = getDeviceId();
     String telemetryJson = buildTelemetryJson(getISO8601Timestamp(), deviceId, get_battery_voltage(), get_solar_voltage(),
-                                               (uint32_t)(millis() / 1000), counts);
+                                               (uint32_t)(millis() / 1000),
+                                               deviceConfig.geoLat, deviceConfig.geoLon, deviceConfig.geoTimeRecorded, counts);
     writeTelemetryFile(datedPath, telemetryJson);
     uploadPendingTelemetry(deviceId, counts, deviceConfig);
 

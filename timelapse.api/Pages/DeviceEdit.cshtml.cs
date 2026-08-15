@@ -122,6 +122,8 @@ namespace timelapse.api.Pages
             device.ApiUrl = Device.ApiUrl;
             device.Hflip = Device.Hflip;
             device.Vflip = Device.Vflip;
+            device.GeoIntervalS = Device.GeoIntervalS;
+            device.AutoSyncPeriodS = Device.AutoSyncPeriodS;
 
             if(Latitude.HasValue && Longitude.HasValue){
 
