@@ -52,14 +52,9 @@
 #define LAST_SYNC_FILE           "/last_sync.txt"
 #define AUTO_SYNC_PERIOD_SEC     (5 * 60)     // Force a resync after this long, to correct clock drift
 
-#define TELEMETRY_DIR            "/telemetry"
-#define TELEMETRY_UPLOADED_DIR   "/uploaded"        // Successfully uploaded telemetry is moved here
+#define TELEMETRY_DIR            "/telemetry/pending"   // Uploaded telemetry is deleted, not archived - see uploadPendingTelemetry()
 
-#define CAMERA_DIR               "/camera/pending"    // Sibling of CAMERA_UPLOADED_DIR, not a parent of it -
-                                                       // otherwise a recursive walk of CAMERA_DIR (see
-                                                       // listFilesRecursive) would wander into "uploaded" and
-                                                       // re-discover already-uploaded images as pending forever.
-#define CAMERA_UPLOADED_DIR      "/camera/uploaded"  // Successfully uploaded images are moved here
+#define CAMERA_DIR               "/camera/pending"      // Uploaded images are deleted, not archived - see uploadPendingImages()
 
 #define COUNTS_FILE              "/counts.txt"  // Running pending/uploaded totals, kept up to date incrementally
                                                  // instead of scanning directories (which gets slow with thousands of files)
@@ -636,6 +631,15 @@ String parseTimestampFromPath(const String &path)
 // Recursively walks `root` (an absolute SD path), collecting every regular file's full path
 // into `paths`. Needed now that telemetry/images live under yyyy/mm/dd/hh buckets rather than
 // one flat directory.
+//
+// Also removes any subdirectory of `root` that turns out to be empty once its own contents have
+// been listed. Once a file's uploaded and removed out of its yyyy/mm/dd/hh bucket, nothing ever
+// empties that bucket's directories again - left alone they accumulate forever, and this same
+// recursive walk (which has to run every single wake, to build the upload list) gets slower and
+// slower having to open and list thousands of long-dead empty directories. Pruning here, as this
+// function's own post-order step, costs nothing extra - it already has every directory open at
+// exactly the moment it can tell whether that directory turned out to be empty. `root` itself is
+// never removed, even if empty.
 void listFilesRecursive(const String &root, std::vector<String> &paths)
 {
     File dir = SD.open(root);
@@ -650,7 +654,11 @@ void listFilesRecursive(const String &root, std::vector<String> &paths)
         entry.close();
 
         if (isDirectory) {
+            size_t before = paths.size();
             listFilesRecursive(fullPath, paths);
+            if (paths.size() == before) {
+                SD.rmdir(fullPath);   // nothing under it (directly or nested) - safe to drop
+            }
         } else {
             paths.push_back(fullPath);
         }
@@ -980,9 +988,11 @@ int postMultipartForm(const String &apiUrl, const String &endpoint, const std::v
 }
 
 // Uploads every telemetry file still sitting in TELEMETRY_DIR (including ones saved during
-// earlier offline cycles), oldest first, moving each one to TELEMETRY_UPLOADED_DIR once the
-// API acknowledges it with 200 OK. Stops at the first failure, leaving it and everything after
-// it in place to retry next time. Also refreshes deviceConfig from the response.
+// earlier offline cycles), oldest first, deleting each one once the API acknowledges it with
+// 200 OK - the API already has the authoritative copy, so there's no reason to keep a second one
+// on the SD card taking up space and slowing down the next listFilesRecursive() walk. Stops at
+// the first failure, leaving it and everything after it in place to retry next time. Also
+// refreshes deviceConfig from the response.
 void uploadPendingTelemetry(const String &deviceId, TelemetryCounts &counts, DeviceConfig &config)
 {
     if (WiFi.status() != WL_CONNECTED) {
@@ -1057,35 +1067,25 @@ void uploadPendingTelemetry(const String &deviceId, TelemetryCounts &counts, Dev
         logf("Telemetry response (status %d): %s", statusCode, responseBody.c_str());
 
         if (statusCode == 200) {
-            // Mirrors the same yyyy/mm/dd/hh bucketing into TELEMETRY_UPLOADED_DIR - otherwise
-            // we'd just relocate the flat-directory slowdown from "pending" to "uploaded".
-            String relativePath = filePath.substring(String(TELEMETRY_DIR).length());
-            String uploadedPath = String(TELEMETRY_UPLOADED_DIR) + relativePath;
-            ensureDirExists(parentDir(uploadedPath));
-            SD.rename(filePath, uploadedPath);
+            SD.remove(filePath);
             counts.pendingTelemetry--;
             counts.uploadedTelemetry++;
             filesUploaded++;
             applyDeviceConfigFromApiResponse(responseBody, config);
-            logf("Uploaded and archived %s", filePath.c_str());
+            logf("Uploaded and deleted %s", filePath.c_str());
         } else {
             logf("Failed to upload %s (status %d), will retry next time", filePath.c_str(), statusCode);
             break;
         }
     }
-
-    DatedPath datedPath = getDatedPath();
-    counts.pendingTelemetry++;
-    String telemetryJson = buildTelemetryJson(getISO8601Timestamp(), deviceId, get_battery_voltage(), get_solar_voltage(), counts);
-    writeTelemetryFile(datedPath, telemetryJson);
 }
 
-// Uploads every image still sitting in CAMERA_DIR (not the "uploaded" subfolder), oldest
-// first, over HTTP to the same API endpoint the Raspberry Pi units already post to - imagery
-// isn't published over MQTT, since message brokers aren't a great fit for large binary
-// payloads, especially once this moves to cellular. Moves each file to CAMERA_UPLOADED_DIR
-// once the API acknowledges it with 200 OK; stops at the first failure so a flaky connection
-// doesn't reorder the backlog (same approach as uploadPendingTelemetry()).
+// Uploads every image still sitting in CAMERA_DIR, oldest first, over HTTP to the same API
+// endpoint the Raspberry Pi units already post to - imagery isn't published over MQTT, since
+// message brokers aren't a great fit for large binary payloads, especially once this moves to
+// cellular. Deletes each file once the API acknowledges it with 200 OK - the API already has the
+// authoritative copy; stops at the first failure so a flaky connection doesn't reorder the
+// backlog (same approach as uploadPendingTelemetry()).
 void uploadPendingImages(const String &deviceId, TelemetryCounts &counts, DeviceConfig &config)
 {
     if (WiFi.status() != WL_CONNECTED) {
@@ -1132,27 +1132,17 @@ void uploadPendingImages(const String &deviceId, TelemetryCounts &counts, Device
         logf("Image response (status %d): %s", statusCode, responseBody.c_str());
 
         if (statusCode == 200) {
-            // Mirrors the same yyyy/mm/dd/hh bucketing into CAMERA_UPLOADED_DIR - otherwise
-            // we'd just relocate the flat-directory slowdown from "pending" to "uploaded".
-            String relativePath = filePath.substring(String(CAMERA_DIR).length());
-            String uploadedPath = String(CAMERA_UPLOADED_DIR) + relativePath;
-            ensureDirExists(parentDir(uploadedPath));
-            SD.rename(filePath, uploadedPath);
+            SD.remove(filePath);
             counts.pendingImages--;
             counts.uploadedImages++;
             filesUploaded++;
             applyDeviceConfigFromApiResponse(responseBody, config);
-            logf("Uploaded and archived %s", filePath.c_str());
+            logf("Uploaded and deleted %s", filePath.c_str());
         } else {
             logf("Failed to upload %s (status %d), will retry next time", filePath.c_str(), statusCode);
             break;
         }
     }
-
-    DatedPath datedPath = getDatedPath();
-    counts.pendingTelemetry++;
-    String telemetryJson = buildTelemetryJson(getISO8601Timestamp(), deviceId, get_battery_voltage(), get_solar_voltage(), counts);
-    writeTelemetryFile(datedPath, telemetryJson);
 }
 
 // Decides how long to deep-sleep for, in seconds. Normally just config.cameraIntervalS, but
