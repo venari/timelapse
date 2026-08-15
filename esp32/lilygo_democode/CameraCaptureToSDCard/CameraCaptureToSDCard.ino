@@ -763,7 +763,7 @@ String getDeviceId()
     return String(buf);
 }
 
-String buildTelemetryJson(const String &timestamp, const String &deviceId, uint16_t voltageMv, uint16_t solarVoltageMv, const TelemetryCounts &counts)
+String buildTelemetryJson(const String &timestamp, const String &deviceId, uint16_t voltageMv, uint16_t solarVoltageMv, uint32_t uptimeSeconds, const TelemetryCounts &counts)
 {
     // ESP32-S3 internal die temperature sensor, not ambient temperature.
     // Named temperatureC (rather than temperature_c) to match the field name used for the
@@ -777,9 +777,9 @@ String buildTelemetryJson(const String &timestamp, const String &deviceId, uint1
     char json[400];
     snprintf(json, sizeof(json),
              "{\"device_id\":\"%s\",\"timestamp\":\"%s\",\"boot_count\":%d,\"voltage_mv\":%u,\"solar_voltage_mv\":%u,\"temperatureC\":%d,"
-             "\"batteryPercent\":%u,"
+             "\"batteryPercent\":%u,\"uptimeSeconds\":%u,"
              "\"pendingImages\":%d,\"uploadedImages\":%d,\"pendingTelemetry\":%d,\"uploadedTelemetry\":%d}",
-             deviceId.c_str(), timestamp.c_str(), bootCount, voltageMv, solarVoltageMv, temperatureC, batteryPercent,
+             deviceId.c_str(), timestamp.c_str(), bootCount, voltageMv, solarVoltageMv, temperatureC, batteryPercent, uptimeSeconds,
              counts.pendingImages, counts.uploadedImages, counts.pendingTelemetry, counts.uploadedTelemetry);
     return String(json);
 }
@@ -1052,7 +1052,10 @@ void uploadPendingTelemetry(const String &deviceId, TelemetryCounts &counts, Dev
             {"BatteryPercent", doc["batteryPercent"].as<String>()},
             // {"BatteryVoltage", doc["voltage_mv"].as<String>()},
             {"Status", String(status)},
-            {"UptimeSeconds", String((uint32_t)(millis() / 1000))},
+            // isNull() guard: telemetry files already backlogged from before uptimeSeconds was
+            // added to buildTelemetryJson() won't have the key at all - without this they'd post
+            // the literal string "null" instead of a number.
+            {"UptimeSeconds", doc["uptimeSeconds"].isNull() ? String("0") : doc["uptimeSeconds"].as<String>()},
             {"PendingImages", doc["pendingImages"].as<String>()},
             {"UploadedImages", doc["uploadedImages"].as<String>()},
             {"PendingTelemetry", doc["pendingTelemetry"].as<String>()},
@@ -1326,7 +1329,8 @@ void setup()
 
     counts.pendingTelemetry++;
     String deviceId = getDeviceId();
-    String telemetryJson = buildTelemetryJson(getISO8601Timestamp(), deviceId, get_battery_voltage(), get_solar_voltage(), counts);
+    String telemetryJson = buildTelemetryJson(getISO8601Timestamp(), deviceId, get_battery_voltage(), get_solar_voltage(),
+                                               (uint32_t)(millis() / 1000), counts);
     writeTelemetryFile(datedPath, telemetryJson);
     uploadPendingTelemetry(deviceId, counts, deviceConfig);
 
