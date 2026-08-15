@@ -109,12 +109,33 @@ public class Telemetry
     }
 
     // Pi-only fields (ESP32 status has no "batteryVoltage"/"batteryCurrent"/"ioVoltage"/"ioCurrent") -
-    // simply absent for ESP32 devices rather than throwing.
-    public int? BatteryVoltage => TryGetInt(ParsedStatus, "batteryVoltage");
+    // May be recorded for Lilygo T-SIM ESP32-S3 devices
+    // return null if missing rather than throwing.
+    public int? BatteryVoltage {
+        get {
+            int? voltage = TryGetInt(ParsedStatus, "batteryVoltage");
+            
+            if(voltage == null) {
+                voltage = TryGetInt(ParsedStatus, "voltage_mv");
+            }
+
+            return voltage;
+        }
+    }
 
     public int? BatteryCurrent => TryGetInt(ParsedStatus, "batteryCurrent");
 
-    public int? IOVoltage => TryGetInt(ParsedStatus, "ioVoltage");
+    public int? IOVoltage {
+        get {
+            int? ioVoltage = TryGetInt(ParsedStatus, "ioVoltage");
+            
+            if(ioVoltage == null) {
+                ioVoltage = TryGetInt(ParsedStatus, "solar_voltage_mv");
+            }
+    
+            return ioVoltage;
+        }
+    }
 
     public int? IOCurrent => TryGetInt(ParsedStatus, "ioCurrent");
 

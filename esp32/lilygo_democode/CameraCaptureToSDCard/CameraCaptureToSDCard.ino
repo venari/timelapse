@@ -1073,6 +1073,11 @@ void uploadPendingTelemetry(const String &deviceId, TelemetryCounts &counts, Dev
             break;
         }
     }
+
+    DatedPath datedPath = getDatedPath();
+    counts.pendingTelemetry++;
+    String telemetryJson = buildTelemetryJson(getISO8601Timestamp(), deviceId, get_battery_voltage(), get_solar_voltage(), counts);
+    writeTelemetryFile(datedPath, telemetryJson);
 }
 
 // Uploads every image still sitting in CAMERA_DIR (not the "uploaded" subfolder), oldest
@@ -1143,6 +1148,11 @@ void uploadPendingImages(const String &deviceId, TelemetryCounts &counts, Device
             break;
         }
     }
+
+    DatedPath datedPath = getDatedPath();
+    counts.pendingTelemetry++;
+    String telemetryJson = buildTelemetryJson(getISO8601Timestamp(), deviceId, get_battery_voltage(), get_solar_voltage(), counts);
+    writeTelemetryFile(datedPath, telemetryJson);
 }
 
 // Decides how long to deep-sleep for, in seconds. Normally just config.cameraIntervalS, but
@@ -1329,7 +1339,10 @@ void setup()
     String telemetryJson = buildTelemetryJson(getISO8601Timestamp(), deviceId, get_battery_voltage(), get_solar_voltage(), counts);
     writeTelemetryFile(datedPath, telemetryJson);
     uploadPendingTelemetry(deviceId, counts, deviceConfig);
+
+
     uploadPendingImages(deviceId, counts, deviceConfig);
+
     writeCounts(counts);
 }
 
