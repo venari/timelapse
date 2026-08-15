@@ -80,10 +80,7 @@ RTC_DATA_ATTR int bootCount = 0;
 
 struct TelemetryCounts {
     int pendingImages;
-
-    int uploadedImages;
     int pendingTelemetry;
-    int uploadedTelemetry;
 };
 
 // Config handed back by the API in the Device object nested in every Image/Telemetry POST
@@ -377,16 +374,16 @@ void writeLastSyncTime(time_t t)
 // Returns all-zero counts if never written yet (no file, or unreadable)
 TelemetryCounts readCounts()
 {
-    TelemetryCounts counts = {0, 0, 0, 0};
+    TelemetryCounts counts = {0, 0};
     File file = SD.open(COUNTS_FILE, "r");
     if (!file) {
         return counts;
     }
     String line = file.readStringUntil('\n');
     file.close();
-    sscanf(line.c_str(), "%d,%d,%d,%d",
-           &counts.pendingImages, &counts.uploadedImages,
-           &counts.pendingTelemetry, &counts.uploadedTelemetry);
+    if (sscanf(line.c_str(), "%d,%d", &counts.pendingImages, &counts.pendingTelemetry) != 2) {
+        counts = {0, 0};   // e.g. an older counts.txt from before uploadedImages/uploadedTelemetry were dropped
+    }
     return counts;
 }
 
@@ -394,8 +391,7 @@ void writeCounts(const TelemetryCounts &counts)
 {
     File file = SD.open(COUNTS_FILE, "w");
     if (file) {
-        file.printf("%d,%d,%d,%d\n", counts.pendingImages, counts.uploadedImages,
-                     counts.pendingTelemetry, counts.uploadedTelemetry);
+        file.printf("%d,%d\n", counts.pendingImages, counts.pendingTelemetry);
         file.close();
     } else {
         logLine("Failed to write counts file!");
@@ -778,9 +774,9 @@ String buildTelemetryJson(const String &timestamp, const String &deviceId, uint1
     snprintf(json, sizeof(json),
              "{\"device_id\":\"%s\",\"timestamp\":\"%s\",\"boot_count\":%d,\"voltage_mv\":%u,\"solar_voltage_mv\":%u,\"temperatureC\":%d,"
              "\"batteryPercent\":%u,\"uptimeSeconds\":%u,"
-             "\"pendingImages\":%d,\"uploadedImages\":%d,\"pendingTelemetry\":%d,\"uploadedTelemetry\":%d}",
+             "\"pendingImages\":%d,\"pendingTelemetry\":%d}",
              deviceId.c_str(), timestamp.c_str(), bootCount, voltageMv, solarVoltageMv, temperatureC, batteryPercent, uptimeSeconds,
-             counts.pendingImages, counts.uploadedImages, counts.pendingTelemetry, counts.uploadedTelemetry);
+             counts.pendingImages, counts.pendingTelemetry);
     return String(json);
 }
 
@@ -992,7 +988,8 @@ int postMultipartForm(const String &apiUrl, const String &endpoint, const std::v
 // 200 OK - the API already has the authoritative copy, so there's no reason to keep a second one
 // on the SD card taking up space and slowing down the next listFilesRecursive() walk. Stops at
 // the first failure, leaving it and everything after it in place to retry next time. Also
-// refreshes deviceConfig from the response.
+// refreshes deviceConfig from the response, and reconciles counts.pendingTelemetry against what's
+// actually on disk (see the comment at the bottom of this function).
 void uploadPendingTelemetry(const String &deviceId, TelemetryCounts &counts, DeviceConfig &config)
 {
     if (WiFi.status() != WL_CONNECTED) {
@@ -1006,6 +1003,7 @@ void uploadPendingTelemetry(const String &deviceId, TelemetryCounts &counts, Dev
     listFilesRecursive(TELEMETRY_DIR, filePaths);
     std::sort(filePaths.begin(), filePaths.end());
 
+    int filesRemoved = 0;   // uploaded, empty, or unparseable - anything gone from disk afterwards
     int filesUploaded = 0;
     for (const String &filePath : filePaths) {
         // Process in batches of 100, same as the Pi's uploadPendingTelemetry()
@@ -1023,6 +1021,7 @@ void uploadPendingTelemetry(const String &deviceId, TelemetryCounts &counts, Dev
             logLine("Empty file - deleting " + filePath);
             file.close();
             SD.remove(filePath);
+            filesRemoved++;
             continue;
         }
 
@@ -1033,6 +1032,7 @@ void uploadPendingTelemetry(const String &deviceId, TelemetryCounts &counts, Dev
         if (err) {
             logf("Failed to parse %s: %s - discarding", filePath.c_str(), err.c_str());
             SD.remove(filePath);
+            filesRemoved++;
             continue;
         }
 
@@ -1057,9 +1057,7 @@ void uploadPendingTelemetry(const String &deviceId, TelemetryCounts &counts, Dev
             // the literal string "null" instead of a number.
             {"UptimeSeconds", doc["uptimeSeconds"].isNull() ? String("0") : doc["uptimeSeconds"].as<String>()},
             {"PendingImages", doc["pendingImages"].as<String>()},
-            {"UploadedImages", doc["uploadedImages"].as<String>()},
             {"PendingTelemetry", doc["pendingTelemetry"].as<String>()},
-            {"UploadedTelemetry", doc["uploadedTelemetry"].as<String>()},
         };
 
         logf("Posting Telemetry: %s", fieldsToJson(fields).c_str());
@@ -1071,8 +1069,7 @@ void uploadPendingTelemetry(const String &deviceId, TelemetryCounts &counts, Dev
 
         if (statusCode == 200) {
             SD.remove(filePath);
-            counts.pendingTelemetry--;
-            counts.uploadedTelemetry++;
+            filesRemoved++;
             filesUploaded++;
             applyDeviceConfigFromApiResponse(responseBody, config);
             logf("Uploaded and deleted %s", filePath.c_str());
@@ -1081,6 +1078,14 @@ void uploadPendingTelemetry(const String &deviceId, TelemetryCounts &counts, Dev
             break;
         }
     }
+
+    // counts.pendingTelemetry is normally just cheap ++/-- bookkeeping (see the increment in
+    // setup(), done without touching the SD card so a telemetry snapshot can be written quickly
+    // every wake) and drifts over time - e.g. the empty/unparseable-file branches above delete a
+    // file without ever having decremented it. listFilesRecursive() above already did a full,
+    // authoritative scan of what's really pending, so this is the natural place to correct that
+    // drift, without needing a second scan just to do it.
+    counts.pendingTelemetry = (int)filePaths.size() - filesRemoved;
 }
 
 // Uploads every image still sitting in CAMERA_DIR, oldest first, over HTTP to the same API
@@ -1088,7 +1093,8 @@ void uploadPendingTelemetry(const String &deviceId, TelemetryCounts &counts, Dev
 // message brokers aren't a great fit for large binary payloads, especially once this moves to
 // cellular. Deletes each file once the API acknowledges it with 200 OK - the API already has the
 // authoritative copy; stops at the first failure so a flaky connection doesn't reorder the
-// backlog (same approach as uploadPendingTelemetry()).
+// backlog (same approach as uploadPendingTelemetry(), including reconciling counts.pendingImages
+// against what's actually on disk - see the comment at the bottom of this function).
 void uploadPendingImages(const String &deviceId, TelemetryCounts &counts, DeviceConfig &config)
 {
     if (WiFi.status() != WL_CONNECTED) {
@@ -1099,6 +1105,7 @@ void uploadPendingImages(const String &deviceId, TelemetryCounts &counts, Device
     listFilesRecursive(CAMERA_DIR, filePaths);
     std::sort(filePaths.begin(), filePaths.end());
 
+    int filesRemoved = 0;   // uploaded or empty - anything gone from disk afterwards
     int filesUploaded = 0;
     for (const String &filePath : filePaths) {
         // Process in batches of 10, same as the Pi's uploadPendingPhotos()
@@ -1116,6 +1123,7 @@ void uploadPendingImages(const String &deviceId, TelemetryCounts &counts, Device
             logLine("Empty file - deleting " + filePath);
             file.close();
             SD.remove(filePath);
+            filesRemoved++;
             continue;
         }
 
@@ -1136,8 +1144,7 @@ void uploadPendingImages(const String &deviceId, TelemetryCounts &counts, Device
 
         if (statusCode == 200) {
             SD.remove(filePath);
-            counts.pendingImages--;
-            counts.uploadedImages++;
+            filesRemoved++;
             filesUploaded++;
             applyDeviceConfigFromApiResponse(responseBody, config);
             logf("Uploaded and deleted %s", filePath.c_str());
@@ -1146,6 +1153,10 @@ void uploadPendingImages(const String &deviceId, TelemetryCounts &counts, Device
             break;
         }
     }
+
+    // See the matching comment in uploadPendingTelemetry() - reconciles counts.pendingImages
+    // against the authoritative scan above rather than trusting the cheap ++/-- bookkeeping.
+    counts.pendingImages = (int)filePaths.size() - filesRemoved;
 }
 
 // Decides how long to deep-sleep for, in seconds. Normally just config.cameraIntervalS, but
