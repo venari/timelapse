@@ -769,6 +769,7 @@ int postMultipartForm(const String &apiUrl, const String &endpoint, const std::v
 
     uint32_t start = millis();
     int statusCode = 0;
+    bool chunked = false;
 
     // Status line + headers
     while ((client.connected() || client.available()) && millis() - start < 15000) {
@@ -779,6 +780,14 @@ int postMultipartForm(const String &apiUrl, const String &endpoint, const std::v
         if (line.startsWith("HTTP/1.1")) {
             statusCode = line.substring(9, 12).toInt();
         }
+        // Header names are case-insensitive (RFC 7230) - Kestrel/Azure sends this rather than
+        // a Content-Length whenever it doesn't know the body size upfront, which is the normal
+        // case for our controller responses.
+        String lowerLine = line;
+        lowerLine.toLowerCase();
+        if (lowerLine.startsWith("transfer-encoding:") && lowerLine.indexOf("chunked") >= 0) {
+            chunked = true;
+        }
         if (line == "\r") {
             break;   // blank line - end of headers, body follows
         }
@@ -786,9 +795,44 @@ int postMultipartForm(const String &apiUrl, const String &endpoint, const std::v
 
     // Body
     responseBody = "";
-    while ((client.connected() || client.available()) && millis() - start < 15000) {
-        if (client.available()) {
-            responseBody += (char)client.read();
+    if (chunked) {
+        // Each chunk is "<hex size>\r\n<size bytes of data>\r\n", repeated until a zero-size
+        // chunk terminates the body (optionally followed by trailer headers, then a final
+        // blank line). Without this, the raw chunk framing (hex size lines, inter-chunk CRLFs)
+        // ends up embedded in responseBody and breaks JSON parsing downstream.
+        while (millis() - start < 15000) {
+            if (!client.available() && !client.connected()) {
+                break;
+            }
+            if (!client.available()) {
+                continue;
+            }
+            String sizeLine = client.readStringUntil('\n');
+            sizeLine.trim();
+            int semicolon = sizeLine.indexOf(';');   // ignore chunk extensions, if any
+            if (semicolon >= 0) {
+                sizeLine = sizeLine.substring(0, semicolon);
+            }
+            long chunkSize = strtol(sizeLine.c_str(), nullptr, 16);
+            if (chunkSize <= 0) {
+                break;   // terminating chunk
+            }
+
+            long readSoFar = 0;
+            while (readSoFar < chunkSize && millis() - start < 15000) {
+                if (!client.available()) {
+                    continue;
+                }
+                responseBody += (char)client.read();
+                readSoFar++;
+            }
+            client.readStringUntil('\n');   // consume the CRLF that follows each chunk's data
+        }
+    } else {
+        while ((client.connected() || client.available()) && millis() - start < 15000) {
+            if (client.available()) {
+                responseBody += (char)client.read();
+            }
         }
     }
 
