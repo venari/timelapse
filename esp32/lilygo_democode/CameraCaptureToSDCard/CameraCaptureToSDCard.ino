@@ -535,7 +535,10 @@ void applyDeviceConfigFromApiResponse(const String &responseBody, DeviceConfig &
         newConfig.cameraIntervalS != config.cameraIntervalS ||
         newConfig.apiUrl != config.apiUrl ||
         newConfig.hflip != config.hflip ||
-        newConfig.vflip != config.vflip) {
+        newConfig.vflip != config.vflip ||
+        newConfig.autoSyncPeriodS != config.autoSyncPeriodS ||
+        newConfig.geoIntervalS !=config.geoIntervalS
+) {
         config = newConfig;
         writeDeviceConfig(config);
         logLine("Config updated from API");
