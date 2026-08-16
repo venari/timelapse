@@ -1278,19 +1278,6 @@ uint32_t computeSleepSeconds(const DeviceConfig &config)
     return sleepSeconds;
 }
 
-// TinyGsmClientSIM7672.h (the SIM7670G implementation) reports +CGNSSINFO's latitude/longitude
-// as raw NMEA-style ddmm.mmmmmm (degrees followed by minutes-with-fraction), same as every other
-// SIMCom modem, but - unlike TinyGsmClientSIM7600.h, which does this same conversion for that
-// modem - only applies the hemisphere sign and passes the ddmm value straight through as if it
-// were already decimal degrees. This does the actual degrees-and-minutes conversion so
-// config.geoLat/geoLon end up as plain decimal degrees.
-double nmeaDegMinToDecimalDegrees(double ddmm)
-{
-    double degrees = trunc(ddmm / 100.0);
-    double minutes = ddmm - degrees * 100.0;
-    return degrees + minutes / 60.0;
-}
-
 // Powers on the SIM7670G's modem/GNSS chip (a separate radio from the ESP32's own WiFi, which is
 // still what uploads go out over), waits for a GPS fix, and updates
 // config.geoLat/geoLon/geoTimeRecorded - but only once config.geoIntervalS has actually elapsed
@@ -1352,6 +1339,21 @@ void updateGeoLocationIfDue(DeviceConfig &config)
         while (millis() - start < GEO_FIX_TIMEOUT_MS) {
             if (modem.getGPS_Ex(info)) {
                 haveFix = true;
+
+                // logf()'s first argument is a printf format string, not a value to print - each
+                // of these used to pass a bare number (e.g. logf(info.isFix)) with nothing to
+                // format it, which is why every one of these came out blank in the log: with no
+                // %-specifier in "the format string" (actually just info.isFix's numeric value
+                // reinterpreted as a pointer), there's no text to print at all.
+                logf("GPS fix: mode=%u lat=%.6f lon=%.6f speed=%.2f alt=%.2f course=%.2f",
+                     info.isFix, info.latitude, info.longitude, info.speed, info.altitude, info.course);
+                logf("GPS satellites: gps=%u beidou=%u glonass=%u galileo=%u",
+                     info.gps_satellite_num, info.beidou_satellite_num, info.glonass_satellite_num, info.galileo_satellite_num);
+                logf("GPS fix time: %04u-%02u-%02u %02u:%02u:%02u UTC",
+                     info.year, info.month, info.day, info.hour, info.minute, info.second);
+                logf("GPS precision: PDOP=%.2f HDOP=%.2f VDOP=%.2f", info.PDOP, info.HDOP, info.VDOP);
+                logf("GPS raw +CGNSSINFO: %s", modem.getGPSraw().c_str());
+
                 break;
             }
             delay(2000);
@@ -1361,8 +1363,14 @@ void updateGeoLocationIfDue(DeviceConfig &config)
     }
 
     if (haveFix) {
-        config.geoLat = copysign(nmeaDegMinToDecimalDegrees(fabs(info.latitude)), info.latitude);
-        config.geoLon = copysign(nmeaDegMinToDecimalDegrees(fabs(info.longitude)), info.longitude);
+        // NOT converted from ddmm.mmmmmm here, despite what an earlier version of this function
+        // (and TinyGsmClientSIM7672.h's own source comments) assumed - real hardware output
+        // confirms this modem's +CGNSSINFO already reports plain decimal degrees. A longitude
+        // of 174.900441 is the giveaway: as ddmm.mmmmmm that would mean 90.0441 minutes, which
+        // isn't valid (minutes only go up to 59.999...). Converting it anyway is exactly what
+        // produced the garbage -0.685311/2.248342 previously logged.
+        config.geoLat = info.latitude;
+        config.geoLon = info.longitude;
         config.geoTimeRecorded = getISO8601Timestamp();
         writeDeviceConfig(config);
         logf("GPS fix recorded: %.6f, %.6f", config.geoLat, config.geoLon);
