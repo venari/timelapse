@@ -1547,10 +1547,7 @@ void setup()
     writeTelemetryFile(datedPath, telemetryJson);
     uploadPendingTelemetry(deviceId, counts, deviceConfig);
 
-
-    uploadPendingImages(deviceId, counts, deviceConfig);
-
-    // A second telemetry snapshot, captured after both uploads (and any GPS fix) have finished -
+    // A second telemetry snapshot, captured after uploading telemetry (and any GPS fix) have finished -
     // comparing its uptimeSeconds/timestamp against the first snapshot's (written before any of
     // that work started) is a quick way to see how long this cycle's upload/GPS work actually
     // took, without having to comb through the serial log for it. Uses its own fresh DatedPath
@@ -1561,7 +1558,18 @@ void setup()
     String telemetryJson2 = buildTelemetryJson(getISO8601Timestamp(), deviceId, get_battery_voltage(), get_solar_voltage(),
                                                 (uint32_t)(millis() / 1000),
                                                 deviceConfig.geoLat, deviceConfig.geoLon, deviceConfig.geoTimeRecorded, counts);
+
     writeTelemetryFile(secondDatedPath, telemetryJson2);
+
+    uploadPendingImages(deviceId, counts, deviceConfig);
+
+    // A third telemetry snapshot, captured after imagery uploads have finished -
+    DatedPath thirdDatedPath = getDatedPath();
+    counts.pendingTelemetry++;
+    String telemetryJson3 = buildTelemetryJson(getISO8601Timestamp(), deviceId, get_battery_voltage(), get_solar_voltage(),
+                                                (uint32_t)(millis() / 1000),
+                                                deviceConfig.geoLat, deviceConfig.geoLon, deviceConfig.geoTimeRecorded, counts);
+    writeTelemetryFile(thirdDatedPath, telemetryJson3);
 
     writeCounts(counts);
 }
