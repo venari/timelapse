@@ -1131,6 +1131,27 @@ int postMultipartForm(ApiConnection &conn, const String &apiUrl, const String &e
             }
             long chunkSize = strtol(sizeLine.c_str(), nullptr, 16);
             if (chunkSize <= 0) {
+                // Terminating "0" chunk - per RFC 7230, the chunked body doesn't actually end
+                // until an optional trailer section and a final blank line have gone by too.
+                // Leaving those unread was the bug: on Connection: close this didn't matter (the
+                // socket just got torn down with them still sitting in it), but with the
+                // connection now kept alive for reuse (see connectApiClient()), that leftover
+                // blank line became the first thing the *next* request's header parser read,
+                // which it mistook for headers already being over - hence a real 200 response
+                // with a correct body getting logged as "status 0" with the whole raw response
+                // (status line, headers and all) dumped into responseBody as if it were content.
+                while (millis() - start < 15000) {
+                    if (!client.available()) {
+                        if (!client.connected()) {
+                            break;
+                        }
+                        continue;
+                    }
+                    String trailerLine = client.readStringUntil('\n');
+                    if (trailerLine == "\r" || trailerLine.length() == 0) {
+                        break;   // blank line - chunked body is now fully consumed
+                    }
+                }
                 break;   // terminating chunk
             }
 
