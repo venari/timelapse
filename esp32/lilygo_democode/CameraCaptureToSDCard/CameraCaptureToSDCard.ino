@@ -1210,7 +1210,7 @@ void uploadPendingImages(const String &deviceId, TelemetryCounts &counts, Device
 
     std::vector<String> filePaths;
     listFilesRecursive(CAMERA_DIR, filePaths);
-    std::sort(filePaths.begin(), filePaths.end());
+    std::sort(filePaths.rbegin(), filePaths.rend());
 
     int filesRemoved = 0;   // uploaded or empty - anything gone from disk afterwards
     int filesUploaded = 0;
