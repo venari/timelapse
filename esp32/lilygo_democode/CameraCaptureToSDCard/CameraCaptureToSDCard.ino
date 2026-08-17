@@ -57,6 +57,7 @@
 #define LAST_SYNC_FILE           "/last_sync.txt"
 
 #define TELEMETRY_DIR            "/telemetry/pending"   // Uploaded telemetry is deleted, not archived - see uploadPendingTelemetry()
+#define TELEMETRY_HOLDING_DIR    "/telemetry/holding"   // Records the API rejected outright (e.g. 400) land here instead - kept for inspection, never retried
 
 #define CAMERA_DIR               "/camera/pending"      // Uploaded images are deleted, not archived - see uploadPendingImages()
 
@@ -1056,12 +1057,16 @@ int postMultipartForm(const String &apiUrl, const String &endpoint, const std::v
 }
 
 // Uploads every telemetry file still sitting in TELEMETRY_DIR (including ones saved during
-// earlier offline cycles), oldest first, deleting each one once the API acknowledges it with
-// 200 OK - the API already has the authoritative copy, so there's no reason to keep a second one
-// on the SD card taking up space and slowing down the next listFilesRecursive() walk. Stops at
-// the first failure, leaving it and everything after it in place to retry next time. Also
-// refreshes deviceConfig from the response, and reconciles counts.pendingTelemetry against what's
-// actually on disk (see the comment at the bottom of this function).
+// earlier offline cycles), most recent first, deleting each one once the API acknowledges it
+// with 200 OK - the API already has the authoritative copy, so there's no reason to keep a second
+// one on the SD card taking up space and slowing down the next listFilesRecursive() walk. A
+// validation error (400 - the request itself is bad, e.g. a field the API's model binder rejects)
+// moves the file to TELEMETRY_HOLDING_DIR instead, so it stops clogging the queue but stays
+// around to inspect, and processing continues with the rest of the backlog. Anything else
+// (timeouts, connection failures, 5xx) is treated as transient - stops there, leaving that file
+// and everything older still queued to retry next time. Also refreshes deviceConfig from the
+// response, and reconciles counts.pendingTelemetry against what's actually on disk (see the
+// comment at the bottom of this function).
 void uploadPendingTelemetry(const String &deviceId, TelemetryCounts &counts, DeviceConfig &config)
 {
     if (WiFi.status() != WL_CONNECTED) {
@@ -1069,11 +1074,13 @@ void uploadPendingTelemetry(const String &deviceId, TelemetryCounts &counts, Dev
     }
 
     // List pending files first and sort them, rather than uploading in whatever order the walk
-    // happens to return. Paths are ".../yyyy/mm/dd/hh/yyyymmdd-hhmmss.json", so a lexical sort
-    // of the full path is still a chronological sort.
+    // happens to return. Paths are ".../yyyy/mm/dd/hh/yyyymmdd-hhmmss.json", so a lexical sort of
+    // the full path is still a chronological sort - descending (rbegin/rend) puts the most recent
+    // telemetry first, so the freshest data gets through even if the backlog is large enough to
+    // hit the batch limit below.
     std::vector<String> filePaths;
     listFilesRecursive(TELEMETRY_DIR, filePaths);
-    std::sort(filePaths.begin(), filePaths.end());
+    std::sort(filePaths.rbegin(), filePaths.rend());
 
     int filesRemoved = 0;   // uploaded, empty, or unparseable - anything gone from disk afterwards
     int filesUploaded = 0;
@@ -1158,7 +1165,22 @@ void uploadPendingTelemetry(const String &deviceId, TelemetryCounts &counts, Dev
             filesUploaded++;
             applyDeviceConfigFromApiResponse(responseBody, config);
             logf("Uploaded and deleted %s", filePath.c_str());
+        } else if (statusCode == 400) {
+            // The API rejected the request itself - retrying won't help, and leaving it in place
+            // would just block every older (now-behind-it, since most-recent-first) record from
+            // ever being tried. Move it aside and keep going rather than losing the rest of the
+            // backlog over one bad record.
+            String relativePath = filePath.substring(String(TELEMETRY_DIR).length());
+            String holdingPath = String(TELEMETRY_HOLDING_DIR) + relativePath;
+            ensureDirExists(parentDir(holdingPath));
+            SD.rename(filePath, holdingPath);
+            filesRemoved++;
+            logf("Rejected (400) - moved %s to %s for inspection", filePath.c_str(), holdingPath.c_str());
         } else {
+            // Anything else (timeout, connection failure, 5xx) is treated as transient - stop
+            // here and leave this file (and everything older, still unprocessed) queued to retry
+            // next cycle rather than risk discarding something that might actually go through
+            // later.
             logf("Failed to upload %s (status %d), will retry next time", filePath.c_str(), statusCode);
             break;
         }
