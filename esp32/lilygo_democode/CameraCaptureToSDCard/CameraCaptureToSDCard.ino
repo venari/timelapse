@@ -87,6 +87,8 @@
 #define DEFAULT_VFLIP                false
 #define DEFAULT_GEO_INTERVAL_S       (60 * 60)   // Check GPS position once an hour by default
 #define DEFAULT_AUTO_SYNC_PERIOD_S   (5 * 60)    // Force a WiFi resync/upload after this long, to correct clock drift
+#define DEFAULT_CAMERA_MODEL         "OV5640"    // Overridden below by on-the-fly PID detection - see setup()
+#define DEFAULT_CAMERA_WARMUP_FRAMES 2            // Frames grabbed+discarded after sensor init to let AEC/AWB converge - see setup()
 
 // utilities.h defines MODEM_GPS_ENABLE_GPIO/MODEM_GPS_ENABLE_LEVEL etc. per board, but not this -
 // matches LilyGo's own reference examples for the SIM7670G-S3 (e.g. LilyGo-Modem-Series/examples/Traccar).
@@ -114,6 +116,21 @@ struct DeviceConfig {
     bool hflip = DEFAULT_HFLIP;
     bool vflip = DEFAULT_VFLIP;
     uint32_t autoSyncPeriodS = DEFAULT_AUTO_SYNC_PERIOD_S;
+
+    // What sensor is actually fitted - "OV5640" or "OV2640". Set from on-the-fly PID detection
+    // every boot (see setup()), which is authoritative whenever it recognises the sensor; this
+    // field only actually gets *used* to pick a target resolution if detection comes back with
+    // something unrecognised (e.g. a driver update adding new PIDs). Still persisted to
+    // CONFIG_FILE / handed back to the API each boot so it shows up centrally without needing a
+    // fresh detection pass to find out what's on a given device.
+    String cameraModel = DEFAULT_CAMERA_MODEL;
+
+    // How many frames to grab and throw away right after sensor init before keeping one - the
+    // sensor's auto-exposure/auto-white-balance haven't converged yet on the first frame or two
+    // after power-on, which otherwise shows up as inconsistent exposure/colour cast between
+    // captures (each cycle powers the camera off - see setCameraPower(false) - so this isn't a
+    // one-time startup cost, it happens every single wake).
+    uint8_t cameraWarmupFrames = DEFAULT_CAMERA_WARMUP_FRAMES;
 
     // Locally-determined (see updateGeoLocationIfDue()) - never handed back by the API, unlike
     // everything above, so applyConfigFields() only ever touches these when reading CONFIG_FILE
@@ -476,12 +493,13 @@ void writeCounts(const TelemetryCounts &counts)
 }
 
 // Applies whichever of sleepDuringNight/daytimeStartsAtH/daytimeEndsAtH/cameraIntervalS/apiUrl/
-// hflip/vflip/autoSyncPeriodS/geoIntervalS/geoLat/geoLon/geoTimeRecorded are present in `fields`
-// on top of an existing DeviceConfig - used for both CONFIG_FILE (on disk) and the Device object
-// nested in an Image/Telemetry API response, so a partial payload only touches the fields it
-// mentions. In practice the geo* fields only ever come from CONFIG_FILE - the API has no way to
-// know a device's GPS position, so its Device object never carries them, and applyConfigFields()
-// just leaves the current in-memory values alone when called with API JSON.
+// hflip/vflip/autoSyncPeriodS/geoIntervalS/geoLat/geoLon/geoTimeRecorded/cameraModel/
+// cameraWarmupFrames are present in `fields` on top of an existing DeviceConfig - used for both
+// CONFIG_FILE (on disk) and the Device object nested in an Image/Telemetry API response, so a
+// partial payload only touches the fields it mentions. In practice the geo* fields and
+// cameraModel only ever come from CONFIG_FILE - the API has no way to know a device's GPS
+// position or what sensor is physically fitted, so its Device object never carries them, and
+// applyConfigFields() just leaves the current in-memory values alone when called with API JSON.
 void applyConfigFields(JsonVariantConst fields, DeviceConfig &config)
 {
     config.sleepDuringNight = fields["sleepDuringNight"] | config.sleepDuringNight;
@@ -494,6 +512,7 @@ void applyConfigFields(JsonVariantConst fields, DeviceConfig &config)
     config.geoIntervalS     = fields["geoIntervalS"] | config.geoIntervalS;
     config.geoLat           = fields["geoLat"] | config.geoLat;
     config.geoLon           = fields["geoLon"] | config.geoLon;
+    config.cameraWarmupFrames = fields["cameraWarmupFrames"] | config.cameraWarmupFrames;
     if (!fields["apiUrl"].isNull()) {
         String apiUrl = fields["apiUrl"].as<String>();
         if (apiUrl.length() > 0) {
@@ -502,6 +521,12 @@ void applyConfigFields(JsonVariantConst fields, DeviceConfig &config)
     }
     if (!fields["geoTimeRecorded"].isNull()) {
         config.geoTimeRecorded = fields["geoTimeRecorded"].as<String>();
+    }
+    if (!fields["cameraModel"].isNull()) {
+        String cameraModel = fields["cameraModel"].as<String>();
+        if (cameraModel.length() > 0) {
+            config.cameraModel = cameraModel;
+        }
     }
 }
 
@@ -517,7 +542,7 @@ DeviceConfig readDeviceConfig()
         return config;
     }
 
-    DynamicJsonDocument doc(512);
+    DynamicJsonDocument doc(640);
     DeserializationError err = deserializeJson(doc, file);
     file.close();
 
@@ -532,7 +557,7 @@ DeviceConfig readDeviceConfig()
 
 void writeDeviceConfig(const DeviceConfig &config)
 {
-    DynamicJsonDocument doc(512);
+    DynamicJsonDocument doc(640);
     doc["sleepDuringNight"] = config.sleepDuringNight;
     doc["daytimeStartsAtH"] = config.daytimeStartsAtH;
     doc["daytimeEndsAtH"] = config.daytimeEndsAtH;
@@ -545,6 +570,8 @@ void writeDeviceConfig(const DeviceConfig &config)
     doc["geoLat"] = config.geoLat;
     doc["geoLon"] = config.geoLon;
     doc["geoTimeRecorded"] = config.geoTimeRecorded;
+    doc["cameraModel"] = config.cameraModel;
+    doc["cameraWarmupFrames"] = config.cameraWarmupFrames;
 
     File file = SD.open(CONFIG_FILE, "w");
     if (file) {
@@ -586,7 +613,8 @@ void applyDeviceConfigFromApiResponse(const String &responseBody, DeviceConfig &
         newConfig.hflip != config.hflip ||
         newConfig.vflip != config.vflip ||
         newConfig.autoSyncPeriodS != config.autoSyncPeriodS ||
-        newConfig.geoIntervalS !=config.geoIntervalS
+        newConfig.geoIntervalS !=config.geoIntervalS ||
+        newConfig.cameraWarmupFrames != config.cameraWarmupFrames
 ) {
         config = newConfig;
         writeDeviceConfig(config);
@@ -1731,7 +1759,11 @@ void setup()
     config.pin_pwdn = CAMERA_PWDN_PIN;
     config.pin_reset = CAMERA_RESET_PIN;
     config.xclk_freq_hz = 20000000;
-    config.frame_size = FRAMESIZE_HD;       //1280x720
+    // Init at a modest size every sensor supports - the real target (QSXGA/UXGA, picked below
+    // once the sensor's actually been identified) is applied via set_framesize() afterwards.
+    // Requesting the OV5640's full QSXGA here before we know it's actually an OV5640 would just
+    // fail outright on an OV2640.
+    config.frame_size = FRAMESIZE_SVGA;    //800x600
     config.pixel_format = PIXFORMAT_JPEG;  // JPEG formart
     config.grab_mode = CAMERA_GRAB_WHEN_EMPTY;
     config.fb_location = CAMERA_FB_IN_PSRAM;
@@ -1753,12 +1785,68 @@ void setup()
         s->set_saturation(s, -2);  // lower the saturation
     }
 
+    // Identify the sensor from its PID rather than trusting deviceConfig.cameraModel blindly -
+    // requesting a resolution the fitted sensor doesn't support (e.g. QSXGA on an OV2640) just
+    // fails, so detection has to drive the actual behaviour. deviceConfig.cameraModel is only
+    // consulted as a fallback for a PID this firmware doesn't recognise, and is otherwise kept
+    // in sync with what's actually detected (see writeDeviceConfig call below) purely so it's
+    // visible in CONFIG_FILE without needing a fresh detection pass.
+    String detectedModel;
+    framesize_t targetFrameSize;
+    if (s->id.PID == OV5640_PID) {
+        detectedModel = "OV5640";
+        targetFrameSize = FRAMESIZE_QSXGA;   // 2560x1920
+    } else if (s->id.PID == OV2640_PID) {
+        detectedModel = "OV2640";
+        targetFrameSize = FRAMESIZE_UXGA;    // 1600x1200 (~2MP) - OV2640's native max
+    } else {
+        logf("Unrecognised camera PID 0x%04x - falling back to configured cameraModel (%s)", s->id.PID, deviceConfig.cameraModel.c_str());
+        detectedModel = deviceConfig.cameraModel;
+        targetFrameSize = (deviceConfig.cameraModel == "OV2640") ? FRAMESIZE_UXGA : FRAMESIZE_QSXGA;
+    }
+    if (detectedModel != deviceConfig.cameraModel) {
+        logf("Camera model detected as %s (config had %s) - updating " CONFIG_FILE, detectedModel.c_str(), deviceConfig.cameraModel.c_str());
+        deviceConfig.cameraModel = detectedModel;
+        writeDeviceConfig(deviceConfig);
+    }
+
+    if (s->set_framesize(s, targetFrameSize) != 0) {
+        logLine("Failed to set target frame size - continuing at init resolution");
+    }
+
+    // AEC/AWB tuning - explicit rather than relying on driver defaults, which have drifted
+    // between esp32-camera versions and differ between the OV5640/OV2640 drivers.
+    s->set_whitebal(s, 1);        // auto white balance on
+    s->set_awb_gain(s, 1);        // let AWB adjust the R/B gains, not just report a mode
+    s->set_exposure_ctrl(s, 1);   // auto exposure on
+    s->set_aec2(s, 1);            // DSP-based AEC - noticeably steadier than the sensor's own AEC
+    s->set_ae_level(s, 0);        // neutral target exposure, no bias
+    s->set_gain_ctrl(s, 1);       // auto gain on
+
     // Mounting-orientation correction, set centrally on the server (see DeviceConfig /
     // applyConfigFields) - lets a camera be physically mounted upside down or mirrored without
     // a firmware change. Applied after the OV3660 fixup above, so it's the final word on
     // orientation regardless of sensor variant.
     s->set_vflip(s, deviceConfig.vflip ? 1 : 0);
     s->set_hmirror(s, deviceConfig.hflip ? 1 : 0);
+
+    // Changing framesize restarts the sensor's timing/PLL, and AEC/AWB start converging again
+    // from scratch on top of that - give it a moment before grabbing frames at all.
+    delay(150);
+
+    // The first frame(s) out of a freshly (re)started sensor are usually still mid-convergence on
+    // exposure/white balance - especially here, since the camera gets fully powered off between
+    // every single wake (see setCameraPower(false) below), so this settling happens on every
+    // capture, not just once at first boot. Grab and discard a few before keeping one, so the
+    // saved image reflects the sensor's settled AEC/AWB state rather than whatever it started at.
+    // Tunable via deviceConfig.cameraWarmupFrames (config.json / API) without a reflash.
+    for (uint8_t i = 0; i < deviceConfig.cameraWarmupFrames; i++) {
+        camera_fb_t *warmupFrame = esp_camera_fb_get();
+        if (warmupFrame) {
+            esp_camera_fb_return(warmupFrame);
+        }
+        delay(100);
+    }
 
     DatedPath datedPath = getDatedPath();
 
