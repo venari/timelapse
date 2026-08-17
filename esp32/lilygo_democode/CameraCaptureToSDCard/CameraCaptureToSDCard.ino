@@ -56,6 +56,11 @@
 
 #define LAST_SYNC_FILE           "/last_sync.txt"
 
+// Presence (contents don't matter) means "sync/upload again next boot, regardless of
+// autoSyncPeriodS" - see the "5x expected" checks in uploadPendingTelemetry()/
+// uploadPendingImages() and how this gets set/cleared in setup().
+#define FORCE_SYNC_FILE          "/force_sync.flag"
+
 #define TELEMETRY_DIR            "/telemetry/pending"   // Uploaded telemetry is deleted, not archived - see uploadPendingTelemetry()
 #define TELEMETRY_HOLDING_DIR    "/telemetry/holding"   // Records the API rejected outright (e.g. 400) land here instead - kept for inspection, never retried
 
@@ -397,6 +402,35 @@ void writeLastSyncTime(time_t t)
         file.close();
     } else {
         logLine("Failed to write last sync time!");
+    }
+}
+
+// Deliberately a plain file rather than an RTC_DATA_ATTR flag (like bootCount) - RTC memory only
+// survives deep sleep, not a real power loss, and a device that's lost power while badly
+// backlogged is exactly the case this needs to keep working through. A plain timestamp-based
+// "just don't update lastSyncTime" approach was considered instead of this, but rejected: it'd
+// depend on lastSyncTime staying stale relative to `now`, which a mid-cycle NTP correction (see
+// connectWiFiAndSyncTime()) could quietly undermine if it ever jumps the clock backward. An
+// explicit flag doesn't care what the clock does at all.
+bool readForceSyncFlag()
+{
+    return SD.exists(FORCE_SYNC_FILE);
+}
+
+void setForceSyncFlag()
+{
+    File file = SD.open(FORCE_SYNC_FILE, "w");
+    if (file) {
+        file.close();
+    } else {
+        logLine("Failed to write force sync flag!");
+    }
+}
+
+void clearForceSyncFlag()
+{
+    if (SD.exists(FORCE_SYNC_FILE)) {
+        SD.remove(FORCE_SYNC_FILE);
     }
 }
 
@@ -1056,6 +1090,22 @@ int postMultipartForm(const String &apiUrl, const String &endpoint, const std::v
     return statusCode;
 }
 
+// How many images (and, given three telemetry snapshots get written per capture cycle - see
+// setup() - three times as many telemetry records) we'd expect to have piled up between one
+// WiFi sync and the next, going by the configured capture/sync cadence alone. Used to spot a
+// backlog that's grown far larger than that would ever produce (e.g. after being offline for a
+// while) - see the "5x expected" checks in uploadPendingTelemetry()/uploadPendingImages() - so a
+// single sync doesn't try to drain an enormous queue in one go, and instead keeps at it every
+// cycle (see the didConnectWiFi handling in setup()) until it's caught up.
+uint32_t expectedImagesPerSync(const DeviceConfig &config)
+{
+    if (config.cameraIntervalS == 0) {
+        return 1;
+    }
+    uint32_t expected = config.autoSyncPeriodS / config.cameraIntervalS;
+    return expected > 0 ? expected : 1;
+}
+
 // Uploads every telemetry file still sitting in TELEMETRY_DIR (including ones saved during
 // earlier offline cycles), most recent first, deleting each one once the API acknowledges it
 // with 200 OK - the API already has the authoritative copy, so there's no reason to keep a second
@@ -1067,10 +1117,14 @@ int postMultipartForm(const String &apiUrl, const String &endpoint, const std::v
 // and everything older still queued to retry next time. Also refreshes deviceConfig from the
 // response, and reconciles counts.pendingTelemetry against what's actually on disk (see the
 // comment at the bottom of this function).
-void uploadPendingTelemetry(const String &deviceId, TelemetryCounts &counts, DeviceConfig &config)
+//
+// Returns true if it had to break off early because far more than expectedImagesPerSync()*3
+// telemetry records have already gone out this cycle - see the didConnectWiFi handling in
+// setup(), which uses this to keep reconnecting every cycle until the backlog is back to normal.
+bool uploadPendingTelemetry(const String &deviceId, TelemetryCounts &counts, DeviceConfig &config)
 {
     if (WiFi.status() != WL_CONNECTED) {
-        return;
+        return false;
     }
 
     // List pending files first and sort them, rather than uploading in whatever order the walk
@@ -1082,12 +1136,24 @@ void uploadPendingTelemetry(const String &deviceId, TelemetryCounts &counts, Dev
     listFilesRecursive(TELEMETRY_DIR, filePaths);
     std::sort(filePaths.rbegin(), filePaths.rend());
 
+    // *3 since three telemetry snapshots get written per capture cycle (see setup()).
+    uint32_t expectedTelemetry = expectedImagesPerSync(config) * 3;
+    bool backlogExcessive = false;
+
     int filesRemoved = 0;   // uploaded, empty, or unparseable - anything gone from disk afterwards
     int filesUploaded = 0;
     for (const String &filePath : filePaths) {
         // Process in batches of 100, same as the Pi's uploadPendingTelemetry()
         if (filesUploaded >= 100) {
             logLine("Hit upload batch limit - remaining telemetry will upload next cycle");
+            break;
+        }
+
+        if ((uint32_t)filesUploaded >= expectedTelemetry * 5) {
+            logf("Uploaded %d telemetry records this cycle - 5x the ~%u expected per sync - "
+                 "stopping early, will keep syncing every cycle until the backlog is back to normal",
+                 filesUploaded, expectedTelemetry);
+            backlogExcessive = true;
             break;
         }
 
@@ -1110,6 +1176,17 @@ void uploadPendingTelemetry(const String &deviceId, TelemetryCounts &counts, Dev
 
         if (err) {
             logf("Failed to parse %s: %s - discarding", filePath.c_str(), err.c_str());
+            SD.remove(filePath);
+            filesRemoved++;
+            continue;
+        }
+
+        // getISO8601Timestamp() (see buildTelemetryJson()) writes "unknown" here if the clock
+        // wasn't synced yet at capture time - the API rejects that outright, so there's no point
+        // ever attempting this upload. Discard it now rather than let it fail (and block every
+        // older record behind it, since uploads run most-recent-first) every single cycle.
+        if (doc["timestamp"].as<String>() == "unknown") {
+            logLine("Unknown capture time - deleting " + filePath);
             SD.remove(filePath);
             filesRemoved++;
             continue;
@@ -1193,6 +1270,7 @@ void uploadPendingTelemetry(const String &deviceId, TelemetryCounts &counts, Dev
     // authoritative scan of what's really pending, so this is the natural place to correct that
     // drift, without needing a second scan just to do it.
     counts.pendingTelemetry = (int)filePaths.size() - filesRemoved;
+    return backlogExcessive;
 }
 
 // Uploads every image still sitting in CAMERA_DIR, oldest first, over HTTP to the same API
@@ -1202,15 +1280,21 @@ void uploadPendingTelemetry(const String &deviceId, TelemetryCounts &counts, Dev
 // authoritative copy; stops at the first failure so a flaky connection doesn't reorder the
 // backlog (same approach as uploadPendingTelemetry(), including reconciling counts.pendingImages
 // against what's actually on disk - see the comment at the bottom of this function).
-void uploadPendingImages(const String &deviceId, TelemetryCounts &counts, DeviceConfig &config)
+//
+// Returns true if it had to break off early because far more than expectedImagesPerSync()*5
+// images have already gone out this cycle - see the didConnectWiFi handling in setup().
+bool uploadPendingImages(const String &deviceId, TelemetryCounts &counts, DeviceConfig &config)
 {
     if (WiFi.status() != WL_CONNECTED) {
-        return;
+        return false;
     }
 
     std::vector<String> filePaths;
     listFilesRecursive(CAMERA_DIR, filePaths);
     std::sort(filePaths.rbegin(), filePaths.rend());
+
+    uint32_t expectedImages = expectedImagesPerSync(config);
+    bool backlogExcessive = false;
 
     int filesRemoved = 0;   // uploaded or empty - anything gone from disk afterwards
     int filesUploaded = 0;
@@ -1218,6 +1302,14 @@ void uploadPendingImages(const String &deviceId, TelemetryCounts &counts, Device
         // Process in batches of 10, same as the Pi's uploadPendingPhotos()
         if (filesUploaded >= 10) {
             logLine("Hit upload batch limit - remaining images will upload next cycle");
+            break;
+        }
+
+        if ((uint32_t)filesUploaded >= expectedImages * 5) {
+            logf("Uploaded %d images this cycle - 5x the ~%u expected per sync - stopping early, "
+                 "will keep syncing every cycle until the backlog is back to normal",
+                 filesUploaded, expectedImages);
+            backlogExcessive = true;
             break;
         }
 
@@ -1235,6 +1327,19 @@ void uploadPendingImages(const String &deviceId, TelemetryCounts &counts, Device
         }
 
         String timestamp = parseTimestampFromPath(filePath);
+        if (timestamp == "unknown") {
+            // The clock wasn't synced yet when this was captured (see getDatedPath()'s
+            // "unsynced/boot-N" fallback naming, which parseTimestampFromPath() can't recover a
+            // real timestamp from) - the API rejects an "unknown" Timestamp outright, so there's
+            // no point ever attempting this upload. Discard it now rather than let it fail (and
+            // block every older image behind it, since uploads run most-recent-first) every
+            // single cycle.
+            logLine("Unknown capture time - deleting " + filePath);
+            file.close();
+            SD.remove(filePath);
+            filesRemoved++;
+            continue;
+        }
 
         std::vector<HttpFormField> fields = {
             {"SerialNumber", deviceId},
@@ -1264,6 +1369,7 @@ void uploadPendingImages(const String &deviceId, TelemetryCounts &counts, Device
     // See the matching comment in uploadPendingTelemetry() - reconciles counts.pendingImages
     // against the authoritative scan above rather than trusting the cheap ++/-- bookkeeping.
     counts.pendingImages = (int)filePaths.size() - filesRemoved;
+    return backlogExcessive;
 }
 
 // Decides how long to deep-sleep for, in seconds. Normally just config.cameraIntervalS, but
@@ -1456,19 +1562,23 @@ void setup()
 
     // Deep sleep keeps the RTC running, so the clock usually survives between wake-ups.
     // Only reconnect to WiFi if the clock looks like it was reset by a power interruption
-    // (i.e. it's now earlier than the last time we successfully synced), or if it's been
-    // longer than deviceConfig.autoSyncPeriodS since the last sync, to correct clock drift. This
-    // is also the only time telemetry/images actually get uploaded (see uploadPendingTelemetry/
-    // uploadPendingImages's WiFi.status() check) - so with cameraIntervalS shorter than
-    // autoSyncPeriodS, several captures can build up between uploads.
+    // (i.e. it's now earlier than the last time we successfully synced), if it's been longer
+    // than deviceConfig.autoSyncPeriodS since the last sync (to correct clock drift), or if a
+    // previous cycle set FORCE_SYNC_FILE because the backlog was too big to clear in one sync
+    // (see the "5x expected" checks in uploadPendingTelemetry()/uploadPendingImages(), and how
+    // the flag gets set/cleared further down). This is also the only time telemetry/images
+    // actually get uploaded (see uploadPendingTelemetry/uploadPendingImages's WiFi.status()
+    // check) - so with cameraIntervalS shorter than autoSyncPeriodS, several captures can build
+    // up between uploads.
     time_t lastSyncTime = readLastSyncTime();
     time_t now = time(nullptr);
-    bool needsSync = (lastSyncTime == 0) || (now < lastSyncTime) || (now - lastSyncTime >= deviceConfig.autoSyncPeriodS);
+    bool needsSync = (lastSyncTime == 0) || (now < lastSyncTime) || (now - lastSyncTime >= deviceConfig.autoSyncPeriodS)
+                      || readForceSyncFlag();
+    bool didConnectWiFi = false;
     if (needsSync) {
         logLine("Clock needs sync, connecting to WiFi...");
-        if (connectWiFiAndSyncTime()) {
-            writeLastSyncTime(time(nullptr));
-        } else {
+        didConnectWiFi = connectWiFiAndSyncTime();
+        if (!didConnectWiFi) {
             logLine("Continuing without synced time, filenames will use boot count!");
         }
     } else {
@@ -1570,7 +1680,7 @@ void setup()
                                                (uint32_t)(millis() / 1000),
                                                deviceConfig.geoLat, deviceConfig.geoLon, deviceConfig.geoTimeRecorded, counts);
     writeTelemetryFile(datedPath, telemetryJson);
-    uploadPendingTelemetry(deviceId, counts, deviceConfig);
+    bool telemetryBacklogExcessive = uploadPendingTelemetry(deviceId, counts, deviceConfig);
 
     // A second telemetry snapshot, captured after uploading telemetry (and any GPS fix) have finished -
     // comparing its uptimeSeconds/timestamp against the first snapshot's (written before any of
@@ -1586,7 +1696,7 @@ void setup()
 
     writeTelemetryFile(secondDatedPath, telemetryJson2);
 
-    uploadPendingImages(deviceId, counts, deviceConfig);
+    bool imagesBacklogExcessive = uploadPendingImages(deviceId, counts, deviceConfig);
 
     // A third telemetry snapshot, captured after imagery uploads have finished -
     DatedPath thirdDatedPath = getDatedPath();
@@ -1595,6 +1705,20 @@ void setup()
                                                 (uint32_t)(millis() / 1000),
                                                 deviceConfig.geoLat, deviceConfig.geoLon, deviceConfig.geoTimeRecorded, counts);
     writeTelemetryFile(thirdDatedPath, telemetryJson3);
+
+    // See the comment by needsSync above. FORCE_SYNC_FILE set here means next boot resyncs
+    // regardless of autoSyncPeriodS; cleared once a cycle finally gets through without either
+    // upload reporting an excessive backlog, whether or not it was actually set (harmless either
+    // way - see clearForceSyncFlag()).
+    if (didConnectWiFi) {
+        if (telemetryBacklogExcessive || imagesBacklogExcessive) {
+            setForceSyncFlag();
+            logLine("Backlog well beyond what's expected per sync - flagged to sync again next boot regardless of autoSyncPeriodS");
+        } else {
+            clearForceSyncFlag();
+            writeLastSyncTime(time(nullptr));
+        }
+    }
 
     writeCounts(counts);
 }
