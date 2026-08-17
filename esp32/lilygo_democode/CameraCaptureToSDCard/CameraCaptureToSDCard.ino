@@ -81,7 +81,7 @@
 #define DEFAULT_SLEEP_DURING_NIGHT   false
 #define DEFAULT_DAYTIME_STARTS_AT_H  7
 #define DEFAULT_DAYTIME_ENDS_AT_H    17
-#define DEFAULT_CAMERA_INTERVAL_S    300
+#define DEFAULT_CAMERA_INTERVAL_S    60
 #define DEFAULT_API_URL              "https://timelapse-dev.azurewebsites.net/api/"
 #define DEFAULT_HFLIP                false
 #define DEFAULT_VFLIP                false
@@ -189,6 +189,20 @@ struct ParsedUrl {
 struct HttpFormField {
     String name;
     String value;
+};
+
+// Holds a connection to the API host that can be reused across several postMultipartForm() calls
+// within one upload batch (see uploadPendingTelemetry()/uploadPendingImages()) instead of paying
+// for a fresh TCP+TLS handshake - several seconds each on this hardware - on every single record.
+// One instance is scoped to a single upload batch (a local in each of those functions), not kept
+// across wake cycles.
+struct ApiConnection {
+    WiFiClientSecure secureClient;
+    WiFiClient plainClient;
+    String host;
+    uint16_t port = 0;
+    bool https = false;
+    bool isOpen = false;
 };
 
 // Guards the file-write half of logLine()/logf() - false until setupSD() confirms the card is
@@ -951,13 +965,57 @@ String fieldsToJson(const std::vector<HttpFormField> &fields)
     return json;
 }
 
+// Returns a Client& already connected to api.host:api.port - reusing conn's existing connection
+// if it's still alive and already pointed at the same host/port/scheme (the common case within
+// one upload batch), otherwise (re)connecting. Returns nullptr if a fresh connect() fails.
+Client *connectApiClient(ApiConnection &conn, const ParsedUrl &api)
+{
+    Client &client = api.https ? (Client &)conn.secureClient : (Client &)conn.plainClient;
+
+    if (conn.isOpen && conn.host == api.host && conn.port == api.port && conn.https == api.https
+        && client.connected()) {
+        return &client;   // reuse - no new handshake needed
+    }
+
+    if (conn.isOpen) {
+        // Either talking to a different host/port/scheme than last time, or the old connection
+        // has died - drop it before opening a new one. Stopping whichever of the two wasn't the
+        // one actually open is a harmless no-op.
+        conn.secureClient.stop();
+        conn.plainClient.stop();
+        conn.isOpen = false;
+    }
+
+    if (api.https) {
+        conn.secureClient.setInsecure();   // No cert store on-device - trust whatever's presented
+    }
+    if (!client.connect(api.host.c_str(), api.port)) {
+        return nullptr;
+    }
+
+    conn.host = api.host;
+    conn.port = api.port;
+    conn.https = api.https;
+    conn.isOpen = true;
+    return &client;
+}
+
 // Performs a multipart/form-data POST to <apiUrl><endpoint>, with the given form fields plus
 // an optional file streamed from SD (pass file=nullptr to omit). Returns the HTTP status code
 // (0 if the connection itself failed) and, via responseBody, whatever the server sent back -
 // the Image/Telemetry endpoints return the saved row plus its related Device, which is how
 // config changes get back to the device (see applyDeviceConfigFromApiResponse) without a
 // separate polling mechanism.
-int postMultipartForm(const String &apiUrl, const String &endpoint, const std::vector<HttpFormField> &fields,
+//
+// Reuses `conn` across calls (see ApiConnection/connectApiClient()) rather than opening a fresh
+// TCP+TLS connection every time - a full handshake is several seconds on this hardware, and with
+// a backlog of hundreds of records that adds up to sync sessions long enough to be exposed to
+// whatever's causing the connection drops seen in the field. Requesting keep-alive only works if
+// we know exactly where the response body ends without relying on the connection closing, so this
+// tracks Content-Length (or Transfer-Encoding: chunked, already framed unambiguously) - if a
+// response has neither, or the server explicitly asks to close, or the body read comes up short,
+// the connection is closed here rather than reused, and the next call just reconnects.
+int postMultipartForm(ApiConnection &conn, const String &apiUrl, const String &endpoint, const std::vector<HttpFormField> &fields,
                        const String &fileFieldName, const String &fileName, File *file, String &responseBody)
 {
     ParsedUrl api = parseApiUrl(apiUrl);
@@ -987,25 +1045,20 @@ int postMultipartForm(const String &apiUrl, const String &endpoint, const std::v
 
     size_t contentLength = startPart.length() + fileLength + endPart.length();
 
-    WiFiClientSecure secureClient;
-    WiFiClient plainClient;
-    if (api.https) {
-        secureClient.setInsecure();   // No cert store on-device - trust whatever's presented
-    }
-    Client &client = api.https ? (Client &)secureClient : (Client &)plainClient;
-
     logf("POST %s://%s:%u%s", api.https ? "https" : "http", api.host.c_str(), api.port, path.c_str());
 
-    if (!client.connect(api.host.c_str(), api.port)) {
+    Client *clientPtr = connectApiClient(conn, api);
+    if (clientPtr == nullptr) {
         logf("Connection to %s:%u failed", api.host.c_str(), api.port);
         return 0;
     }
+    Client &client = *clientPtr;
 
     client.printf("POST %s HTTP/1.1\r\n", path.c_str());
     client.printf("Host: %s\r\n", api.host.c_str());
     client.printf("Content-Type: multipart/form-data; boundary=%s\r\n", boundary.c_str());
     client.printf("Content-Length: %u\r\n", (unsigned)contentLength);
-    client.print("Connection: close\r\n\r\n");
+    client.print("Connection: keep-alive\r\n\r\n");
     client.print(startPart);
 
     if (file != nullptr) {
@@ -1020,6 +1073,8 @@ int postMultipartForm(const String &apiUrl, const String &endpoint, const std::v
     uint32_t start = millis();
     int statusCode = 0;
     bool chunked = false;
+    long responseContentLength = -1;      // -1 means "not present in the headers"
+    bool serverWantsClose = false;
 
     // Status line + headers
     while ((client.connected() || client.available()) && millis() - start < 15000) {
@@ -1030,21 +1085,31 @@ int postMultipartForm(const String &apiUrl, const String &endpoint, const std::v
         if (line.startsWith("HTTP/1.1")) {
             statusCode = line.substring(9, 12).toInt();
         }
-        // Header names are case-insensitive (RFC 7230) - Kestrel/Azure sends this rather than
-        // a Content-Length whenever it doesn't know the body size upfront, which is the normal
-        // case for our controller responses.
+        // Header names are case-insensitive (RFC 7230) - Kestrel/Azure sends Transfer-Encoding
+        // rather than Content-Length whenever it doesn't know the body size upfront, which is the
+        // normal case for our controller responses; a fixed-size response (or an error page from
+        // something in front of Kestrel) is more likely to carry a plain Content-Length instead.
         String lowerLine = line;
         lowerLine.toLowerCase();
         if (lowerLine.startsWith("transfer-encoding:") && lowerLine.indexOf("chunked") >= 0) {
             chunked = true;
+        }
+        if (lowerLine.startsWith("content-length:")) {
+            responseContentLength = lowerLine.substring(15).toInt();
+        }
+        if (lowerLine.startsWith("connection:") && lowerLine.indexOf("close") >= 0) {
+            serverWantsClose = true;
         }
         if (line == "\r") {
             break;   // blank line - end of headers, body follows
         }
     }
 
-    // Body
+    // Body. Keeping the connection open afterward (see the end of this function) is only safe if
+    // we know exactly where the body ends without relying on the connection closing to tell us -
+    // chunked framing already carries that itself; otherwise Content-Length has to be there.
     responseBody = "";
+    bool sawCompleteBody = true;
     if (chunked) {
         // Each chunk is "<hex size>\r\n<size bytes of data>\r\n", repeated until a zero-size
         // chunk terminates the body (optionally followed by trailer headers, then a final
@@ -1052,6 +1117,7 @@ int postMultipartForm(const String &apiUrl, const String &endpoint, const std::v
         // ends up embedded in responseBody and breaks JSON parsing downstream.
         while (millis() - start < 15000) {
             if (!client.available() && !client.connected()) {
+                sawCompleteBody = false;   // connection died mid-body
                 break;
             }
             if (!client.available()) {
@@ -1078,15 +1144,38 @@ int postMultipartForm(const String &apiUrl, const String &endpoint, const std::v
             }
             client.readStringUntil('\n');   // consume the CRLF that follows each chunk's data
         }
+    } else if (responseContentLength >= 0) {
+        long readSoFar = 0;
+        while (readSoFar < responseContentLength && millis() - start < 15000) {
+            if (!client.available()) {
+                if (!client.connected()) {
+                    break;   // connection died mid-body
+                }
+                continue;
+            }
+            responseBody += (char)client.read();
+            readSoFar++;
+        }
+        sawCompleteBody = (readSoFar >= responseContentLength);
     } else {
+        // No framing info at all - the only way to know the body's finished is the connection
+        // closing, which rules out reusing it afterward regardless of what the server asked for.
         while ((client.connected() || client.available()) && millis() - start < 15000) {
             if (client.available()) {
                 responseBody += (char)client.read();
             }
         }
+        serverWantsClose = true;
     }
 
-    client.stop();
+    // Leave the connection open for the next call to reuse unless something says it shouldn't be:
+    // the server asked to close, the body didn't frame itself unambiguously, we came up short
+    // reading it, or we never even got a status line at all (statusCode == 0 - e.g. the request
+    // timed out with no response, so the connection is left in an unknown state either way).
+    if (serverWantsClose || !sawCompleteBody || statusCode == 0) {
+        client.stop();
+        conn.isOpen = false;
+    }
     return statusCode;
 }
 
@@ -1139,6 +1228,10 @@ bool uploadPendingTelemetry(const String &deviceId, TelemetryCounts &counts, Dev
     // *3 since three telemetry snapshots get written per capture cycle (see setup()).
     uint32_t expectedTelemetry = expectedImagesPerSync(config) * 3;
     bool backlogExcessive = false;
+
+    // Reused across every request below (see ApiConnection/connectApiClient()) rather than
+    // opening a fresh TCP+TLS connection per record.
+    ApiConnection conn;
 
     int filesRemoved = 0;   // uploaded, empty, or unparseable - anything gone from disk afterwards
     int filesUploaded = 0;
@@ -1232,7 +1325,7 @@ bool uploadPendingTelemetry(const String &deviceId, TelemetryCounts &counts, Dev
         logf("Posting Telemetry: %s", fieldsToJson(fields).c_str());
 
         String responseBody;
-        int statusCode = postMultipartForm(config.apiUrl, "Telemetry", fields, "", "", nullptr, responseBody);
+        int statusCode = postMultipartForm(conn, config.apiUrl, "Telemetry", fields, "", "", nullptr, responseBody);
 
         logf("Telemetry response (status %d): %s", statusCode, responseBody.c_str());
 
@@ -1270,6 +1363,8 @@ bool uploadPendingTelemetry(const String &deviceId, TelemetryCounts &counts, Dev
     // authoritative scan of what's really pending, so this is the natural place to correct that
     // drift, without needing a second scan just to do it.
     counts.pendingTelemetry = (int)filePaths.size() - filesRemoved;
+    conn.secureClient.stop();
+    conn.plainClient.stop();
     return backlogExcessive;
 }
 
@@ -1295,6 +1390,10 @@ bool uploadPendingImages(const String &deviceId, TelemetryCounts &counts, Device
 
     uint32_t expectedImages = expectedImagesPerSync(config);
     bool backlogExcessive = false;
+
+    // Reused across every request below (see ApiConnection/connectApiClient()) rather than
+    // opening a fresh TCP+TLS connection per image.
+    ApiConnection conn;
 
     int filesRemoved = 0;   // uploaded or empty - anything gone from disk afterwards
     int filesUploaded = 0;
@@ -1349,7 +1448,7 @@ bool uploadPendingImages(const String &deviceId, TelemetryCounts &counts, Device
         logf("Posting Image: %s", fieldsToJson(fields).c_str());
 
         String responseBody;
-        int statusCode = postMultipartForm(config.apiUrl, "Image", fields, "File", fileBaseName(filePath), &file, responseBody);
+        int statusCode = postMultipartForm(conn, config.apiUrl, "Image", fields, "File", fileBaseName(filePath), &file, responseBody);
         file.close();
 
         logf("Image response (status %d): %s", statusCode, responseBody.c_str());
@@ -1369,6 +1468,8 @@ bool uploadPendingImages(const String &deviceId, TelemetryCounts &counts, Device
     // See the matching comment in uploadPendingTelemetry() - reconciles counts.pendingImages
     // against the authoritative scan above rather than trusting the cheap ++/-- bookkeeping.
     counts.pendingImages = (int)filePaths.size() - filesRemoved;
+    conn.secureClient.stop();
+    conn.plainClient.stop();
     return backlogExcessive;
 }
 
