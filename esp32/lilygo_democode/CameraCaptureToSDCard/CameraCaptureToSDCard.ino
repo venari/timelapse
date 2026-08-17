@@ -1759,11 +1759,13 @@ void setup()
     config.pin_pwdn = CAMERA_PWDN_PIN;
     config.pin_reset = CAMERA_RESET_PIN;
     config.xclk_freq_hz = 20000000;
-    // Init at a modest size every sensor supports - the real target (QSXGA/UXGA, picked below
-    // once the sensor's actually been identified) is applied via set_framesize() afterwards.
-    // Requesting the OV5640's full QSXGA here before we know it's actually an OV5640 would just
-    // fail outright on an OV2640.
-    config.frame_size = FRAMESIZE_SVGA;    //800x600
+    // Highest we ever want (OV5640's max). esp_camera_init() probes the sensor internally and
+    // automatically clamps this down to whatever that sensor actually supports (e.g. OV2640 ->
+    // UXGA, its native ~2MP max) *before* sizing the DMA receive buffer for it - so the buffer
+    // and the resolution always agree. Do NOT try to raise the resolution after init via
+    // sensor->set_framesize() instead - the DMA buffer stays sized for whatever was requested
+    // here, so upsizing afterwards overflows it (cam_hal: "FB-OVF", then capture failures).
+    config.frame_size = FRAMESIZE_QSXGA;   // 2560x1920
     config.pixel_format = PIXFORMAT_JPEG;  // JPEG formart
     config.grab_mode = CAMERA_GRAB_WHEN_EMPTY;
     config.fb_location = CAMERA_FB_IN_PSRAM;
@@ -1785,33 +1787,24 @@ void setup()
         s->set_saturation(s, -2);  // lower the saturation
     }
 
-    // Identify the sensor from its PID rather than trusting deviceConfig.cameraModel blindly -
-    // requesting a resolution the fitted sensor doesn't support (e.g. QSXGA on an OV2640) just
-    // fails, so detection has to drive the actual behaviour. deviceConfig.cameraModel is only
-    // consulted as a fallback for a PID this firmware doesn't recognise, and is otherwise kept
-    // in sync with what's actually detected (see writeDeviceConfig call below) purely so it's
-    // visible in CONFIG_FILE without needing a fresh detection pass.
+    // Identify the sensor from its PID purely to record it - actual resolution was already
+    // decided by esp_camera_init()'s own clamping (see config.frame_size above), nothing further
+    // to do about that here. deviceConfig.cameraModel is only used as a fallback label for a PID
+    // this firmware doesn't recognise, and is otherwise kept in sync with what's actually
+    // detected so it's visible in CONFIG_FILE without needing a fresh detection pass.
     String detectedModel;
-    framesize_t targetFrameSize;
     if (s->id.PID == OV5640_PID) {
         detectedModel = "OV5640";
-        targetFrameSize = FRAMESIZE_QSXGA;   // 2560x1920
     } else if (s->id.PID == OV2640_PID) {
         detectedModel = "OV2640";
-        targetFrameSize = FRAMESIZE_UXGA;    // 1600x1200 (~2MP) - OV2640's native max
     } else {
-        logf("Unrecognised camera PID 0x%04x - falling back to configured cameraModel (%s)", s->id.PID, deviceConfig.cameraModel.c_str());
+        logf("Unrecognised camera PID 0x%04x - keeping configured cameraModel (%s)", s->id.PID, deviceConfig.cameraModel.c_str());
         detectedModel = deviceConfig.cameraModel;
-        targetFrameSize = (deviceConfig.cameraModel == "OV2640") ? FRAMESIZE_UXGA : FRAMESIZE_QSXGA;
     }
     if (detectedModel != deviceConfig.cameraModel) {
         logf("Camera model detected as %s (config had %s) - updating " CONFIG_FILE, detectedModel.c_str(), deviceConfig.cameraModel.c_str());
         deviceConfig.cameraModel = detectedModel;
         writeDeviceConfig(deviceConfig);
-    }
-
-    if (s->set_framesize(s, targetFrameSize) != 0) {
-        logLine("Failed to set target frame size - continuing at init resolution");
     }
 
     // AEC/AWB tuning - explicit rather than relying on driver defaults, which have drifted
@@ -1829,10 +1822,6 @@ void setup()
     // orientation regardless of sensor variant.
     s->set_vflip(s, deviceConfig.vflip ? 1 : 0);
     s->set_hmirror(s, deviceConfig.hflip ? 1 : 0);
-
-    // Changing framesize restarts the sensor's timing/PLL, and AEC/AWB start converging again
-    // from scratch on top of that - give it a moment before grabbing frames at all.
-    delay(150);
 
     // The first frame(s) out of a freshly (re)started sensor are usually still mid-convergence on
     // exposure/white balance - especially here, since the camera gets fully powered off between
