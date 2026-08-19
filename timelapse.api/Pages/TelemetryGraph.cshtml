@@ -101,6 +101,8 @@
 
         var lastBatteryPercent = data[0].batteryPercent;
         var lastTimestamp =  new Date(data[0].timestamp);
+        var smoothedBatteryPercentPerHour; // EMA state, carried across iterations
+        var smoothingAlpha = 0.1; // lower = smoother/slower to react, higher = more responsive
         data.forEach(function(d, i) {
             if(i==0){
                 return;
@@ -110,7 +112,12 @@
             var batteryPercentDifference = d.batteryPercent - lastBatteryPercent;
             // Work out battery percent, but cap to remove unreal bounces.
             if(hoursDifference>=0.5){
-                d.batteryPercentPerHour = Math.min(60, Math.max(-50, batteryPercentDifference / hoursDifference));
+                var rawBatteryPercentPerHour = Math.min(60, Math.max(-50, batteryPercentDifference / hoursDifference));
+                // Smooth with an exponential moving average so single noisy readings don't spike the graph.
+                smoothedBatteryPercentPerHour = smoothedBatteryPercentPerHour === undefined
+                    ? rawBatteryPercentPerHour
+                    : smoothingAlpha * rawBatteryPercentPerHour + (1 - smoothingAlpha) * smoothedBatteryPercentPerHour;
+                d.batteryPercentPerHour = smoothedBatteryPercentPerHour;
             }
 
             while(hoursDifference>1){
