@@ -47,7 +47,9 @@
 // #define TIME_TO_SLEEP           180          /* Time ESP32 will go to sleep (in seconds) */
 // #define TIME_TO_SLEEP           10          /* Time ESP32 will go to sleep (in seconds) */
 #define TIME_TO_SLEEP           60          /* Time ESP32 will go to sleep (in seconds) */
-#define BATTERY_VOLTAGE_LOW     3000        // Set low voltage to sleep mode
+#define BATTERY_VOLTAGE_LOW     2900        // Set low voltage to sleep mode - ~5% per BATTERY_CURVE, checked
+                                             // before the camera/modem draw anything, so this is close to resting
+                                             // voltage rather than under load
 
 #define WIFI_CONNECT_TIMEOUT_MS 15000       // Give up on WiFi after this long
 #define NTP_SERVER              "pool.ntp.org"
@@ -82,6 +84,17 @@
 #define DEFAULT_DAYTIME_STARTS_AT_H  7
 #define DEFAULT_DAYTIME_ENDS_AT_H    17
 #define DEFAULT_CAMERA_INTERVAL_S    60
+
+// Stretches the capture interval out as the battery gets low, to conserve what's left - see
+// applyLowBatteryIntervalFloor(). Each is a floor, not an override: it only ever lengthens
+// whatever cameraIntervalS is already configured, never shortens it.
+#define BATTERY_LOW_PERCENT_50       50
+#define BATTERY_LOW_PERCENT_25       25
+#define BATTERY_LOW_PERCENT_15       15
+#define BATTERY_LOW_INTERVAL_50_S    (5 * 60)     // 5 minutes
+#define BATTERY_LOW_INTERVAL_25_S    (15 * 60)    // 15 minutes
+#define BATTERY_LOW_INTERVAL_15_S    (60 * 60)    // 1 hour
+
 #define DEFAULT_API_URL              "https://timelapse-dev.azurewebsites.net/api/"
 #define DEFAULT_HFLIP                false
 #define DEFAULT_VFLIP                false
@@ -371,6 +384,24 @@ uint8_t get_battery_percent(uint16_t mv)
         }
     }
     return 0;
+}
+
+// Floors intervalS up to the BATTERY_LOW_INTERVAL_*_S for the lowest BATTERY_LOW_PERCENT_* tier
+// batteryPercent is under - e.g. 20% -> at least BATTERY_LOW_INTERVAL_25_S. Never returns less
+// than intervalS itself: an already-longer configured interval is left alone.
+uint32_t applyLowBatteryIntervalFloor(uint32_t intervalS, uint8_t batteryPercent)
+{
+    uint32_t floorS = 0;
+    if (batteryPercent < BATTERY_LOW_PERCENT_50) {
+        floorS = BATTERY_LOW_INTERVAL_50_S;
+    }
+    if (batteryPercent < BATTERY_LOW_PERCENT_25) {
+        floorS = BATTERY_LOW_INTERVAL_25_S;
+    }
+    if (batteryPercent < BATTERY_LOW_PERCENT_15) {
+        floorS = BATTERY_LOW_INTERVAL_15_S;
+    }
+    return intervalS > floorS ? intervalS : floorS;
 }
 
 void set_device_to_sleep()
@@ -1547,19 +1578,24 @@ bool uploadPendingImages(const String &deviceId, TelemetryCounts &counts, Device
 // Hours are compared in UTC, since GMT_OFFSET_SEC/DAY_LIGHT_OFFSET_SEC are left at 0.
 uint32_t computeSleepSeconds(const DeviceConfig &config)
 {
+    // Floored by battery level - see applyLowBatteryIntervalFloor() - so a low battery still gets
+    // captures/telemetry, just less often, rather than running at the configured interval right
+    // down to BATTERY_VOLTAGE_LOW.
+    uint32_t intervalS = applyLowBatteryIntervalFloor(config.cameraIntervalS, get_battery_percent(get_battery_voltage()));
+
     if (!config.sleepDuringNight) {
-        return config.cameraIntervalS;
+        return intervalS;
     }
 
     struct tm timeinfo;
     if (!getLocalTime(&timeinfo, 0)) {
         // No synced clock to judge night from - fall back to the regular interval
-        return config.cameraIntervalS;
+        return intervalS;
     }
 
     bool isNight = (timeinfo.tm_hour >= config.daytimeEndsAtH) || (timeinfo.tm_hour < config.daytimeStartsAtH);
     if (!isNight) {
-        return config.cameraIntervalS;
+        return intervalS;
     }
 
     struct tm wake = timeinfo;
@@ -1972,11 +2008,18 @@ void loop()
     // says (see applyDeviceConfigFromApiResponse()), which is how support mode being turned back
     // off ever gets noticed - falls through to the normal deep-sleep path below the next time
     // loop() runs after that.
-    if (deviceConfig.supportMode) {
+    //
+    // Ignored below BATTERY_LOW_PERCENT_15 - staying awake and uploading every cycle is exactly
+    // what a battery that low can least afford, so this falls through to the normal (floored)
+    // deep-sleep path instead, same as if support mode were off.
+    uint8_t batteryPercent = get_battery_percent(get_battery_voltage());
+    if (deviceConfig.supportMode && batteryPercent >= BATTERY_LOW_PERCENT_15) {
         logf("Support mode active - repeating wake cycle in %u seconds instead of deep-sleeping", deviceConfig.cameraIntervalS);
         delay(deviceConfig.cameraIntervalS * 1000UL);
         runWakeCycle();
         return;
+    } else if (deviceConfig.supportMode) {
+        logf("Support mode active but battery at %u%% - ignoring support mode and deep-sleeping instead", batteryPercent);
     }
 
     uint32_t sleepSeconds = computeSleepSeconds(deviceConfig);
