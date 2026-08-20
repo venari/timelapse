@@ -1749,11 +1749,12 @@ void runWakeCycle()
     // the flag gets set/cleared further down). This is also the only time telemetry/images
     // actually get uploaded (see uploadPendingTelemetry/uploadPendingImages's WiFi.status()
     // check) - so with cameraIntervalS shorter than autoSyncPeriodS, several captures can build
-    // up between uploads.
+    // up between uploads. Support mode always needs a sync - the whole point is imagery/
+    // telemetry flowing every cycle rather than waiting out the normal autoSyncPeriodS.
     time_t lastSyncTime = readLastSyncTime();
     time_t now = time(nullptr);
     bool needsSync = (lastSyncTime == 0) || (now < lastSyncTime) || (now - lastSyncTime >= deviceConfig.autoSyncPeriodS)
-                      || readForceSyncFlag();
+                      || readForceSyncFlag() || deviceConfig.supportMode;
     bool didConnectWiFi = false;
     if (needsSync) {
         logLine("Clock needs sync, connecting to WiFi...");
