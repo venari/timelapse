@@ -89,6 +89,7 @@
 #define DEFAULT_AUTO_SYNC_PERIOD_S   (5 * 60)    // Force a WiFi resync/upload after this long, to correct clock drift
 #define DEFAULT_CAMERA_MODEL         "OV5640"    // Overridden below by on-the-fly PID detection - see setup()
 #define DEFAULT_CAMERA_WARMUP_FRAMES 2            // Frames grabbed+discarded after sensor init to let AEC/AWB converge - see setup()
+#define DEFAULT_SUPPORT_MODE         false        // See loop() - true keeps the board awake instead of deep-sleeping
 
 // utilities.h defines MODEM_GPS_ENABLE_GPIO/MODEM_GPS_ENABLE_LEVEL etc. per board, but not this -
 // matches LilyGo's own reference examples for the SIM7670G-S3 (e.g. LilyGo-Modem-Series/examples/Traccar).
@@ -116,6 +117,12 @@ struct DeviceConfig {
     bool hflip = DEFAULT_HFLIP;
     bool vflip = DEFAULT_VFLIP;
     uint32_t autoSyncPeriodS = DEFAULT_AUTO_SYNC_PERIOD_S;
+
+    // Set remotely (see the API's Device row / scripts/uploadPending.py's identical field for the
+    // Raspberry Pi units) to keep the board awake indefinitely instead of deep-sleeping between
+    // wake cycles - see loop(). Meant for a technician who needs the board reliably reachable
+    // (serial/OTA) rather than asleep most of the time.
+    bool supportMode = DEFAULT_SUPPORT_MODE;
 
     // What sensor is actually fitted - "OV5640" or "OV2640". Set from on-the-fly PID detection
     // every boot (see setup()), which is authoritative whenever it recognises the sensor; this
@@ -381,6 +388,11 @@ void set_device_to_sleep()
 void ensureDirExists(const String &path);
 void rotateLogIfNeeded();
 
+// One capture+telemetry+upload cycle - see runWakeCycle() further down. setup() runs it once on
+// every real boot; loop() calls it again, repeatedly, while parked awake in support mode (see
+// DeviceConfig::supportMode) instead of deep-sleeping between cycles.
+void runWakeCycle();
+
 bool setupSD()
 {
     SPI.begin(BOARD_SCK_PIN, BOARD_MISO_PIN, BOARD_MOSI_PIN);
@@ -513,6 +525,7 @@ void applyConfigFields(JsonVariantConst fields, DeviceConfig &config)
     config.hflip            = fields["hflip"] | config.hflip;
     config.vflip            = fields["vflip"] | config.vflip;
     config.autoSyncPeriodS  = fields["autoSyncPeriodS"] | config.autoSyncPeriodS;
+    config.supportMode      = fields["supportMode"] | config.supportMode;
     config.geoIntervalS     = fields["geoIntervalS"] | config.geoIntervalS;
     config.geoLat           = fields["geoLat"] | config.geoLat;
     config.geoLon           = fields["geoLon"] | config.geoLon;
@@ -570,6 +583,7 @@ void writeDeviceConfig(const DeviceConfig &config)
     doc["hflip"] = config.hflip;
     doc["vflip"] = config.vflip;
     doc["autoSyncPeriodS"] = config.autoSyncPeriodS;
+    doc["supportMode"] = config.supportMode;
     doc["geoIntervalS"] = config.geoIntervalS;
     doc["geoLat"] = config.geoLat;
     doc["geoLon"] = config.geoLon;
@@ -617,6 +631,7 @@ void applyDeviceConfigFromApiResponse(const String &responseBody, DeviceConfig &
         newConfig.hflip != config.hflip ||
         newConfig.vflip != config.vflip ||
         newConfig.autoSyncPeriodS != config.autoSyncPeriodS ||
+        newConfig.supportMode != config.supportMode ||
         newConfig.geoIntervalS !=config.geoIntervalS ||
         newConfig.cameraWarmupFrames != config.cameraWarmupFrames
 ) {
@@ -1696,6 +1711,17 @@ void setup()
     }
 #endif
 
+    runWakeCycle();
+}
+
+// Everything a single wake cycle does: bring the camera up, capture, take/refresh a GPS fix,
+// build+upload telemetry, upload any backlogged images, then power the camera back down. This
+// is the whole of what used to be setup() below the boot-once battery check above - normally
+// that's fine to run only once, since deep sleep resets the chip back through setup() on every
+// real wake anyway. Support mode changes that: it keeps the chip running instead of sleeping, so
+// loop() calls this again itself, repeatedly, to keep imagery/telemetry flowing meanwhile.
+void runWakeCycle()
+{
     // Turn on the camera power
     if (!setCameraPower(true)) {
         logLine("Failed to initialize Camera power chip!"); return;
@@ -1936,6 +1962,21 @@ void loop()
 
     WiFi.disconnect(true);
     WiFi.mode(WIFI_OFF);
+
+    // Support mode (set remotely via the API - see DeviceConfig::supportMode) keeps the board
+    // awake instead of deep-sleeping, repeating the normal capture/telemetry/upload cycle on
+    // cameraIntervalS instead of going quiet - so it stays reliably reachable, and imagery/
+    // telemetry keep flowing, while someone's working on it. Each cycle re-reads config.json
+    // (see runWakeCycle() -> readDeviceConfig()) and re-applies whatever the API's Device row
+    // says (see applyDeviceConfigFromApiResponse()), which is how support mode being turned back
+    // off ever gets noticed - falls through to the normal deep-sleep path below the next time
+    // loop() runs after that.
+    if (deviceConfig.supportMode) {
+        logf("Support mode active - repeating wake cycle in %u seconds instead of deep-sleeping", deviceConfig.cameraIntervalS);
+        delay(deviceConfig.cameraIntervalS * 1000UL);
+        runWakeCycle();
+        return;
+    }
 
     uint32_t sleepSeconds = computeSleepSeconds(deviceConfig);
     logf("Enter esp32 goto deepsleep for %u seconds!", sleepSeconds);

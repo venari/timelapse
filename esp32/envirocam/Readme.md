@@ -45,11 +45,13 @@ Microsoft Windows [Version 10.0.26200.8893]
 
 C:\Windows\System32>usbipd bind --busid 3-3
 
-C:\Windows\System32>usbipd attach --wsl --busid 3-3
+C:\Windows\System32>usbipd attach --wsl --busid 3-3 --auto-attach
 usbipd: info: Using WSL distribution 'Ubuntu' to attach; the device will be available in all WSL 2 distributions.
-usbipd: info: Loading vhci_hcd module.
 usbipd: info: Detected networking mode 'nat'.
 usbipd: info: Using IP address 172.23.80.1 to reach the host.
+usbipd: info: Starting endless attach loop; press Ctrl+C to quit.
+WSL Monitoring host 172.23.80.1 for BUSID: 3-3
+WSL 2026-08-20 23:25:59 Device 3-3 is now attached.
 ```
 
 In WSL/Ubuntu:
