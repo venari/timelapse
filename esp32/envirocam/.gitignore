@@ -1,1 +1,4 @@
 secrets.cpp
+.pio/
+.pioenvs/
+.piolibdeps/

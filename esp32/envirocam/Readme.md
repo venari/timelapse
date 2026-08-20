@@ -11,12 +11,12 @@ usbipd list
 C:\Users\LeighHunt>usbipd list
 Connected:
 BUSID  VID:PID    DEVICE                                                        STATE
-2-1    25a4:9311  USB C Video Adaptor                                           Not shared
-2-3    413c:301a  USB Input Device                                              Not shared
-2-4    045e:07f8  USB Input Device                                              Not shared
+3-4    413c:301a  USB Input Device                                              Not shared
 3-6    04f2:b829  Integrated Camera, Integrated IR Camera, Camera DFU Device    Not shared
 3-9    27c6:659a  Goodix MOC Fingerprint                                        Not shared
 3-10   8087:0033  Intel(R) Wireless Bluetooth(R)                                Not shared
+4-1    25a4:9311  USB C Video Adaptor                                           Not shared
+4-4    045e:07f8  USB Input Device                                              Not shared
 
 Persisted:
 GUID                                  DEVICE
@@ -25,14 +25,13 @@ GUID                                  DEVICE
 C:\Users\LeighHunt>usbipd list
 Connected:
 BUSID  VID:PID    DEVICE                                                        STATE
-2-1    25a4:9311  USB C Video Adaptor                                           Not shared
-2-3    413c:301a  USB Input Device                                              Not shared
-2-4    045e:07f8  USB Input Device                                              Not shared
+3-3    303a:1001  USB Serial Device (COM10), USB JTAG/serial debug unit         Not shared
+3-4    413c:301a  USB Input Device                                              Not shared
 3-6    04f2:b829  Integrated Camera, Integrated IR Camera, Camera DFU Device    Not shared
 3-9    27c6:659a  Goodix MOC Fingerprint                                        Not shared
 3-10   8087:0033  Intel(R) Wireless Bluetooth(R)                                Not shared
-5-3    19d1:0001  Remote NDIS based Internet Sharing Device, USB Serial Dev...  Not shared    <<<<< ~~~
-5-4    1a86:55d3  USB Serial Device (COM3)                                      Not shared    <<<<< ===
+4-1    25a4:9311  USB C Video Adaptor                                           Not shared
+4-4    045e:07f8  USB Input Device                                              Not shared
 
 Persisted:
 GUID                                  DEVICE
@@ -44,9 +43,9 @@ In admin command prompt:
 Microsoft Windows [Version 10.0.26200.8893]
 (c) Microsoft Corporation. All rights reserved.
 
-C:\Windows\System32>usbipd bind --busid 5-4
+C:\Windows\System32>usbipd bind --busid 3-3
 
-C:\Windows\System32>usbipd attach --wsl --busid 5-4
+C:\Windows\System32>usbipd attach --wsl --busid 3-3
 usbipd: info: Using WSL distribution 'Ubuntu' to attach; the device will be available in all WSL 2 distributions.
 usbipd: info: Loading vhci_hcd module.
 usbipd: info: Detected networking mode 'nat'.

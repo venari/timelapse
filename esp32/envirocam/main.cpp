@@ -376,6 +376,10 @@ void set_device_to_sleep()
     while (1);
 }
 
+// Arduino IDE auto-generates these prototypes from the .ino; a plain .cpp needs them explicit
+// since setupSD() below calls both before their definitions further down this file.
+void ensureDirExists(const String &path);
+void rotateLogIfNeeded();
 
 bool setupSD()
 {

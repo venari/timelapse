@@ -143,3 +143,4 @@ timelapse.functions/local.settings.json
 
 # esp-idf build artefacts
 managed_components/
+esp32/envirocam/main.d
