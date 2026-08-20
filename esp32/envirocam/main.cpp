@@ -85,6 +85,11 @@
 // memory - survives a deep-sleep wake but not a real power cycle - so this only ever runs across
 // a fresh install's first few boots, never costing battery on a camera that's already deployed.
 #define SETUP_AP_MAX_BOOT_COUNT  5
+#define SETUP_AP_NEXT_BOOT_DELAY_S 1   // See loop() - replaces the normal cameraIntervalS wait while
+                                        // still inside the setup window's boot budget above, so the
+                                        // next boot's setup window is available right away rather
+                                        // than waiting out a full interval on top of the one that
+                                        // just ran for minutes on its own
 #define SETUP_AP_WINDOW_MS       (5UL * 60 * 1000)   // How long the hotspot stays up before continuing on to deep sleep
 #define SETUP_AP_STREAM_FRAMESIZE       FRAMESIZE_SVGA  // Much lighter than the QSXGA capture - plenty to check framing/focus
 #define SETUP_AP_STREAM_FRAME_INTERVAL_MS (300UL)      // Paces "/stream" frames - keeps the softAP link comfortable
@@ -2183,7 +2188,10 @@ void loop()
         logf("Support mode active but battery at %u%% - ignoring support mode and deep-sleeping instead", batteryPercent);
     }
 
-    uint32_t sleepSeconds = computeSleepSeconds(deviceConfig);
+    // Still inside the setup window's boot budget (see SETUP_AP_MAX_BOOT_COUNT) - runSetupApWindow()
+    // just ran for minutes on its own, so skip the normal wait on top of that and make the next
+    // boot (and its own setup window, while the budget lasts) available almost immediately instead.
+    uint32_t sleepSeconds = (bootCount <= SETUP_AP_MAX_BOOT_COUNT) ? SETUP_AP_NEXT_BOOT_DELAY_S : computeSleepSeconds(deviceConfig);
     logf("Enter esp32 goto deepsleep for %u seconds!", sleepSeconds);
     esp_sleep_enable_timer_wakeup((uint64_t)sleepSeconds * uS_TO_S_FACTOR);
     delay(200);
