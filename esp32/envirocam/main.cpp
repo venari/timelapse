@@ -20,6 +20,7 @@
 #include <SD.h>
 #include <WiFi.h>
 #include <WiFiClientSecure.h>
+#include <WebServer.h>
 #include <time.h>
 #include <ArduinoJson.h>
 #include <vector>
@@ -76,6 +77,19 @@
 #define LOG_DIR                  "/logs"
 #define LOG_FILE                 "/logs/envirocam.log"  // Active day's log - see rotateLogIfNeeded()
 #define LOG_RETENTION_DAYS       30                      // Rotated logs older than this get deleted
+
+// A temporary local WiFi hotspot + status/photo web page - see runSetupApWindow() - so an
+// installer can confirm the camera's working right after power-on with zero cellular/internet
+// WiFi needed, which is the point: this is for exactly the low/no-connectivity sites where
+// DeviceConfig::supportMode (API-driven, needs a working uplink) can't help. bootCount is RTC
+// memory - survives a deep-sleep wake but not a real power cycle - so this only ever runs across
+// a fresh install's first few boots, never costing battery on a camera that's already deployed.
+#define SETUP_AP_MAX_BOOT_COUNT  5
+#define SETUP_AP_WINDOW_MS       (5UL * 60 * 1000)   // How long the hotspot stays up before continuing on to deep sleep
+#define SETUP_AP_STREAM_FRAMESIZE       FRAMESIZE_SVGA  // Much lighter than the QSXGA capture - plenty to check framing/focus
+#define SETUP_AP_STREAM_FRAME_INTERVAL_MS (300UL)      // Paces "/stream" frames - keeps the softAP link comfortable
+#define SETUP_AP_SSID_PREFIX     "EnviroCam-"
+#define SETUP_AP_PASSWORD        "envirocam"          // Shared across all units - keep it out of range of anyone but the install crew
 
 // Defaults used until a config.json exists (i.e. before the API has ever handed back a
 // Device row - see applyDeviceConfigFromApiResponse). Names match the Device model's JSON
@@ -164,6 +178,12 @@ struct DeviceConfig {
 };
 
 DeviceConfig deviceConfig;
+
+// Set at the end of each runWakeCycle() - see there - purely so runSetupApWindow()'s status page
+// has something to show for "did this boot's capture/upload actually happen, and when". Not
+// persisted; these only ever need to reflect the boot currently in progress.
+String lastCaptureTimestamp = "";
+bool lastWakeConnectedWiFi = false;
 
 // The SIM7670G's cellular/GNSS modem, talked to over the UART wired up as SerialAT (see
 // utilities.h) - used only for GPS here (see updateGeoLocationIfDue()).
@@ -423,6 +443,10 @@ void rotateLogIfNeeded();
 // every real boot; loop() calls it again, repeatedly, while parked awake in support mode (see
 // DeviceConfig::supportMode) instead of deep-sleeping between cycles.
 void runWakeCycle();
+
+// The local, no-connectivity-needed alternative to supportMode for a fresh install - see
+// runSetupApWindow() further down.
+void runSetupApWindow();
 
 bool setupSD()
 {
@@ -1748,6 +1772,13 @@ void setup()
 #endif
 
     runWakeCycle();
+
+    // Fresh install only (see SETUP_AP_MAX_BOOT_COUNT/runSetupApWindow()) - gives an installer a
+    // window to confirm the camera's working, right there in the field, with no cellular/internet
+    // WiFi needed for it.
+    if (bootCount <= SETUP_AP_MAX_BOOT_COUNT) {
+        runSetupApWindow();
+    }
 }
 
 // Everything a single wake cycle does: bring the camera up, capture, take/refresh a GPS fix,
@@ -1801,6 +1832,7 @@ void runWakeCycle()
     } else {
         logLine("Clock already synced, skipping WiFi connection");
     }
+    lastWakeConnectedWiFi = didConnectWiFi;
 
     // Enable / disable power save mode (1 disabled, 0 enabled)
     pinMode(BOARD_POWER_SAVE_MODE_PIN, OUTPUT);
@@ -1929,6 +1961,11 @@ void runWakeCycle()
             logLine("JPG created failed!");
         }
         jpg.close();
+
+        // Purely for runSetupApWindow()'s status page ("last recorded capture") - the AP window's
+        // own live view is a direct camera stream (see "/stream"), not this file.
+        lastCaptureTimestamp = getISO8601Timestamp();
+
         esp_camera_fb_return(frame);
     } else {
         logLine("Capturing camera failed!");
@@ -1987,6 +2024,130 @@ void runWakeCycle()
     }
 
     writeCounts(counts);
+}
+
+// The page runSetupApWindow() serves at "/" - just enough for an installer to tell the camera's
+// actually working: battery/solar, GPS fix, whether this boot could reach the internet at all,
+// and the backlog - without needing any of that to actually have gone anywhere yet.
+// windowRemainingS is how long until runSetupApWindow() closes the AP and this boot goes on to
+// deep sleep - purely to drive the on-page countdown below, counted down client-side from there
+// rather than re-polled, so it doesn't need another request to the device to stay accurate.
+String buildStatusHtml(uint32_t windowRemainingS)
+{
+    TelemetryCounts counts = readCounts();
+    uint16_t batteryMv = get_battery_voltage();
+
+    // The viewport tag matters more than the font-size below - without it iOS Safari renders at
+    // desktop width and shrinks the whole page to fit, which would undo any font-size increase.
+    String html = "<html><head><title>EnviroCam Status</title>"
+                  "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">"
+                  "<style>body{font-size:1.4em}</style>"
+                  "</head><body>";
+    html += "<h1>EnviroCam " + getDeviceId() + "</h1>";
+    // "/stream" is a multipart/x-mixed-replace MJPEG feed (see runSetupApWindow()) - browsers
+    // render that natively in a plain <img>, no polling/JS needed to keep it live.
+    html += "<img src=\"/stream\" style=\"max-width:100%\"><br>";
+    html += "<p>Setup window closes (and this boot goes to sleep) in <span id=\"countdown\">" +
+            String(windowRemainingS) + "</span>s</p>";
+    html += "<script>var t=" + String(windowRemainingS) + ";setInterval(function(){"
+            "t=Math.max(0,t-1);document.getElementById('countdown').textContent=t;"
+            "},1000);</script>";
+    html += "<p>Last recorded capture: " + (lastCaptureTimestamp.length() ? lastCaptureTimestamp : String("none yet")) + "</p>";
+    html += "<ul>";
+    html += "<li>Boot number: " + String(bootCount) + "</li>";
+    html += "<li>Uptime: " + String(millis() / 1000) + "s</li>";
+    html += "<li>Battery: " + String(batteryMv) + "mV (" + String(get_battery_percent(batteryMv)) + "%)</li>";
+    html += "<li>Solar: " + String(get_solar_voltage()) + "mV</li>";
+    html += "<li>GPS: " + String(deviceConfig.geoLat, 6) + ", " + String(deviceConfig.geoLon, 6) +
+            " (fix recorded " + (deviceConfig.geoTimeRecorded.length() ? deviceConfig.geoTimeRecorded : String("never")) + ")</li>";
+    html += "<li>This boot reached the internet: " + String(lastWakeConnectedWiFi ? "yes" : "no") + "</li>";
+    html += "<li>Pending images: " + String(counts.pendingImages) + "</li>";
+    html += "<li>Pending telemetry: " + String(counts.pendingTelemetry) + "</li>";
+    html += "<li>Support mode: " + String(deviceConfig.supportMode ? "on" : "off") + "</li>";
+    html += "<li>Camera interval: " + String(deviceConfig.cameraIntervalS) + "s</li>";
+    html += "<li>API URL: " + deviceConfig.apiUrl + "</li>";
+    html += "</ul></body></html>";
+    return html;
+}
+
+// A temporary local WiFi hotspot + the status page above - entirely offline, no cellular or
+// internet WiFi required - so an installer can confirm the camera's working right where they're
+// standing. See SETUP_AP_* and the comment on setup()'s call to this. Runs for
+// SETUP_AP_WINDOW_MS then returns, letting loop() carry on into its normal deep-sleep decision.
+void runSetupApWindow()
+{
+    // Dropped to a much lighter resolution for this preview - the QSXGA frames runWakeCycle()
+    // captures for real are far more than a live "is it aimed right" view needs, and every one of
+    // those bytes has to go out over the softAP link. Safe to lower after esp_camera_init() (only
+    // *raising* it afterwards overflows the DMA buffer, which was sized for the larger frame_size
+    // requested at init) - and nothing needs it back at QSXGA, since the camera gets fully
+    // deinitialised in loop() right after this returns regardless.
+    sensor_t *sensor = esp_camera_sensor_get();
+    if (sensor) {
+        sensor->set_framesize(sensor, SETUP_AP_STREAM_FRAMESIZE);
+    }
+
+    String ssid = String(SETUP_AP_SSID_PREFIX) + getDeviceId();
+    WiFi.mode(WIFI_AP);
+    WiFi.softAP(ssid.c_str(), SETUP_AP_PASSWORD);
+    logf("Setup AP \"%s\" (password \"%s\") up at %s for %lu seconds - connect to check status",
+         ssid.c_str(), SETUP_AP_PASSWORD, WiFi.softAPIP().toString().c_str(), SETUP_AP_WINDOW_MS / 1000);
+
+    uint32_t start = millis();
+
+    WebServer server(80);
+    server.on("/", HTTP_GET, [&server, start]() {
+        uint32_t elapsedMs = millis() - start;
+        uint32_t remainingS = (elapsedMs < SETUP_AP_WINDOW_MS) ? (SETUP_AP_WINDOW_MS - elapsedMs) / 1000 : 0;
+        server.send(200, "text/html", buildStatusHtml(remainingS));
+    });
+    server.on("/stream", HTTP_GET, [&server, start]() {
+        // Same multipart/x-mixed-replace MJPEG trick the CameraWebServer example uses - a
+        // continuous run of JPEG frames a browser renders directly in an <img> tag, no page-side
+        // JS needed. Frames come straight off the camera each time round, never touching SD.
+        //
+        // Bounded by the same SETUP_AP_WINDOW_MS deadline as the outer loop below: once a browser
+        // opens this, the handler doesn't otherwise return - and hence never lets
+        // server.handleClient() regain control - until the client disconnects, which would
+        // otherwise stop the window from ever closing on schedule while a phone's still watching.
+        WiFiClient client = server.client();
+        client.print("HTTP/1.1 200 OK\r\nContent-Type: multipart/x-mixed-replace; boundary=frame\r\n\r\n");
+
+        while (client.connected() && millis() - start < SETUP_AP_WINDOW_MS) {
+            camera_fb_t *frame = esp_camera_fb_get();
+            if (!frame) {
+                break;
+            }
+            client.printf("--frame\r\nContent-Type: image/jpeg\r\nContent-Length: %u\r\n\r\n", frame->len);
+            client.write(frame->buf, frame->len);
+            client.print("\r\n");
+            esp_camera_fb_return(frame);
+            delay(SETUP_AP_STREAM_FRAME_INTERVAL_MS);
+        }
+    });
+    server.begin();
+
+    while (millis() - start < SETUP_AP_WINDOW_MS) {
+        server.handleClient();
+        delay(10);
+    }
+
+    // One more telemetry point, queued for the next wake's upload same as any other pending
+    // record (nothing to upload it to right now - this is softAP, not a route to the internet) -
+    // so the eventual upload shows uptimeSeconds covering the setup window too, not just
+    // whatever runWakeCycle() had already captured before it ever opened.
+    TelemetryCounts counts = readCounts();
+    counts.pendingTelemetry++;
+    String finalTelemetryJson = buildTelemetryJson(getISO8601Timestamp(), getDeviceId(), get_battery_voltage(), get_solar_voltage(),
+                                                    (uint32_t)(millis() / 1000),
+                                                    deviceConfig.geoLat, deviceConfig.geoLon, deviceConfig.geoTimeRecorded, counts);
+    writeTelemetryFile(getDatedPath(), finalTelemetryJson);
+    writeCounts(counts);
+
+    server.close();
+    WiFi.softAPdisconnect(true);
+    WiFi.mode(WIFI_OFF);
+    logLine("Setup AP window closed");
 }
 
 void loop()
