@@ -1,6 +1,74 @@
 Documentation here: https://github.com/Xinyuan-LILYGO/LilyGo-Modem-Series/blob/main/docs/en/esp32s3/sim7670g-s3-standard/README.MD
 
-# Windows
+# Windows/WSL, VSCode, PlatformIO
+
+Windows:
+```
+usbipd list
+```
+
+```
+C:\Users\LeighHunt>usbipd list
+Connected:
+BUSID  VID:PID    DEVICE                                                        STATE
+2-1    25a4:9311  USB C Video Adaptor                                           Not shared
+2-3    413c:301a  USB Input Device                                              Not shared
+2-4    045e:07f8  USB Input Device                                              Not shared
+3-6    04f2:b829  Integrated Camera, Integrated IR Camera, Camera DFU Device    Not shared
+3-9    27c6:659a  Goodix MOC Fingerprint                                        Not shared
+3-10   8087:0033  Intel(R) Wireless Bluetooth(R)                                Not shared
+
+Persisted:
+GUID                                  DEVICE
+
+
+C:\Users\LeighHunt>usbipd list
+Connected:
+BUSID  VID:PID    DEVICE                                                        STATE
+2-1    25a4:9311  USB C Video Adaptor                                           Not shared
+2-3    413c:301a  USB Input Device                                              Not shared
+2-4    045e:07f8  USB Input Device                                              Not shared
+3-6    04f2:b829  Integrated Camera, Integrated IR Camera, Camera DFU Device    Not shared
+3-9    27c6:659a  Goodix MOC Fingerprint                                        Not shared
+3-10   8087:0033  Intel(R) Wireless Bluetooth(R)                                Not shared
+5-3    19d1:0001  Remote NDIS based Internet Sharing Device, USB Serial Dev...  Not shared    <<<<< ~~~
+5-4    1a86:55d3  USB Serial Device (COM3)                                      Not shared    <<<<< ===
+
+Persisted:
+GUID                                  DEVICE
+
+```
+
+In admin command prompt:
+```
+Microsoft Windows [Version 10.0.26200.8893]
+(c) Microsoft Corporation. All rights reserved.
+
+C:\Windows\System32>usbipd bind --busid 5-4
+
+C:\Windows\System32>usbipd attach --wsl --busid 5-4
+usbipd: info: Using WSL distribution 'Ubuntu' to attach; the device will be available in all WSL 2 distributions.
+usbipd: info: Loading vhci_hcd module.
+usbipd: info: Detected networking mode 'nat'.
+usbipd: info: Using IP address 172.23.80.1 to reach the host.
+```
+
+In WSL/Ubuntu:
+
+```
+at 14:09:03 ~
+✗ dmesg | tail
+[ 1813.225907] vhci_hcd vhci_hcd.0: pdev(0) rhport(0) sockfd(3)
+[ 1813.225914] vhci_hcd vhci_hcd.0: devid(327684) speed(2) speed_str(full-speed)
+[ 1813.225966] vhci_hcd vhci_hcd.0: Device attached
+[ 1813.390953] vhci_hcd: vhci_device speed not set
+[ 1813.446912] usb 1-1: new full-speed USB device number 2 using vhci_hcd
+[ 1813.510937] vhci_hcd: vhci_device speed not set
+[ 1813.567064] usb 1-1: SetAddress Request (2) to port 0
+[ 1813.598657] cdc_acm 1-1:1.0: ttyACM0: USB ACM device                                   <<<<< ===
+[ 1813.598688] usbcore: registered new interface driver cdc_acm
+[ 1813.598689] cdc_acm: USB Abstract Control Model driver for USB modems and ISDN adapters
+```
 
 ## Arduino
 
