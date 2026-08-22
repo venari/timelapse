@@ -11,6 +11,7 @@
                 "/home/leigh/dev/venari/timelapse/esp32/envirocam",
                 "/home/leigh/.platformio/packages/framework-arduinoespressif32/libraries/Wire/src",
                 "/home/leigh/.platformio/packages/framework-arduinoespressif32/libraries/WiFiClientSecure/src",
+                "/home/leigh/.platformio/packages/framework-arduinoespressif32/libraries/WebServer/src",
                 "/home/leigh/.platformio/packages/framework-arduinoespressif32/libraries/WiFi/src",
                 "/home/leigh/.platformio/packages/framework-arduinoespressif32/libraries/SD/src",
                 "/home/leigh/.platformio/packages/framework-arduinoespressif32/libraries/SPI/src",
@@ -242,7 +243,6 @@
                 "/home/leigh/.platformio/packages/framework-arduinoespressif32/libraries/Ticker/src",
                 "/home/leigh/.platformio/packages/framework-arduinoespressif32/libraries/USB/src",
                 "/home/leigh/.platformio/packages/framework-arduinoespressif32/libraries/Update/src",
-                "/home/leigh/.platformio/packages/framework-arduinoespressif32/libraries/WebServer/src",
                 "/home/leigh/.platformio/packages/framework-arduinoespressif32/libraries/WiFiProv/src",
                 ""
             ],
@@ -252,6 +252,7 @@
                     "/home/leigh/dev/venari/timelapse/esp32/envirocam",
                     "/home/leigh/.platformio/packages/framework-arduinoespressif32/libraries/Wire/src",
                     "/home/leigh/.platformio/packages/framework-arduinoespressif32/libraries/WiFiClientSecure/src",
+                    "/home/leigh/.platformio/packages/framework-arduinoespressif32/libraries/WebServer/src",
                     "/home/leigh/.platformio/packages/framework-arduinoespressif32/libraries/WiFi/src",
                     "/home/leigh/.platformio/packages/framework-arduinoespressif32/libraries/SD/src",
                     "/home/leigh/.platformio/packages/framework-arduinoespressif32/libraries/SPI/src",
@@ -483,7 +484,6 @@
                     "/home/leigh/.platformio/packages/framework-arduinoespressif32/libraries/Ticker/src",
                     "/home/leigh/.platformio/packages/framework-arduinoespressif32/libraries/USB/src",
                     "/home/leigh/.platformio/packages/framework-arduinoespressif32/libraries/Update/src",
-                    "/home/leigh/.platformio/packages/framework-arduinoespressif32/libraries/WebServer/src",
                     "/home/leigh/.platformio/packages/framework-arduinoespressif32/libraries/WiFiProv/src",
                     ""
                 ]
