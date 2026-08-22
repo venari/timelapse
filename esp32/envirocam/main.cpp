@@ -2107,12 +2107,19 @@ void runSetupApWindow()
     // needed once a phone's already joined.
     NimBLEDevice::init(ssid.c_str());
     NimBLEAdvertising *pAdvertising = NimBLEDevice::getAdvertising();
+    // NimBLEDevice::init() only sets the GATT device name (visible once connected) - the
+    // advertisement payload itself needs the name set separately, or scanners see no name
+    // at all. Matches the pattern in NimBLE-Arduino's own NimBLE_Server example.
+    pAdvertising->setName(ssid.c_str());
     pAdvertising->start();
+    logf("BLE advertising started as \"%s\"", ssid.c_str());
     WiFi.onEvent([pAdvertising](WiFiEvent_t event, WiFiEventInfo_t info) {
         if (event == ARDUINO_EVENT_WIFI_AP_STACONNECTED) {
             pAdvertising->stop();
+            logLine("Station connected - BLE advertising stopped");
         } else if (event == ARDUINO_EVENT_WIFI_AP_STADISCONNECTED) {
             pAdvertising->start();
+            logLine("Station disconnected - BLE advertising resumed");
         }
     });
 
