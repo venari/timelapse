@@ -21,6 +21,7 @@
 #include <WiFi.h>
 #include <WiFiClientSecure.h>
 #include <WebServer.h>
+#include <NimBLEDevice.h>
 #include <time.h>
 #include <ArduinoJson.h>
 #include <vector>
@@ -2098,6 +2099,23 @@ void runSetupApWindow()
     logf("Setup AP \"%s\" (password \"%s\") up at %s for %lu seconds - connect to check status",
          ssid.c_str(), SETUP_AP_PASSWORD, WiFi.softAPIP().toString().c_str(), SETUP_AP_WINDOW_MS / 1000);
 
+    // Advertises under the same name as the AP SSID so a companion app can discover which
+    // physical unit is which without the installer having to read/type it - the app then joins
+    // the AP itself using that name plus the fixed SETUP_AP_PASSWORD above, so nothing secret
+    // ever needs to go over BLE. Advertising is stopped for as long as a station is actually
+    // connected (below) since it shares the same 2.4GHz radio as the /stream handler and isn't
+    // needed once a phone's already joined.
+    NimBLEDevice::init(ssid.c_str());
+    NimBLEAdvertising *pAdvertising = NimBLEDevice::getAdvertising();
+    pAdvertising->start();
+    WiFi.onEvent([pAdvertising](WiFiEvent_t event, WiFiEventInfo_t info) {
+        if (event == ARDUINO_EVENT_WIFI_AP_STACONNECTED) {
+            pAdvertising->stop();
+        } else if (event == ARDUINO_EVENT_WIFI_AP_STADISCONNECTED) {
+            pAdvertising->start();
+        }
+    });
+
     uint32_t start = millis();
 
     WebServer server(80);
@@ -2150,6 +2168,8 @@ void runSetupApWindow()
     writeCounts(counts);
 
     server.close();
+    pAdvertising->stop();
+    NimBLEDevice::deinit(true);
     WiFi.softAPdisconnect(true);
     WiFi.mode(WIFI_OFF);
     logLine("Setup AP window closed");
