@@ -2113,7 +2113,7 @@ void runSetupApWindow()
     pAdvertising->setName(ssid.c_str());
     pAdvertising->start();
     logf("BLE advertising started as \"%s\"", ssid.c_str());
-    WiFi.onEvent([pAdvertising](WiFiEvent_t event, WiFiEventInfo_t info) {
+    wifi_event_id_t bleAdvertisingEventId = WiFi.onEvent([pAdvertising](WiFiEvent_t event, WiFiEventInfo_t info) {
         if (event == ARDUINO_EVENT_WIFI_AP_STACONNECTED) {
             pAdvertising->stop();
             logLine("Station connected - BLE advertising stopped");
@@ -2175,6 +2175,11 @@ void runSetupApWindow()
     writeCounts(counts);
 
     server.close();
+    // Unregister before touching BLE/WiFi teardown - softAPdisconnect() below forcibly drops
+    // any connected station, which fires STADISCONNECTED, and by then pAdvertising is already
+    // freed by NimBLEDevice::deinit(); a still-registered handler would call through that
+    // dangling pointer and crash.
+    WiFi.removeEvent(bleAdvertisingEventId);
     pAdvertising->stop();
     NimBLEDevice::deinit(true);
     WiFi.softAPdisconnect(true);
