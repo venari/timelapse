@@ -19,6 +19,7 @@ export function ImageView() {
   const [preloadProgress, setPreloadProgress] = useState(0);
   const playIntervalRef = useRef<number | null>(null);
   const imageRefs = useRef<Map<number, HTMLImageElement>>(new Map());
+  const previousImageIdsRef = useRef<number[]>([]);
 
   const getTimeRange = () => {
     const now = new Date();
@@ -69,25 +70,21 @@ export function ImageView() {
       setLoadedImages(new Set());
       setPreloadProgress(0);
       imageRefs.current.clear();
+      previousImageIdsRef.current = [];
       return;
     }
 
-    // Set to latest image (last in sequence)
-    setCurrentIndex(images.length - 1);
-    setLoadedImages(new Set());
-    setPreloadProgress(0);
-    imageRefs.current.clear();
+    const previousIds = previousImageIdsRef.current;
+    const currentIds = images.map((image) => image.id);
+    const isBackgroundRefresh =
+      previousIds.length > 0 &&
+      currentIds.length >= previousIds.length &&
+      previousIds.every((id, i) => id === currentIds[i]);
 
-    let loadedCount = 0;
-
-    // Load latest image first, then load the rest
-    const latestIndex = images.length - 1;
-    const latestImage = images[latestIndex];
-    
-    const loadImage = (image: typeof images[0], index: number) => {
+    const loadImage = (image: typeof images[0], index: number, total: number, onProgress: () => void) => {
       const img = new Image();
       img.src = getImageUrl(image.id);
-      
+
       img.onload = () => {
         imageRefs.current.set(index, img);
         setLoadedImages((prev) => {
@@ -95,24 +92,62 @@ export function ImageView() {
           newSet.add(index);
           return newSet;
         });
-        loadedCount++;
-        setPreloadProgress((loadedCount / images.length) * 100);
+        onProgress();
       };
 
       img.onerror = () => {
         console.error(`Failed to load image ${image.id}`);
-        loadedCount++;
-        setPreloadProgress((loadedCount / images.length) * 100);
+        onProgress();
       };
     };
 
-    // Load latest image first
-    loadImage(latestImage, latestIndex);
+    if (isBackgroundRefresh) {
+      // A periodic poll returned the same images, possibly with new ones
+      // appended. Don't disturb the user's playback position or re-download
+      // frames that are already cached - only fetch what's new, and only
+      // jump to the latest frame if they were already following it live.
+      previousImageIdsRef.current = currentIds;
 
-    // Then load all other images
+      if (currentIds.length === previousIds.length) {
+        return;
+      }
+
+      const wasAtLatest = currentIndex === previousIds.length - 1;
+      if (wasAtLatest) {
+        setCurrentIndex(currentIds.length - 1);
+      }
+
+      let loadedCount = loadedImages.size;
+      for (let index = previousIds.length; index < images.length; index++) {
+        loadImage(images[index], index, currentIds.length, () => {
+          loadedCount++;
+          setPreloadProgress((loadedCount / currentIds.length) * 100);
+        });
+      }
+      return;
+    }
+
+    // Initial load, or the device/time range changed - reset everything
+    // and jump to the latest image.
+    previousImageIdsRef.current = currentIds;
+    setCurrentIndex(images.length - 1);
+    setLoadedImages(new Set());
+    setPreloadProgress(0);
+    imageRefs.current.clear();
+
+    let loadedCount = 0;
+    const latestIndex = images.length - 1;
+
+    const onProgress = () => {
+      loadedCount++;
+      setPreloadProgress((loadedCount / images.length) * 100);
+    };
+
+    // Load latest image first, then load the rest
+    loadImage(images[latestIndex], latestIndex, images.length, onProgress);
     images.forEach((image, index) => {
       if (index !== latestIndex) {
-        loadImage(image, index);
+        loadImage(image, index, images.length, onProgress);
       }
     });
   }, [images]);
