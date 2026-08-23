@@ -35,8 +35,6 @@ export function ImageView() {
     }
   };
 
-  const { start, end } = getTimeRange();
-
   const {
     data: device,
     isLoading: deviceLoading,
@@ -54,12 +52,16 @@ export function ImageView() {
     refetch,
   } = useQuery({
     queryKey: ['images', deviceId, timeRange],
-    queryFn: () =>
-      api.getImagesBetweenDates(
+    queryFn: () => {
+      // Computed fresh on every fetch (not just every render) so the
+      // window actually slides forward on each background refetch below.
+      const { start, end } = getTimeRange();
+      return api.getImagesBetweenDates(
         Number(deviceId),
         start.toISOString(),
         end.toISOString()
-      ),
+      );
+    },
     enabled: !!deviceId,
     refetchInterval: 30000, // Refetch every 30 seconds for new images
   });
