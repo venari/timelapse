@@ -22,7 +22,7 @@ export interface Telemetry {
   temperatureC: number;
   batteryPercent: number;
   status?: string; // Raw JSON string from backend
-  diskSpaceFree?: number;
+  diskSpaceFree?: number | null;
   uptimeSeconds?: number;
   pendingImages?: number;
   uploadedImages?: number;

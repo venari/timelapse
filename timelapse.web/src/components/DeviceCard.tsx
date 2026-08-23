@@ -103,14 +103,14 @@ export function DeviceCard({ device }: DeviceCardProps) {
                   <span className="text-sm font-semibold">{telemetry.temperatureC.toFixed(1)}°C</span>
                 </div>
 
-                {telemetry.diskSpaceFree !== undefined && (
+                {telemetry.diskSpaceFree != null && (
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <HardDrive className="h-4 w-4 text-purple-600" />
                       <span className="text-sm">Disk Space</span>
                     </div>
                     <span className="text-sm font-semibold">
-                      {(telemetry.diskSpaceFree ).toFixed(1)} GB
+                      {telemetry.diskSpaceFree.toFixed(1)} GB
                     </span>
                   </div>
                 )}
