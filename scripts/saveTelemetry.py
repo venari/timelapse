@@ -102,7 +102,13 @@ _CHARGING_STATES = (
     PvPiChargeState.TopOffTimerCharge,
 )
 
+# Track consecutive low voltage readings
+low_voltage_count = 0
+LOW_VOLTAGE_THRESHOLD = 5
+
 def scheduleShutdown():
+    global low_voltage_count
+    
     try:
         if not pj_is_alive():
             logger.error('PvPi not connected')
@@ -225,35 +231,49 @@ def scheduleShutdown():
 
                 # Also let's give it a chance to upload once an hour to catch up and avoid anxiety that camera has been stolen
 
-                if config['low_battery_voltage'] > 0 \
-                and round(pvpiClient.get_battery_voltage()*1000) <= config['low_battery_voltage'] \
-                and datetime.datetime.now().minute >= 10 \
-                and bCharging == False:
+                # Check if voltage is currently low
+                voltage_is_low = (config['low_battery_voltage'] > 0 
+                                  and round(pvpiClient.get_battery_voltage()*1000) <= config['low_battery_voltage'] 
+                                  and datetime.datetime.now().minute >= 10 
+                                  and bCharging == False)
 
-                    if round(pvpiClient.get_battery_voltage()*1000) > config['pvpi_low_battery_voltage']:
-                        logger.info('scheduling 10 minute sleep due to low battery')
-                        loggerIntent.info('scheduling 10 minute sleep due to low battery')
-                        logger.info(f"Battery voltage: {round(pvpiClient.get_battery_voltage()*1000)} mV")
-                        logger.info(f"State of charge: {pvpiClient.estimated_soc()}%")
-                        logger.info(f"Charge state: {pvpiClient.get_charge_state()}")
+                if voltage_is_low:
+                    low_voltage_count += 1
+                    logger.debug(f"Low voltage detected (count: {low_voltage_count}/{LOW_VOLTAGE_THRESHOLD})")
+                    loggerIntent.debug(f"Low voltage detected (count: {low_voltage_count}/{LOW_VOLTAGE_THRESHOLD})")
+                else:
+                    if low_voltage_count > 0:
+                        logger.debug(f"Voltage returned to normal, resetting count from {low_voltage_count}")
+                        loggerIntent.debug(f"Voltage returned to normal, resetting count from {low_voltage_count}")
+                    low_voltage_count = 0
 
-                        time.sleep(30)
+                # Only take action after 5 consecutive low voltage readings
+                if low_voltage_count >= LOW_VOLTAGE_THRESHOLD:
 
-                        wake_time = datetime.datetime.now() + datetime.timedelta(minutes=10)
-                        alarm_time = datetime.time(wake_time.hour, wake_time.minute, 0)
+                    # if round(pvpiClient.get_battery_voltage()*1000) > config['pvpi_low_battery_voltage']:
+                    logger.info(f'scheduling 10 minute sleep due to {LOW_VOLTAGE_THRESHOLD} consecutive low battery readings')
+                    loggerIntent.info(f'scheduling 10 minute sleep due to {LOW_VOLTAGE_THRESHOLD} consecutive low battery readings')
+                    logger.info(f"Battery voltage: {round(pvpiClient.get_battery_voltage()*1000)} mV")
+                    logger.info(f"State of charge: {pvpiClient.estimated_soc()}%")
+                    logger.info(f"Charge state: {pvpiClient.get_charge_state()}")
 
-                    # If we're down at hibernate level, let's just hibernate.
-                    else:
-                        logger.info('Hibernating due to very low battery')
-                        loggerIntent.info('Hibernating due to very low battery')
-                        logger.info(f"Battery voltage: {round(pvpiClient.get_battery_voltage()*1000)} mV")
-                        logger.info(f"State of charge: {pvpiClient.estimated_soc()}%")
-                        logger.info(f"Charge state: {pvpiClient.get_charge_state()}")
-                        alarm_time = datetime.time(hibernateHourToWakeAt, 0, 0)
+                    time.sleep(30)
+
+                    wake_time = datetime.datetime.now() + datetime.timedelta(minutes=10)
+                    alarm_time = datetime.time(wake_time.hour, wake_time.minute, 0)
+
+                    # # If we're down at hibernate level, let's just hibernate.
+                    # else:
+                    #     logger.info(f'Hibernating due to {LOW_VOLTAGE_THRESHOLD} consecutive very low battery readings')
+                    #     loggerIntent.info(f'Hibernating due to {LOW_VOLTAGE_THRESHOLD} consecutive very low battery readings')
+                    #     logger.info(f"Battery voltage: {round(pvpiClient.get_battery_voltage()*1000)} mV")
+                    #     logger.info(f"State of charge: {pvpiClient.estimated_soc()}%")
+                    #     logger.info(f"Charge state: {pvpiClient.get_charge_state()}")
+                    #     alarm_time = datetime.time(hibernateHourToWakeAt, 0, 0)
 
                     setAlarm = True
 
-                else:
+                if not voltage_is_low or low_voltage_count < LOW_VOLTAGE_THRESHOLD:
 
                     # If we've been up for more than 2 modem cycles or 30 minutes, and the most recently captured image is older than 10 minutes, or the most recently uploaded image is older than 30 minutes,
                     # either network is out, or we can't get a cellular signal, DNS is messing around, or camera isn't capturing.

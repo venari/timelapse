@@ -392,11 +392,11 @@ def check_usb_power_status():
                 model = f.read().strip('\0')
                 if 'Raspberry Pi 5' not in model:
                     logger.debug(f'Not a Raspberry Pi 5 (detected: {model}) - USB power status not applicable.')
-                    return 'N/A'
+                    return {'data': 0, 'error': 'Not Pi 5'}
         except FileNotFoundError:
             logger.debug('Could not determine Pi model - /proc/device-tree/model not found.')
             #return 'UNKNOWN'
-            return "{'data': 0, 'error': 'Not Pi 5'}"
+            return {'data': 0, 'error': 'Not Pi 5'}
         
         # Query USB hub status using uhubctl
         # Check hub 4 (one of the main USB hubs on Pi 5)

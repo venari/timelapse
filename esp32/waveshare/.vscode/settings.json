@@ -1,0 +1,5 @@
+{
+    "idf.currentSetup": "/home/leigh/.espressif/v6.0.2/esp-idf",
+    "idf.port": "/dev/ttyACM0",
+    "idf.flashType": "UART"
+}

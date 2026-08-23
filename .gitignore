@@ -141,6 +141,9 @@ arduino_secrets.h
 arduino_secrets.cpp
 timelapse.functions/local.settings.json
 
-
 bin/
 obj/
+
+# esp-idf build artefacts
+managed_components/
+esp32/envirocam/main.d
