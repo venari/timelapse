@@ -1658,7 +1658,7 @@ void updateGeoLocationIfDue(DeviceConfig &config)
 {
     time_t now = time(nullptr);
     time_t lastFix = parseISO8601Timestamp(config.geoTimeRecorded);
-    if (lastFix != 0 && now >= lastFix && (uint32_t)(now - lastFix) < config.geoIntervalS) {
+    if (config.geoIntervalS == 0 || lastFix != 0 && now >= lastFix && (uint32_t)(now - lastFix) < config.geoIntervalS) {
         return;   // not due yet
     }
 
