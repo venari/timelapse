@@ -124,6 +124,28 @@
 #define DEFAULT_CAMERA_WARMUP_FRAMES 2            // Frames grabbed+discarded after sensor init to let AEC/AWB converge - see setup()
 #define DEFAULT_SUPPORT_MODE         false        // See loop() - true keeps the board awake instead of deep-sleeping
 
+// Mirrors the Raspberry Pi units' camera.enable_long_exposure_at_night (see scripts/savePhotos.py)
+// as closely as the OV5640 hardware allows - see setupCameraNightExposure(). Off by default: this
+// is a much rougher lever than the Pi's libcamera ExposureTime control (see that function's
+// comment), and wants field verification on real hardware before being turned on fleet-wide.
+#define DEFAULT_ENABLE_LONG_EXPOSURE_AT_NIGHT true
+// esp_camera's OV5640 driver derives the sensor's whole PLL/pixel-clock chain from
+// camera_config_t.xclk_freq_hz (see set_framesize() in the esp32-camera component) - halving
+// xclk roughly halves pixel clock, which roughly doubles how long the sensor's fixed per-frame
+// exposure-line ceiling is worth in wall-clock time. 8MHz (vs. the normal 20MHz - see
+// config.xclk_freq_hz below) lands comfortably inside the OV5640's documented PLL input/VCO
+// range while giving roughly a 2.5x longer max exposure than the daytime clock allows. Tunable
+// via config.json without a reflash if a deployed unit needs a different value.
+#define DEFAULT_LONG_EXPOSURE_XCLK_HZ (8000000UL)
+// set_aec_value() (see ov5640.c) clamps whatever's passed to the sensor's *current* total frame
+// length in lines (register 0x380e/0x380f, "VTS") - but pinning exposure to that literal ceiling
+// leaves the sensor zero blanking/readout margin, which is out of spec (most OV-series sensors
+// need exposure lines <= VTS - 4) and was observed causing roughly a coin-flip's worth of failed/
+// corrupted captures ("Capturing camera failed!") - see setupCameraNightExposure(). Backed off a
+// bit further than the datasheet's bare minimum since this hasn't been characterised on real
+// hardware yet.
+#define NIGHT_EXPOSURE_MARGIN_LINES 16
+
 // utilities.h defines MODEM_GPS_ENABLE_GPIO/MODEM_GPS_ENABLE_LEVEL etc. per board, but not this -
 // matches LilyGo's own reference examples for the SIM7670G-S3 (e.g. LilyGo-Modem-Series/examples/Traccar).
 #define MODEM_POWERON_PULSE_WIDTH_MS 100
@@ -156,6 +178,12 @@ struct DeviceConfig {
     // wake cycles - see loop(). Meant for a technician who needs the board reliably reachable
     // (serial/OTA) rather than asleep most of the time.
     bool supportMode = DEFAULT_SUPPORT_MODE;
+
+    // See DEFAULT_ENABLE_LONG_EXPOSURE_AT_NIGHT/DEFAULT_LONG_EXPOSURE_XCLK_HZ above and
+    // setupCameraNightExposure() below - OV5640 only, silently ignored on OV2640 (its driver has
+    // no equivalent lever - see setupCameraNightExposure()'s comment).
+    bool enableLongExposureAtNight = DEFAULT_ENABLE_LONG_EXPOSURE_AT_NIGHT;
+    uint32_t longExposureXclkHz = DEFAULT_LONG_EXPOSURE_XCLK_HZ;
 
     // What sensor is actually fitted - "OV5640" or "OV2640". Set from on-the-fly PID detection
     // every boot (see setup()), which is authoritative whenever it recognises the sensor; this
@@ -571,7 +599,8 @@ void writeCounts(const TelemetryCounts &counts)
 
 // Applies whichever of sleepDuringNight/daytimeStartsAtH/daytimeEndsAtH/cameraIntervalS/apiUrl/
 // hflip/vflip/autoSyncPeriodS/geoIntervalS/geoLat/geoLon/geoTimeRecorded/cameraModel/
-// cameraWarmupFrames are present in `fields` on top of an existing DeviceConfig - used for both
+// cameraWarmupFrames/enableLongExposureAtNight/longExposureXclkHz are present in `fields` on top
+// of an existing DeviceConfig - used for both
 // CONFIG_FILE (on disk) and the Device object nested in an Image/Telemetry API response, so a
 // partial payload only touches the fields it mentions. In practice the geo* fields and
 // cameraModel only ever come from CONFIG_FILE - the API has no way to know a device's GPS
@@ -591,6 +620,8 @@ void applyConfigFields(JsonVariantConst fields, DeviceConfig &config)
     config.geoLat           = fields["geoLat"] | config.geoLat;
     config.geoLon           = fields["geoLon"] | config.geoLon;
     config.cameraWarmupFrames = fields["cameraWarmupFrames"] | config.cameraWarmupFrames;
+    config.enableLongExposureAtNight = fields["enableLongExposureAtNight"] | config.enableLongExposureAtNight;
+    config.longExposureXclkHz = fields["longExposureXclkHz"] | config.longExposureXclkHz;
     if (!fields["apiUrl"].isNull()) {
         String apiUrl = fields["apiUrl"].as<String>();
         if (apiUrl.length() > 0) {
@@ -620,7 +651,7 @@ DeviceConfig readDeviceConfig()
         return config;
     }
 
-    DynamicJsonDocument doc(640);
+    DynamicJsonDocument doc(768);
     DeserializationError err = deserializeJson(doc, file);
     file.close();
 
@@ -635,7 +666,7 @@ DeviceConfig readDeviceConfig()
 
 void writeDeviceConfig(const DeviceConfig &config)
 {
-    DynamicJsonDocument doc(640);
+    DynamicJsonDocument doc(768);
     doc["sleepDuringNight"] = config.sleepDuringNight;
     doc["daytimeStartsAtH"] = config.daytimeStartsAtH;
     doc["daytimeEndsAtH"] = config.daytimeEndsAtH;
@@ -651,6 +682,8 @@ void writeDeviceConfig(const DeviceConfig &config)
     doc["geoTimeRecorded"] = config.geoTimeRecorded;
     doc["cameraModel"] = config.cameraModel;
     doc["cameraWarmupFrames"] = config.cameraWarmupFrames;
+    doc["enableLongExposureAtNight"] = config.enableLongExposureAtNight;
+    doc["longExposureXclkHz"] = config.longExposureXclkHz;
 
     File file = SD.open(CONFIG_FILE, "w");
     if (file) {
@@ -668,7 +701,7 @@ void writeDeviceConfig(const DeviceConfig &config)
 // already live for the Raspberry Pi units (see scripts/uploadPending.py).
 void applyDeviceConfigFromApiResponse(const String &responseBody, DeviceConfig &config)
 {
-    DynamicJsonDocument doc(1024);
+    DynamicJsonDocument doc(1152);
     DeserializationError err = deserializeJson(doc, responseBody);
     if (err) {
         logf("Failed to parse API response: %s", err.c_str());
@@ -694,7 +727,9 @@ void applyDeviceConfigFromApiResponse(const String &responseBody, DeviceConfig &
         newConfig.autoSyncPeriodS != config.autoSyncPeriodS ||
         newConfig.supportMode != config.supportMode ||
         newConfig.geoIntervalS !=config.geoIntervalS ||
-        newConfig.cameraWarmupFrames != config.cameraWarmupFrames
+        newConfig.cameraWarmupFrames != config.cameraWarmupFrames ||
+        newConfig.enableLongExposureAtNight != config.enableLongExposureAtNight ||
+        newConfig.longExposureXclkHz != config.longExposureXclkHz
 ) {
         config = newConfig;
         writeDeviceConfig(config);
@@ -1602,6 +1637,21 @@ bool uploadPendingImages(const String &deviceId, TelemetryCounts &counts, Device
     return backlogExcessive;
 }
 
+// Whether it's currently outside daytime hours (daytimeStartsAtH/daytimeEndsAtH, compared in
+// UTC - see computeSleepSeconds()'s comment on why UTC). Returns false - i.e. "assume daytime" -
+// if the clock was never synced, same as computeSleepSeconds()/setupCameraNightExposure() falling
+// back to their normal daytime behaviour in that case. Shared by computeSleepSeconds() (whether
+// to sleep through the night instead of waking every cameraIntervalS) and
+// setupCameraNightExposure() (whether to switch the sensor into its long-exposure setup).
+bool isCurrentlyNight(const DeviceConfig &config)
+{
+    struct tm timeinfo;
+    if (!getLocalTime(&timeinfo, 0)) {
+        return false;
+    }
+    return (timeinfo.tm_hour >= config.daytimeEndsAtH) || (timeinfo.tm_hour < config.daytimeStartsAtH);
+}
+
 // Decides how long to deep-sleep for, in seconds. Normally just config.cameraIntervalS, but
 // when sleep_during_night is enabled and it's currently outside daytime hours, sleeps through
 // until daytimeStartsAtH instead of waking every cameraIntervalS to take a photo in the dark.
@@ -1623,8 +1673,7 @@ uint32_t computeSleepSeconds(const DeviceConfig &config)
         return intervalS;
     }
 
-    bool isNight = (timeinfo.tm_hour >= config.daytimeEndsAtH) || (timeinfo.tm_hour < config.daytimeStartsAtH);
-    if (!isNight) {
+    if (!isCurrentlyNight(config)) {
         return intervalS;
     }
 
@@ -1787,6 +1836,57 @@ void setup()
     }
 }
 
+// Switches the sensor from auto exposure to a fixed exposure pinned at its maximum - the closest
+// the OV5640 driver gets to the Raspberry Pi units' camera.enable_long_exposure_at_night /
+// ExposureTime (see scripts/savePhotos.py). Only called from runWakeCycle() when
+// deviceConfig.enableLongExposureAtNight is set, it's night (see isCurrentlyNight()), and the
+// detected sensor is OV5640.
+//
+// How this differs from the Pi: libcamera lets Picamera2 ask the IMX708 for an explicit
+// ExposureTime in microseconds, up to several seconds. The esp32-camera OV5640 driver has no such
+// control - sensor->set_aec_value() only accepts a value up to the sensor's *current* frame
+// length in lines (register 0x380e/0x380f, read internally - see set_aec_value() in the
+// component's ov5640.c), i.e. at most one frame period. The only lever the driver's public
+// sensor_t API gives us to stretch that ceiling is to slow the whole pixel clock down by lowering
+// camera_config_t.xclk_freq_hz before esp_camera_init() - set_framesize() in ov5640.c derives
+// every PLL register from sensor->xclk_freq_hz, so a lower xclk means a proportionally longer
+// wall-clock duration per frame/line even though the line-count ceiling itself doesn't change.
+// runWakeCycle() already switches config.xclk_freq_hz to deviceConfig.longExposureXclkHz before
+// esp_camera_init() for this reason (see nightLongExposure there) - this function just:
+//   1. Turns auto exposure off (set_exposure_ctrl(0)) so the sensor's own AEC doesn't fight the
+//      manual value set below.
+//   2. Pins aec_value to the sensor's maximum for whatever frame length is currently configured -
+//      set_aec_value() clamps internally to that ceiling, so passing a deliberately oversized
+//      value is enough; there's no need to separately read the real ceiling back out first.
+// Gain is left on auto (set_gain_ctrl(1), set further up in runWakeCycle) so AGC can still
+// brighten the image on top of the maxed-out exposure if that alone isn't enough - as close as
+// this hardware gets to the Pi's paired ExposureTime/AnalogueGain.
+//
+// OV2640 has no comparable lever - its set_aec_value() ceiling is a hardcoded 1200, unrelated to
+// frame timing (see ov2640.c) - so runWakeCycle() never calls this for a detected/configured
+// OV2640; enableLongExposureAtNight is simply a no-op there.
+//
+// NOT verified against real hardware: DEFAULT_LONG_EXPOSURE_XCLK_HZ was picked from the OV5640
+// driver's own PLL math (see that macro's comment), not measured on a device, and the OV5640
+// datasheet's PLL/VCO valid ranges aren't enforced anywhere in this driver - an unsuitable
+// longExposureXclkHz could plausibly stop the sensor's PLL from locking rather than just slowing
+// it down. Confirm actual exposure time and image quality on a real unit before enabling this
+// fleet-wide, and retune deviceConfig.longExposureXclkHz (config.json, no reflash needed) if it
+// needs adjusting.
+void setupCameraNightExposure(sensor_t *s)
+{
+    s->set_exposure_ctrl(s, 0);    // manual exposure - see comment above
+
+    // Read VTS (frame length, lines) ourselves via the generic register accessor the driver
+    // exposes on sensor_t (get_reg with a >0xFF mask reads a 16-bit register - see get_reg() in
+    // ov5640.c), so we can back off NIGHT_EXPOSURE_MARGIN_LINES from it - see that macro's
+    // comment for why pinning to the literal ceiling isn't safe.
+    int vtsLines = s->get_reg(s, 0x380e, 0xFFFF);
+    int aecTarget = (vtsLines > NIGHT_EXPOSURE_MARGIN_LINES) ? (vtsLines - NIGHT_EXPOSURE_MARGIN_LINES) : 0xFFFF;
+    s->set_aec_value(s, aecTarget);   // set_aec_value() still clamps internally as a backstop
+    logf("Night long exposure active: xclk=%dHz, VTS=%d, AEC=%d", s->xclk_freq_hz, vtsLines, aecTarget);
+}
+
 // Everything a single wake cycle does: bring the camera up, capture, take/refresh a GPS fix,
 // build+upload telemetry, upload any backlogged images, then power the camera back down. This
 // is the whole of what used to be setup() below the boot-once battery check above - normally
@@ -1840,6 +1940,16 @@ void runWakeCycle()
     }
     lastWakeConnectedWiFi = didConnectWiFi;
 
+    // See setupCameraNightExposure() below - decided here, ahead of camera_config_t, because
+    // xclk_freq_hz has to be picked before esp_camera_init() (it can't be changed afterwards
+    // without a full re-init). deviceConfig.cameraModel is last boot's PID detection (or the
+    // "OV5640" default before any detection has run) - good enough to avoid slowing an OV2640's
+    // clock for no benefit (see setupCameraNightExposure()'s comment on why OV2640 can't use
+    // this), without waiting on this boot's own detection which only happens after init.
+    bool nightLongExposure = deviceConfig.enableLongExposureAtNight
+                              && deviceConfig.cameraModel != "OV2640"
+                              && isCurrentlyNight(deviceConfig);
+
     // Enable / disable power save mode (1 disabled, 0 enabled)
     pinMode(BOARD_POWER_SAVE_MODE_PIN, OUTPUT);
     digitalWrite(BOARD_POWER_SAVE_MODE_PIN, HIGH);
@@ -1863,7 +1973,7 @@ void runWakeCycle()
     config.pin_sccb_scl = CAMERA_SIOC_PIN;
     config.pin_pwdn = CAMERA_PWDN_PIN;
     config.pin_reset = CAMERA_RESET_PIN;
-    config.xclk_freq_hz = 20000000;
+    config.xclk_freq_hz = nightLongExposure ? deviceConfig.longExposureXclkHz : 20000000;
     // Highest we ever want (OV5640's max). esp_camera_init() probes the sensor internally and
     // automatically clamps this down to whatever that sensor actually supports (e.g. OV2640 ->
     // UXGA, its native ~2MP max) *before* sizing the DMA receive buffer for it - so the buffer
@@ -1921,6 +2031,15 @@ void runWakeCycle()
     s->set_ae_level(s, 0);        // neutral target exposure, no bias
     s->set_gain_ctrl(s, 1);       // auto gain on
 
+    // Overrides the auto-exposure settings just above - see setupCameraNightExposure()'s comment
+    // for what this does and doesn't achieve compared to the Raspberry Pi units' long exposure.
+    // Gated on the sensor actually detected this boot (detectedModel), not the
+    // nightLongExposure/deviceConfig.cameraModel check that picked config.xclk_freq_hz above -
+    // that one only had last boot's PID detection (or the default) to go on.
+    if (nightLongExposure && detectedModel == "OV5640") {
+        setupCameraNightExposure(s);
+    }
+
     // Mounting-orientation correction, set centrally on the server (see DeviceConfig /
     // applyConfigFields) - lets a camera be physically mounted upside down or mirrored without
     // a firmware change. Applied after the OV3660 fixup above, so it's the final word on
@@ -1944,8 +2063,16 @@ void runWakeCycle()
 
     DatedPath datedPath = getDatedPath();
 
-    // Capture camera photo
+    // Capture camera photo. A single retry costs at most one more frame period if the first
+    // attempt comes back NULL (timeout, DMA hiccup, transient SCCB error) - cheap insurance
+    // against losing the whole wake cycle to one bad frame, most likely to matter at night
+    // where a slower clock/near-ceiling exposure (see setupCameraNightExposure()) leaves less
+    // margin than the normal daytime capture.
     camera_fb_t *frame = esp_camera_fb_get();
+    if (!frame) {
+        logLine("First capture attempt failed, retrying once...");
+        frame = esp_camera_fb_get();
+    }
 
     if (frame) {
 
