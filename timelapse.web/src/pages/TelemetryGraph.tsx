@@ -15,7 +15,6 @@ import {
   Legend,
   ResponsiveContainer,
   Area,
-  AreaChart,
   ComposedChart,
 } from 'recharts';
 import { format, subHours, subDays } from 'date-fns';
@@ -248,7 +247,7 @@ export function TelemetryGraph() {
                   <YAxis domain={[0, 100]} unit="%" />
                   <Tooltip
                     labelFormatter={(timestamp) => format(new Date(timestamp), 'PPpp')}
-                    formatter={(value: number) => [`${value.toFixed(1)}%`, 'Battery']}
+                    formatter={(value) => [`${Number(value).toFixed(1)}%`, 'Battery']}
                   />
                   <Legend />
                   <Line
@@ -285,7 +284,7 @@ export function TelemetryGraph() {
                   <YAxis unit="°C" />
                   <Tooltip
                     labelFormatter={(timestamp) => format(new Date(timestamp), 'PPpp')}
-                    formatter={(value: number) => [`${value.toFixed(1)}°C`, 'Temperature']}
+                    formatter={(value) => [`${Number(value).toFixed(1)}°C`, 'Temperature']}
                   />
                   <Legend />
                   <Line
@@ -323,7 +322,7 @@ export function TelemetryGraph() {
                     <YAxis unit=" GB" />
                     <Tooltip
                       labelFormatter={(timestamp) => format(new Date(timestamp), 'PPpp')}
-                      formatter={(value: number) => [`${value.toFixed(2)} GB`, 'Free Space']}
+                      formatter={(value) => [`${Number(value).toFixed(2)} GB`, 'Free Space']}
                     />
                     <Legend />
                     <Line
@@ -366,12 +365,12 @@ export function TelemetryGraph() {
                     <YAxis yAxisId="right" orientation="right" label={{ value: 'Current (mA)', angle: 90, position: 'insideRight' }} />
                     <Tooltip
                       labelFormatter={(timestamp) => format(new Date(timestamp), 'PPpp')}
-                      formatter={(value: number, name: string) => {
+                      formatter={(value, name) => {
                         if (name === 'Charging') return null;
                         if (name === 'Voltage (V)') {
-                          return [`${value.toFixed(2)} V`, name];
+                          return [`${Number(value).toFixed(2)} V`, name];
                         }
-                        return [`${value.toFixed(0)} mA`, name];
+                        return [`${Number(value).toFixed(0)} mA`, name];
                       }}
                     />
                     <Legend 
@@ -439,7 +438,7 @@ export function TelemetryGraph() {
                     <YAxis unit=" hrs" />
                     <Tooltip
                       labelFormatter={(timestamp) => format(new Date(timestamp), 'PPpp')}
-                      formatter={(value: number) => [`${value.toFixed(1)} hours`, 'Uptime']}
+                      formatter={(value) => [`${Number(value).toFixed(1)} hours`, 'Uptime']}
                     />
                     <Legend />
                     <Line
@@ -481,7 +480,7 @@ export function TelemetryGraph() {
                     <YAxis />
                     <Tooltip
                       labelFormatter={(timestamp) => format(new Date(timestamp), 'PPpp')}
-                      formatter={(value: number, name: string) => {
+                      formatter={(value, name) => {
                         if (name === 'Power No WiFi' || name === 'WiFi Only' || name === 'Internet') return null;
                         return [`${value}`, name];
                       }}

@@ -246,7 +246,7 @@ export function ImageView() {
         <h1 className="text-4xl font-bold mb-2">
           {device?.name || 'Loading...'}
         </h1>
-        <p className="text-muted-foreground">Timelapse Image Viewer</p>
+        <p className="text-muted-foreground">Envirocam Image Viewer</p>
       </div>
 
       <Card>

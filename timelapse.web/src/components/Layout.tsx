@@ -9,7 +9,7 @@ export function Layout() {
           <div className="flex items-center gap-6">
             <Link to="/dashboard" className="flex items-center gap-2 font-bold text-xl">
               <Camera className="h-6 w-6" />
-              Timelapse
+              Envirocam
             </Link>
             <div className="flex gap-4">
               <Link to="/dashboard" className="text-sm hover:underline">
