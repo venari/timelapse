@@ -44,7 +44,7 @@ export function Login() {
         <CardHeader className="items-center text-center space-y-2">
           <Camera className="h-8 w-8" />
           <CardTitle>Sign in</CardTitle>
-          <CardDescription>Sign in to access the Timelapse dashboard</CardDescription>
+          <CardDescription>Sign in to access the Envirocam dashboard</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
