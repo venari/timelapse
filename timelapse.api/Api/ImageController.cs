@@ -92,6 +92,19 @@ namespace timelapse.api{
             return new RedirectResult(image.BlobUri.ToString() + _storageHelper.SasToken);
         }        
 
+        // Needed by the React Event-creation flow to look up the image (and its
+        // device) the user was viewing when they clicked "Create Event".
+        [HttpGet("{id}")]
+        public ActionResult<Image> GetImage(int id){
+            var image = _appDbContext.Images.FirstOrDefault(i => i.Id == id);
+
+            if(image==null){
+                return new NotFoundResult();
+            }
+
+            return image;
+        }
+
         [HttpGet("GetImageAtOrAround")]
         // [ThirdPartyApiKeyAuth]
         public ActionResult<Image> GetImageAtOrAround([FromQuery] int deviceId, DateTime timestamp, bool forwards){

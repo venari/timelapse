@@ -30,6 +30,9 @@ export function Layout() {
               <Link to="/dashboard" className="text-sm hover:underline">
                 Dashboard
               </Link>
+              <Link to="/event" className="text-sm hover:underline">
+                Events
+              </Link>
             </div>
             {user && (
               <div className="ml-auto flex items-center gap-3">

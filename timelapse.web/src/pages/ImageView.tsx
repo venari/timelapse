@@ -1,12 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/api/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Play, Pause, Loader2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Play, Pause, Loader2, ChevronLeft, ChevronRight, Flag } from 'lucide-react';
 import { format, subHours, subDays } from 'date-fns';
 import { getImageUrl } from '@/lib/imageUtils';
 
@@ -253,14 +253,24 @@ export function ImageView() {
         <CardHeader>
           <div className="flex justify-between items-center">
             <CardTitle>Images</CardTitle>
-            <Tabs value={timeRange} onValueChange={handleTimeRangeChange}>
-              <TabsList>
-                <TabsTrigger value="1h">1 Hour</TabsTrigger>
-                <TabsTrigger value="24h">24 Hours</TabsTrigger>
-                <TabsTrigger value="48h">48 Hours</TabsTrigger>
-                <TabsTrigger value="7d">7 Days</TabsTrigger>
-              </TabsList>
-            </Tabs>
+            <div className="flex items-center gap-4">
+              <Tabs value={timeRange} onValueChange={handleTimeRangeChange}>
+                <TabsList>
+                  <TabsTrigger value="1h">1 Hour</TabsTrigger>
+                  <TabsTrigger value="24h">24 Hours</TabsTrigger>
+                  <TabsTrigger value="48h">48 Hours</TabsTrigger>
+                  <TabsTrigger value="7d">7 Days</TabsTrigger>
+                </TabsList>
+              </Tabs>
+              {currentImage && (
+                <Link to={`/event/new/${currentImage.id}`}>
+                  <Button variant="outline" size="sm">
+                    <Flag className="h-4 w-4 mr-2" />
+                    Create Event
+                  </Button>
+                </Link>
+              )}
+            </div>
           </div>
         </CardHeader>
         <CardContent>

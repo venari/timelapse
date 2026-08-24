@@ -104,11 +104,42 @@ export interface DeviceUpdateRequest {
   location?: DeviceLocationUpdateRequest | null;
 }
 
-export interface Event {
+export interface EventType {
   id: number;
   name: string;
-  description?: string;
+  description?: string | null;
+}
+
+export interface EventSummary {
+  id: number;
   startTime: string;
   endTime: string;
-  deviceId: number;
+  description?: string | null;
+  createdDate: string;
+  device: { id: number; name: string; description?: string | null };
+  eventTypes: EventType[];
+  startImage: Image | null;
+  endImage: Image | null;
+  createdBy: string;
+}
+
+export interface EventDetail extends EventSummary {
+  lastEditedDate: string;
+  lastEditedBy: string;
+  eventImages: { id: number; timestamp: string; blobUri: string }[];
+}
+
+export interface CreateEventRequest {
+  imageId: number;
+  startTime: string;
+  endTime: string;
+  description: string;
+  eventTypeIds: number[];
+}
+
+export interface UpdateEventRequest {
+  startTime: string;
+  endTime: string;
+  description: string;
+  eventTypeIds: number[];
 }

@@ -120,6 +120,12 @@ app.MapFallbackToFile("/device/{*path}", "dist/index.html");
 app.MapFallbackToFile("/image-view/{*path}", "dist/index.html");
 app.MapFallbackToFile("/telemetry/{*path}", "dist/index.html");
 app.MapFallbackToFile("/login", "dist/index.html");
+// "event" (singular) deliberately, not "events" - the old Razor "Events" folder's
+// Index page has an implicit bare-folder alias plus its own optional int route
+// parameter, so (combined with ASP.NET's case-insensitive routing) "/events" and
+// "/events/{number}" already resolve to that old page; "event" never collides with it.
+app.MapFallbackToFile("/event", "dist/index.html");
+app.MapFallbackToFile("/event/{*path}", "dist/index.html");
 
 app.MapSwagger();
 app.UseSwaggerUI();

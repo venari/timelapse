@@ -6,6 +6,10 @@ import { ImageView } from '@/pages/ImageView';
 import { TelemetryGraph } from '@/pages/TelemetryGraph';
 import { DeviceEdit } from '@/pages/DeviceEdit';
 import { Login } from '@/pages/Login';
+import { EventsIndex } from '@/pages/EventsIndex';
+import { EventCreate } from '@/pages/EventCreate';
+import { EventDetail } from '@/pages/EventDetail';
+import { EventEdit } from '@/pages/EventEdit';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -29,6 +33,10 @@ function App() {
             <Route path="/device/:deviceId/edit" element={<DeviceEdit />} />
             <Route path="/image-view/:deviceId" element={<ImageView />} />
             <Route path="/telemetry/:deviceId" element={<TelemetryGraph />} />
+            <Route path="/event" element={<EventsIndex />} />
+            <Route path="/event/new/:imageId" element={<EventCreate />} />
+            <Route path="/event/:eventId" element={<EventDetail />} />
+            <Route path="/event/:eventId/edit" element={<EventEdit />} />
           </Route>
         </Routes>
       </Router>

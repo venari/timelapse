@@ -1,5 +1,15 @@
 import axios from 'axios';
-import type { Device, Telemetry, Image, DeviceUpdateRequest } from '@/types';
+import type {
+  Device,
+  Telemetry,
+  Image,
+  DeviceUpdateRequest,
+  EventSummary,
+  EventDetail,
+  EventType,
+  CreateEventRequest,
+  UpdateEventRequest,
+} from '@/types';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
 
@@ -77,7 +87,42 @@ export const api = {
     return response.data;
   },
 
+  // Events
+  async getEvents(days: number): Promise<EventSummary[]> {
+    const response = await apiClient.get<EventSummary[]>(`/api/Event?days=${days}`);
+    return response.data;
+  },
+
+  async getEventTypes(): Promise<EventType[]> {
+    const response = await apiClient.get<EventType[]>('/api/Event/Types');
+    return response.data;
+  },
+
+  async getEvent(eventId: number): Promise<EventDetail> {
+    const response = await apiClient.get<EventDetail>(`/api/Event/${eventId}`);
+    return response.data;
+  },
+
+  async createEvent(payload: CreateEventRequest): Promise<EventDetail> {
+    const response = await apiClient.post<EventDetail>('/api/Event', payload);
+    return response.data;
+  },
+
+  async updateEvent(eventId: number, payload: UpdateEventRequest): Promise<EventDetail> {
+    const response = await apiClient.put<EventDetail>(`/api/Event/${eventId}`, payload);
+    return response.data;
+  },
+
+  async deleteEvent(eventId: number): Promise<void> {
+    await apiClient.delete(`/api/Event?eventId=${eventId}`);
+  },
+
   // Images
+  async getImage(imageId: number): Promise<Image> {
+    const response = await apiClient.get<Image>(`/api/Image/${imageId}`);
+    return response.data;
+  },
+
   async getLatestImage(deviceId: number): Promise<string> {
     const response = await apiClient.get<string>(`/api/Image/Latest?deviceId=${deviceId}`);
     return response.data;
