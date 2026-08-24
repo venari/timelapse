@@ -14,7 +14,7 @@ export function ImageView() {
   const { deviceId } = useParams<{ deviceId: string }>();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [timeRange, setTimeRange] = useState<'1h' | '24h' | '48h' | '7d'>('24h');
+  const [timeRange, setTimeRange] = useState<'1h' | '24h' | '48h' | '7d'>('1h');
   const [loadedImages, setLoadedImages] = useState<Set<number>>(new Set());
   const [preloadProgress, setPreloadProgress] = useState(0);
   const playIntervalRef = useRef<number | null>(null);
