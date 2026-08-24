@@ -134,8 +134,12 @@ export function TelemetryGraph() {
         diskSpace: t.diskSpaceFree ? t.diskSpaceFree : null, // Convert to GB
         voltage: t.batteryVoltage != null ? t.batteryVoltage / 1000 : null, // Convert mV to V
         current: t.batteryCurrent != null ? t.batteryCurrent : null,
+        ioVoltage: t.ioVoltage != null ? t.ioVoltage / 1000 : null, // Convert mV to V
         // Boolean values
-        charging: t.charging === true ? 1 : 0,
+        // ESP32 devices never populate the Pi-only Status_Battery/Charge_State fields
+        // that `charging` is otherwise derived from, so treat a solar/IO voltage above
+        // 4.2V as a charging signal too.
+        charging: t.charging === true || (t.ioVoltage != null && t.ioVoltage > 4200) ? 1 : 0,
         powerSwitch: t.powerSwitch === true ? 1 : 0,
         connectedWifi: t.connectedToWirelessNetwork === true ? 1 : 0,
         connectedInternet: t.connectedToInternet === true ? 1 : 0,
@@ -145,8 +149,9 @@ export function TelemetryGraph() {
         pendingTelemetry: t.pendingTelemetry != null ? t.pendingTelemetry : null,
       })) || [];
 
-    // Calculate min and max voltage for y-axis domain
-    const voltageValues = rawChartData.map(d => d.voltage).filter((v): v is number => v != null && v > 0);
+    // Calculate min and max voltage for y-axis domain (battery + IO voltage share this axis)
+    const voltageValues = [...rawChartData.map(d => d.voltage), ...rawChartData.map(d => d.ioVoltage)]
+      .filter((v): v is number => v != null && v > 0);
     const minVoltage = voltageValues.length > 0 ? Math.min(...voltageValues) : 0;
     const maxVoltage = voltageValues.length > 0 ? Math.max(...voltageValues) : 5;
     
@@ -339,14 +344,14 @@ export function TelemetryGraph() {
           )}
 
           {/* Voltage & Current Chart */}
-          {chartData.some((d) => d.voltage != null || d.current != null) && (
+          {chartData.some((d) => d.voltage != null || d.current != null || d.ioVoltage != null) && (
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Battery className="h-5 w-5 text-amber-600" />
                   Battery Voltage & Current
                   <span className="text-sm font-normal text-muted-foreground ml-2">
-                    (Green background = Charging)
+                    (Green background = Charging, or IO Voltage &gt; 4.2V)
                   </span>
                 </CardTitle>
               </CardHeader>
@@ -367,7 +372,7 @@ export function TelemetryGraph() {
                       labelFormatter={(timestamp) => format(new Date(timestamp), 'PPpp')}
                       formatter={(value, name) => {
                         if (name === 'Charging') return null;
-                        if (name === 'Voltage (V)') {
+                        if (name === 'Voltage (V)' || name === 'IO Voltage (V)') {
                           return [`${Number(value).toFixed(2)} V`, name];
                         }
                         return [`${Number(value).toFixed(0)} mA`, name];
@@ -398,6 +403,16 @@ export function TelemetryGraph() {
                       stroke="#f59e0b"
                       strokeWidth={2}
                       name="Voltage (V)"
+                      dot={false}
+                    />
+                    {/* IO (solar) voltage line - also drives the Charging background above 4.2V */}
+                    <Line
+                      yAxisId="left"
+                      type="monotone"
+                      dataKey="ioVoltage"
+                      stroke="#8b5cf6"
+                      strokeWidth={2}
+                      name="IO Voltage (V)"
                       dot={false}
                     />
                     {/* Current line */}
