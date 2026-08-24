@@ -13,12 +13,23 @@ var builder = WebApplication.CreateBuilder(args);
 // Add services to the container.
 builder.Services.AddRazorPages();
 
-builder.Services.AddDefaultIdentity<AppUser>(options => 
+builder.Services.AddDefaultIdentity<AppUser>(options =>
 {
     options.SignIn.RequireConfirmedAccount = true;
 })
     .AddRoles<IdentityRole>()
     .AddEntityFrameworkStores<AppDbContext>();
+
+// SameSite=None (with Secure, since the app already forces HTTPS via UseHttpsRedirection)
+// so the auth cookie still flows to the API from the Vite dev server, which - because it's
+// served over plain http while the API is https - counts as cross-site under browsers'
+// schemeful-same-site rules and wouldn't otherwise receive a Lax/Strict cookie at all. Safe
+// for the existing same-site Razor Pages flows too: None is a strict superset of Lax.
+builder.Services.ConfigureApplicationCookie(options =>
+{
+    options.Cookie.SameSite = SameSiteMode.None;
+    options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+});
 
 
 builder.Services.AddEndpointsApiExplorer();
@@ -108,6 +119,7 @@ app.MapFallbackToFile("/dashboard/{*path}", "dist/index.html");
 app.MapFallbackToFile("/device/{*path}", "dist/index.html");
 app.MapFallbackToFile("/image-view/{*path}", "dist/index.html");
 app.MapFallbackToFile("/telemetry/{*path}", "dist/index.html");
+app.MapFallbackToFile("/login", "dist/index.html");
 
 app.MapSwagger();
 app.UseSwaggerUI();

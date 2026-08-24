@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using timelapse.core.Helpers;
@@ -8,6 +9,7 @@ namespace timelapse.api{
 
     [Route("api/[controller]")]
     [ApiController]
+    [Authorize]
     public class TelemetryController{
 
         public TelemetryController(AppDbContext appDbContext, ILogger<TelemetryController> logger){
@@ -24,6 +26,9 @@ namespace timelapse.api{
             return _appDbContext.Telemetry.ToList();
         }
 
+        // ESP32 devices upload here directly, identified by SerialNumber - no user login
+        // involved, so this stays open regardless of the class-level [Authorize] above.
+        [AllowAnonymous]
         [HttpPost]
         public ActionResult<Telemetry> Post([FromForm] TelemetryPostModel model){
 

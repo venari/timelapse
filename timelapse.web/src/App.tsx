@@ -5,6 +5,7 @@ import { Dashboard } from '@/pages/Dashboard';
 import { ImageView } from '@/pages/ImageView';
 import { TelemetryGraph } from '@/pages/TelemetryGraph';
 import { DeviceEdit } from '@/pages/DeviceEdit';
+import { Login } from '@/pages/Login';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -20,6 +21,7 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <Router>
         <Routes>
+          <Route path="/login" element={<Login />} />
           <Route element={<Layout />}>
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
             <Route path="/dashboard" element={<Dashboard />} />

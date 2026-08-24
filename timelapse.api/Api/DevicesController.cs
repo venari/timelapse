@@ -9,6 +9,7 @@ namespace timelapse.api{
 
     [Route("api/[controller]")]
     [ApiController]
+    [Authorize]
     public class DevicesController{
 
         public DevicesController(AppDbContext appDbContext, ILogger<DevicesController> logger, DeviceUpdateService deviceUpdateService){
@@ -129,7 +130,6 @@ namespace timelapse.api{
         // This class doesn't inherit ControllerBase (matches ImageController's style
         // elsewhere in this file), so no NotFound()/Ok()/ModelState helpers are
         // available here - results are constructed explicitly instead.
-        [Authorize]
         [HttpPut("{id}")]
         public async Task<ActionResult<object>> UpdateDevice(int id, [FromBody] DeviceUpdateRequest request){
             _logger.LogInformation($"Update device {id}");

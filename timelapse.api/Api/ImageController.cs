@@ -11,7 +11,7 @@ namespace timelapse.api{
 
     [Route("api/[controller]")]
     [ApiController]
-    [AllowAnonymous]
+    [Authorize]
     public class ImageController{
 
         public ImageController(AppDbContext appDbContext, ILogger<ImageController> logger, IConfiguration configuration, IMemoryCache memoryCache){
@@ -24,6 +24,9 @@ namespace timelapse.api{
         private ILogger _logger;
         private StorageHelper _storageHelper;
         
+        // ESP32 devices upload here directly, identified by SerialNumber - no user login
+        // involved, so this stays open regardless of the class-level [Authorize] above.
+        [AllowAnonymous]
         [HttpPost]
         public ActionResult<Image> Post([FromForm] ImagePostModel model){
 
@@ -64,7 +67,10 @@ namespace timelapse.api{
             return image;
         }
 
-        // Return latest image for device as a JPEG
+        // Return latest image for device as a JPEG - gated by its own ThirdPartyApiKeyAuth
+        // filter instead of the class-level [Authorize] (still lets a logged-in user
+        // through too, since that filter checks User.Identity.IsAuthenticated first).
+        [AllowAnonymous]
         [HttpGet("Latest")]
         [ThirdPartyApiKeyAuth]
         public ActionResult GetLatest([FromQuery] int deviceId){

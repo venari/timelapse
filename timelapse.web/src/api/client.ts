@@ -11,21 +11,49 @@ const apiClient = axios.create({
   },
 });
 
-// Write endpoints require an ASP.NET Identity session cookie (see DevicesController's
-// [Authorize] PUT). Bounce unauthenticated requests to the existing login page rather
-// than failing silently - there's no React login UI yet.
+// Every data endpoint requires an ASP.NET Identity session cookie now. Bounce
+// unauthenticated requests to the React login screen rather than failing silently -
+// except calls to Auth itself, where a 401 is an expected "not logged in" result
+// (e.g. the Me check on load), not something that should force a navigation.
 apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
+    const isAuthCall = error.config?.url?.startsWith('/api/Auth/');
+    if (error.response?.status === 401 && !isAuthCall) {
       const returnUrl = encodeURIComponent(window.location.pathname + window.location.search);
-      window.location.href = `${API_BASE_URL}/Identity/Account/Login?returnUrl=${returnUrl}`;
+      window.location.href = `/login?returnUrl=${returnUrl}`;
     }
     return Promise.reject(error);
   }
 );
 
 export const api = {
+  // Auth
+  async login(email: string, password: string, rememberMe: boolean): Promise<{ email: string }> {
+    const response = await apiClient.post<{ email: string }>('/api/Auth/Login', {
+      email,
+      password,
+      rememberMe,
+    });
+    return response.data;
+  },
+
+  async logout(): Promise<void> {
+    await apiClient.post('/api/Auth/Logout');
+  },
+
+  async getCurrentUser(): Promise<{ email: string } | null> {
+    try {
+      const response = await apiClient.get<{ email: string }>('/api/Auth/Me');
+      return response.data;
+    } catch (error) {
+      if (axios.isAxiosError(error) && error.response?.status === 401) {
+        return null;
+      }
+      throw error;
+    }
+  },
+
   // Devices
   async getDevices(): Promise<Device[]> {
     // Note: This endpoint might not exist in the current backend

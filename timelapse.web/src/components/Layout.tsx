@@ -1,7 +1,22 @@
 import { Link, Outlet } from 'react-router-dom';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Camera } from 'lucide-react';
+import { api } from '@/api/client';
+import { Button } from '@/components/ui/button';
 
 export function Layout() {
+  const queryClient = useQueryClient();
+  const { data: user } = useQuery({
+    queryKey: ['auth', 'me'],
+    queryFn: api.getCurrentUser,
+  });
+
+  const handleLogout = async () => {
+    await api.logout();
+    queryClient.clear();
+    window.location.href = '/login';
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <nav className="border-b">
@@ -16,6 +31,14 @@ export function Layout() {
                 Dashboard
               </Link>
             </div>
+            {user && (
+              <div className="ml-auto flex items-center gap-3">
+                <span className="text-sm text-muted-foreground">{user.email}</span>
+                <Button variant="outline" size="sm" onClick={handleLogout}>
+                  Log out
+                </Button>
+              </div>
+            )}
           </div>
         </div>
       </nav>

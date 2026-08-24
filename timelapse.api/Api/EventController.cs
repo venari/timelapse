@@ -11,6 +11,7 @@ namespace timelapse.api{
 
     [Route("api/[controller]")]
     [ApiController]
+    [Authorize]
     public class EventController{
 
         public EventController(AppDbContext appDbContext, ILogger<EventController> logger){ //}, IConfiguration configuration, IMemoryCache memoryCache){

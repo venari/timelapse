@@ -5,7 +5,9 @@ namespace timelapse.api{
 
     [Route("api/[controller]")]
     [ApiController]
-    [AllowAnonymous]
+    // Matches DeviceEdit.cshtml's own [Authorize] - this URL+key was previously only
+    // ever rendered into that logged-in-only page's HTML.
+    [Authorize]
     public class ConfigController{
 
         public ConfigController(IConfiguration configuration){

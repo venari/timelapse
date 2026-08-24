@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using timelapse.core.models;
@@ -7,6 +8,7 @@ namespace timelapse.api{
 
     [Route("api/[controller]")]
     [ApiController]
+    [Authorize]
     public class TestController{
 
         public TestController(AppDbContext appDbContext, ILogger<TelemetryController> logger){
