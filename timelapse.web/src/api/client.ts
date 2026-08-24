@@ -11,7 +11,13 @@ import type {
   UpdateEventRequest,
 } from '@/types';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+// In production the app is served from the same ASP.NET host as the API (see
+// vite.config.ts's build.outDir + Program.cs's fallback routes), so the correct
+// default there is a same-origin relative URL - never localhost. VITE_API_BASE_URL
+// still overrides this for a split-origin deployment if one is ever needed.
+// The localhost fallback only applies to `npm run dev`, where the API runs on a
+// separate port (see .env.development / .env.example).
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || (import.meta.env.PROD ? '' : 'http://localhost:5000');
 
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
