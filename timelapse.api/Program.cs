@@ -59,6 +59,7 @@ builder.Services.AddControllers()
 // builder.AddEnvironmentVariables();
 
 builder.Services.AddDbContext<AppDbContext>();
+builder.Services.AddScoped<timelapse.api.Services.DeviceUpdateService>();
 
 builder.Services.AddTransient<IEmailSender, EmailSender>();
 builder.Services.Configure<AuthMessageSenderOptions>(builder.Configuration);
@@ -96,6 +97,17 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapRazorPages();
+
+// The React app (timelapse.web) is now the default UI. The old Razor Pages Index
+// page moved to /legacy (see Pages/Index.cshtml's @page directive) so it stays
+// fully reachable; every other old URL is untouched.
+app.MapGet("/", () => Results.Redirect("/dashboard"));
+
+app.MapFallbackToFile("/dashboard", "dist/index.html");
+app.MapFallbackToFile("/dashboard/{*path}", "dist/index.html");
+app.MapFallbackToFile("/device/{*path}", "dist/index.html");
+app.MapFallbackToFile("/image-view/{*path}", "dist/index.html");
+app.MapFallbackToFile("/telemetry/{*path}", "dist/index.html");
 
 app.MapSwagger();
 app.UseSwaggerUI();

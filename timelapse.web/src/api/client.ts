@@ -1,14 +1,29 @@
 import axios from 'axios';
-import type { Device, Telemetry, Image } from '@/types';
+import type { Device, Telemetry, Image, DeviceUpdateRequest } from '@/types';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
 
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
+  withCredentials: true,
   headers: {
     'Content-Type': 'application/json',
   },
 });
+
+// Write endpoints require an ASP.NET Identity session cookie (see DevicesController's
+// [Authorize] PUT). Bounce unauthenticated requests to the existing login page rather
+// than failing silently - there's no React login UI yet.
+apiClient.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      const returnUrl = encodeURIComponent(window.location.pathname + window.location.search);
+      window.location.href = `${API_BASE_URL}/Identity/Account/Login?returnUrl=${returnUrl}`;
+    }
+    return Promise.reject(error);
+  }
+);
 
 export const api = {
   // Devices
@@ -21,6 +36,16 @@ export const api = {
 
   async getDevice(deviceId: number): Promise<Device> {
     const response = await apiClient.get<Device>(`/api/Devices/${deviceId}`);
+    return response.data;
+  },
+
+  async updateDevice(deviceId: number, payload: DeviceUpdateRequest): Promise<Device> {
+    const response = await apiClient.put<Device>(`/api/Devices/${deviceId}`, payload);
+    return response.data;
+  },
+
+  async getBasemapConfig(): Promise<{ url: string }> {
+    const response = await apiClient.get<{ url: string }>('/api/Config/Basemap');
     return response.data;
   },
 

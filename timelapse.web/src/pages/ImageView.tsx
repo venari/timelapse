@@ -49,7 +49,6 @@ export function ImageView() {
     data: images,
     isLoading: imagesLoading,
     error: imagesError,
-    refetch,
   } = useQuery({
     queryKey: ['images', deviceId, timeRange],
     queryFn: () => {
@@ -83,7 +82,7 @@ export function ImageView() {
       currentIds.length >= previousIds.length &&
       previousIds.every((id, i) => id === currentIds[i]);
 
-    const loadImage = (image: typeof images[0], index: number, total: number, onProgress: () => void) => {
+    const loadImage = (image: typeof images[0], index: number, onProgress: () => void) => {
       const img = new Image();
       img.src = getImageUrl(image.id);
 
@@ -121,7 +120,7 @@ export function ImageView() {
 
       let loadedCount = loadedImages.size;
       for (let index = previousIds.length; index < images.length; index++) {
-        loadImage(images[index], index, currentIds.length, () => {
+        loadImage(images[index], index, () => {
           loadedCount++;
           setPreloadProgress((loadedCount / currentIds.length) * 100);
         });
@@ -146,10 +145,10 @@ export function ImageView() {
     };
 
     // Load latest image first, then load the rest
-    loadImage(images[latestIndex], latestIndex, images.length, onProgress);
+    loadImage(images[latestIndex], latestIndex, onProgress);
     images.forEach((image, index) => {
       if (index !== latestIndex) {
-        loadImage(image, index, images.length, onProgress);
+        loadImage(image, index, onProgress);
       }
     });
   }, [images]);

@@ -1,5 +1,7 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using timelapse.api.Services;
 using timelapse.core.models;
 using timelapse.infrastructure;
 
@@ -9,13 +11,15 @@ namespace timelapse.api{
     [ApiController]
     public class DevicesController{
 
-        public DevicesController(AppDbContext appDbContext, ILogger<DevicesController> logger){
+        public DevicesController(AppDbContext appDbContext, ILogger<DevicesController> logger, DeviceUpdateService deviceUpdateService){
             _appDbContext = appDbContext;
             _logger = logger;
+            _deviceUpdateService = deviceUpdateService;
         }
 
         private AppDbContext _appDbContext;
         private ILogger _logger;
+        private DeviceUpdateService _deviceUpdateService;
 
         [HttpGet]
         public ActionResult<IEnumerable<object>> GetDevices(){
@@ -105,12 +109,48 @@ namespace timelapse.api{
                 device.PowerOff,
                 device.Service,
                 device.WideAngle,
+                device.SleepDuringNight,
+                device.DaytimeStartsAtH,
+                device.DaytimeEndsAtH,
+                device.CameraIntervalS,
+                device.ApiUrl,
+                device.Hflip,
+                device.Vflip,
+                device.GeoIntervalS,
+                device.AutoSyncPeriodS,
                 LatestTelemetry = latestTelemetry,
                 LatestImage = latestImage,
                 DeviceLocations = deviceLocations
             };
 
             return result;
+        }
+
+        // This class doesn't inherit ControllerBase (matches ImageController's style
+        // elsewhere in this file), so no NotFound()/Ok()/ModelState helpers are
+        // available here - results are constructed explicitly instead.
+        [Authorize]
+        [HttpPut("{id}")]
+        public async Task<ActionResult<object>> UpdateDevice(int id, [FromBody] DeviceUpdateRequest request){
+            _logger.LogInformation($"Update device {id}");
+
+            var device = _appDbContext.Devices
+                .Include(d => d.DeviceLocations)
+                .FirstOrDefault(d => d.Id == id);
+
+            if(device == null){
+                return new NotFoundResult();
+            }
+
+            var result = _deviceUpdateService.ApplyUpdate(device, request);
+
+            if(!result.Success){
+                return new BadRequestObjectResult(result.Errors);
+            }
+
+            await _appDbContext.SaveChangesAsync();
+
+            return GetDevice(id);
         }
 
         [HttpGet("UnregisteredDevices")]

@@ -1,6 +1,6 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Battery, Thermometer, HardDrive, Camera } from 'lucide-react';
+import { Battery, Thermometer, HardDrive, Camera, Pencil } from 'lucide-react';
 import type { Device } from '@/types';
 import { formatDistanceToNow } from 'date-fns';
 import { Link } from 'react-router-dom';
@@ -43,12 +43,21 @@ export function DeviceCard({ device }: DeviceCardProps) {
             </CardTitle>
             <CardDescription>{device.serialNumber}</CardDescription>
           </div>
-          <div className="flex gap-2 flex-wrap justify-end">
-            {getStatusBadges().map((badge) => (
-              <Badge key={badge.label} variant={badge.variant}>
-                {badge.label}
-              </Badge>
-            ))}
+          <div className="flex items-start gap-2">
+            <div className="flex gap-2 flex-wrap justify-end">
+              {getStatusBadges().map((badge) => (
+                <Badge key={badge.label} variant={badge.variant}>
+                  {badge.label}
+                </Badge>
+              ))}
+            </div>
+            <Link
+              to={`/device/${device.id}/edit`}
+              className="text-muted-foreground hover:text-foreground"
+              aria-label="Edit device"
+            >
+              <Pencil className="h-4 w-4" />
+            </Link>
           </div>
         </div>
       </CardHeader>

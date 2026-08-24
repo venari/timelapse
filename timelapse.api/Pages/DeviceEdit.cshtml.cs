@@ -4,6 +4,7 @@ using timelapse.core.models;
 using timelapse.infrastructure;
 using Microsoft.EntityFrameworkCore;
 using timelapse.api.Helpers;
+using timelapse.api.Services;
 using Microsoft.AspNetCore.Authorization;
 
 
@@ -18,6 +19,7 @@ namespace timelapse.api.Pages
         private readonly ILogger<DeviceEditModel> _logger;
         private AppDbContext _appDbContext;
         private StorageHelper _storageHelper;
+        private DeviceUpdateService _deviceUpdateService;
 
         // public List<Device> devices {get;}
 
@@ -47,10 +49,11 @@ namespace timelapse.api.Pages
         [BindProperty]
         public int? HeightMM {get; set;}
 
-        public DeviceEditModel(ILogger<DeviceEditModel> logger, AppDbContext appDbContext, IConfiguration configuration)
+        public DeviceEditModel(ILogger<DeviceEditModel> logger, AppDbContext appDbContext, IConfiguration configuration, DeviceUpdateService deviceUpdateService)
         {
             _logger = logger;
             _appDbContext = appDbContext;
+            _deviceUpdateService = deviceUpdateService;
             // devices = _appDbContext.Devices
             //     // .Include(d => d.Telemetries)
             //     // .Include(d => d.Images)
@@ -91,60 +94,50 @@ namespace timelapse.api.Pages
         // To protect from overposting attacks, see https://aka.ms/RazorPagesCRUD
         public async Task<IActionResult> OnPostAsync(int id)
         {
-
-            if(Latitude.HasValue && Longitude.HasValue && LocationDescription==null){
-                ModelState.AddModelError("LocationDescription", "Location Description is required");
-            }
-
-            if (!ModelState.IsValid)
-            {
-                return Page();
-            }
-
             var device = _appDbContext.Devices
             .Include(d => d.DeviceLocations)
             .FirstOrDefault(d => d.Id == id);
 
-            device.Name = Device.Name;
-            device.Description = Device.Description;
-            device.ShortDescription = Device.ShortDescription;
-            device.SupportMode = Device.SupportMode;
-            device.MonitoringMode = Device.MonitoringMode;
-            device.HibernateMode = Device.HibernateMode;
-            device.PowerOff = Device.PowerOff;
-            device.Service = Device.Service;
-            device.WideAngle = Device.WideAngle;
-            device.Retired = Device.Retired;
-            device.SleepDuringNight = Device.SleepDuringNight;
-            device.DaytimeStartsAtH = Device.DaytimeStartsAtH;
-            device.DaytimeEndsAtH = Device.DaytimeEndsAtH;
-            device.CameraIntervalS = Device.CameraIntervalS;
-            device.ApiUrl = Device.ApiUrl;
-            device.Hflip = Device.Hflip;
-            device.Vflip = Device.Vflip;
-            device.GeoIntervalS = Device.GeoIntervalS;
-            device.AutoSyncPeriodS = Device.AutoSyncPeriodS;
-
-            if(Latitude.HasValue && Longitude.HasValue){
-
-                var deviceLocation = device.CurrentLocation;
-
-                if(deviceLocation == null || LocationMoved){
-                    deviceLocation = new DeviceLocation();
-                    device.DeviceLocations.Add(deviceLocation);
+            var request = new DeviceUpdateRequest{
+                Name = Device.Name,
+                Description = Device.Description,
+                ShortDescription = Device.ShortDescription,
+                SupportMode = Device.SupportMode,
+                MonitoringMode = Device.MonitoringMode,
+                HibernateMode = Device.HibernateMode,
+                PowerOff = Device.PowerOff,
+                Service = Device.Service,
+                WideAngle = Device.WideAngle,
+                Retired = Device.Retired,
+                SleepDuringNight = Device.SleepDuringNight,
+                DaytimeStartsAtH = Device.DaytimeStartsAtH,
+                DaytimeEndsAtH = Device.DaytimeEndsAtH,
+                CameraIntervalS = Device.CameraIntervalS,
+                ApiUrl = Device.ApiUrl,
+                Hflip = Device.Hflip,
+                Vflip = Device.Vflip,
+                GeoIntervalS = Device.GeoIntervalS,
+                AutoSyncPeriodS = Device.AutoSyncPeriodS,
+                Location = new DeviceLocationUpdateRequest{
+                    LocationMoved = LocationMoved,
+                    Description = LocationDescription,
+                    Latitude = Latitude,
+                    Longitude = Longitude,
+                    Heading = Heading,
+                    Pitch = Pitch,
+                    HeightMM = HeightMM,
                 }
+            };
 
-                deviceLocation.Latitude = Latitude.Value;
-                deviceLocation.Longitude = Longitude.Value;
-                deviceLocation.Heading = Heading;
-                deviceLocation.Pitch = Pitch;
-                deviceLocation.HeightMM = HeightMM;
-                deviceLocation.Timestamp = DateTime.UtcNow;
-                deviceLocation.Description = LocationDescription;
+            var result = _deviceUpdateService.ApplyUpdate(device, request);
+
+            if(!result.Success){
+                foreach(var error in result.Errors){
+                    ModelState.AddModelError(error.Key, error.Value);
+                }
+                return Page();
             }
 
-            _appDbContext.Devices.Update(device);
-            // _appDbContext.Devices.Update(device.CurrentLocation);
             await _appDbContext.SaveChangesAsync();
 
             return RedirectToPage("./Index");

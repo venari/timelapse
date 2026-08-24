@@ -11,6 +11,16 @@ export interface Device {
   powerOff: boolean;
   service: boolean;
   wideAngle: boolean;
+  // Only populated by GET /api/Devices/{id} (single-device), not the list endpoint.
+  sleepDuringNight?: boolean;
+  daytimeStartsAtH?: number;
+  daytimeEndsAtH?: number;
+  cameraIntervalS?: number;
+  apiUrl?: string;
+  hflip?: boolean;
+  vflip?: boolean;
+  geoIntervalS?: number;
+  autoSyncPeriodS?: number;
   latestTelemetry?: Telemetry;
   latestImage?: Image;
   deviceLocations?: DeviceLocation[];
@@ -51,10 +61,47 @@ export interface Image {
 
 export interface DeviceLocation {
   id: number;
+  deviceId: number;
   latitude: number;
   longitude: number;
-  altitude?: number;
-  deviceId: number;
+  timestamp: string;
+  heading?: number | null;
+  pitch?: number | null;
+  heightMM?: number | null;
+  description?: string | null;
+}
+
+export interface DeviceLocationUpdateRequest {
+  locationMoved: boolean;
+  description?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  heading?: number | null;
+  pitch?: number | null;
+  heightMM?: number | null;
+}
+
+export interface DeviceUpdateRequest {
+  name: string;
+  description?: string | null;
+  shortDescription?: string | null;
+  supportMode: boolean;
+  monitoringMode: boolean;
+  hibernateMode: boolean;
+  powerOff: boolean;
+  service: boolean;
+  wideAngle: boolean;
+  retired: boolean;
+  sleepDuringNight: boolean;
+  daytimeStartsAtH: number;
+  daytimeEndsAtH: number;
+  cameraIntervalS: number;
+  apiUrl: string;
+  hflip: boolean;
+  vflip: boolean;
+  geoIntervalS: number;
+  autoSyncPeriodS: number;
+  location?: DeviceLocationUpdateRequest | null;
 }
 
 export interface Event {
