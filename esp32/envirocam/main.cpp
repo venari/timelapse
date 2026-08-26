@@ -15,6 +15,9 @@
  *
  * */
 #include <esp_camera.h>
+#include <esp_log.h>
+#include <esp_heap_caps.h>
+#include <esp_system.h>
 #include <Wire.h>
 #include <FS.h>
 #include <SD.h>
@@ -85,13 +88,13 @@
 // DeviceConfig::supportMode (API-driven, needs a working uplink) can't help. bootCount is RTC
 // memory - survives a deep-sleep wake but not a real power cycle - so this only ever runs across
 // a fresh install's first few boots, never costing battery on a camera that's already deployed.
-#define SETUP_AP_MAX_BOOT_COUNT  5
+#define SETUP_AP_MAX_BOOT_COUNT  3
 #define SETUP_AP_NEXT_BOOT_DELAY_S 1   // See loop() - replaces the normal cameraIntervalS wait while
                                         // still inside the setup window's boot budget above, so the
                                         // next boot's setup window is available right away rather
                                         // than waiting out a full interval on top of the one that
                                         // just ran for minutes on its own
-#define SETUP_AP_WINDOW_MS       (5UL * 60 * 1000)   // How long the hotspot stays up before continuing on to deep sleep
+#define SETUP_AP_WINDOW_MS       (3UL * 60 * 1000)   // How long the hotspot stays up before continuing on to deep sleep
 #define SETUP_AP_STREAM_FRAMESIZE       FRAMESIZE_SVGA  // Much lighter than the QSXGA capture - plenty to check framing/focus
 #define SETUP_AP_STREAM_FRAME_INTERVAL_MS (300UL)      // Paces "/stream" frames - keeps the softAP link comfortable
 #define SETUP_AP_SSID_PREFIX     "EnviroCam-"
@@ -349,6 +352,63 @@ void logf(const char *format, ...)
     va_end(args);
 
     logLine(String(buf.data()));
+}
+
+// Registered via esp_log_set_vprintf() in setup() - catches ESP-IDF's own ESP_LOGW/ESP_LOGE output
+// (e.g. the esp32-camera driver's "Failed to get frame: timeout", or its DMA buffer malloc-failed
+// message) and appends it to LOG_FILE alongside logLine()/logf(), not just Serial. Without this,
+// a "Capturing camera failed!" entry never says *why* esp_camera_fb_get() returned NULL - the
+// driver already logs the reason, it just never reached the SD card. esp_log_level_set("*", ...)
+// in setup() keeps this to warnings/errors only, so routine INFO/DEBUG chatter from WiFi/BLE/the
+// modem library doesn't turn into a flood of SD file opens every boot.
+int fileLogVprintf(const char *fmt, va_list args)
+{
+    va_list argsCopy;
+    va_copy(argsCopy, args);
+    int written = vprintf(fmt, args);   // preserve the normal Serial/UART output
+
+    if (sdReady) {
+        char buf[256];
+        vsnprintf(buf, sizeof(buf), fmt, argsCopy);
+
+        char timestamp[20] = "unsynced";
+        struct tm timeinfo;
+        if (getLocalTime(&timeinfo, 0)) {
+            strftime(timestamp, sizeof(timestamp), "%Y-%m-%d %H:%M:%S", &timeinfo);
+        }
+
+        File file = SD.open(LOG_FILE, FILE_APPEND);
+        if (file) {
+            file.print(String(timestamp) + " ");
+            file.print(buf);   // ESP-IDF log lines already end in \r\n
+            file.close();
+        }
+    }
+    va_end(argsCopy);
+    return written;
+}
+
+// esp_reset_reason() is the ROM/bootloader's own record of why this boot happened, surviving even
+// resets that lose RTC memory (see bootCount) - unlike fileLogVprintf()/the PSRAM logging near
+// esp_camera_fb_get(), which only explain a *clean* boot's failed capture, this is what tells us
+// whether a run of low/resetting bootCount values (RTC_DATA_ATTR wiped) is a brownout, a watchdog
+// timeout, a panic, or the unit genuinely losing power - none of which leave any other trace,
+// since a brownout/panic reset happens before any app code (including our log hooks) runs.
+const char *resetReasonName(esp_reset_reason_t reason)
+{
+    switch (reason) {
+    case ESP_RST_POWERON:   return "POWERON (fresh power-on, or RTC memory lost)";
+    case ESP_RST_BROWNOUT:  return "BROWNOUT (supply voltage dropped below the chip's cutoff)";
+    case ESP_RST_TASK_WDT:  return "TASK_WDT (a task hung/blocked too long)";
+    case ESP_RST_INT_WDT:   return "INT_WDT (interrupt watchdog - ISR ran too long)";
+    case ESP_RST_WDT:       return "WDT (other watchdog)";
+    case ESP_RST_PANIC:     return "PANIC (software crash - exception/assert)";
+    case ESP_RST_SW:        return "SW (esp_restart() called)";
+    case ESP_RST_DEEPSLEEP: return "DEEPSLEEP (normal wake from deep sleep)";
+    case ESP_RST_EXT:       return "EXT (external reset pin)";
+    case ESP_RST_SDIO:      return "SDIO";
+    default:                return "UNKNOWN";
+    }
 }
 
 bool setCameraPower(bool enable)
@@ -1809,6 +1869,11 @@ void setup()
 
     Serial.println();
 
+    // Warnings/errors only (see fileLogVprintf()'s comment) - keeps this to the diagnostic
+    // messages worth persisting rather than every library's routine INFO/DEBUG chatter.
+    esp_log_level_set("*", ESP_LOG_WARN);
+    esp_log_set_vprintf(fileLogVprintf);
+
     //Increment boot number and print it every reboot
     ++bootCount;
     logLine("Boot number: " + String(bootCount));
@@ -1904,6 +1969,13 @@ void runWakeCycle()
     if (!setupSD()) {
         logLine("Failed to initialize SD card! Please check SD card!"); return;
     }
+
+    // Logged here (once SD/sdReady is up, see logLine()) rather than at the very top of setup() -
+    // esp_reset_reason() itself doesn't need that, but landing this in envirocam.log rather than
+    // only Serial is the whole point (see resetReasonName()'s comment). A brownout/watchdog/panic
+    // reset happens before app code runs, so this is the only trace of *why* such a reset
+    // happened - bootCount (RTC_DATA_ATTR) just tells us one occurred, via dropping back down.
+    logf("Reset reason: %s", resetReasonName(esp_reset_reason()));
 
     // Kept up to date incrementally below rather than re-scanned from disk each wake,
     // since scanning directories with thousands of backlogged files gets slow
@@ -2068,6 +2140,13 @@ void runWakeCycle()
     // against losing the whole wake cycle to one bad frame, most likely to matter at night
     // where a slower clock/near-ceiling exposure (see setupCameraNightExposure()) leaves less
     // margin than the normal daytime capture.
+    //
+    // Logged every cycle (not just on failure) so PSRAM free/largest-block has a baseline to
+    // compare a failure against - e.g. distinguishing a fragmented/exhausted heap from the
+    // "Failed to get frame: timeout" the driver itself logs (see fileLogVprintf()) when it isn't.
+    logf("Free PSRAM before capture: %u bytes (largest block %u)",
+         heap_caps_get_free_size(MALLOC_CAP_SPIRAM), heap_caps_get_largest_free_block(MALLOC_CAP_SPIRAM));
+
     camera_fb_t *frame = esp_camera_fb_get();
     if (!frame) {
         logLine("First capture attempt failed, retrying once...");
@@ -2303,12 +2382,30 @@ void runSetupApWindow()
 
     server.close();
     // Unregister before touching BLE/WiFi teardown - softAPdisconnect() below forcibly drops
-    // any connected station, which fires STADISCONNECTED, and by then pAdvertising is already
-    // freed by NimBLEDevice::deinit(); a still-registered handler would call through that
-    // dangling pointer and crash.
+    // any connected station, which fires STADISCONNECTED, and a still-registered handler calling
+    // through pAdvertising after it's gone would crash the same way NimBLEDevice::deinit() does
+    // below (was, until this change - see next comment).
     WiFi.removeEvent(bleAdvertisingEventId);
     pAdvertising->stop();
-    NimBLEDevice::deinit(true);
+
+    // Deliberately NOT calling NimBLEDevice::deinit() here. It signals NimBLE's separate host
+    // FreeRTOS task to unwind out of nimble_port_run() and returns immediately, without waiting
+    // for that task to actually finish self-deleting - and then goes on to tear down the BT
+    // controller out from under it. Confirmed in the field (firmware.elf backtraces decoded
+    // straight into NimBLEDevice::host_task()) as a reliably reproducible "Guru Meditation
+    // Error ... InstrFetchProhibited" panic, PC=0. This is a known, unresolved bug in
+    // NimBLE-Arduino itself (https://github.com/h2zero/NimBLE-Arduino/issues/803) - a 50ms delay
+    // patched into deinit() (see lib/NimBLE-Arduino/src/NimBLEDevice.cpp, the same workaround
+    // reported upstream) did not stop it recurring on every single AP window in the field, so
+    // this isn't just a timing window worth widening further.
+    //
+    // We don't need a graceful BLE shutdown here: this boot is headed straight for
+    // esp_deep_sleep_start() (or, in support mode, further wake cycles that never call
+    // NimBLEDevice::init() again - see setup()/loop()), and deep sleep power-collapses the radio
+    // hardware regardless of what state NimBLE's host stack thinks it's in. pAdvertising->stop()
+    // above already silences the actual over-the-air advertising; leaving the host task/BT
+    // controller nominally "initialized" but idle until the chip sleeps is a smaller risk than a
+    // guaranteed crash on every setup/support-mode boot.
     WiFi.softAPdisconnect(true);
     WiFi.mode(WIFI_OFF);
     logLine("Setup AP window closed");
