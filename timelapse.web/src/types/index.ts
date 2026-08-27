@@ -15,10 +15,13 @@ export interface Device {
   sleepDuringNight?: boolean;
   daytimeStartsAtH?: number;
   daytimeEndsAtH?: number;
+  utcOffsetMinutes?: number;
   cameraIntervalS?: number;
   apiUrl?: string;
   hflip?: boolean;
   vflip?: boolean;
+  enableLongExposureAtNight?: boolean;
+  longExposureXclkHz?: number;
   geoIntervalS?: number;
   autoSyncPeriodS?: number;
   latestTelemetry?: Telemetry;
@@ -95,10 +98,13 @@ export interface DeviceUpdateRequest {
   sleepDuringNight: boolean;
   daytimeStartsAtH: number;
   daytimeEndsAtH: number;
+  utcOffsetMinutes: number;
   cameraIntervalS: number;
   apiUrl: string;
   hflip: boolean;
   vflip: boolean;
+  enableLongExposureAtNight: boolean;
+  longExposureXclkHz: number;
   geoIntervalS: number;
   autoSyncPeriodS: number;
   location?: DeviceLocationUpdateRequest | null;

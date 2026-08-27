@@ -29,9 +29,27 @@ public class Device
     public bool SleepDuringNight {get; set;} = false;
     public int DaytimeStartsAtH {get; set;} = 7;
     public int DaytimeEndsAtH {get; set;} = 17;
+
+    // Fixed offset from UTC, in minutes, the ESP32 uses to interpret DaytimeStartsAtH/
+    // DaytimeEndsAtH as local wall-clock time (they're a working-day schedule, not sunlight -
+    // camera exposure switching is worked out on-device from sunrise/sunset instead, see
+    // isNightForExposure() in the .ino). Not a real timezone/DST lookup - just a plain offset -
+    // so daylight saving currently means updating this by hand twice a year (NZST +720 / NZDT
+    // +780). Defaults to NZST since that's every device deployed so far.
+    public int UtcOffsetMinutes {get; set;} = 720;
+
     public int CameraIntervalS {get; set;} = 300;
     public bool Hflip {get; set;} = false;
     public bool Vflip {get; set;} = false;
+
+    // Whether the ESP32 switches the camera to a slower-clock, fixed-exposure setup at night
+    // (isNightForExposure() in the .ino, based on real sunrise/sunset - see UtcOffsetMinutes'
+    // comment above for why that's a separate thing from DaytimeStartsAtH/DaytimeEndsAtH).
+    // LongExposureXclkHz is the pixel clock (Hz) used while it's active - lower gives a longer
+    // max exposure but hasn't been characterised against every OV5640 unit's PLL tolerance yet
+    // (see setupCameraNightExposure()'s comment in the .ino).
+    public bool EnableLongExposureAtNight {get; set;} = true;
+    public int LongExposureXclkHz {get; set;} = 8000000;
 
     // How often (in seconds) the device checks GPS position (see updateGeoLocationIfDue() in
     // the .ino) and how often it reconnects to WiFi to sync its clock and upload its backlog
