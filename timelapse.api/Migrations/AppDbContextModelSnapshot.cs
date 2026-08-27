@@ -324,6 +324,10 @@ namespace timelapse.api.Migrations
                         .HasColumnType("text")
                         .HasColumnName("description");
 
+                    b.Property<bool>("EnableLongExposureAtNight")
+                        .HasColumnType("boolean")
+                        .HasColumnName("enable_long_exposure_at_night");
+
                     b.Property<int>("GeoIntervalS")
                         .HasColumnType("integer")
                         .HasColumnName("geo_interval_s");
@@ -335,6 +339,10 @@ namespace timelapse.api.Migrations
                     b.Property<bool>("HibernateMode")
                         .HasColumnType("boolean")
                         .HasColumnName("hibernate_mode");
+
+                    b.Property<int>("LongExposureXclkHz")
+                        .HasColumnType("integer")
+                        .HasColumnName("long_exposure_xclk_hz");
 
                     b.Property<bool>("MonitoringMode")
                         .HasColumnType("boolean")
@@ -374,6 +382,10 @@ namespace timelapse.api.Migrations
                     b.Property<bool>("SupportMode")
                         .HasColumnType("boolean")
                         .HasColumnName("support_mode");
+
+                    b.Property<int>("UtcOffsetMinutes")
+                        .HasColumnType("integer")
+                        .HasColumnName("utc_offset_minutes");
 
                     b.Property<bool>("Vflip")
                         .HasColumnType("boolean")

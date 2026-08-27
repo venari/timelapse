@@ -112,10 +112,13 @@ namespace timelapse.api.Pages
                 SleepDuringNight = Device.SleepDuringNight,
                 DaytimeStartsAtH = Device.DaytimeStartsAtH,
                 DaytimeEndsAtH = Device.DaytimeEndsAtH,
+                UtcOffsetMinutes = Device.UtcOffsetMinutes,
                 CameraIntervalS = Device.CameraIntervalS,
                 ApiUrl = Device.ApiUrl,
                 Hflip = Device.Hflip,
                 Vflip = Device.Vflip,
+                EnableLongExposureAtNight = Device.EnableLongExposureAtNight,
+                LongExposureXclkHz = Device.LongExposureXclkHz,
                 GeoIntervalS = Device.GeoIntervalS,
                 AutoSyncPeriodS = Device.AutoSyncPeriodS,
                 Location = new DeviceLocationUpdateRequest{

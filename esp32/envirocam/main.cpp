@@ -15,6 +15,10 @@
  *
  * */
 #include <esp_camera.h>
+#include <esp_log.h>
+#include <esp_heap_caps.h>
+#include <esp_system.h>
+#include <math.h>
 #include <Wire.h>
 #include <FS.h>
 #include <SD.h>
@@ -85,13 +89,13 @@
 // DeviceConfig::supportMode (API-driven, needs a working uplink) can't help. bootCount is RTC
 // memory - survives a deep-sleep wake but not a real power cycle - so this only ever runs across
 // a fresh install's first few boots, never costing battery on a camera that's already deployed.
-#define SETUP_AP_MAX_BOOT_COUNT  5
+#define SETUP_AP_MAX_BOOT_COUNT  3
 #define SETUP_AP_NEXT_BOOT_DELAY_S 1   // See loop() - replaces the normal cameraIntervalS wait while
                                         // still inside the setup window's boot budget above, so the
                                         // next boot's setup window is available right away rather
                                         // than waiting out a full interval on top of the one that
                                         // just ran for minutes on its own
-#define SETUP_AP_WINDOW_MS       (5UL * 60 * 1000)   // How long the hotspot stays up before continuing on to deep sleep
+#define SETUP_AP_WINDOW_MS       (3UL * 60 * 1000)   // How long the hotspot stays up before continuing on to deep sleep
 #define SETUP_AP_STREAM_FRAMESIZE       FRAMESIZE_SVGA  // Much lighter than the QSXGA capture - plenty to check framing/focus
 #define SETUP_AP_STREAM_FRAME_INTERVAL_MS (300UL)      // Paces "/stream" frames - keeps the softAP link comfortable
 #define SETUP_AP_SSID_PREFIX     "EnviroCam-"
@@ -100,10 +104,31 @@
 // Defaults used until a config.json exists (i.e. before the API has ever handed back a
 // Device row - see applyDeviceConfigFromApiResponse). Names match the Device model's JSON
 // property names on the API side (System.Text.Json defaults to camelCase).
+//
+// daytimeStartsAtH/daytimeEndsAtH are *local* hours (see utcOffsetMinutes below) marking the
+// working day - purely a fixed schedule for computeSleepSeconds()'s sleepDuringNight feature
+// (activity/uploads are unlikely outside it), unrelated to actual sunlight. Long-exposure
+// switching uses real sunrise/sunset instead - see isNightForExposure().
 #define DEFAULT_SLEEP_DURING_NIGHT   false
 #define DEFAULT_DAYTIME_STARTS_AT_H  7
 #define DEFAULT_DAYTIME_ENDS_AT_H    17
 #define DEFAULT_CAMERA_INTERVAL_S    60
+
+// Fixed local-time offset from UTC, in minutes, used only for interpreting
+// daytimeStartsAtH/daytimeEndsAtH as wall-clock local time (see utcToLocalTm()/
+// isOutsideWorkingHours()) - a real IANA timezone database isn't available on this hardware, and
+// GMT_OFFSET_SEC/DAY_LIGHT_OFFSET_SEC above are deliberately left at 0 so every *other* timestamp
+// in this firmware (logs, ISO8601 fields, isNightForExposure()'s sun math) stays in UTC. This is
+// a plain fixed offset, not auto-adjusting daylight saving - NZDT (UTC+13) vs NZST (UTC+12)
+// currently has to be toggled by hand via config.json/the API twice a year. Automating that is a
+// reasonable future improvement if it becomes a hassle.
+#define DEFAULT_UTC_OFFSET_MINUTES   (12 * 60)   // NZST, UTC+12
+// Fallback location for isNightForExposure()'s sunrise/sunset calculation, used whenever
+// deviceConfig.geoLat/geoLon are still their default 0,0 (no GPS fix yet - see
+// updateGeoLocationIfDue()). Wellington, NZ - close enough for every unit currently deployed that
+// a fix hasn't landed for yet; a device with a real fix always uses that instead.
+#define DEFAULT_LAT (-41.2887)
+#define DEFAULT_LON (174.7771)
 
 // Stretches the capture interval out as the battery gets low, to conserve what's left - see
 // applyLowBatteryIntervalFloor(). Each is a floor, not an override: it only ever lengthens
@@ -123,6 +148,28 @@
 #define DEFAULT_CAMERA_MODEL         "OV5640"    // Overridden below by on-the-fly PID detection - see setup()
 #define DEFAULT_CAMERA_WARMUP_FRAMES 2            // Frames grabbed+discarded after sensor init to let AEC/AWB converge - see setup()
 #define DEFAULT_SUPPORT_MODE         false        // See loop() - true keeps the board awake instead of deep-sleeping
+
+// Mirrors the Raspberry Pi units' camera.enable_long_exposure_at_night (see scripts/savePhotos.py)
+// as closely as the OV5640 hardware allows - see setupCameraNightExposure(). Off by default: this
+// is a much rougher lever than the Pi's libcamera ExposureTime control (see that function's
+// comment), and wants field verification on real hardware before being turned on fleet-wide.
+#define DEFAULT_ENABLE_LONG_EXPOSURE_AT_NIGHT true
+// esp_camera's OV5640 driver derives the sensor's whole PLL/pixel-clock chain from
+// camera_config_t.xclk_freq_hz (see set_framesize() in the esp32-camera component) - halving
+// xclk roughly halves pixel clock, which roughly doubles how long the sensor's fixed per-frame
+// exposure-line ceiling is worth in wall-clock time. 8MHz (vs. the normal 20MHz - see
+// config.xclk_freq_hz below) lands comfortably inside the OV5640's documented PLL input/VCO
+// range while giving roughly a 2.5x longer max exposure than the daytime clock allows. Tunable
+// via config.json without a reflash if a deployed unit needs a different value.
+#define DEFAULT_LONG_EXPOSURE_XCLK_HZ (8000000UL)
+// set_aec_value() (see ov5640.c) clamps whatever's passed to the sensor's *current* total frame
+// length in lines (register 0x380e/0x380f, "VTS") - but pinning exposure to that literal ceiling
+// leaves the sensor zero blanking/readout margin, which is out of spec (most OV-series sensors
+// need exposure lines <= VTS - 4) and was observed causing roughly a coin-flip's worth of failed/
+// corrupted captures ("Capturing camera failed!") - see setupCameraNightExposure(). Backed off a
+// bit further than the datasheet's bare minimum since this hasn't been characterised on real
+// hardware yet.
+#define NIGHT_EXPOSURE_MARGIN_LINES 16
 
 // utilities.h defines MODEM_GPS_ENABLE_GPIO/MODEM_GPS_ENABLE_LEVEL etc. per board, but not this -
 // matches LilyGo's own reference examples for the SIM7670G-S3 (e.g. LilyGo-Modem-Series/examples/Traccar).
@@ -145,6 +192,8 @@ struct DeviceConfig {
     bool sleepDuringNight = DEFAULT_SLEEP_DURING_NIGHT;
     int daytimeStartsAtH = DEFAULT_DAYTIME_STARTS_AT_H;
     int daytimeEndsAtH = DEFAULT_DAYTIME_ENDS_AT_H;
+    // See DEFAULT_UTC_OFFSET_MINUTES above - only affects daytimeStartsAtH/daytimeEndsAtH.
+    int utcOffsetMinutes = DEFAULT_UTC_OFFSET_MINUTES;
     uint32_t cameraIntervalS = DEFAULT_CAMERA_INTERVAL_S;
     String apiUrl = DEFAULT_API_URL;
     bool hflip = DEFAULT_HFLIP;
@@ -156,6 +205,12 @@ struct DeviceConfig {
     // wake cycles - see loop(). Meant for a technician who needs the board reliably reachable
     // (serial/OTA) rather than asleep most of the time.
     bool supportMode = DEFAULT_SUPPORT_MODE;
+
+    // See DEFAULT_ENABLE_LONG_EXPOSURE_AT_NIGHT/DEFAULT_LONG_EXPOSURE_XCLK_HZ above and
+    // setupCameraNightExposure() below - OV5640 only, silently ignored on OV2640 (its driver has
+    // no equivalent lever - see setupCameraNightExposure()'s comment).
+    bool enableLongExposureAtNight = DEFAULT_ENABLE_LONG_EXPOSURE_AT_NIGHT;
+    uint32_t longExposureXclkHz = DEFAULT_LONG_EXPOSURE_XCLK_HZ;
 
     // What sensor is actually fitted - "OV5640" or "OV2640". Set from on-the-fly PID detection
     // every boot (see setup()), which is authoritative whenever it recognises the sensor; this
@@ -321,6 +376,63 @@ void logf(const char *format, ...)
     va_end(args);
 
     logLine(String(buf.data()));
+}
+
+// Registered via esp_log_set_vprintf() in setup() - catches ESP-IDF's own ESP_LOGW/ESP_LOGE output
+// (e.g. the esp32-camera driver's "Failed to get frame: timeout", or its DMA buffer malloc-failed
+// message) and appends it to LOG_FILE alongside logLine()/logf(), not just Serial. Without this,
+// a "Capturing camera failed!" entry never says *why* esp_camera_fb_get() returned NULL - the
+// driver already logs the reason, it just never reached the SD card. esp_log_level_set("*", ...)
+// in setup() keeps this to warnings/errors only, so routine INFO/DEBUG chatter from WiFi/BLE/the
+// modem library doesn't turn into a flood of SD file opens every boot.
+int fileLogVprintf(const char *fmt, va_list args)
+{
+    va_list argsCopy;
+    va_copy(argsCopy, args);
+    int written = vprintf(fmt, args);   // preserve the normal Serial/UART output
+
+    if (sdReady) {
+        char buf[256];
+        vsnprintf(buf, sizeof(buf), fmt, argsCopy);
+
+        char timestamp[20] = "unsynced";
+        struct tm timeinfo;
+        if (getLocalTime(&timeinfo, 0)) {
+            strftime(timestamp, sizeof(timestamp), "%Y-%m-%d %H:%M:%S", &timeinfo);
+        }
+
+        File file = SD.open(LOG_FILE, FILE_APPEND);
+        if (file) {
+            file.print(String(timestamp) + " ");
+            file.print(buf);   // ESP-IDF log lines already end in \r\n
+            file.close();
+        }
+    }
+    va_end(argsCopy);
+    return written;
+}
+
+// esp_reset_reason() is the ROM/bootloader's own record of why this boot happened, surviving even
+// resets that lose RTC memory (see bootCount) - unlike fileLogVprintf()/the PSRAM logging near
+// esp_camera_fb_get(), which only explain a *clean* boot's failed capture, this is what tells us
+// whether a run of low/resetting bootCount values (RTC_DATA_ATTR wiped) is a brownout, a watchdog
+// timeout, a panic, or the unit genuinely losing power - none of which leave any other trace,
+// since a brownout/panic reset happens before any app code (including our log hooks) runs.
+const char *resetReasonName(esp_reset_reason_t reason)
+{
+    switch (reason) {
+    case ESP_RST_POWERON:   return "POWERON (fresh power-on, or RTC memory lost)";
+    case ESP_RST_BROWNOUT:  return "BROWNOUT (supply voltage dropped below the chip's cutoff)";
+    case ESP_RST_TASK_WDT:  return "TASK_WDT (a task hung/blocked too long)";
+    case ESP_RST_INT_WDT:   return "INT_WDT (interrupt watchdog - ISR ran too long)";
+    case ESP_RST_WDT:       return "WDT (other watchdog)";
+    case ESP_RST_PANIC:     return "PANIC (software crash - exception/assert)";
+    case ESP_RST_SW:        return "SW (esp_restart() called)";
+    case ESP_RST_DEEPSLEEP: return "DEEPSLEEP (normal wake from deep sleep)";
+    case ESP_RST_EXT:       return "EXT (external reset pin)";
+    case ESP_RST_SDIO:      return "SDIO";
+    default:                return "UNKNOWN";
+    }
 }
 
 bool setCameraPower(bool enable)
@@ -569,9 +681,10 @@ void writeCounts(const TelemetryCounts &counts)
     }
 }
 
-// Applies whichever of sleepDuringNight/daytimeStartsAtH/daytimeEndsAtH/cameraIntervalS/apiUrl/
-// hflip/vflip/autoSyncPeriodS/geoIntervalS/geoLat/geoLon/geoTimeRecorded/cameraModel/
-// cameraWarmupFrames are present in `fields` on top of an existing DeviceConfig - used for both
+// Applies whichever of sleepDuringNight/daytimeStartsAtH/daytimeEndsAtH/utcOffsetMinutes/
+// cameraIntervalS/apiUrl/hflip/vflip/autoSyncPeriodS/geoIntervalS/geoLat/geoLon/geoTimeRecorded/
+// cameraModel/cameraWarmupFrames/enableLongExposureAtNight/longExposureXclkHz are present in
+// `fields` on top of an existing DeviceConfig - used for both
 // CONFIG_FILE (on disk) and the Device object nested in an Image/Telemetry API response, so a
 // partial payload only touches the fields it mentions. In practice the geo* fields and
 // cameraModel only ever come from CONFIG_FILE - the API has no way to know a device's GPS
@@ -582,6 +695,7 @@ void applyConfigFields(JsonVariantConst fields, DeviceConfig &config)
     config.sleepDuringNight = fields["sleepDuringNight"] | config.sleepDuringNight;
     config.daytimeStartsAtH = fields["daytimeStartsAtH"] | config.daytimeStartsAtH;
     config.daytimeEndsAtH   = fields["daytimeEndsAtH"] | config.daytimeEndsAtH;
+    config.utcOffsetMinutes = fields["utcOffsetMinutes"] | config.utcOffsetMinutes;
     config.cameraIntervalS  = fields["cameraIntervalS"] | config.cameraIntervalS;
     config.hflip            = fields["hflip"] | config.hflip;
     config.vflip            = fields["vflip"] | config.vflip;
@@ -591,6 +705,8 @@ void applyConfigFields(JsonVariantConst fields, DeviceConfig &config)
     config.geoLat           = fields["geoLat"] | config.geoLat;
     config.geoLon           = fields["geoLon"] | config.geoLon;
     config.cameraWarmupFrames = fields["cameraWarmupFrames"] | config.cameraWarmupFrames;
+    config.enableLongExposureAtNight = fields["enableLongExposureAtNight"] | config.enableLongExposureAtNight;
+    config.longExposureXclkHz = fields["longExposureXclkHz"] | config.longExposureXclkHz;
     if (!fields["apiUrl"].isNull()) {
         String apiUrl = fields["apiUrl"].as<String>();
         if (apiUrl.length() > 0) {
@@ -620,7 +736,7 @@ DeviceConfig readDeviceConfig()
         return config;
     }
 
-    DynamicJsonDocument doc(640);
+    DynamicJsonDocument doc(768);
     DeserializationError err = deserializeJson(doc, file);
     file.close();
 
@@ -635,10 +751,11 @@ DeviceConfig readDeviceConfig()
 
 void writeDeviceConfig(const DeviceConfig &config)
 {
-    DynamicJsonDocument doc(640);
+    DynamicJsonDocument doc(768);
     doc["sleepDuringNight"] = config.sleepDuringNight;
     doc["daytimeStartsAtH"] = config.daytimeStartsAtH;
     doc["daytimeEndsAtH"] = config.daytimeEndsAtH;
+    doc["utcOffsetMinutes"] = config.utcOffsetMinutes;
     doc["cameraIntervalS"] = config.cameraIntervalS;
     doc["apiUrl"] = config.apiUrl;
     doc["hflip"] = config.hflip;
@@ -651,6 +768,8 @@ void writeDeviceConfig(const DeviceConfig &config)
     doc["geoTimeRecorded"] = config.geoTimeRecorded;
     doc["cameraModel"] = config.cameraModel;
     doc["cameraWarmupFrames"] = config.cameraWarmupFrames;
+    doc["enableLongExposureAtNight"] = config.enableLongExposureAtNight;
+    doc["longExposureXclkHz"] = config.longExposureXclkHz;
 
     File file = SD.open(CONFIG_FILE, "w");
     if (file) {
@@ -668,7 +787,7 @@ void writeDeviceConfig(const DeviceConfig &config)
 // already live for the Raspberry Pi units (see scripts/uploadPending.py).
 void applyDeviceConfigFromApiResponse(const String &responseBody, DeviceConfig &config)
 {
-    DynamicJsonDocument doc(1024);
+    DynamicJsonDocument doc(1152);
     DeserializationError err = deserializeJson(doc, responseBody);
     if (err) {
         logf("Failed to parse API response: %s", err.c_str());
@@ -687,6 +806,7 @@ void applyDeviceConfigFromApiResponse(const String &responseBody, DeviceConfig &
     if (newConfig.sleepDuringNight != config.sleepDuringNight ||
         newConfig.daytimeStartsAtH != config.daytimeStartsAtH ||
         newConfig.daytimeEndsAtH != config.daytimeEndsAtH ||
+        newConfig.utcOffsetMinutes != config.utcOffsetMinutes ||
         newConfig.cameraIntervalS != config.cameraIntervalS ||
         newConfig.apiUrl != config.apiUrl ||
         newConfig.hflip != config.hflip ||
@@ -694,7 +814,9 @@ void applyDeviceConfigFromApiResponse(const String &responseBody, DeviceConfig &
         newConfig.autoSyncPeriodS != config.autoSyncPeriodS ||
         newConfig.supportMode != config.supportMode ||
         newConfig.geoIntervalS !=config.geoIntervalS ||
-        newConfig.cameraWarmupFrames != config.cameraWarmupFrames
+        newConfig.cameraWarmupFrames != config.cameraWarmupFrames ||
+        newConfig.enableLongExposureAtNight != config.enableLongExposureAtNight ||
+        newConfig.longExposureXclkHz != config.longExposureXclkHz
 ) {
         config = newConfig;
         writeDeviceConfig(config);
@@ -1602,10 +1724,157 @@ bool uploadPendingImages(const String &deviceId, TelemetryCounts &counts, Device
     return backlogExcessive;
 }
 
+// --- Sunrise/sunset calculation -------------------------------------------------------------
+// Used by isNightForExposure() below to decide when to switch the camera into its long-exposure
+// setup, based on where the sun actually is rather than a fixed clock-hour boundary (see the
+// git history of isCurrentlyNight() - a boundary compared in the wrong timezone once caused this
+// firmware to apply *daytime* exposure settings right at real dusk, and reliably failed captures
+// for the ~40 minutes until it was next disturbed). Ported from the public-domain solar position
+// formulas (Jean Meeus, "Astronomical Algorithms") as popularised by mourner/suncalc.js
+// (https://github.com/mourner/suncalc) - the same maths behind the Pi units' `suncalc` Python
+// package (see scripts/helpers.py's currentPhase()), just the sunrise/sunset pair rather than
+// suncalc's full set of twilight phases - see isNightForExposure()'s comment on why only two.
+namespace SunCalc {
+constexpr double RAD = 3.14159265358979323846 / 180.0;
+constexpr double J1970 = 2440588.0;
+constexpr double J2000 = 2451545.0;
+constexpr double OBLIQUITY = RAD * 23.4397;   // Earth's axial tilt
+constexpr double J0 = 0.0009;
+
+double toDays(time_t utc)
+{
+    return ((double)utc / 86400.0 - 0.5 + J1970) - J2000;
+}
+
+time_t fromJulian(double j)
+{
+    return (time_t)((j + 0.5 - J1970) * 86400.0);
+}
+
+double solarMeanAnomaly(double d) { return RAD * (357.5291 + 0.98560028 * d); }
+
+double eclipticLongitude(double m)
+{
+    double c = RAD * (1.9148 * sin(m) + 0.02 * sin(2 * m) + 0.0003 * sin(3 * m));  // equation of center
+    double p = RAD * 102.9372;                                                     // perihelion of the Earth
+    return m + c + p + 3.14159265358979323846;
+}
+
+double declination(double l) { return asin(sin(l) * sin(OBLIQUITY)); }   // ecliptic latitude of the sun is ~0
+double julianCycle(double d, double lw) { return round(d - J0 - lw / (2 * 3.14159265358979323846)); }
+double approxTransit(double ht, double lw, double n) { return J0 + (ht + lw) / (2 * 3.14159265358979323846) + n; }
+double solarTransitJ(double ds, double m, double l) { return J2000 + ds + 0.0053 * sin(m) - 0.0069 * sin(2 * l); }
+
+double hourAngle(double h, double phi, double d)
+{
+    double cosH = (sin(h) - sin(phi) * sin(d)) / (cos(phi) * cos(d));
+    if (cosH < -1) cosH = -1;   // sun never sets this day (polar summer) - treat as "always up"
+    if (cosH > 1) cosH = 1;     // sun never rises this day (polar winter) - treat as "always down"
+    return acos(cosH);
+}
+
+// Sunrise/sunset (UTC) for the solar day containing `dayUTC` - pass any instant within the UTC
+// calendar day you want (this file always passes local noon-ish of that day, see below, to stay
+// well clear of the edges).
+void sunriseSunset(time_t dayUTC, double latDeg, double lonDeg, time_t &sunriseOut, time_t &sunsetOut)
+{
+    double lw = RAD * -lonDeg;
+    double phi = RAD * latDeg;
+    double d = toDays(dayUTC);
+    double n = julianCycle(d, lw);
+    double ds = approxTransit(0, lw, n);
+    double m = solarMeanAnomaly(ds);
+    double l = eclipticLongitude(m);
+    double dec = declination(l);
+    double jNoon = solarTransitJ(ds, m, l);
+
+    double h0 = -0.833 * RAD;   // standard sunrise/sunset angle - accounts for atmospheric refraction + solar radius
+    double w0 = hourAngle(h0, phi, dec);
+    double a0 = approxTransit(w0, lw, n);
+    double jSet = solarTransitJ(a0, m, l);
+    double jRise = jNoon - (jSet - jNoon);
+
+    sunriseOut = fromJulian(jRise);
+    sunsetOut = fromJulian(jSet);
+}
+}   // namespace SunCalc
+
+// Whether `nowUTC` falls at night for camera-exposure purposes - i.e. anywhere between a sunset
+// and the following sunrise - at (latDeg, lonDeg). Uses DEFAULT_LAT/DEFAULT_LON (Wellington) if
+// both are still 0 (no GPS fix yet - see updateGeoLocationIfDue()).
+//
+// Deliberately checks against the wider sunset/sunrise window rather than a narrower civil-
+// twilight one (dusk/dawn, ~20-30 min inside it): the OV5640 lever this firmware has for "night"
+// is a coarse on/off switch (see setupCameraNightExposure()), and running it a little longer than
+// strictly necessary around the edges of twilight is harmless - it was already confirmed working
+// fine under full daylight (see runWakeCycle()'s "nightLongExposure" comment history) - whereas
+// running normal daytime auto-exposure a little into real dusk/dawn is exactly what caused the
+// failures this replaces. Only two tiers (unlike the Pi's multi-phase dawn/dusk/nautical/night
+// ladder - see scripts/helpers.py's currentPhase()) because the OV5640 driver only gives us one
+// lever to pull, not the Pi's continuously-variable ExposureTime.
+//
+// Checks yesterday/today/tomorrow's UTC-calendar-day sunset/sunrise (not just "today's") so a
+// local sunset/sunrise landing on a different UTC calendar date than `nowUTC` itself - as it does
+// for most of the day, this far from UTC - still gets caught correctly.
+bool isNightForExposure(time_t nowUTC, double latDeg, double lonDeg)
+{
+    if (latDeg == 0 && lonDeg == 0) {
+        latDeg = DEFAULT_LAT;
+        lonDeg = DEFAULT_LON;
+    }
+
+    time_t todayNoonUTC = (nowUTC / 86400) * 86400 + 43200;
+    time_t sunriseYesterday, sunsetYesterday;
+    time_t sunriseToday, sunsetToday;
+    time_t sunriseTomorrow, sunsetTomorrow;
+    SunCalc::sunriseSunset(todayNoonUTC - 86400, latDeg, lonDeg, sunriseYesterday, sunsetYesterday);
+    SunCalc::sunriseSunset(todayNoonUTC, latDeg, lonDeg, sunriseToday, sunsetToday);
+    SunCalc::sunriseSunset(todayNoonUTC + 86400, latDeg, lonDeg, sunriseTomorrow, sunsetTomorrow);
+
+    if (nowUTC >= sunsetYesterday && nowUTC < sunriseToday) return true;
+    if (nowUTC >= sunsetToday && nowUTC < sunriseTomorrow) return true;
+    return false;
+}
+
+// --- Fixed-offset local time --------------------------------------------------------------
+// Only used for daytimeStartsAtH/daytimeEndsAtH (see isOutsideWorkingHours()) - everything else
+// in this firmware (logs, ISO8601 fields, isNightForExposure() above) deliberately stays in UTC.
+// mktime()/gmtime_r() below are used purely as epoch<->calendar-field converters, not for their
+// usual local-timezone behaviour - this firmware never sets a timezone (GMT_OFFSET_SEC/
+// DAY_LIGHT_OFFSET_SEC are left at 0), so the C library treats both as UTC, which is exactly what
+// lets the manual `+ utcOffsetMinutes` shift below stand in for a real timezone conversion.
+
+// UTC time_t -> wall-clock fields at `utcOffsetMinutes`.
+void utcToLocalTm(time_t utc, int utcOffsetMinutes, struct tm &out)
+{
+    time_t shifted = utc + (time_t)utcOffsetMinutes * 60;
+    gmtime_r(&shifted, &out);
+}
+
+// Inverse of utcToLocalTm() - interprets `local` as wall-clock time at `utcOffsetMinutes` and
+// returns the equivalent UTC time_t.
+time_t localTmToUtc(struct tm local, int utcOffsetMinutes)
+{
+    return mktime(&local) - (time_t)utcOffsetMinutes * 60;
+}
+
+// Whether `nowUTC` falls outside the device's configured working-day window
+// (daytimeStartsAtH/daytimeEndsAtH, in local time - see utcOffsetMinutes) - used only by
+// computeSleepSeconds() to decide whether to sleep straight through rather than waking every
+// cameraIntervalS. This is a fixed clock-hour schedule (when a technician/animal/etc. is likely
+// to be around), not actual daylight - see isNightForExposure() for that. Returns false - i.e.
+// "assume within hours" - if the clock was never synced, same as computeSleepSeconds() falling
+// back to its normal behaviour in that case.
+bool isOutsideWorkingHours(time_t nowUTC, const DeviceConfig &config)
+{
+    struct tm local;
+    utcToLocalTm(nowUTC, config.utcOffsetMinutes, local);
+    return (local.tm_hour >= config.daytimeEndsAtH) || (local.tm_hour < config.daytimeStartsAtH);
+}
+
 // Decides how long to deep-sleep for, in seconds. Normally just config.cameraIntervalS, but
-// when sleep_during_night is enabled and it's currently outside daytime hours, sleeps through
-// until daytimeStartsAtH instead of waking every cameraIntervalS to take a photo in the dark.
-// Hours are compared in UTC, since GMT_OFFSET_SEC/DAY_LIGHT_OFFSET_SEC are left at 0.
+// when sleep_during_night is enabled and it's currently outside the working-day window, sleeps
+// through until daytimeStartsAtH (local time) instead of waking every cameraIntervalS overnight.
 uint32_t computeSleepSeconds(const DeviceConfig &config)
 {
     // Floored by battery level - see applyLowBatteryIntervalFloor() - so a low battery still gets
@@ -1619,28 +1888,28 @@ uint32_t computeSleepSeconds(const DeviceConfig &config)
 
     struct tm timeinfo;
     if (!getLocalTime(&timeinfo, 0)) {
-        // No synced clock to judge night from - fall back to the regular interval
+        // No synced clock to judge the working-day window from - fall back to the regular interval
         return intervalS;
     }
 
-    bool isNight = (timeinfo.tm_hour >= config.daytimeEndsAtH) || (timeinfo.tm_hour < config.daytimeStartsAtH);
-    if (!isNight) {
+    time_t nowUTC = time(nullptr);
+    if (!isOutsideWorkingHours(nowUTC, config)) {
         return intervalS;
     }
 
-    struct tm wake = timeinfo;
-    wake.tm_hour = config.daytimeStartsAtH;
-    wake.tm_min = 0;
-    wake.tm_sec = 0;
+    struct tm wakeLocal;
+    utcToLocalTm(nowUTC, config.utcOffsetMinutes, wakeLocal);
+    wakeLocal.tm_hour = config.daytimeStartsAtH;
+    wakeLocal.tm_min = 0;
+    wakeLocal.tm_sec = 0;
 
-    time_t now = mktime(&timeinfo);
-    time_t wakeTime = mktime(&wake);
-    if (wakeTime <= now) {
-        wakeTime += 24 * 60 * 60;
+    time_t wakeUTC = localTmToUtc(wakeLocal, config.utcOffsetMinutes);
+    if (wakeUTC <= nowUTC) {
+        wakeUTC += 24 * 60 * 60;
     }
 
-    uint32_t sleepSeconds = (uint32_t)difftime(wakeTime, now);
-    logf("Night mode - sleeping %u seconds until %02d:00 UTC", sleepSeconds, config.daytimeStartsAtH);
+    uint32_t sleepSeconds = (uint32_t)difftime(wakeUTC, nowUTC);
+    logf("Night mode - sleeping %u seconds until %02d:00 local (UTC%+d min)", sleepSeconds, config.daytimeStartsAtH, config.utcOffsetMinutes);
     return sleepSeconds;
 }
 
@@ -1760,6 +2029,11 @@ void setup()
 
     Serial.println();
 
+    // Warnings/errors only (see fileLogVprintf()'s comment) - keeps this to the diagnostic
+    // messages worth persisting rather than every library's routine INFO/DEBUG chatter.
+    esp_log_level_set("*", ESP_LOG_WARN);
+    esp_log_set_vprintf(fileLogVprintf);
+
     //Increment boot number and print it every reboot
     ++bootCount;
     logLine("Boot number: " + String(bootCount));
@@ -1787,6 +2061,57 @@ void setup()
     }
 }
 
+// Switches the sensor from auto exposure to a fixed exposure pinned at its maximum - the closest
+// the OV5640 driver gets to the Raspberry Pi units' camera.enable_long_exposure_at_night /
+// ExposureTime (see scripts/savePhotos.py). Only called from runWakeCycle() when
+// deviceConfig.enableLongExposureAtNight is set, it's night (see isNightForExposure()), and the
+// detected sensor is OV5640.
+//
+// How this differs from the Pi: libcamera lets Picamera2 ask the IMX708 for an explicit
+// ExposureTime in microseconds, up to several seconds. The esp32-camera OV5640 driver has no such
+// control - sensor->set_aec_value() only accepts a value up to the sensor's *current* frame
+// length in lines (register 0x380e/0x380f, read internally - see set_aec_value() in the
+// component's ov5640.c), i.e. at most one frame period. The only lever the driver's public
+// sensor_t API gives us to stretch that ceiling is to slow the whole pixel clock down by lowering
+// camera_config_t.xclk_freq_hz before esp_camera_init() - set_framesize() in ov5640.c derives
+// every PLL register from sensor->xclk_freq_hz, so a lower xclk means a proportionally longer
+// wall-clock duration per frame/line even though the line-count ceiling itself doesn't change.
+// runWakeCycle() already switches config.xclk_freq_hz to deviceConfig.longExposureXclkHz before
+// esp_camera_init() for this reason (see nightLongExposure there) - this function just:
+//   1. Turns auto exposure off (set_exposure_ctrl(0)) so the sensor's own AEC doesn't fight the
+//      manual value set below.
+//   2. Pins aec_value to the sensor's maximum for whatever frame length is currently configured -
+//      set_aec_value() clamps internally to that ceiling, so passing a deliberately oversized
+//      value is enough; there's no need to separately read the real ceiling back out first.
+// Gain is left on auto (set_gain_ctrl(1), set further up in runWakeCycle) so AGC can still
+// brighten the image on top of the maxed-out exposure if that alone isn't enough - as close as
+// this hardware gets to the Pi's paired ExposureTime/AnalogueGain.
+//
+// OV2640 has no comparable lever - its set_aec_value() ceiling is a hardcoded 1200, unrelated to
+// frame timing (see ov2640.c) - so runWakeCycle() never calls this for a detected/configured
+// OV2640; enableLongExposureAtNight is simply a no-op there.
+//
+// NOT verified against real hardware: DEFAULT_LONG_EXPOSURE_XCLK_HZ was picked from the OV5640
+// driver's own PLL math (see that macro's comment), not measured on a device, and the OV5640
+// datasheet's PLL/VCO valid ranges aren't enforced anywhere in this driver - an unsuitable
+// longExposureXclkHz could plausibly stop the sensor's PLL from locking rather than just slowing
+// it down. Confirm actual exposure time and image quality on a real unit before enabling this
+// fleet-wide, and retune deviceConfig.longExposureXclkHz (config.json, no reflash needed) if it
+// needs adjusting.
+void setupCameraNightExposure(sensor_t *s)
+{
+    s->set_exposure_ctrl(s, 0);    // manual exposure - see comment above
+
+    // Read VTS (frame length, lines) ourselves via the generic register accessor the driver
+    // exposes on sensor_t (get_reg with a >0xFF mask reads a 16-bit register - see get_reg() in
+    // ov5640.c), so we can back off NIGHT_EXPOSURE_MARGIN_LINES from it - see that macro's
+    // comment for why pinning to the literal ceiling isn't safe.
+    int vtsLines = s->get_reg(s, 0x380e, 0xFFFF);
+    int aecTarget = (vtsLines > NIGHT_EXPOSURE_MARGIN_LINES) ? (vtsLines - NIGHT_EXPOSURE_MARGIN_LINES) : 0xFFFF;
+    s->set_aec_value(s, aecTarget);   // set_aec_value() still clamps internally as a backstop
+    logf("Night long exposure active: xclk=%dHz, VTS=%d, AEC=%d", s->xclk_freq_hz, vtsLines, aecTarget);
+}
+
 // Everything a single wake cycle does: bring the camera up, capture, take/refresh a GPS fix,
 // build+upload telemetry, upload any backlogged images, then power the camera back down. This
 // is the whole of what used to be setup() below the boot-once battery check above - normally
@@ -1804,6 +2129,13 @@ void runWakeCycle()
     if (!setupSD()) {
         logLine("Failed to initialize SD card! Please check SD card!"); return;
     }
+
+    // Logged here (once SD/sdReady is up, see logLine()) rather than at the very top of setup() -
+    // esp_reset_reason() itself doesn't need that, but landing this in envirocam.log rather than
+    // only Serial is the whole point (see resetReasonName()'s comment). A brownout/watchdog/panic
+    // reset happens before app code runs, so this is the only trace of *why* such a reset
+    // happened - bootCount (RTC_DATA_ATTR) just tells us one occurred, via dropping back down.
+    logf("Reset reason: %s", resetReasonName(esp_reset_reason()));
 
     // Kept up to date incrementally below rather than re-scanned from disk each wake,
     // since scanning directories with thousands of backlogged files gets slow
@@ -1840,6 +2172,23 @@ void runWakeCycle()
     }
     lastWakeConnectedWiFi = didConnectWiFi;
 
+    // See setupCameraNightExposure() below - decided here, ahead of camera_config_t, because
+    // xclk_freq_hz has to be picked before esp_camera_init() (it can't be changed afterwards
+    // without a full re-init). deviceConfig.cameraModel is last boot's PID detection (or the
+    // "OV5640" default before any detection has run) - good enough to avoid slowing an OV2640's
+    // clock for no benefit (see setupCameraNightExposure()'s comment on why OV2640 can't use
+    // this), without waiting on this boot's own detection which only happens after init.
+    //
+    // isNightForExposure() uses actual sunrise/sunset (deviceConfig.geoLat/geoLon, or Wellington
+    // until a GPS fix lands) rather than daytimeStartsAtH/daytimeEndsAtH - those are a fixed
+    // working-day schedule for computeSleepSeconds() (see isOutsideWorkingHours()), not sunlight,
+    // and a fixed clock-hour boundary drifts against real dusk/dawn by up to a couple of hours
+    // across the seasons - see isNightForExposure()'s comment for how that already bit this
+    // firmware once.
+    bool nightLongExposure = deviceConfig.enableLongExposureAtNight
+                              && deviceConfig.cameraModel != "OV2640"
+                              && isNightForExposure(time(nullptr), deviceConfig.geoLat, deviceConfig.geoLon);
+
     // Enable / disable power save mode (1 disabled, 0 enabled)
     pinMode(BOARD_POWER_SAVE_MODE_PIN, OUTPUT);
     digitalWrite(BOARD_POWER_SAVE_MODE_PIN, HIGH);
@@ -1863,7 +2212,7 @@ void runWakeCycle()
     config.pin_sccb_scl = CAMERA_SIOC_PIN;
     config.pin_pwdn = CAMERA_PWDN_PIN;
     config.pin_reset = CAMERA_RESET_PIN;
-    config.xclk_freq_hz = 20000000;
+    config.xclk_freq_hz = nightLongExposure ? deviceConfig.longExposureXclkHz : 20000000;
     // Highest we ever want (OV5640's max). esp_camera_init() probes the sensor internally and
     // automatically clamps this down to whatever that sensor actually supports (e.g. OV2640 ->
     // UXGA, its native ~2MP max) *before* sizing the DMA receive buffer for it - so the buffer
@@ -1921,6 +2270,15 @@ void runWakeCycle()
     s->set_ae_level(s, 0);        // neutral target exposure, no bias
     s->set_gain_ctrl(s, 1);       // auto gain on
 
+    // Overrides the auto-exposure settings just above - see setupCameraNightExposure()'s comment
+    // for what this does and doesn't achieve compared to the Raspberry Pi units' long exposure.
+    // Gated on the sensor actually detected this boot (detectedModel), not the
+    // nightLongExposure/deviceConfig.cameraModel check that picked config.xclk_freq_hz above -
+    // that one only had last boot's PID detection (or the default) to go on.
+    if (nightLongExposure && detectedModel == "OV5640") {
+        setupCameraNightExposure(s);
+    }
+
     // Mounting-orientation correction, set centrally on the server (see DeviceConfig /
     // applyConfigFields) - lets a camera be physically mounted upside down or mirrored without
     // a firmware change. Applied after the OV3660 fixup above, so it's the final word on
@@ -1944,8 +2302,23 @@ void runWakeCycle()
 
     DatedPath datedPath = getDatedPath();
 
-    // Capture camera photo
+    // Capture camera photo. A single retry costs at most one more frame period if the first
+    // attempt comes back NULL (timeout, DMA hiccup, transient SCCB error) - cheap insurance
+    // against losing the whole wake cycle to one bad frame, most likely to matter at night
+    // where a slower clock/near-ceiling exposure (see setupCameraNightExposure()) leaves less
+    // margin than the normal daytime capture.
+    //
+    // Logged every cycle (not just on failure) so PSRAM free/largest-block has a baseline to
+    // compare a failure against - e.g. distinguishing a fragmented/exhausted heap from the
+    // "Failed to get frame: timeout" the driver itself logs (see fileLogVprintf()) when it isn't.
+    logf("Free PSRAM before capture: %u bytes (largest block %u)",
+         heap_caps_get_free_size(MALLOC_CAP_SPIRAM), heap_caps_get_largest_free_block(MALLOC_CAP_SPIRAM));
+
     camera_fb_t *frame = esp_camera_fb_get();
+    if (!frame) {
+        logLine("First capture attempt failed, retrying once...");
+        frame = esp_camera_fb_get();
+    }
 
     if (frame) {
 
@@ -2176,12 +2549,30 @@ void runSetupApWindow()
 
     server.close();
     // Unregister before touching BLE/WiFi teardown - softAPdisconnect() below forcibly drops
-    // any connected station, which fires STADISCONNECTED, and by then pAdvertising is already
-    // freed by NimBLEDevice::deinit(); a still-registered handler would call through that
-    // dangling pointer and crash.
+    // any connected station, which fires STADISCONNECTED, and a still-registered handler calling
+    // through pAdvertising after it's gone would crash the same way NimBLEDevice::deinit() does
+    // below (was, until this change - see next comment).
     WiFi.removeEvent(bleAdvertisingEventId);
     pAdvertising->stop();
-    NimBLEDevice::deinit(true);
+
+    // Deliberately NOT calling NimBLEDevice::deinit() here. It signals NimBLE's separate host
+    // FreeRTOS task to unwind out of nimble_port_run() and returns immediately, without waiting
+    // for that task to actually finish self-deleting - and then goes on to tear down the BT
+    // controller out from under it. Confirmed in the field (firmware.elf backtraces decoded
+    // straight into NimBLEDevice::host_task()) as a reliably reproducible "Guru Meditation
+    // Error ... InstrFetchProhibited" panic, PC=0. This is a known, unresolved bug in
+    // NimBLE-Arduino itself (https://github.com/h2zero/NimBLE-Arduino/issues/803) - a 50ms delay
+    // patched into deinit() (see lib/NimBLE-Arduino/src/NimBLEDevice.cpp, the same workaround
+    // reported upstream) did not stop it recurring on every single AP window in the field, so
+    // this isn't just a timing window worth widening further.
+    //
+    // We don't need a graceful BLE shutdown here: this boot is headed straight for
+    // esp_deep_sleep_start() (or, in support mode, further wake cycles that never call
+    // NimBLEDevice::init() again - see setup()/loop()), and deep sleep power-collapses the radio
+    // hardware regardless of what state NimBLE's host stack thinks it's in. pAdvertising->stop()
+    // above already silences the actual over-the-air advertising; leaving the host task/BT
+    // controller nominally "initialized" but idle until the chip sleeps is a smaller risk than a
+    // guaranteed crash on every setup/support-mode boot.
     WiFi.softAPdisconnect(true);
     WiFi.mode(WIFI_OFF);
     logLine("Setup AP window closed");

@@ -48,10 +48,13 @@ public class DeviceUpdateService
         device.SleepDuringNight = request.SleepDuringNight;
         device.DaytimeStartsAtH = request.DaytimeStartsAtH;
         device.DaytimeEndsAtH = request.DaytimeEndsAtH;
+        device.UtcOffsetMinutes = request.UtcOffsetMinutes;
         device.CameraIntervalS = request.CameraIntervalS;
         device.ApiUrl = request.ApiUrl;
         device.Hflip = request.Hflip;
         device.Vflip = request.Vflip;
+        device.EnableLongExposureAtNight = request.EnableLongExposureAtNight;
+        device.LongExposureXclkHz = request.LongExposureXclkHz;
         device.GeoIntervalS = request.GeoIntervalS;
         device.AutoSyncPeriodS = request.AutoSyncPeriodS;
 
