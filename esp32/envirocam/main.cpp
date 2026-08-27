@@ -18,6 +18,7 @@
 #include <esp_log.h>
 #include <esp_heap_caps.h>
 #include <esp_system.h>
+#include <math.h>
 #include <Wire.h>
 #include <FS.h>
 #include <SD.h>
@@ -103,10 +104,31 @@
 // Defaults used until a config.json exists (i.e. before the API has ever handed back a
 // Device row - see applyDeviceConfigFromApiResponse). Names match the Device model's JSON
 // property names on the API side (System.Text.Json defaults to camelCase).
+//
+// daytimeStartsAtH/daytimeEndsAtH are *local* hours (see utcOffsetMinutes below) marking the
+// working day - purely a fixed schedule for computeSleepSeconds()'s sleepDuringNight feature
+// (activity/uploads are unlikely outside it), unrelated to actual sunlight. Long-exposure
+// switching uses real sunrise/sunset instead - see isNightForExposure().
 #define DEFAULT_SLEEP_DURING_NIGHT   false
 #define DEFAULT_DAYTIME_STARTS_AT_H  7
 #define DEFAULT_DAYTIME_ENDS_AT_H    17
 #define DEFAULT_CAMERA_INTERVAL_S    60
+
+// Fixed local-time offset from UTC, in minutes, used only for interpreting
+// daytimeStartsAtH/daytimeEndsAtH as wall-clock local time (see utcToLocalTm()/
+// isOutsideWorkingHours()) - a real IANA timezone database isn't available on this hardware, and
+// GMT_OFFSET_SEC/DAY_LIGHT_OFFSET_SEC above are deliberately left at 0 so every *other* timestamp
+// in this firmware (logs, ISO8601 fields, isNightForExposure()'s sun math) stays in UTC. This is
+// a plain fixed offset, not auto-adjusting daylight saving - NZDT (UTC+13) vs NZST (UTC+12)
+// currently has to be toggled by hand via config.json/the API twice a year. Automating that is a
+// reasonable future improvement if it becomes a hassle.
+#define DEFAULT_UTC_OFFSET_MINUTES   (12 * 60)   // NZST, UTC+12
+// Fallback location for isNightForExposure()'s sunrise/sunset calculation, used whenever
+// deviceConfig.geoLat/geoLon are still their default 0,0 (no GPS fix yet - see
+// updateGeoLocationIfDue()). Wellington, NZ - close enough for every unit currently deployed that
+// a fix hasn't landed for yet; a device with a real fix always uses that instead.
+#define DEFAULT_LAT (-41.2887)
+#define DEFAULT_LON (174.7771)
 
 // Stretches the capture interval out as the battery gets low, to conserve what's left - see
 // applyLowBatteryIntervalFloor(). Each is a floor, not an override: it only ever lengthens
@@ -170,6 +192,8 @@ struct DeviceConfig {
     bool sleepDuringNight = DEFAULT_SLEEP_DURING_NIGHT;
     int daytimeStartsAtH = DEFAULT_DAYTIME_STARTS_AT_H;
     int daytimeEndsAtH = DEFAULT_DAYTIME_ENDS_AT_H;
+    // See DEFAULT_UTC_OFFSET_MINUTES above - only affects daytimeStartsAtH/daytimeEndsAtH.
+    int utcOffsetMinutes = DEFAULT_UTC_OFFSET_MINUTES;
     uint32_t cameraIntervalS = DEFAULT_CAMERA_INTERVAL_S;
     String apiUrl = DEFAULT_API_URL;
     bool hflip = DEFAULT_HFLIP;
@@ -657,10 +681,10 @@ void writeCounts(const TelemetryCounts &counts)
     }
 }
 
-// Applies whichever of sleepDuringNight/daytimeStartsAtH/daytimeEndsAtH/cameraIntervalS/apiUrl/
-// hflip/vflip/autoSyncPeriodS/geoIntervalS/geoLat/geoLon/geoTimeRecorded/cameraModel/
-// cameraWarmupFrames/enableLongExposureAtNight/longExposureXclkHz are present in `fields` on top
-// of an existing DeviceConfig - used for both
+// Applies whichever of sleepDuringNight/daytimeStartsAtH/daytimeEndsAtH/utcOffsetMinutes/
+// cameraIntervalS/apiUrl/hflip/vflip/autoSyncPeriodS/geoIntervalS/geoLat/geoLon/geoTimeRecorded/
+// cameraModel/cameraWarmupFrames/enableLongExposureAtNight/longExposureXclkHz are present in
+// `fields` on top of an existing DeviceConfig - used for both
 // CONFIG_FILE (on disk) and the Device object nested in an Image/Telemetry API response, so a
 // partial payload only touches the fields it mentions. In practice the geo* fields and
 // cameraModel only ever come from CONFIG_FILE - the API has no way to know a device's GPS
@@ -671,6 +695,7 @@ void applyConfigFields(JsonVariantConst fields, DeviceConfig &config)
     config.sleepDuringNight = fields["sleepDuringNight"] | config.sleepDuringNight;
     config.daytimeStartsAtH = fields["daytimeStartsAtH"] | config.daytimeStartsAtH;
     config.daytimeEndsAtH   = fields["daytimeEndsAtH"] | config.daytimeEndsAtH;
+    config.utcOffsetMinutes = fields["utcOffsetMinutes"] | config.utcOffsetMinutes;
     config.cameraIntervalS  = fields["cameraIntervalS"] | config.cameraIntervalS;
     config.hflip            = fields["hflip"] | config.hflip;
     config.vflip            = fields["vflip"] | config.vflip;
@@ -730,6 +755,7 @@ void writeDeviceConfig(const DeviceConfig &config)
     doc["sleepDuringNight"] = config.sleepDuringNight;
     doc["daytimeStartsAtH"] = config.daytimeStartsAtH;
     doc["daytimeEndsAtH"] = config.daytimeEndsAtH;
+    doc["utcOffsetMinutes"] = config.utcOffsetMinutes;
     doc["cameraIntervalS"] = config.cameraIntervalS;
     doc["apiUrl"] = config.apiUrl;
     doc["hflip"] = config.hflip;
@@ -780,6 +806,7 @@ void applyDeviceConfigFromApiResponse(const String &responseBody, DeviceConfig &
     if (newConfig.sleepDuringNight != config.sleepDuringNight ||
         newConfig.daytimeStartsAtH != config.daytimeStartsAtH ||
         newConfig.daytimeEndsAtH != config.daytimeEndsAtH ||
+        newConfig.utcOffsetMinutes != config.utcOffsetMinutes ||
         newConfig.cameraIntervalS != config.cameraIntervalS ||
         newConfig.apiUrl != config.apiUrl ||
         newConfig.hflip != config.hflip ||
@@ -1697,25 +1724,157 @@ bool uploadPendingImages(const String &deviceId, TelemetryCounts &counts, Device
     return backlogExcessive;
 }
 
-// Whether it's currently outside daytime hours (daytimeStartsAtH/daytimeEndsAtH, compared in
-// UTC - see computeSleepSeconds()'s comment on why UTC). Returns false - i.e. "assume daytime" -
-// if the clock was never synced, same as computeSleepSeconds()/setupCameraNightExposure() falling
-// back to their normal daytime behaviour in that case. Shared by computeSleepSeconds() (whether
-// to sleep through the night instead of waking every cameraIntervalS) and
-// setupCameraNightExposure() (whether to switch the sensor into its long-exposure setup).
-bool isCurrentlyNight(const DeviceConfig &config)
+// --- Sunrise/sunset calculation -------------------------------------------------------------
+// Used by isNightForExposure() below to decide when to switch the camera into its long-exposure
+// setup, based on where the sun actually is rather than a fixed clock-hour boundary (see the
+// git history of isCurrentlyNight() - a boundary compared in the wrong timezone once caused this
+// firmware to apply *daytime* exposure settings right at real dusk, and reliably failed captures
+// for the ~40 minutes until it was next disturbed). Ported from the public-domain solar position
+// formulas (Jean Meeus, "Astronomical Algorithms") as popularised by mourner/suncalc.js
+// (https://github.com/mourner/suncalc) - the same maths behind the Pi units' `suncalc` Python
+// package (see scripts/helpers.py's currentPhase()), just the sunrise/sunset pair rather than
+// suncalc's full set of twilight phases - see isNightForExposure()'s comment on why only two.
+namespace SunCalc {
+constexpr double RAD = 3.14159265358979323846 / 180.0;
+constexpr double J1970 = 2440588.0;
+constexpr double J2000 = 2451545.0;
+constexpr double OBLIQUITY = RAD * 23.4397;   // Earth's axial tilt
+constexpr double J0 = 0.0009;
+
+double toDays(time_t utc)
 {
-    struct tm timeinfo;
-    if (!getLocalTime(&timeinfo, 0)) {
-        return false;
+    return ((double)utc / 86400.0 - 0.5 + J1970) - J2000;
+}
+
+time_t fromJulian(double j)
+{
+    return (time_t)((j + 0.5 - J1970) * 86400.0);
+}
+
+double solarMeanAnomaly(double d) { return RAD * (357.5291 + 0.98560028 * d); }
+
+double eclipticLongitude(double m)
+{
+    double c = RAD * (1.9148 * sin(m) + 0.02 * sin(2 * m) + 0.0003 * sin(3 * m));  // equation of center
+    double p = RAD * 102.9372;                                                     // perihelion of the Earth
+    return m + c + p + 3.14159265358979323846;
+}
+
+double declination(double l) { return asin(sin(l) * sin(OBLIQUITY)); }   // ecliptic latitude of the sun is ~0
+double julianCycle(double d, double lw) { return round(d - J0 - lw / (2 * 3.14159265358979323846)); }
+double approxTransit(double ht, double lw, double n) { return J0 + (ht + lw) / (2 * 3.14159265358979323846) + n; }
+double solarTransitJ(double ds, double m, double l) { return J2000 + ds + 0.0053 * sin(m) - 0.0069 * sin(2 * l); }
+
+double hourAngle(double h, double phi, double d)
+{
+    double cosH = (sin(h) - sin(phi) * sin(d)) / (cos(phi) * cos(d));
+    if (cosH < -1) cosH = -1;   // sun never sets this day (polar summer) - treat as "always up"
+    if (cosH > 1) cosH = 1;     // sun never rises this day (polar winter) - treat as "always down"
+    return acos(cosH);
+}
+
+// Sunrise/sunset (UTC) for the solar day containing `dayUTC` - pass any instant within the UTC
+// calendar day you want (this file always passes local noon-ish of that day, see below, to stay
+// well clear of the edges).
+void sunriseSunset(time_t dayUTC, double latDeg, double lonDeg, time_t &sunriseOut, time_t &sunsetOut)
+{
+    double lw = RAD * -lonDeg;
+    double phi = RAD * latDeg;
+    double d = toDays(dayUTC);
+    double n = julianCycle(d, lw);
+    double ds = approxTransit(0, lw, n);
+    double m = solarMeanAnomaly(ds);
+    double l = eclipticLongitude(m);
+    double dec = declination(l);
+    double jNoon = solarTransitJ(ds, m, l);
+
+    double h0 = -0.833 * RAD;   // standard sunrise/sunset angle - accounts for atmospheric refraction + solar radius
+    double w0 = hourAngle(h0, phi, dec);
+    double a0 = approxTransit(w0, lw, n);
+    double jSet = solarTransitJ(a0, m, l);
+    double jRise = jNoon - (jSet - jNoon);
+
+    sunriseOut = fromJulian(jRise);
+    sunsetOut = fromJulian(jSet);
+}
+}   // namespace SunCalc
+
+// Whether `nowUTC` falls at night for camera-exposure purposes - i.e. anywhere between a sunset
+// and the following sunrise - at (latDeg, lonDeg). Uses DEFAULT_LAT/DEFAULT_LON (Wellington) if
+// both are still 0 (no GPS fix yet - see updateGeoLocationIfDue()).
+//
+// Deliberately checks against the wider sunset/sunrise window rather than a narrower civil-
+// twilight one (dusk/dawn, ~20-30 min inside it): the OV5640 lever this firmware has for "night"
+// is a coarse on/off switch (see setupCameraNightExposure()), and running it a little longer than
+// strictly necessary around the edges of twilight is harmless - it was already confirmed working
+// fine under full daylight (see runWakeCycle()'s "nightLongExposure" comment history) - whereas
+// running normal daytime auto-exposure a little into real dusk/dawn is exactly what caused the
+// failures this replaces. Only two tiers (unlike the Pi's multi-phase dawn/dusk/nautical/night
+// ladder - see scripts/helpers.py's currentPhase()) because the OV5640 driver only gives us one
+// lever to pull, not the Pi's continuously-variable ExposureTime.
+//
+// Checks yesterday/today/tomorrow's UTC-calendar-day sunset/sunrise (not just "today's") so a
+// local sunset/sunrise landing on a different UTC calendar date than `nowUTC` itself - as it does
+// for most of the day, this far from UTC - still gets caught correctly.
+bool isNightForExposure(time_t nowUTC, double latDeg, double lonDeg)
+{
+    if (latDeg == 0 && lonDeg == 0) {
+        latDeg = DEFAULT_LAT;
+        lonDeg = DEFAULT_LON;
     }
-    return (timeinfo.tm_hour >= config.daytimeEndsAtH) || (timeinfo.tm_hour < config.daytimeStartsAtH);
+
+    time_t todayNoonUTC = (nowUTC / 86400) * 86400 + 43200;
+    time_t sunriseYesterday, sunsetYesterday;
+    time_t sunriseToday, sunsetToday;
+    time_t sunriseTomorrow, sunsetTomorrow;
+    SunCalc::sunriseSunset(todayNoonUTC - 86400, latDeg, lonDeg, sunriseYesterday, sunsetYesterday);
+    SunCalc::sunriseSunset(todayNoonUTC, latDeg, lonDeg, sunriseToday, sunsetToday);
+    SunCalc::sunriseSunset(todayNoonUTC + 86400, latDeg, lonDeg, sunriseTomorrow, sunsetTomorrow);
+
+    if (nowUTC >= sunsetYesterday && nowUTC < sunriseToday) return true;
+    if (nowUTC >= sunsetToday && nowUTC < sunriseTomorrow) return true;
+    return false;
+}
+
+// --- Fixed-offset local time --------------------------------------------------------------
+// Only used for daytimeStartsAtH/daytimeEndsAtH (see isOutsideWorkingHours()) - everything else
+// in this firmware (logs, ISO8601 fields, isNightForExposure() above) deliberately stays in UTC.
+// mktime()/gmtime_r() below are used purely as epoch<->calendar-field converters, not for their
+// usual local-timezone behaviour - this firmware never sets a timezone (GMT_OFFSET_SEC/
+// DAY_LIGHT_OFFSET_SEC are left at 0), so the C library treats both as UTC, which is exactly what
+// lets the manual `+ utcOffsetMinutes` shift below stand in for a real timezone conversion.
+
+// UTC time_t -> wall-clock fields at `utcOffsetMinutes`.
+void utcToLocalTm(time_t utc, int utcOffsetMinutes, struct tm &out)
+{
+    time_t shifted = utc + (time_t)utcOffsetMinutes * 60;
+    gmtime_r(&shifted, &out);
+}
+
+// Inverse of utcToLocalTm() - interprets `local` as wall-clock time at `utcOffsetMinutes` and
+// returns the equivalent UTC time_t.
+time_t localTmToUtc(struct tm local, int utcOffsetMinutes)
+{
+    return mktime(&local) - (time_t)utcOffsetMinutes * 60;
+}
+
+// Whether `nowUTC` falls outside the device's configured working-day window
+// (daytimeStartsAtH/daytimeEndsAtH, in local time - see utcOffsetMinutes) - used only by
+// computeSleepSeconds() to decide whether to sleep straight through rather than waking every
+// cameraIntervalS. This is a fixed clock-hour schedule (when a technician/animal/etc. is likely
+// to be around), not actual daylight - see isNightForExposure() for that. Returns false - i.e.
+// "assume within hours" - if the clock was never synced, same as computeSleepSeconds() falling
+// back to its normal behaviour in that case.
+bool isOutsideWorkingHours(time_t nowUTC, const DeviceConfig &config)
+{
+    struct tm local;
+    utcToLocalTm(nowUTC, config.utcOffsetMinutes, local);
+    return (local.tm_hour >= config.daytimeEndsAtH) || (local.tm_hour < config.daytimeStartsAtH);
 }
 
 // Decides how long to deep-sleep for, in seconds. Normally just config.cameraIntervalS, but
-// when sleep_during_night is enabled and it's currently outside daytime hours, sleeps through
-// until daytimeStartsAtH instead of waking every cameraIntervalS to take a photo in the dark.
-// Hours are compared in UTC, since GMT_OFFSET_SEC/DAY_LIGHT_OFFSET_SEC are left at 0.
+// when sleep_during_night is enabled and it's currently outside the working-day window, sleeps
+// through until daytimeStartsAtH (local time) instead of waking every cameraIntervalS overnight.
 uint32_t computeSleepSeconds(const DeviceConfig &config)
 {
     // Floored by battery level - see applyLowBatteryIntervalFloor() - so a low battery still gets
@@ -1729,27 +1888,28 @@ uint32_t computeSleepSeconds(const DeviceConfig &config)
 
     struct tm timeinfo;
     if (!getLocalTime(&timeinfo, 0)) {
-        // No synced clock to judge night from - fall back to the regular interval
+        // No synced clock to judge the working-day window from - fall back to the regular interval
         return intervalS;
     }
 
-    if (!isCurrentlyNight(config)) {
+    time_t nowUTC = time(nullptr);
+    if (!isOutsideWorkingHours(nowUTC, config)) {
         return intervalS;
     }
 
-    struct tm wake = timeinfo;
-    wake.tm_hour = config.daytimeStartsAtH;
-    wake.tm_min = 0;
-    wake.tm_sec = 0;
+    struct tm wakeLocal;
+    utcToLocalTm(nowUTC, config.utcOffsetMinutes, wakeLocal);
+    wakeLocal.tm_hour = config.daytimeStartsAtH;
+    wakeLocal.tm_min = 0;
+    wakeLocal.tm_sec = 0;
 
-    time_t now = mktime(&timeinfo);
-    time_t wakeTime = mktime(&wake);
-    if (wakeTime <= now) {
-        wakeTime += 24 * 60 * 60;
+    time_t wakeUTC = localTmToUtc(wakeLocal, config.utcOffsetMinutes);
+    if (wakeUTC <= nowUTC) {
+        wakeUTC += 24 * 60 * 60;
     }
 
-    uint32_t sleepSeconds = (uint32_t)difftime(wakeTime, now);
-    logf("Night mode - sleeping %u seconds until %02d:00 UTC", sleepSeconds, config.daytimeStartsAtH);
+    uint32_t sleepSeconds = (uint32_t)difftime(wakeUTC, nowUTC);
+    logf("Night mode - sleeping %u seconds until %02d:00 local (UTC%+d min)", sleepSeconds, config.daytimeStartsAtH, config.utcOffsetMinutes);
     return sleepSeconds;
 }
 
@@ -1904,7 +2064,7 @@ void setup()
 // Switches the sensor from auto exposure to a fixed exposure pinned at its maximum - the closest
 // the OV5640 driver gets to the Raspberry Pi units' camera.enable_long_exposure_at_night /
 // ExposureTime (see scripts/savePhotos.py). Only called from runWakeCycle() when
-// deviceConfig.enableLongExposureAtNight is set, it's night (see isCurrentlyNight()), and the
+// deviceConfig.enableLongExposureAtNight is set, it's night (see isNightForExposure()), and the
 // detected sensor is OV5640.
 //
 // How this differs from the Pi: libcamera lets Picamera2 ask the IMX708 for an explicit
@@ -2018,9 +2178,16 @@ void runWakeCycle()
     // "OV5640" default before any detection has run) - good enough to avoid slowing an OV2640's
     // clock for no benefit (see setupCameraNightExposure()'s comment on why OV2640 can't use
     // this), without waiting on this boot's own detection which only happens after init.
+    //
+    // isNightForExposure() uses actual sunrise/sunset (deviceConfig.geoLat/geoLon, or Wellington
+    // until a GPS fix lands) rather than daytimeStartsAtH/daytimeEndsAtH - those are a fixed
+    // working-day schedule for computeSleepSeconds() (see isOutsideWorkingHours()), not sunlight,
+    // and a fixed clock-hour boundary drifts against real dusk/dawn by up to a couple of hours
+    // across the seasons - see isNightForExposure()'s comment for how that already bit this
+    // firmware once.
     bool nightLongExposure = deviceConfig.enableLongExposureAtNight
                               && deviceConfig.cameraModel != "OV2640"
-                              && isCurrentlyNight(deviceConfig);
+                              && isNightForExposure(time(nullptr), deviceConfig.geoLat, deviceConfig.geoLon);
 
     // Enable / disable power save mode (1 disabled, 0 enabled)
     pinMode(BOARD_POWER_SAVE_MODE_PIN, OUTPUT);
