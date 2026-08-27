@@ -103,6 +103,12 @@ ViewData["Title"] = "Edit";
                 <span asp-validation-for="Device.DaytimeEndsAtH" class="text-danger"></span>
             </div>
             <div class="form-group" class="col-md-4">
+                <label asp-for="Device.UtcOffsetMinutes" class="control-label">UTC Offset (minutes)</label>
+                <input asp-for="Device.UtcOffsetMinutes" class="form-control"></input>
+                <span asp-validation-for="Device.UtcOffsetMinutes" class="text-danger"></span>
+                <small class="form-text text-muted">Only affects Daytime Starts/Ends At H above. NZST = 720, NZDT = 780 - not auto-adjusted for daylight saving, update by hand.</small>
+            </div>
+            <div class="form-group" class="col-md-4">
                 <label asp-for="Device.CameraIntervalS" class="control-label"></label>
                 <input asp-for="Device.CameraIntervalS" class="form-control"></input>
                 <span asp-validation-for="Device.CameraIntervalS" class="text-danger"></span>
@@ -133,6 +139,17 @@ ViewData["Title"] = "Edit";
                 <label class="form-check-label" asp-for="Device.Vflip">
                     Vertical Flip
                 </label>
+            </div>
+            <div class="form-check" class="col-md-12">
+                <input asp-for="Device.EnableLongExposureAtNight" class="form-check-input" type="checkbox">
+                <label class="form-check-label" asp-for="Device.EnableLongExposureAtNight">
+                    Enable Long Exposure At Night
+                </label>
+            </div>
+            <div class="form-group" class="col-md-4">
+                <label asp-for="Device.LongExposureXclkHz" class="control-label">Long Exposure XCLK (Hz)</label>
+                <input asp-for="Device.LongExposureXclkHz" class="form-control"></input>
+                <span asp-validation-for="Device.LongExposureXclkHz" class="text-danger"></span>
             </div>
             <hr />
 

@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using timelapse.infrastructure;
@@ -11,9 +12,11 @@ using timelapse.infrastructure;
 namespace timelapse.api.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260827105248_AddDeviceUtcOffset")]
+    partial class AddDeviceUtcOffset
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -324,10 +327,6 @@ namespace timelapse.api.Migrations
                         .HasColumnType("text")
                         .HasColumnName("description");
 
-                    b.Property<bool>("EnableLongExposureAtNight")
-                        .HasColumnType("boolean")
-                        .HasColumnName("enable_long_exposure_at_night");
-
                     b.Property<int>("GeoIntervalS")
                         .HasColumnType("integer")
                         .HasColumnName("geo_interval_s");
@@ -339,10 +338,6 @@ namespace timelapse.api.Migrations
                     b.Property<bool>("HibernateMode")
                         .HasColumnType("boolean")
                         .HasColumnName("hibernate_mode");
-
-                    b.Property<int>("LongExposureXclkHz")
-                        .HasColumnType("integer")
-                        .HasColumnName("long_exposure_xclk_hz");
 
                     b.Property<bool>("MonitoringMode")
                         .HasColumnType("boolean")

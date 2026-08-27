@@ -51,10 +51,13 @@ const deviceEditSchema = z.object({
   // true }), and mixing that with z.coerce breaks zodResolver's generic inference.
   daytimeStartsAtH: z.number().int(),
   daytimeEndsAtH: z.number().int(),
+  utcOffsetMinutes: z.number().int(),
   cameraIntervalS: z.number().int(),
   apiUrl: z.string(),
   hflip: z.boolean(),
   vflip: z.boolean(),
+  enableLongExposureAtNight: z.boolean(),
+  longExposureXclkHz: z.number().int(),
   geoIntervalS: z.number().int(),
   autoSyncPeriodS: z.number().int(),
   location: locationSchema,
@@ -76,10 +79,13 @@ const emptyDefaults: DeviceEditForm = {
   sleepDuringNight: false,
   daytimeStartsAtH: 7,
   daytimeEndsAtH: 17,
+  utcOffsetMinutes: 720,
   cameraIntervalS: 300,
   apiUrl: '',
   hflip: false,
   vflip: false,
+  enableLongExposureAtNight: true,
+  longExposureXclkHz: 8000000,
   geoIntervalS: 3600,
   autoSyncPeriodS: 300,
   location: {
@@ -149,10 +155,13 @@ export function DeviceEdit() {
       sleepDuringNight: device.sleepDuringNight ?? emptyDefaults.sleepDuringNight,
       daytimeStartsAtH: device.daytimeStartsAtH ?? emptyDefaults.daytimeStartsAtH,
       daytimeEndsAtH: device.daytimeEndsAtH ?? emptyDefaults.daytimeEndsAtH,
+      utcOffsetMinutes: device.utcOffsetMinutes ?? emptyDefaults.utcOffsetMinutes,
       cameraIntervalS: device.cameraIntervalS ?? emptyDefaults.cameraIntervalS,
       apiUrl: device.apiUrl ?? emptyDefaults.apiUrl,
       hflip: device.hflip ?? emptyDefaults.hflip,
       vflip: device.vflip ?? emptyDefaults.vflip,
+      enableLongExposureAtNight: device.enableLongExposureAtNight ?? emptyDefaults.enableLongExposureAtNight,
+      longExposureXclkHz: device.longExposureXclkHz ?? emptyDefaults.longExposureXclkHz,
       geoIntervalS: device.geoIntervalS ?? emptyDefaults.geoIntervalS,
       autoSyncPeriodS: device.autoSyncPeriodS ?? emptyDefaults.autoSyncPeriodS,
       location: {
@@ -287,6 +296,14 @@ export function DeviceEdit() {
                 <Input id="daytimeEndsAtH" type="number" {...register('daytimeEndsAtH', { valueAsNumber: true })} />
               </div>
               <div className="space-y-2">
+                <Label htmlFor="utcOffsetMinutes">UTC Offset (minutes)</Label>
+                <Input id="utcOffsetMinutes" type="number" {...register('utcOffsetMinutes', { valueAsNumber: true })} />
+                <p className="text-sm text-muted-foreground">
+                  Only affects Daytime Starts/Ends At above. NZST = 720, NZDT = 780 - not
+                  auto-adjusted for daylight saving.
+                </p>
+              </div>
+              <div className="space-y-2">
                 <Label htmlFor="cameraIntervalS">Camera Interval (s)</Label>
                 <Input id="cameraIntervalS" type="number" {...register('cameraIntervalS', { valueAsNumber: true })} />
               </div>
@@ -318,6 +335,20 @@ export function DeviceEdit() {
                   <Switch id="vflip" checked={value} onCheckedChange={onChange} />
                 )}
               />
+            </div>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="enableLongExposureAtNight">Enable Long Exposure At Night</Label>
+              <Controller
+                name="enableLongExposureAtNight"
+                control={control}
+                render={({ field: { value, onChange } }) => (
+                  <Switch id="enableLongExposureAtNight" checked={value} onCheckedChange={onChange} />
+                )}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="longExposureXclkHz">Long Exposure XCLK (Hz)</Label>
+              <Input id="longExposureXclkHz" type="number" {...register('longExposureXclkHz', { valueAsNumber: true })} />
             </div>
             <div className="space-y-2">
               <Label htmlFor="apiUrl">API URL</Label>

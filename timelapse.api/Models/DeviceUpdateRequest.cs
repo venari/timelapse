@@ -20,10 +20,13 @@ namespace timelapse.api{
         public bool SleepDuringNight {get; set;}
         public int DaytimeStartsAtH {get; set;}
         public int DaytimeEndsAtH {get; set;}
+        public int UtcOffsetMinutes {get; set;}
         public int CameraIntervalS {get; set;}
         public string ApiUrl {get; set;} = "";
         public bool Hflip {get; set;}
         public bool Vflip {get; set;}
+        public bool EnableLongExposureAtNight {get; set;}
+        public int LongExposureXclkHz {get; set;}
         public int GeoIntervalS {get; set;}
         public int AutoSyncPeriodS {get; set;}
 
