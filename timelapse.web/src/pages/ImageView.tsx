@@ -4,8 +4,8 @@ import { useQuery } from '@tanstack/react-query';
 import { api } from '@/api/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Slider } from '@/components/ui/slider';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { ImageTimeline } from '@/components/ImageTimeline';
 import { Play, Pause, Loader2, ChevronLeft, ChevronRight, Flag } from 'lucide-react';
 import { format, subHours, subDays } from 'date-fns';
 import { getImageUrl } from '@/lib/imageUtils';
@@ -206,8 +206,8 @@ export function ImageView() {
     setCurrentIndex((prev) => Math.min(images ? images.length - 1 : 0, prev + 1));
   };
 
-  const handleSliderChange = (value: number[]) => {
-    setCurrentIndex(value[0]);
+  const handleSeek = (index: number) => {
+    setCurrentIndex(index);
     setIsPlaying(false);
   };
 
@@ -239,6 +239,27 @@ export function ImageView() {
   }
 
   const currentImage = images?.[currentIndex];
+
+  // The full selected window (start..now), so the timeline can show gaps at the
+  // edges too - not just between the first and last image we happen to have.
+  const rangeMs = { '1h': 1, '24h': 24, '48h': 48, '7d': 168 }[timeRange] * 60 * 60 * 1000;
+  const windowEnd = Math.floor(Date.now() / 60000) * 60000;
+  const windowStart = windowEnd - rangeMs;
+
+  // Overnight sleep schedule, so those gaps read as expected rather than outages.
+  const nightSchedule =
+    device?.sleepDuringNight &&
+    device.daytimeStartsAtH != null &&
+    device.daytimeEndsAtH != null
+      ? {
+          startHour: device.daytimeStartsAtH,
+          endHour: device.daytimeEndsAtH,
+          utcOffsetMinutes: device.utcOffsetMinutes ?? 0,
+        }
+      : undefined;
+
+  // Flag daytime gaps that span more than a few missed capture intervals.
+  const gapThresholdMs = Math.max((device?.cameraIntervalS ?? 60) * 5, 15 * 60) * 1000;
 
   return (
     <div className="container mx-auto py-8 px-4">
@@ -305,23 +326,16 @@ export function ImageView() {
 
               {/* Controls */}
               <div className="space-y-4">
-                {/* Slider */}
-                <div className="px-2">
-                  <Slider
-                    value={[currentIndex]}
-                    onValueChange={handleSliderChange}
-                    max={images.length - 1}
-                    step={1}
-                    className="w-full"
-                  />
-                  <div className="flex justify-between text-xs text-muted-foreground mt-1">
-                    <span>{format(new Date(images[0].timestamp), 'PPp')}</span>
-                    <span>
-                      {currentIndex + 1} / {images.length}
-                    </span>
-                    <span>{format(new Date(images[images.length - 1].timestamp), 'PPp')}</span>
-                  </div>
-                </div>
+                {/* Timeline scrubber - filled = footage present, blank = gap */}
+                <ImageTimeline
+                  images={images}
+                  currentIndex={currentIndex}
+                  windowStart={windowStart}
+                  windowEnd={windowEnd}
+                  onSeek={handleSeek}
+                  night={nightSchedule}
+                  gapThresholdMs={gapThresholdMs}
+                />
 
                 {/* Preload Progress */}
                 {preloadProgress < 100 && (
