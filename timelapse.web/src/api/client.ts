@@ -169,10 +169,11 @@ export const api = {
   async getTelemetryBetweenDates(
     deviceId: number,
     startDate: string,
-    endDate: string
+    endDate: string,
+    fullDetail = false
   ): Promise<Telemetry[]> {
     const response = await apiClient.get<Telemetry[]>(
-      `/api/Telemetry/GetTelemetryBetweenDates?deviceId=${deviceId}&startDate=${startDate}&endDate=${endDate}`
+      `/api/Telemetry/GetTelemetryBetweenDates?deviceId=${deviceId}&startDate=${startDate}&endDate=${endDate}&aggregate=${!fullDetail}`
     );
     return response.data;
   },

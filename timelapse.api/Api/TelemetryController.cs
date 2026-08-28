@@ -80,7 +80,7 @@ namespace timelapse.api{
  
 
         [HttpGet("GetTelemetryBetweenDates")]
-        public ActionResult<IEnumerable<Telemetry>> GetTelemetryBetweenDates([FromQuery] int deviceId, DateTime startDate, DateTime endDate){
+        public ActionResult<IEnumerable<Telemetry>> GetTelemetryBetweenDates([FromQuery] int deviceId, DateTime startDate, DateTime endDate, bool aggregate = true){
             _logger.LogInformation($"Get latest telemetry between {startDate} and {endDate}");
 
             List<Telemetry> telemetry = new List<Telemetry>();
@@ -109,6 +109,12 @@ namespace timelapse.api{
 
             if(telemetry.Count==0){
                 return new NotFoundObjectResult(telemetry);
+            }
+
+            // Caller opted out of bucketing (telemetry view "Full detail" toggle) - return every reading
+            if (!aggregate)
+            {
+                return telemetry;
             }
 
             // Determine if we should aggregate based on the time span and data volume

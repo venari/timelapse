@@ -4,6 +4,8 @@ import { useQuery } from '@tanstack/react-query';
 import { api } from '@/api/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 import { Loader2, Battery, Thermometer, HardDrive, Clock, Database } from 'lucide-react';
 import {
   LineChart,
@@ -37,6 +39,7 @@ function getTimeRange(timeRange: '1h' | '24h' | '48h' | '7d') {
 export function TelemetryGraph() {
   const { deviceId } = useParams<{ deviceId: string }>();
   const [timeRange, setTimeRange] = useState<'1h' | '24h' | '48h' | '7d'>('24h');
+  const [fullDetail, setFullDetail] = useState(false);
 
   const { start, end } = getTimeRange(timeRange);
 
@@ -109,12 +112,13 @@ export function TelemetryGraph() {
     isLoading: telemetryLoading,
     error: telemetryError,
   } = useQuery({
-    queryKey: ['telemetry', deviceId, timeRange],
+    queryKey: ['telemetry', deviceId, timeRange, fullDetail],
     queryFn: () =>
       api.getTelemetryBetweenDates(
         Number(deviceId),
         start.toISOString(),
-        end.toISOString()
+        end.toISOString(),
+        fullDetail
       ),
     enabled: !!deviceId,
     refetchInterval: 30000, // Refetch every 30 seconds for real-time updates
@@ -177,6 +181,10 @@ export function TelemetryGraph() {
     return { chartData, voltageMin, voltageMax };
   }, [telemetry]);
 
+  // In full-detail mode, plot straight segments between every reading (no spline
+  // smoothing) so the chart shows exactly what was recorded.
+  const lineType = fullDetail ? 'linear' : 'monotone';
+
   const handleTimeRangeChange = (value: string) => {
     setTimeRange(value as '1h' | '24h' | '48h' | '7d');
   };
@@ -213,7 +221,7 @@ export function TelemetryGraph() {
         <p className="text-muted-foreground">Telemetry Graphs</p>
       </div>
 
-      <div className="mb-6">
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
         <Tabs value={timeRange} onValueChange={handleTimeRangeChange}>
           <TabsList>
             <TabsTrigger value="1h">Last Hour</TabsTrigger>
@@ -222,6 +230,20 @@ export function TelemetryGraph() {
             <TabsTrigger value="7d">Last 7 Days</TabsTrigger>
           </TabsList>
         </Tabs>
+
+        <div className="flex items-center gap-2">
+          <Switch
+            id="full-detail"
+            checked={fullDetail}
+            onCheckedChange={setFullDetail}
+          />
+          <Label htmlFor="full-detail" className="cursor-pointer">
+            Full detail
+            <span className="block text-xs font-normal text-muted-foreground">
+              Plot every reading instead of averaging into time buckets
+            </span>
+          </Label>
+        </div>
       </div>
 
       {telemetryLoading ? (
@@ -256,7 +278,7 @@ export function TelemetryGraph() {
                   />
                   <Legend />
                   <Line
-                    type="monotone"
+                    type={lineType}
                     dataKey="battery"
                     stroke="#10b981"
                     name="Battery %"
@@ -293,7 +315,7 @@ export function TelemetryGraph() {
                   />
                   <Legend />
                   <Line
-                    type="monotone"
+                    type={lineType}
                     dataKey="temperature"
                     stroke="#3b82f6"
                     name="Temperature °C"
@@ -331,7 +353,7 @@ export function TelemetryGraph() {
                     />
                     <Legend />
                     <Line
-                      type="monotone"
+                      type={lineType}
                       dataKey="diskSpace"
                       stroke="#a855f7"
                       name="Free Space GB"
@@ -398,7 +420,7 @@ export function TelemetryGraph() {
                     {/* Voltage line */}
                     <Line
                       yAxisId="left"
-                      type="monotone"
+                      type={lineType}
                       dataKey="voltage"
                       stroke="#f59e0b"
                       strokeWidth={2}
@@ -408,7 +430,7 @@ export function TelemetryGraph() {
                     {/* IO (solar) voltage line - also drives the Charging background above 4.2V */}
                     <Line
                       yAxisId="left"
-                      type="monotone"
+                      type={lineType}
                       dataKey="ioVoltage"
                       stroke="#8b5cf6"
                       strokeWidth={2}
@@ -418,7 +440,7 @@ export function TelemetryGraph() {
                     {/* Current line */}
                     <Line
                       yAxisId="right"
-                      type="monotone"
+                      type={lineType}
                       dataKey="current"
                       stroke="#ef4444"
                       name="Current (mA)"
