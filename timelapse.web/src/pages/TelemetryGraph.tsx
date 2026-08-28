@@ -185,6 +185,17 @@ export function TelemetryGraph() {
   // smoothing) so the chart shows exactly what was recorded.
   const lineType = fullDetail ? 'linear' : 'monotone';
 
+  // Pin the x-axis to the selected window so gaps in the data read as gaps
+  // rather than the line being stretched across the full chart width.
+  const xDomain: [number, number] = [start.getTime(), end.getTime()];
+
+  // ESP32 devices can't report battery current - hide that series entirely when absent.
+  const hasCurrent = chartData.some((d) => d.current != null);
+
+  // For short uptimes, minutes read better than "0.3 hrs".
+  const maxUptimeHours = Math.max(0, ...chartData.map((d) => d.uptimeHours ?? 0));
+  const uptimeInMinutes = maxUptimeHours > 0 && maxUptimeHours < 1;
+
   const handleTimeRangeChange = (value: string) => {
     setTimeRange(value as '1h' | '24h' | '48h' | '7d');
   };
@@ -267,7 +278,7 @@ export function TelemetryGraph() {
                   <XAxis
                     dataKey="timestamp"
                     type="number"
-                    domain={['dataMin', 'dataMax']}
+                    domain={xDomain}
                     ticks={tickConfig.ticks}
                     tickFormatter={(timestamp) => format(new Date(timestamp), tickConfig.format)}
                   />
@@ -304,7 +315,7 @@ export function TelemetryGraph() {
                   <XAxis
                     dataKey="timestamp"
                     type="number"
-                    domain={['dataMin', 'dataMax']}
+                    domain={xDomain}
                     ticks={tickConfig.ticks}
                     tickFormatter={(timestamp) => format(new Date(timestamp), tickConfig.format)}
                   />
@@ -342,7 +353,7 @@ export function TelemetryGraph() {
                     <XAxis
                       dataKey="timestamp"
                       type="number"
-                      domain={['dataMin', 'dataMax']}
+                      domain={xDomain}
                       ticks={tickConfig.ticks}
                       tickFormatter={(timestamp) => format(new Date(timestamp), tickConfig.format)}
                     />
@@ -371,7 +382,7 @@ export function TelemetryGraph() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Battery className="h-5 w-5 text-amber-600" />
-                  Battery Voltage & Current
+                  {hasCurrent ? 'Battery Voltage & Current' : 'Battery Voltage'}
                   <span className="text-sm font-normal text-muted-foreground ml-2">
                     (Green background = Charging, or IO Voltage &gt; 4.2V)
                   </span>
@@ -384,12 +395,14 @@ export function TelemetryGraph() {
                     <XAxis
                       dataKey="timestamp"
                       type="number"
-                      domain={['dataMin', 'dataMax']}
+                      domain={xDomain}
                       ticks={tickConfig.ticks}
                       tickFormatter={(timestamp) => format(new Date(timestamp), tickConfig.format)}
                     />
                     <YAxis yAxisId="left" domain={[voltageMin, voltageMax]} label={{ value: 'Voltage (V)', angle: -90, position: 'insideLeft' }} />
-                    <YAxis yAxisId="right" orientation="right" label={{ value: 'Current (mA)', angle: 90, position: 'insideRight' }} />
+                    {hasCurrent && (
+                      <YAxis yAxisId="right" orientation="right" label={{ value: 'Current (mA)', angle: 90, position: 'insideRight' }} />
+                    )}
                     <Tooltip
                       labelFormatter={(timestamp) => format(new Date(timestamp), 'PPpp')}
                       formatter={(value, name) => {
@@ -437,15 +450,17 @@ export function TelemetryGraph() {
                       name="IO Voltage (V)"
                       dot={false}
                     />
-                    {/* Current line */}
-                    <Line
-                      yAxisId="right"
-                      type={lineType}
-                      dataKey="current"
-                      stroke="#ef4444"
-                      name="Current (mA)"
-                      dot={false}
-                    />
+                    {/* Current line - ESP32 devices don't report this */}
+                    {hasCurrent && (
+                      <Line
+                        yAxisId="right"
+                        type={lineType}
+                        dataKey="current"
+                        stroke="#ef4444"
+                        name="Current (mA)"
+                        dot={false}
+                      />
+                    )}
                   </ComposedChart>
                 </ResponsiveContainer>
               </CardContent>
@@ -468,21 +483,28 @@ export function TelemetryGraph() {
                     <XAxis
                       dataKey="timestamp"
                       type="number"
-                      domain={['dataMin', 'dataMax']}
+                      domain={xDomain}
                       ticks={tickConfig.ticks}
                       tickFormatter={(timestamp) => format(new Date(timestamp), tickConfig.format)}
                     />
-                    <YAxis unit=" hrs" />
+                    <YAxis unit={uptimeInMinutes ? ' min' : ' hrs'} />
                     <Tooltip
                       labelFormatter={(timestamp) => format(new Date(timestamp), 'PPpp')}
-                      formatter={(value) => [`${Number(value).toFixed(1)} hours`, 'Uptime']}
+                      formatter={(value) =>
+                        uptimeInMinutes
+                          ? [`${Number(value).toFixed(0)} minutes`, 'Uptime']
+                          : [`${Number(value).toFixed(1)} hours`, 'Uptime']
+                      }
                     />
                     <Legend />
                     <Line
                       type="linear"
-                      dataKey="uptimeHours"
+                      dataKey={(d) => {
+                        const h = d.uptimeHours;
+                        return h == null ? null : uptimeInMinutes ? h * 60 : h;
+                      }}
                       stroke="#6366f1"
-                      name="Uptime (hours)"
+                      name={uptimeInMinutes ? 'Uptime (minutes)' : 'Uptime (hours)'}
                       dot={false}
                     />
                   </LineChart>
@@ -510,7 +532,7 @@ export function TelemetryGraph() {
                     <XAxis
                       dataKey="timestamp"
                       type="number"
-                      domain={['dataMin', 'dataMax']}
+                      domain={xDomain}
                       ticks={tickConfig.ticks}
                       tickFormatter={(timestamp) => format(new Date(timestamp), tickConfig.format)}
                     />
