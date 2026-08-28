@@ -172,10 +172,19 @@ export const api = {
     endDate: string,
     fullDetail = false
   ): Promise<Telemetry[]> {
-    const response = await apiClient.get<Telemetry[]>(
-      `/api/Telemetry/GetTelemetryBetweenDates?deviceId=${deviceId}&startDate=${startDate}&endDate=${endDate}&aggregate=${!fullDetail}`
-    );
-    return response.data;
+    try {
+      const response = await apiClient.get<Telemetry[]>(
+        `/api/Telemetry/GetTelemetryBetweenDates?deviceId=${deviceId}&startDate=${startDate}&endDate=${endDate}&aggregate=${!fullDetail}`
+      );
+      return response.data;
+    } catch (error) {
+      // The API returns 404 when a window contains no readings (common when
+      // panning/zooming to an empty period) - treat that as "no data", not an error.
+      if (axios.isAxiosError(error) && error.response?.status === 404) {
+        return [];
+      }
+      throw error;
+    }
   },
 };
 

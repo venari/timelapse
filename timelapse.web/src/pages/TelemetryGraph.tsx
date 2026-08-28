@@ -1,12 +1,25 @@
 import { useState, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { api } from '@/api/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
-import { Loader2, Battery, Thermometer, HardDrive, Clock, Database } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import {
+  Loader2,
+  Battery,
+  Thermometer,
+  HardDrive,
+  Clock,
+  Database,
+  ZoomIn,
+  ZoomOut,
+  ChevronLeft,
+  ChevronRight,
+  SkipForward,
+} from 'lucide-react';
 import {
   LineChart,
   Line,
@@ -19,83 +32,128 @@ import {
   Area,
   ComposedChart,
 } from 'recharts';
-import { format, subHours, subDays } from 'date-fns';
+import { format } from 'date-fns';
 
-// Helper function moved outside component to prevent recreation on every render
-function getTimeRange(timeRange: '1h' | '24h' | '48h' | '7d') {
-  const now = new Date();
-  switch (timeRange) {
-    case '1h':
-      return { start: subHours(now, 1), end: now };
-    case '24h':
-      return { start: subHours(now, 24), end: now };
-    case '48h':
-      return { start: subHours(now, 48), end: now };
-    case '7d':
-      return { start: subDays(now, 7), end: now };
+const MINUTE = 60 * 1000;
+const HOUR = 60 * MINUTE;
+const DAY = 24 * HOUR;
+
+// Zoom/pan bounds for the shared x-axis window.
+const MIN_WINDOW_MS = 15 * MINUTE;
+const MAX_WINDOW_MS = 120 * DAY;
+const ZOOM_FACTOR = 2;
+const PAN_FRACTION = 0.5; // pan by half the visible window per click
+
+const PRESETS = [
+  { key: '1h', label: 'Last Hour', ms: HOUR },
+  { key: '24h', label: 'Last 24 Hours', ms: 24 * HOUR },
+  { key: '48h', label: 'Last 48 Hours', ms: 48 * HOUR },
+  { key: '7d', label: 'Last 7 Days', ms: 7 * DAY },
+] as const;
+
+const clamp = (value: number, min: number, max: number) =>
+  Math.min(max, Math.max(min, value));
+
+// Snap a timestamp down to a boundary that suits the given tick interval, so
+// ticks land on tidy local times (:00, midnight, ...) rather than arbitrary offsets.
+function alignDown(ts: number, interval: number) {
+  const d = new Date(ts);
+  if (interval >= DAY) {
+    d.setHours(0, 0, 0, 0);
+  } else if (interval >= HOUR) {
+    const step = interval / HOUR;
+    d.setHours(Math.floor(d.getHours() / step) * step, 0, 0, 0);
+  } else {
+    const step = interval / MINUTE;
+    d.setMinutes(Math.floor(d.getMinutes() / step) * step, 0, 0);
   }
+  return d.getTime();
+}
+
+// Derive tick spacing + label format from however wide the visible window is
+// (moved outside the component to avoid recreating it every render).
+function getTickConfig(start: number, end: number) {
+  const spanHours = (end - start) / HOUR;
+
+  let interval: number;
+  let formatStr: string;
+  if (spanHours <= 2) {
+    interval = 15 * MINUTE;
+    formatStr = 'HH:mm';
+  } else if (spanHours <= 8) {
+    interval = HOUR;
+    formatStr = 'HH:mm';
+  } else if (spanHours <= 30) {
+    interval = 2 * HOUR;
+    formatStr = 'HH:mm';
+  } else if (spanHours <= 78) {
+    interval = 6 * HOUR;
+    formatStr = 'EEE HH:mm';
+  } else if (spanHours <= 24 * 16) {
+    interval = DAY;
+    formatStr = 'EEE dd MMM';
+  } else {
+    interval = 7 * DAY;
+    formatStr = 'dd MMM';
+  }
+
+  const ticks: number[] = [];
+  let current = alignDown(start, interval);
+  while (current < start) current += interval;
+  while (current <= end) {
+    ticks.push(current);
+    current += interval;
+  }
+
+  return { ticks, format: formatStr };
 }
 
 export function TelemetryGraph() {
   const { deviceId } = useParams<{ deviceId: string }>();
-  const [timeRange, setTimeRange] = useState<'1h' | '24h' | '48h' | '7d'>('24h');
   const [fullDetail, setFullDetail] = useState(false);
 
-  const { start, end } = getTimeRange(timeRange);
+  // The visible x-axis window, shared by every chart. `anchorEnd === null` means
+  // "track now" so the charts keep advancing with live data; panning back in time
+  // pins the right edge to a fixed timestamp until the user returns to Latest.
+  const [view, setView] = useState<{ windowMs: number; anchorEnd: number | null }>({
+    windowMs: 24 * HOUR,
+    anchorEnd: null,
+  });
 
-  // Generate tick values aligned to sensible time boundaries - memoized
-  const tickConfig = useMemo(() => {
-    const ticks: number[] = [];
-    let current: Date;
-    let interval: number;
-    let formatStr: string;
+  const isLive = view.anchorEnd === null;
 
-    switch (timeRange) {
-      case '1h':
-        // Align to 10-minute marks
-        current = new Date(start);
-        current.setMinutes(Math.floor(current.getMinutes() / 10) * 10, 0, 0);
-        interval = 10 * 60 * 1000; // 10 minutes in ms
-        formatStr = 'HH:mm';
-        break;
-      case '24h':
-        // Align to hours
-        current = new Date(start);
-        current.setMinutes(0, 0, 0);
-        interval = 2 * 60 * 60 * 1000; // 2 hours in ms
-        formatStr = 'HH:mm';
-        break;
-      case '48h':
-        // Align to 6-hour marks (0, 6, 12, 18)
-        current = new Date(start);
-        current.setHours(Math.floor(current.getHours() / 6) * 6, 0, 0, 0);
-        interval = 6 * 60 * 60 * 1000; // 6 hours in ms
-        formatStr = 'EEE HH:mm';
-        break;
-      case '7d':
-        // Align to midnight
-        current = new Date(start);
-        current.setHours(0, 0, 0, 0);
-        interval = 24 * 60 * 60 * 1000; // 1 day in ms
-        formatStr = 'EEE dd MMM';
-        break;
-      default:
-        current = new Date(start);
-        interval = 60 * 60 * 1000;
-        formatStr = 'HH:mm';
-    }
+  // Round "now" to 30s so a live window doesn't thrash query keys / memoised ticks
+  // on every render while still advancing.
+  const nowRounded = Math.floor(Date.now() / (30 * 1000)) * (30 * 1000);
+  const end = view.anchorEnd ?? nowRounded;
+  const start = end - view.windowMs;
 
-    // Generate ticks from start to end
-    while (current.getTime() <= end.getTime()) {
-      ticks.push(current.getTime());
-      current = new Date(current.getTime() + interval);
-    }
+  const activePreset = isLive
+    ? PRESETS.find((p) => p.ms === view.windowMs)?.key ?? ''
+    : '';
 
-    return {
-      ticks,
-      format: formatStr,
-    };
-  }, [timeRange, start, end]);
+  const applyPreset = (ms: number) => setView({ windowMs: ms, anchorEnd: null });
+
+  const applyZoom = (factor: number) =>
+    setView((v) => {
+      const windowMs = clamp(v.windowMs * factor, MIN_WINDOW_MS, MAX_WINDOW_MS);
+      if (v.anchorEnd === null) return { windowMs, anchorEnd: null }; // keep tracking now
+      // Otherwise zoom about the centre of the current window.
+      const centre = v.anchorEnd - v.windowMs / 2;
+      return { windowMs, anchorEnd: centre + windowMs / 2 };
+    });
+
+  const applyPan = (direction: -1 | 1) =>
+    setView((v) => {
+      const currentEnd = v.anchorEnd ?? Date.now();
+      const nextEnd = currentEnd + direction * v.windowMs * PAN_FRACTION;
+      // Panned up to (or past) the present -> resume live tracking.
+      if (nextEnd >= Date.now()) return { windowMs: v.windowMs, anchorEnd: null };
+      return { windowMs: v.windowMs, anchorEnd: nextEnd };
+    });
+
+  // Tick spacing/format follow the window width; memoised on the rounded bounds.
+  const tickConfig = useMemo(() => getTickConfig(start, end), [start, end]);
 
   const {
     data: device,
@@ -112,18 +170,21 @@ export function TelemetryGraph() {
     isLoading: telemetryLoading,
     error: telemetryError,
   } = useQuery({
-    queryKey: ['telemetry', deviceId, timeRange, fullDetail],
+    queryKey: ['telemetry', deviceId, view.windowMs, view.anchorEnd, fullDetail],
     queryFn: () =>
       api.getTelemetryBetweenDates(
         Number(deviceId),
-        start.toISOString(),
-        end.toISOString(),
+        new Date(start).toISOString(),
+        new Date(end).toISOString(),
         fullDetail
       ),
     enabled: !!deviceId,
-    refetchInterval: 30000, // Refetch every 30 seconds for real-time updates
+    // Only auto-refresh while tracking "now"; a pinned historical window is static.
+    refetchInterval: isLive ? 30000 : false,
     staleTime: 25000, // Consider data stale after 25 seconds (just before refetch)
     gcTime: 60000, // Keep unused data in cache for only 1 minute before garbage collection
+    // Keep the previous window's charts on screen while a zoom/pan fetch resolves.
+    placeholderData: keepPreviousData,
   });
 
   // Prepare chart data - memoized to prevent memory leaks from recreating large arrays
@@ -187,7 +248,7 @@ export function TelemetryGraph() {
 
   // Pin the x-axis to the selected window so gaps in the data read as gaps
   // rather than the line being stretched across the full chart width.
-  const xDomain: [number, number] = [start.getTime(), end.getTime()];
+  const xDomain: [number, number] = [start, end];
 
   // ESP32 devices can't report battery current - hide that series entirely when absent.
   const hasCurrent = chartData.some((d) => d.current != null);
@@ -195,10 +256,6 @@ export function TelemetryGraph() {
   // For short uptimes, minutes read better than "0.3 hrs".
   const maxUptimeHours = Math.max(0, ...chartData.map((d) => d.uptimeHours ?? 0));
   const uptimeInMinutes = maxUptimeHours > 0 && maxUptimeHours < 1;
-
-  const handleTimeRangeChange = (value: string) => {
-    setTimeRange(value as '1h' | '24h' | '48h' | '7d');
-  };
 
   if (deviceLoading) {
     return (
@@ -232,28 +289,95 @@ export function TelemetryGraph() {
         <p className="text-muted-foreground">Telemetry Graphs</p>
       </div>
 
-      <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
-        <Tabs value={timeRange} onValueChange={handleTimeRangeChange}>
-          <TabsList>
-            <TabsTrigger value="1h">Last Hour</TabsTrigger>
-            <TabsTrigger value="24h">Last 24 Hours</TabsTrigger>
-            <TabsTrigger value="48h">Last 48 Hours</TabsTrigger>
-            <TabsTrigger value="7d">Last 7 Days</TabsTrigger>
-          </TabsList>
-        </Tabs>
+      <div className="mb-6 space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <Tabs
+            value={activePreset}
+            onValueChange={(v) => {
+              const preset = PRESETS.find((p) => p.key === v);
+              if (preset) applyPreset(preset.ms);
+            }}
+          >
+            <TabsList>
+              {PRESETS.map((p) => (
+                <TabsTrigger key={p.key} value={p.key}>
+                  {p.label}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+          </Tabs>
 
-        <div className="flex items-center gap-2">
-          <Switch
-            id="full-detail"
-            checked={fullDetail}
-            onCheckedChange={setFullDetail}
-          />
-          <Label htmlFor="full-detail" className="cursor-pointer">
-            Full detail
-            <span className="block text-xs font-normal text-muted-foreground">
-              Plot every reading instead of averaging into time buckets
-            </span>
-          </Label>
+          <div className="flex items-center gap-2">
+            <Switch
+              id="full-detail"
+              checked={fullDetail}
+              onCheckedChange={setFullDetail}
+            />
+            <Label htmlFor="full-detail" className="cursor-pointer">
+              Full detail
+              <span className="block text-xs font-normal text-muted-foreground">
+                Plot every reading instead of averaging into time buckets
+              </span>
+            </Label>
+          </div>
+        </div>
+
+        {/* Shared zoom / pan controls - every chart uses the same x-axis window */}
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex items-center gap-1">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => applyPan(-1)}
+              title="Pan to older data"
+            >
+              <ChevronLeft className="h-4 w-4" />
+              Older
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => applyZoom(1 / ZOOM_FACTOR)}
+              disabled={view.windowMs <= MIN_WINDOW_MS}
+              title="Zoom in"
+            >
+              <ZoomIn className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => applyZoom(ZOOM_FACTOR)}
+              disabled={view.windowMs >= MAX_WINDOW_MS}
+              title="Zoom out"
+            >
+              <ZoomOut className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => applyPan(1)}
+              disabled={isLive}
+              title="Pan to newer data"
+            >
+              Newer
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => applyPreset(view.windowMs)}
+              disabled={isLive}
+              title="Jump back to the latest data"
+            >
+              <SkipForward className="h-4 w-4" />
+              Latest
+            </Button>
+          </div>
+
+          <span className="text-sm text-muted-foreground">
+            {format(new Date(start), 'PP p')} &ndash;{' '}
+            {isLive ? 'now' : format(new Date(end), 'PP p')}
+          </span>
         </div>
       </div>
 
