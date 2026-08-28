@@ -114,6 +114,13 @@
 #define DEFAULT_DAYTIME_ENDS_AT_H    17
 #define DEFAULT_CAMERA_INTERVAL_S    60
 
+// With sleepDuringNight enabled, computeSleepSeconds() would otherwise sleep straight through from
+// daytimeEndsAtH to daytimeStartsAtH in one shot. Instead we cap each overnight sleep at this, so
+// the unit still wakes ~hourly to check in (telemetry/config/OTA) while skipping the captures it
+// would normally take at cameraIntervalS. The final sleep of the night is still shortened to land
+// on daytimeStartsAtH exactly.
+#define NIGHT_CHECKIN_INTERVAL_S     (60UL * 60)
+
 // Fixed local-time offset from UTC, in minutes, used only for interpreting
 // daytimeStartsAtH/daytimeEndsAtH as wall-clock local time (see utcToLocalTm()/
 // isOutsideWorkingHours()) - a real IANA timezone database isn't available on this hardware, and
@@ -1874,7 +1881,9 @@ bool isOutsideWorkingHours(time_t nowUTC, const DeviceConfig &config)
 
 // Decides how long to deep-sleep for, in seconds. Normally just config.cameraIntervalS, but
 // when sleep_during_night is enabled and it's currently outside the working-day window, sleeps
-// through until daytimeStartsAtH (local time) instead of waking every cameraIntervalS overnight.
+// until daytimeStartsAtH (local time) instead of waking every cameraIntervalS overnight -
+// capped at NIGHT_CHECKIN_INTERVAL_S so the unit still wakes roughly hourly through the night
+// to check in (telemetry/config/OTA), just without the usual captures.
 uint32_t computeSleepSeconds(const DeviceConfig &config)
 {
     // Floored by battery level - see applyLowBatteryIntervalFloor() - so a low battery still gets
@@ -1908,9 +1917,18 @@ uint32_t computeSleepSeconds(const DeviceConfig &config)
         wakeUTC += 24 * 60 * 60;
     }
 
-    uint32_t sleepSeconds = (uint32_t)difftime(wakeUTC, nowUTC);
-    logf("Night mode - sleeping %u seconds until %02d:00 local (UTC%+d min)", sleepSeconds, config.daytimeStartsAtH, config.utcOffsetMinutes);
-    return sleepSeconds;
+    uint32_t untilMorningS = (uint32_t)difftime(wakeUTC, nowUTC);
+
+    // Wake roughly hourly through the night to check in rather than sleeping straight through -
+    // but never more often than the battery-level floor already wants (intervalS), so a low
+    // battery still wins.
+    uint32_t checkinS = (intervalS > NIGHT_CHECKIN_INTERVAL_S) ? intervalS : NIGHT_CHECKIN_INTERVAL_S;
+    if (untilMorningS > checkinS) {
+        logf("Night mode - sleeping %u seconds (check-in; %02d:00 local still %u s away)", checkinS, config.daytimeStartsAtH, untilMorningS);
+        return checkinS;
+    }
+    logf("Night mode - sleeping %u seconds until %02d:00 local (UTC%+d min)", untilMorningS, config.daytimeStartsAtH, config.utcOffsetMinutes);
+    return untilMorningS;
 }
 
 // Powers on the SIM7670G's modem/GNSS chip (a separate radio from the ESP32's own WiFi, which is
@@ -2158,8 +2176,19 @@ void runWakeCycle()
     // telemetry flowing every cycle rather than waiting out the normal autoSyncPeriodS.
     time_t lastSyncTime = readLastSyncTime();
     time_t now = time(nullptr);
+
+    // With sleepDuringNight enabled, computeSleepSeconds() only lets the device wake roughly hourly
+    // through the night (NIGHT_CHECKIN_INTERVAL_S) rather than every cameraIntervalS. Treat each of
+    // those overnight wakes as needing a sync, so telemetry/config/OTA still round-trip every hour
+    // overnight instead of waiting out autoSyncPeriodS - the capture itself still happens either
+    // way. Gated on a synced clock (same as computeSleepSeconds()), since isOutsideWorkingHours()
+    // is only meaningful then.
+    struct tm nightCheckTm;
+    bool nightCheckin = deviceConfig.sleepDuringNight && getLocalTime(&nightCheckTm, 0)
+                          && isOutsideWorkingHours(now, deviceConfig);
+
     bool needsSync = (lastSyncTime == 0) || (now < lastSyncTime) || (now - lastSyncTime >= deviceConfig.autoSyncPeriodS)
-                      || readForceSyncFlag() || deviceConfig.supportMode;
+                      || readForceSyncFlag() || deviceConfig.supportMode || nightCheckin;
     bool didConnectWiFi = false;
     if (needsSync) {
         logLine("Clock needs sync, connecting to WiFi...");
