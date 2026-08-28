@@ -115,11 +115,13 @@
 #define DEFAULT_CAMERA_INTERVAL_S    60
 
 // With sleepDuringNight enabled, computeSleepSeconds() would otherwise sleep straight through from
-// daytimeEndsAtH to daytimeStartsAtH in one shot. Instead we cap each overnight sleep at this, so
-// the unit still wakes ~hourly to check in (telemetry/config/OTA) while skipping the captures it
-// would normally take at cameraIntervalS. The final sleep of the night is still shortened to land
-// on daytimeStartsAtH exactly.
-#define NIGHT_CHECKIN_INTERVAL_S     (60UL * 60)
+// daytimeEndsAtH to daytimeStartsAtH in one shot. Instead the unit wakes once an hour, on the
+// local hour (22:00, 23:00, ...), to check in (telemetry/config/OTA - the capture still happens
+// too). NIGHT_CHECKIN_MIN_SLEEP_S guards the one degenerate case: if a long wake cycle leaves us
+// only moments before the next hour boundary, skip it and aim for the following hour rather than
+// waking again almost immediately. daytimeStartsAtH is itself an hour boundary, so the last sleep
+// of the night lands on it naturally.
+#define NIGHT_CHECKIN_MIN_SLEEP_S    (5UL * 60)
 
 // Fixed local-time offset from UTC, in minutes, used only for interpreting
 // daytimeStartsAtH/daytimeEndsAtH as wall-clock local time (see utcToLocalTm()/
@@ -1880,10 +1882,10 @@ bool isOutsideWorkingHours(time_t nowUTC, const DeviceConfig &config)
 }
 
 // Decides how long to deep-sleep for, in seconds. Normally just config.cameraIntervalS, but
-// when sleep_during_night is enabled and it's currently outside the working-day window, sleeps
-// until daytimeStartsAtH (local time) instead of waking every cameraIntervalS overnight -
-// capped at NIGHT_CHECKIN_INTERVAL_S so the unit still wakes roughly hourly through the night
-// to check in (telemetry/config/OTA), just without the usual captures.
+// when sleep_during_night is enabled and it's currently outside the working-day window, wakes
+// only once an hour - on the local hour (22:00, 23:00, ...) - instead of every cameraIntervalS,
+// so the unit still checks in through the night (telemetry/config/OTA, plus the usual capture)
+// without running at the full daytime rate. See NIGHT_CHECKIN_MIN_SLEEP_S.
 uint32_t computeSleepSeconds(const DeviceConfig &config)
 {
     // Floored by battery level - see applyLowBatteryIntervalFloor() - so a low battery still gets
@@ -1906,29 +1908,40 @@ uint32_t computeSleepSeconds(const DeviceConfig &config)
         return intervalS;
     }
 
-    struct tm wakeLocal;
-    utcToLocalTm(nowUTC, config.utcOffsetMinutes, wakeLocal);
-    wakeLocal.tm_hour = config.daytimeStartsAtH;
-    wakeLocal.tm_min = 0;
-    wakeLocal.tm_sec = 0;
+    struct tm morningLocal;
+    utcToLocalTm(nowUTC, config.utcOffsetMinutes, morningLocal);
+    morningLocal.tm_hour = config.daytimeStartsAtH;
+    morningLocal.tm_min = 0;
+    morningLocal.tm_sec = 0;
 
-    time_t wakeUTC = localTmToUtc(wakeLocal, config.utcOffsetMinutes);
-    if (wakeUTC <= nowUTC) {
-        wakeUTC += 24 * 60 * 60;
+    time_t morningUTC = localTmToUtc(morningLocal, config.utcOffsetMinutes);
+    if (morningUTC <= nowUTC) {
+        morningUTC += 24 * 60 * 60;
     }
 
-    uint32_t untilMorningS = (uint32_t)difftime(wakeUTC, nowUTC);
-
-    // Wake roughly hourly through the night to check in rather than sleeping straight through -
-    // but never more often than the battery-level floor already wants (intervalS), so a low
-    // battery still wins.
-    uint32_t checkinS = (intervalS > NIGHT_CHECKIN_INTERVAL_S) ? intervalS : NIGHT_CHECKIN_INTERVAL_S;
-    if (untilMorningS > checkinS) {
-        logf("Night mode - sleeping %u seconds (check-in; %02d:00 local still %u s away)", checkinS, config.daytimeStartsAtH, untilMorningS);
-        return checkinS;
+    // Next local top-of-hour. If a long wake cycle has left us right up against it, skip to the
+    // following hour rather than waking again almost immediately (NIGHT_CHECKIN_MIN_SLEEP_S).
+    // mktime() (inside localTmToUtc) normalises tm_hour == 24 to 00:00 the next day.
+    struct tm hourLocal;
+    utcToLocalTm(nowUTC, config.utcOffsetMinutes, hourLocal);
+    hourLocal.tm_min = 0;
+    hourLocal.tm_sec = 0;
+    hourLocal.tm_hour += 1;
+    time_t nextHourUTC = localTmToUtc(hourLocal, config.utcOffsetMinutes);
+    while (difftime(nextHourUTC, nowUTC) < (double)NIGHT_CHECKIN_MIN_SLEEP_S) {
+        nextHourUTC += 60 * 60;
     }
-    logf("Night mode - sleeping %u seconds until %02d:00 local (UTC%+d min)", untilMorningS, config.daytimeStartsAtH, config.utcOffsetMinutes);
-    return untilMorningS;
+
+    // daytimeStartsAtH is itself an hour boundary, so the hourly wakes converge onto it and this
+    // becomes the last sleep of the night with no special-casing.
+    time_t wakeUTC = (nextHourUTC < morningUTC) ? nextHourUTC : morningUTC;
+    uint32_t sleepSeconds = (uint32_t)difftime(wakeUTC, nowUTC);
+
+    struct tm wakeAtLocal;
+    utcToLocalTm(wakeUTC, config.utcOffsetMinutes, wakeAtLocal);
+    logf("Night mode - sleeping %u seconds until %02d:%02d local (UTC%+d min)",
+         sleepSeconds, wakeAtLocal.tm_hour, wakeAtLocal.tm_min, config.utcOffsetMinutes);
+    return sleepSeconds;
 }
 
 // Powers on the SIM7670G's modem/GNSS chip (a separate radio from the ESP32's own WiFi, which is
@@ -2177,12 +2190,11 @@ void runWakeCycle()
     time_t lastSyncTime = readLastSyncTime();
     time_t now = time(nullptr);
 
-    // With sleepDuringNight enabled, computeSleepSeconds() only lets the device wake roughly hourly
-    // through the night (NIGHT_CHECKIN_INTERVAL_S) rather than every cameraIntervalS. Treat each of
-    // those overnight wakes as needing a sync, so telemetry/config/OTA still round-trip every hour
-    // overnight instead of waiting out autoSyncPeriodS - the capture itself still happens either
-    // way. Gated on a synced clock (same as computeSleepSeconds()), since isOutsideWorkingHours()
-    // is only meaningful then.
+    // With sleepDuringNight enabled, computeSleepSeconds() only lets the device wake once an hour
+    // through the night rather than every cameraIntervalS. Treat each of those overnight wakes as
+    // needing a sync, so telemetry/config/OTA still round-trip every hour overnight instead of
+    // waiting out autoSyncPeriodS - the capture itself still happens either way. Gated on a synced
+    // clock (same as computeSleepSeconds()), since isOutsideWorkingHours() is only meaningful then.
     struct tm nightCheckTm;
     bool nightCheckin = deviceConfig.sleepDuringNight && getLocalTime(&nightCheckTm, 0)
                           && isOutsideWorkingHours(now, deviceConfig);
