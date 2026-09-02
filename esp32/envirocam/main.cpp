@@ -27,6 +27,7 @@
 #include <WebServer.h>
 #include <NimBLEDevice.h>
 #include <time.h>
+#include <sys/time.h>
 #include <ArduinoJson.h>
 #include <vector>
 #include <algorithm>
@@ -36,8 +37,9 @@
 #include "secrets.h"
 
 // TINY_GSM_MODEM_* is set by utilities.h based on the board #define above - must come after it.
-// Used here purely for the SIM7670G's onboard GNSS receiver (see updateGeoLocationIfDue()) - this
-// sketch still uploads over the ESP32's own WiFi radio, same as ever, not over cellular.
+// Used for the SIM7670G's onboard GNSS receiver (see updateGeoLocationIfDue()) and, when WiFi
+// association fails, for an LTE data + TLS uplink to the API (see cellularConnect() /
+// connectApiClient()). WiFi is still the preferred path whenever it's available.
 #include <TinyGsmClient.h>
 
 #if !defined(LILYGO_SIM7000G_S3_STAN) && !defined(LILYGO_SIM7080G_S3_STAN) \
@@ -58,6 +60,8 @@
                                              // voltage rather than under load
 
 #define WIFI_CONNECT_TIMEOUT_MS 15000       // Give up on WiFi after this long
+#define CELLULAR_NET_TIMEOUT_MS 60000       // Give up waiting for LTE network attach after this long
+                                             // (see cellularConnect()) - only reached when WiFi failed
 #define NTP_SERVER              "pool.ntp.org"
 #define GMT_OFFSET_SEC           0          // Adjust for local timezone
 #define DAY_LIGHT_OFFSET_SEC     0          // Adjust for daylight saving
@@ -209,6 +213,11 @@ struct DeviceConfig {
     bool vflip = DEFAULT_VFLIP;
     uint32_t autoSyncPeriodS = DEFAULT_AUTO_SYNC_PERIOD_S;
 
+    // APN for the cellular fallback uplink. Empty means "use the compiled-in CELLULAR_APN from
+    // secrets.cpp" - see effectiveApn(). Only consulted when WiFi association fails and the modem
+    // data path is brought up (see cellularConnect()).
+    String apn = "";
+
     // Set remotely (see the API's Device row / scripts/uploadPending.py's identical field for the
     // Raspberry Pi units) to keep the board awake indefinitely instead of deep-sleeping between
     // wake cycles - see loop(). Meant for a technician who needs the board reliably reachable
@@ -256,8 +265,31 @@ String lastCaptureTimestamp = "";
 bool lastWakeConnectedWiFi = false;
 
 // The SIM7670G's cellular/GNSS modem, talked to over the UART wired up as SerialAT (see
-// utilities.h) - used only for GPS here (see updateGeoLocationIfDue()).
+// utilities.h) - used for GPS (see updateGeoLocationIfDue()) and, when WiFi is unavailable, for
+// the LTE data + TLS uplink (see cellularConnect() / connectApiClient()).
 TinyGsm modem(SerialAT);
+
+// Which path (if any) this wake cycle reached the API over. Set in runWakeCycle() - WiFi is tried
+// first, cellular only if WiFi association fails. uploadPendingTelemetry()/uploadPendingImages()
+// and connectApiClient() branch on this. Reset to UPLINK_NONE implicitly every boot (deep sleep
+// clears RAM).
+enum UplinkKind { UPLINK_NONE, UPLINK_WIFI, UPLINK_CELL };
+UplinkKind g_uplink = UPLINK_NONE;
+
+// True between modemPowerOn() and modemPowerOff(). The modem is a separate chip with its own
+// power domain, so it has to be explicitly powered down (AT+CPOF) before deep sleep or it keeps
+// draining the battery. modemPowerOn() is idempotent so GPS and the cellular uplink can both ask
+// for it in the same cycle without a double power-on pulse.
+bool g_modemPoweredOn = false;
+
+// Defined further down (grouped with updateGeoLocationIfDue(), since they share the modem) but
+// referenced earlier by connectApiClient() / the upload functions / runWakeCycle().
+String effectiveApn(const DeviceConfig &config);
+bool uplinkConnected();
+bool modemPowerOn();
+void modemPowerOff();
+bool cellularConnect(const DeviceConfig &config);
+bool cellularSyncTime();
 
 // Piecewise-linear state-of-charge curve for a single-cell 3.7V Li-ion (these boards run off a
 // single 3400mAh cell). Mirrors VoltageToPercentageHelper.cs on the API side, so a percentage
@@ -324,8 +356,10 @@ struct HttpFormField {
 // One instance is scoped to a single upload batch (a local in each of those functions), not kept
 // across wake cycles.
 struct ApiConnection {
-    WiFiClientSecure secureClient;
-    WiFiClient plainClient;
+    WiFiClientSecure secureClient;   // used when g_uplink == UPLINK_WIFI
+    WiFiClient plainClient;          // ditto (http only - not used in practice, API is https)
+    TinyGsmClientSecure gsmClient;   // used when g_uplink == UPLINK_CELL - modem-side TLS via AT+CCH*
+    bool gsmClientInited = false;    // gsmClient.init() is deferred to first cellular use
     String host;
     uint16_t port = 0;
     bool https = false;
@@ -722,6 +756,9 @@ void applyConfigFields(JsonVariantConst fields, DeviceConfig &config)
             config.apiUrl = apiUrl;
         }
     }
+    if (!fields["apn"].isNull()) {
+        config.apn = fields["apn"].as<String>();
+    }
     if (!fields["geoTimeRecorded"].isNull()) {
         config.geoTimeRecorded = fields["geoTimeRecorded"].as<String>();
     }
@@ -745,7 +782,7 @@ DeviceConfig readDeviceConfig()
         return config;
     }
 
-    DynamicJsonDocument doc(768);
+    DynamicJsonDocument doc(1024);
     DeserializationError err = deserializeJson(doc, file);
     file.close();
 
@@ -760,13 +797,14 @@ DeviceConfig readDeviceConfig()
 
 void writeDeviceConfig(const DeviceConfig &config)
 {
-    DynamicJsonDocument doc(768);
+    DynamicJsonDocument doc(1024);
     doc["sleepDuringNight"] = config.sleepDuringNight;
     doc["daytimeStartsAtH"] = config.daytimeStartsAtH;
     doc["daytimeEndsAtH"] = config.daytimeEndsAtH;
     doc["utcOffsetMinutes"] = config.utcOffsetMinutes;
     doc["cameraIntervalS"] = config.cameraIntervalS;
     doc["apiUrl"] = config.apiUrl;
+    doc["apn"] = config.apn;
     doc["hflip"] = config.hflip;
     doc["vflip"] = config.vflip;
     doc["autoSyncPeriodS"] = config.autoSyncPeriodS;
@@ -818,6 +856,7 @@ void applyDeviceConfigFromApiResponse(const String &responseBody, DeviceConfig &
         newConfig.utcOffsetMinutes != config.utcOffsetMinutes ||
         newConfig.cameraIntervalS != config.cameraIntervalS ||
         newConfig.apiUrl != config.apiUrl ||
+        newConfig.apn != config.apn ||
         newConfig.hflip != config.hflip ||
         newConfig.vflip != config.vflip ||
         newConfig.autoSyncPeriodS != config.autoSyncPeriodS ||
@@ -1209,7 +1248,13 @@ String fieldsToJson(const std::vector<HttpFormField> &fields)
 // one upload batch), otherwise (re)connecting. Returns nullptr if a fresh connect() fails.
 Client *connectApiClient(ApiConnection &conn, const ParsedUrl &api)
 {
-    Client &client = api.https ? (Client &)conn.secureClient : (Client &)conn.plainClient;
+    // On cellular, TLS is terminated on the modem (TinyGsmClientSecure via AT+CCH*), so the same
+    // Client& abstraction still applies - postMultipartForm() below doesn't know or care which
+    // transport it's streaming over. The API is always https; a plain-http apiUrl only ever
+    // happens on WiFi against a local dev box.
+    Client &client = (g_uplink == UPLINK_CELL) ? (Client &)conn.gsmClient
+                     : api.https               ? (Client &)conn.secureClient
+                                               : (Client &)conn.plainClient;
 
     if (conn.isOpen && conn.host == api.host && conn.port == api.port && conn.https == api.https
         && client.connected()) {
@@ -1218,14 +1263,22 @@ Client *connectApiClient(ApiConnection &conn, const ParsedUrl &api)
 
     if (conn.isOpen) {
         // Either talking to a different host/port/scheme than last time, or the old connection
-        // has died - drop it before opening a new one. Stopping whichever of the two wasn't the
-        // one actually open is a harmless no-op.
+        // has died - drop it before opening a new one. Stopping whichever of the clients wasn't
+        // the one actually open is a harmless no-op.
         conn.secureClient.stop();
         conn.plainClient.stop();
+        conn.gsmClient.stop();
         conn.isOpen = false;
     }
 
-    if (api.https) {
+    if (g_uplink == UPLINK_CELL) {
+        if (!conn.gsmClientInited) {
+            conn.gsmClient.init(&modem, 0);   // SSL sessions use mux 0/1; one connection at a time here
+            conn.gsmClientInited = true;
+        }
+        // No setInsecure() equivalent needed - GsmClientSecureSIM7672 defaults to authmode 0
+        // (accept any server cert), matching the WiFi path's secureClient.setInsecure().
+    } else if (api.https) {
         conn.secureClient.setInsecure();   // No cert store on-device - trust whatever's presented
     }
     if (!client.connect(api.host.c_str(), api.port)) {
@@ -1472,7 +1525,7 @@ uint32_t expectedImagesPerSync(const DeviceConfig &config)
 // setup(), which uses this to keep reconnecting every cycle until the backlog is back to normal.
 bool uploadPendingTelemetry(const String &deviceId, TelemetryCounts &counts, DeviceConfig &config)
 {
-    if (WiFi.status() != WL_CONNECTED) {
+    if (!uplinkConnected()) {
         return false;
     }
 
@@ -1490,8 +1543,10 @@ bool uploadPendingTelemetry(const String &deviceId, TelemetryCounts &counts, Dev
     bool backlogExcessive = false;
 
     // Reused across every request below (see ApiConnection/connectApiClient()) rather than
-    // opening a fresh TCP+TLS connection per record.
-    ApiConnection conn;
+    // opening a fresh TCP+TLS connection per record. static so the ~2 KB modem RX FIFO inside
+    // gsmClient doesn't land on the (limited) loop-task stack - the two upload functions never
+    // run concurrently, and connectApiClient() re-validates the connection on entry anyway.
+    static ApiConnection conn;
 
     int filesRemoved = 0;   // uploaded, empty, or unparseable - anything gone from disk afterwards
     int filesUploaded = 0;
@@ -1625,6 +1680,7 @@ bool uploadPendingTelemetry(const String &deviceId, TelemetryCounts &counts, Dev
     counts.pendingTelemetry = (int)filePaths.size() - filesRemoved;
     conn.secureClient.stop();
     conn.plainClient.stop();
+    conn.gsmClient.stop();
     return backlogExcessive;
 }
 
@@ -1640,7 +1696,7 @@ bool uploadPendingTelemetry(const String &deviceId, TelemetryCounts &counts, Dev
 // images have already gone out this cycle - see the didConnectWiFi handling in setup().
 bool uploadPendingImages(const String &deviceId, TelemetryCounts &counts, DeviceConfig &config)
 {
-    if (WiFi.status() != WL_CONNECTED) {
+    if (!uplinkConnected()) {
         return false;
     }
 
@@ -1652,8 +1708,9 @@ bool uploadPendingImages(const String &deviceId, TelemetryCounts &counts, Device
     bool backlogExcessive = false;
 
     // Reused across every request below (see ApiConnection/connectApiClient()) rather than
-    // opening a fresh TCP+TLS connection per image.
-    ApiConnection conn;
+    // opening a fresh TCP+TLS connection per image. static - see the matching note in
+    // uploadPendingTelemetry().
+    static ApiConnection conn;
 
     int filesRemoved = 0;   // uploaded or empty - anything gone from disk afterwards
     int filesUploaded = 0;
@@ -1730,6 +1787,7 @@ bool uploadPendingImages(const String &deviceId, TelemetryCounts &counts, Device
     counts.pendingImages = (int)filePaths.size() - filesRemoved;
     conn.secureClient.stop();
     conn.plainClient.stop();
+    conn.gsmClient.stop();
     return backlogExcessive;
 }
 
@@ -1944,6 +2002,173 @@ uint32_t computeSleepSeconds(const DeviceConfig &config)
     return sleepSeconds;
 }
 
+// The effective APN for the cellular fallback: an apn set on the API's Device row (cached into
+// config.apn) wins, otherwise the compiled-in CELLULAR_APN from secrets.cpp.
+String effectiveApn(const DeviceConfig &config)
+{
+    return config.apn.length() > 0 ? config.apn : String(CELLULAR_APN);
+}
+
+// True if this cycle's chosen uplink is actually up right now - the transport-agnostic
+// replacement for the bare `WiFi.status() != WL_CONNECTED` checks the upload functions used to
+// do. Returns false when no uplink was established this cycle (g_uplink == UPLINK_NONE).
+bool uplinkConnected()
+{
+    switch (g_uplink) {
+        case UPLINK_WIFI: return WiFi.status() == WL_CONNECTED;
+        case UPLINK_CELL: return modem.isGprsConnected();
+        default:          return false;
+    }
+}
+
+// Brings the modem chip up over SerialAT and waits for it to answer AT. Idempotent - the
+// PWRKEY pulse only happens on the first call of a wake cycle (tracked by g_modemPoweredOn), so
+// GPS (updateGeoLocationIfDue) and the cellular uplink (cellularConnect) can both call it.
+// Returns false if the modem never responds within GEO_FIX_TIMEOUT_MS. Callers must arrange for
+// modemPowerOff() to run before deep sleep (runWakeCycle() does this centrally).
+bool modemPowerOn()
+{
+    if (g_modemPoweredOn) {
+        return true;
+    }
+
+    SerialAT.begin(MODEM_BAUDRATE, SERIAL_8N1, MODEM_RX_PIN, MODEM_TX_PIN);
+
+    pinMode(BOARD_PWRKEY_PIN, OUTPUT);
+    digitalWrite(BOARD_PWRKEY_PIN, LOW);
+    delay(100);
+    digitalWrite(BOARD_PWRKEY_PIN, HIGH);
+    delay(MODEM_POWERON_PULSE_WIDTH_MS);
+    digitalWrite(BOARD_PWRKEY_PIN, LOW);
+
+    uint32_t start = millis();
+    int retry = 0;
+    while (!modem.testAT(1000)) {
+        if (millis() - start > GEO_FIX_TIMEOUT_MS) {
+            logLine("Modem never responded to AT - giving up on the modem this cycle");
+            return false;
+        }
+        if (++retry > GEO_MODEM_BOOT_RETRIES) {
+            logLine("Modem not responding yet - re-pulsing PWRKEY");
+            digitalWrite(BOARD_PWRKEY_PIN, LOW);
+            delay(100);
+            digitalWrite(BOARD_PWRKEY_PIN, HIGH);
+            delay(MODEM_POWERON_PULSE_WIDTH_MS);
+            digitalWrite(BOARD_PWRKEY_PIN, LOW);
+            retry = 0;
+        }
+    }
+
+    g_modemPoweredOn = true;
+    return true;
+}
+
+// Powers the modem chip fully down. AT+CPOF cleanly powers the whole modem down (documented
+// SIMCom behaviour) rather than fumbling with PWRKEY pulse timing again, which differs between
+// power-on and power-off. Best-effort - the ESP32 is usually about to deep-sleep anyway, at
+// which point SerialAT goes away regardless. Must run on every path that called modemPowerOn(),
+// or the modem keeps draining the battery through deep sleep.
+void modemPowerOff()
+{
+    if (!g_modemPoweredOn) {
+        return;
+    }
+    modem.poweroff();
+    delay(2000);
+    g_modemPoweredOn = false;
+}
+
+// Brings up an LTE data connection on the modem, for use when WiFi association has failed. Locks
+// to LTE so the link can never drop to 2G/3G (the SIM7670G is LTE-only hardware anyway, but the
+// A7670/SIM7600 variants this repo can also build for are not, and 3G is retired in NZ). Returns
+// true only once a PDP context is actually active. Bounded by CELLULAR_NET_TIMEOUT_MS on the
+// network-attach wait.
+bool cellularConnect(const DeviceConfig &config)
+{
+    logLine("WiFi unavailable - bringing up cellular (LTE) uplink...");
+
+    // Drop the failed WiFi association - no point holding the radio on while cellular runs.
+    WiFi.disconnect(true);
+    WiFi.mode(WIFI_OFF);
+
+    if (!modemPowerOn()) {
+        return false;
+    }
+    modem.init();
+
+    // Lock to LTE-only. Best-effort via raw AT (the SIM7670G's Qualcomm firmware may not
+    // implement +CNMP) - the module has no 2G/3G radio to fall back to regardless.
+    SerialAT.println("AT+CNMP=38");
+    delay(500);
+#if defined(LILYGO_A7670X_S3_STAN) || defined(LILYGO_SIM7600X_S3_STAN)
+    // These modems (ASR-based) *do* have 2G/3G radios and the library exposes the setter.
+    modem.setNetworkMode(MODEM_NETWORK_LTE);
+#endif
+
+    logLine("Waiting for LTE network registration...");
+    if (!modem.waitForNetwork(CELLULAR_NET_TIMEOUT_MS)) {
+        logLine("No LTE network within timeout - staying offline this cycle");
+        return false;
+    }
+    logf("LTE registered, signal quality (CSQ): %d", modem.getSignalQuality());
+
+    String apn = effectiveApn(config);
+    logf("Connecting GPRS/PDP context, APN: %s", apn.c_str());
+    if (!modem.gprsConnect(apn.c_str(), CELLULAR_APN_USER, CELLULAR_APN_PASS)) {
+        logLine("gprsConnect() failed");
+        return false;
+    }
+    if (!modem.isGprsConnected()) {
+        logLine("PDP context did not come up");
+        return false;
+    }
+    logf("Cellular uplink up, IP: %s", modem.getLocalIP().c_str());
+    return true;
+}
+
+// Sets the ESP32 system clock (UTC - the sketch runs GMT_OFFSET_SEC = 0) from the network, for
+// the cellular path - the WiFi path's connectWiFiAndSyncTime() gets this from NTP over IP via
+// configTime(). Asks the modem to NTP-sync its own RTC first, then reads it back with +CCLK?.
+// Returns true if the clock was set to a plausible value.
+bool cellularSyncTime()
+{
+    modem.NTPServerSync("pool.ntp.org", 0);   // best-effort; +CCLK read below is the source of truth
+
+    int year = 0, month = 0, day = 0, hour = 0, minute = 0, second = 0;
+    float tz = 0;
+    if (!modem.getNetworkTime(&year, &month, &day, &hour, &minute, &second, &tz)) {
+        logLine("Modem returned no network time");
+        return false;
+    }
+    if (year < 2024) {
+        logf("Modem network time implausible (%04d-%02d-%02d) - not setting clock", year, month, day);
+        return false;
+    }
+
+    // Days-from-civil (Howard Hinnant's algorithm) - turns a UTC calendar date into epoch days
+    // without depending on timegm() (not in ESP-IDF's newlib) or the process TZ (mktime()).
+    int y = year - (month <= 2 ? 1 : 0);
+    int era = (y >= 0 ? y : y - 399) / 400;
+    int yoe = y - era * 400;
+    int doy = (153 * (month + (month > 2 ? -3 : 9)) + 2) / 5 + day - 1;
+    int doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
+    long epochDays = (long)era * 146097 + doe - 719468;
+    // getNetworkTime() reports the modem's local time plus its tz offset (in quarter-hours);
+    // subtracting the tz offset converts local -> UTC.
+    time_t utc = (time_t)epochDays * 86400 + hour * 3600 + minute * 60 + second
+                 - (time_t)lround(tz * 15 * 60);
+
+    struct timeval tv = { .tv_sec = utc, .tv_usec = 0 };
+    settimeofday(&tv, nullptr);
+
+    struct tm check;
+    gmtime_r(&utc, &check);
+    logf("Time synced over cellular: %04d-%02d-%02d %02d:%02d:%02d UTC",
+         check.tm_year + 1900, check.tm_mon + 1, check.tm_mday,
+         check.tm_hour, check.tm_min, check.tm_sec);
+    return true;
+}
+
 // Powers on the SIM7670G's modem/GNSS chip (a separate radio from the ESP32's own WiFi, which is
 // still what uploads go out over), waits for a GPS fix, and updates
 // config.geoLat/geoLon/geoTimeRecorded - but only once config.geoIntervalS has actually elapsed
@@ -1963,32 +2188,10 @@ void updateGeoLocationIfDue(DeviceConfig &config)
     }
 
     logLine("Checking GPS position...");
-    SerialAT.begin(MODEM_BAUDRATE, SERIAL_8N1, MODEM_RX_PIN, MODEM_TX_PIN);
-
-    pinMode(BOARD_PWRKEY_PIN, OUTPUT);
-    digitalWrite(BOARD_PWRKEY_PIN, LOW);
-    delay(100);
-    digitalWrite(BOARD_PWRKEY_PIN, HIGH);
-    delay(MODEM_POWERON_PULSE_WIDTH_MS);
-    digitalWrite(BOARD_PWRKEY_PIN, LOW);
-
-    uint32_t start = millis();
-    int retry = 0;
-    while (!modem.testAT(1000)) {
-        if (millis() - start > GEO_FIX_TIMEOUT_MS) {
-            logLine("Modem never responded to AT - giving up on this cycle's GPS fix");
-            return;
-        }
-        if (++retry > GEO_MODEM_BOOT_RETRIES) {
-            logLine("Modem not responding yet - re-pulsing PWRKEY");
-            digitalWrite(BOARD_PWRKEY_PIN, LOW);
-            delay(100);
-            digitalWrite(BOARD_PWRKEY_PIN, HIGH);
-            delay(MODEM_POWERON_PULSE_WIDTH_MS);
-            digitalWrite(BOARD_PWRKEY_PIN, LOW);
-            retry = 0;
-        }
+    if (!modemPowerOn()) {
+        return;   // modem not responding - modemPowerOn() already logged it
     }
+    uint32_t start = millis();
 
     bool gpsEnabled = false;
     while (millis() - start < GEO_FIX_TIMEOUT_MS) {
@@ -2044,14 +2247,9 @@ void updateGeoLocationIfDue(DeviceConfig &config)
         logLine("No GPS fix within timeout - keeping last known location");
     }
 
-    // AT+CPOF cleanly powers the whole modem down (documented SIMCom behaviour) rather than
-    // fumbling with PWRKEY pulse timing again, which differs between power-on and power-off and
-    // isn't worth the risk of getting wrong on hardware this sketch can't test against. Sent
-    // best-effort, without waiting on/parsing a response - the ESP32 is about to deep-sleep
-    // regardless, at which point SerialAT goes away either way.
+    // Leave the modem powered on - the cellular uplink (if WiFi failed) still needs it, and
+    // runWakeCycle() powers it down centrally at the end of the cycle via modemPowerOff().
     modem.disableGPS(MODEM_GPS_ENABLE_GPIO, 0);
-    SerialAT.println("AT+CPOF");
-    delay(2000);
 }
 
 void setup()
@@ -2190,6 +2388,10 @@ void runWakeCycle()
     time_t lastSyncTime = readLastSyncTime();
     time_t now = time(nullptr);
 
+    // Reset per cycle - in support mode loop() calls runWakeCycle() repeatedly without a fresh
+    // boot to clear it, and the modem/WiFi get torn down between cycles.
+    g_uplink = UPLINK_NONE;
+
     // With sleepDuringNight enabled, computeSleepSeconds() only lets the device wake once an hour
     // through the night rather than every cameraIntervalS. Treat each of those overnight wakes as
     // needing a sync, so telemetry/config/OTA still round-trip every hour overnight instead of
@@ -2201,10 +2403,27 @@ void runWakeCycle()
 
     bool needsSync = (lastSyncTime == 0) || (now < lastSyncTime) || (now - lastSyncTime >= deviceConfig.autoSyncPeriodS)
                       || readForceSyncFlag() || deviceConfig.supportMode || nightCheckin;
+
+    // didConnectWiFi is really "reached the internet AND got synced time this cycle" - it gates
+    // writeLastSyncTime()/the force-sync flag further down, and lastWakeConnectedWiFi on the
+    // status page. WiFi is tried first; only if it can't associate do we spin up the modem's LTE
+    // data path (see cellularConnect()). The actual uploads gate on g_uplink/uplinkConnected(),
+    // not on this, so a connection with a failed time sync still drains the backlog.
     bool didConnectWiFi = false;
     if (needsSync) {
         logLine("Clock needs sync, connecting to WiFi...");
-        didConnectWiFi = connectWiFiAndSyncTime();
+        if (connectWiFiAndSyncTime()) {
+            g_uplink = UPLINK_WIFI;
+            didConnectWiFi = true;
+        } else if (WiFi.status() == WL_CONNECTED) {
+            // Associated but the NTP sync failed - keep WiFi for the uploads (the backlog carries
+            // its own capture timestamps), just don't treat the clock as freshly synced. No point
+            // spinning up cellular here - the WiFi link itself is fine.
+            g_uplink = UPLINK_WIFI;
+        } else if (cellularConnect(deviceConfig)) {
+            g_uplink = UPLINK_CELL;
+            didConnectWiFi = cellularSyncTime();
+        }
         if (!didConnectWiFi) {
             logLine("Continuing without synced time, filenames will use boot count!");
         }
@@ -2444,6 +2663,14 @@ void runWakeCycle()
     }
 
     writeCounts(counts);
+
+    // Power the modem down - it may have been brought up for GPS (updateGeoLocationIfDue) and/or
+    // the cellular uplink (cellularConnect). No-op if it was never powered on this cycle. It's a
+    // separate power domain from the ESP32, so skipping this leaves it draining through deep sleep.
+    if (g_uplink == UPLINK_CELL) {
+        modem.gprsDisconnect();
+    }
+    modemPowerOff();
 }
 
 // The page runSetupApWindow() serves at "/" - just enough for an installer to tell the camera's
@@ -2629,6 +2856,11 @@ void loop()
 
     WiFi.disconnect(true);
     WiFi.mode(WIFI_OFF);
+
+    // Defensive - runWakeCycle() already powers the modem down at its end, but an early return in
+    // there (or a future code path) could skip that, and the modem drains the battery if left on
+    // through deep sleep. No-op when it's already off.
+    modemPowerOff();
 
     // Support mode (set remotely via the API - see DeviceConfig::supportMode) keeps the board
     // awake instead of deep-sleeping, repeating the normal capture/telemetry/upload cycle on
