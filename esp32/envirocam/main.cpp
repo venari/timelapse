@@ -2754,13 +2754,26 @@ void runSetupApWindow()
     pAdvertising->setName(ssid.c_str());
     pAdvertising->start();
     logf("BLE advertising started as \"%s\"", ssid.c_str());
+    // Guarded with isAdvertising()/softAPgetStationNum() rather than toggling unconditionally on
+    // every event - ARDUINO_EVENT_WIFI_AP_STACONNECTED has been observed firing twice in a row in
+    // the field for what's a single flaky phone reconnect, with no STADISCONNECTED between. Without
+    // this guard that meant two back-to-back stop() calls (each issuing an HCI "set advertising
+    // enable" command into the BT controller), which lines up with a Guru Meditation double
+    // exception (stack corruption, backtrace unwind corrupted) seen shortly after in the field -
+    // the BT controller isn't guaranteed to tolerate a second start/stop command landing before the
+    // first one's completion event has been processed. softAPgetStationNum() also means a second
+    // station's disconnect can't resume advertising while a first station is still connected.
     wifi_event_id_t bleAdvertisingEventId = WiFi.onEvent([pAdvertising](WiFiEvent_t event, WiFiEventInfo_t info) {
         if (event == ARDUINO_EVENT_WIFI_AP_STACONNECTED) {
-            pAdvertising->stop();
-            logLine("Station connected - BLE advertising stopped");
+            if (pAdvertising->isAdvertising()) {
+                pAdvertising->stop();
+                logLine("Station connected - BLE advertising stopped");
+            }
         } else if (event == ARDUINO_EVENT_WIFI_AP_STADISCONNECTED) {
-            pAdvertising->start();
-            logLine("Station disconnected - BLE advertising resumed");
+            if (WiFi.softAPgetStationNum() == 0 && !pAdvertising->isAdvertising()) {
+                pAdvertising->start();
+                logLine("Station disconnected - BLE advertising resumed");
+            }
         }
     });
 
