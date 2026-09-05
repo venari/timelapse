@@ -264,6 +264,13 @@ DeviceConfig deviceConfig;
 String lastCaptureTimestamp = "";
 bool lastWakeConnectedWiFi = false;
 
+// Set by capturePhoto() to that capture's own timestamp + cameraIntervalS - anchored to when the
+// last shot actually happened rather than a fixed wall-clock grid, so support mode's repeated
+// wake cycles land captures as close to cameraIntervalS apart as the upload/GPS/connect work in
+// between allows (see captureIfDueDuringUpload() and loop()'s support-mode delay). Not persisted -
+// a real deep sleep only ever happens outside support mode, where nothing consults this anyway.
+uint32_t nextCaptureDueMs = 0;
+
 // The SIM7670G's cellular/GNSS modem, talked to over the UART wired up as SerialAT (see
 // utilities.h) - used for GPS (see updateGeoLocationIfDue()) and, when WiFi is unavailable, for
 // the LTE data + TLS uplink (see cellularConnect() / connectApiClient()).
@@ -599,6 +606,12 @@ void set_device_to_sleep()
 // since setupSD() below calls both before their definitions further down this file.
 void ensureDirExists(const String &path);
 void rotateLogIfNeeded();
+
+// Needed here since uploadPendingTelemetry()/uploadPendingImages() below call
+// captureIfDueDuringUpload(), which calls capturePhoto() - both defined near runWakeCycle()
+// further down still.
+DatedPath capturePhoto(TelemetryCounts &counts);
+void captureIfDueDuringUpload(TelemetryCounts &counts);
 
 // One capture+telemetry+upload cycle - see runWakeCycle() further down. setup() runs it once on
 // every real boot; loop() calls it again, repeatedly, while parked awake in support mode (see
@@ -1551,6 +1564,11 @@ bool uploadPendingTelemetry(const String &deviceId, TelemetryCounts &counts, Dev
     int filesRemoved = 0;   // uploaded, empty, or unparseable - anything gone from disk afterwards
     int filesUploaded = 0;
     for (const String &filePath : filePaths) {
+        // Support mode only - see captureIfDueDuringUpload(). A large telemetry backlog can take
+        // a while to drain; this keeps captures on schedule rather than letting them all wait
+        // behind it.
+        captureIfDueDuringUpload(counts);
+
         // Process in batches of 100, same as the Pi's uploadPendingTelemetry()
         if (filesUploaded >= 100) {
             logLine("Hit upload batch limit - remaining telemetry will upload next cycle");
@@ -1715,6 +1733,11 @@ bool uploadPendingImages(const String &deviceId, TelemetryCounts &counts, Device
     int filesRemoved = 0;   // uploaded or empty - anything gone from disk afterwards
     int filesUploaded = 0;
     for (const String &filePath : filePaths) {
+        // Support mode only - see captureIfDueDuringUpload(). A large image backlog can take a
+        // while to drain, especially over cellular; this keeps captures on schedule rather than
+        // letting them all wait behind it.
+        captureIfDueDuringUpload(counts);
+
         // Process in batches of 10, same as the Pi's uploadPendingPhotos()
         if (filesUploaded >= 10) {
             logLine("Hit upload batch limit - remaining images will upload next cycle");
@@ -2327,6 +2350,108 @@ void setup()
 // it down. Confirm actual exposure time and image quality on a real unit before enabling this
 // fleet-wide, and retune deviceConfig.longExposureXclkHz (config.json, no reflash needed) if it
 // needs adjusting.
+
+// Grabs one JPEG frame and writes it to CAMERA_DIR - the whole of what used to be inline in
+// runWakeCycle() below, factored out so captureIfDueDuringUpload() can call it mid-upload too
+// (support mode only) without duplicating the warmup/retry/save logic. Assumes the camera is
+// already powered and initialised (see runWakeCycle()) - never touches camera power/init itself.
+// Returns the DatedPath used for this capture - runWakeCycle()'s first telemetry snapshot reuses
+// it so that snapshot lines up with the image it accompanies, same as before this was factored out.
+DatedPath capturePhoto(TelemetryCounts &counts)
+{
+    // The first frame(s) out of a freshly (re)started sensor are usually still mid-convergence on
+    // exposure/white balance - especially here, since the camera gets fully powered off between
+    // every single wake (see setCameraPower(false) below), so this settling happens on every
+    // capture, not just once at first boot. Grab and discard a few before keeping one, so the
+    // saved image reflects the sensor's settled AEC/AWB state rather than whatever it started at.
+    // Tunable via deviceConfig.cameraWarmupFrames (config.json / API) without a reflash.
+    for (uint8_t i = 0; i < deviceConfig.cameraWarmupFrames; i++) {
+        camera_fb_t *warmupFrame = esp_camera_fb_get();
+        if (warmupFrame) {
+            esp_camera_fb_return(warmupFrame);
+        }
+        delay(100);
+    }
+
+    DatedPath datedPath = getDatedPath();
+
+    // Capture camera photo. A single retry costs at most one more frame period if the first
+    // attempt comes back NULL (timeout, DMA hiccup, transient SCCB error) - cheap insurance
+    // against losing the whole wake cycle to one bad frame, most likely to matter at night
+    // where a slower clock/near-ceiling exposure (see setupCameraNightExposure()) leaves less
+    // margin than the normal daytime capture.
+    //
+    // Logged every cycle (not just on failure) so PSRAM free/largest-block has a baseline to
+    // compare a failure against - e.g. distinguishing a fragmented/exhausted heap from the
+    // "Failed to get frame: timeout" the driver itself logs (see fileLogVprintf()) when it isn't.
+    logf("Free PSRAM before capture: %u bytes (largest block %u)",
+         heap_caps_get_free_size(MALLOC_CAP_SPIRAM), heap_caps_get_largest_free_block(MALLOC_CAP_SPIRAM));
+
+    camera_fb_t *frame = esp_camera_fb_get();
+    if (!frame) {
+        logLine("First capture attempt failed, retrying once...");
+        frame = esp_camera_fb_get();
+    }
+
+    if (frame) {
+
+        // Stored under CAMERA_DIR/yyyy/mm/dd/hh/ rather than directly in CAMERA_DIR - keeps
+        // any single directory small no matter how large the backlog grows.
+        String dirPath = String(CAMERA_DIR) + "/" + datedPath.dirPath;
+        ensureDirExists(dirPath);
+
+        String filename = dirPath + "/" + datedPath.leafName + ".jpeg";
+
+        uint32_t startTime = millis();
+        File jpg = SD.open(filename, "w");
+        if (jpg) {
+            logf("JPG created successfully,filename:%s write image data,framesize:%u * %u", filename.c_str(), frame->width, frame->height);
+            jpg.write(frame->buf, frame->len);
+            logf("JPG was written successfully, taking %lu ms", millis() - startTime);
+            counts.pendingImages++;
+        } else {
+            logLine("JPG created failed!");
+        }
+        jpg.close();
+
+        // Purely for runSetupApWindow()'s status page ("last recorded capture") - the AP window's
+        // own live view is a direct camera stream (see "/stream"), not this file.
+        lastCaptureTimestamp = getISO8601Timestamp();
+
+        esp_camera_fb_return(frame);
+    } else {
+        logLine("Capturing camera failed!");
+    }
+
+    // Anchors the next due time to this capture's own timestamp rather than a fixed wall-clock
+    // grid, so consecutive captures land as close to cameraIntervalS apart as the upload/GPS/
+    // connect work in between allows - see captureIfDueDuringUpload() and loop()'s support-mode
+    // delay, which schedule off this instead of just delaying a flat cameraIntervalS every time.
+    nextCaptureDueMs = millis() + deviceConfig.cameraIntervalS * 1000UL;
+
+    return datedPath;
+}
+
+// Called between files in the upload loops (see uploadPendingTelemetry()/uploadPendingImages())
+// so a slow or large backlog doesn't push a whole cameraIntervalS (or more) past due before the
+// next shot gets taken. Support mode only: a normal field wake takes exactly one photo (at the
+// top of runWakeCycle()) and heads straight back to deep sleep, so there's no mid-cycle schedule
+// to keep to there. Safe to call capturePhoto() directly here - the camera stays powered and
+// initialised for the whole of runWakeCycle() regardless of how many extra captures this takes
+// (see loop(), which only tears the camera down after runWakeCycle() returns).
+void captureIfDueDuringUpload(TelemetryCounts &counts)
+{
+    if (!deviceConfig.supportMode) {
+        return;
+    }
+    // Unsigned-subtraction "is it due" check - tolerates millis() wrapping every ~49 days, unlike
+    // a direct millis() >= nextCaptureDueMs comparison.
+    if ((int32_t)(millis() - nextCaptureDueMs) >= 0) {
+        logLine("Upload running long - interleaving a capture to keep to cameraIntervalS");
+        capturePhoto(counts);
+    }
+}
+
 void setupCameraNightExposure(sensor_t *s)
 {
     s->set_exposure_ctrl(s, 0);    // manual exposure - see comment above
@@ -2546,69 +2671,10 @@ void runWakeCycle()
     s->set_vflip(s, deviceConfig.vflip ? 1 : 0);
     s->set_hmirror(s, deviceConfig.hflip ? 1 : 0);
 
-    // The first frame(s) out of a freshly (re)started sensor are usually still mid-convergence on
-    // exposure/white balance - especially here, since the camera gets fully powered off between
-    // every single wake (see setCameraPower(false) below), so this settling happens on every
-    // capture, not just once at first boot. Grab and discard a few before keeping one, so the
-    // saved image reflects the sensor's settled AEC/AWB state rather than whatever it started at.
-    // Tunable via deviceConfig.cameraWarmupFrames (config.json / API) without a reflash.
-    for (uint8_t i = 0; i < deviceConfig.cameraWarmupFrames; i++) {
-        camera_fb_t *warmupFrame = esp_camera_fb_get();
-        if (warmupFrame) {
-            esp_camera_fb_return(warmupFrame);
-        }
-        delay(100);
-    }
-
-    DatedPath datedPath = getDatedPath();
-
-    // Capture camera photo. A single retry costs at most one more frame period if the first
-    // attempt comes back NULL (timeout, DMA hiccup, transient SCCB error) - cheap insurance
-    // against losing the whole wake cycle to one bad frame, most likely to matter at night
-    // where a slower clock/near-ceiling exposure (see setupCameraNightExposure()) leaves less
-    // margin than the normal daytime capture.
-    //
-    // Logged every cycle (not just on failure) so PSRAM free/largest-block has a baseline to
-    // compare a failure against - e.g. distinguishing a fragmented/exhausted heap from the
-    // "Failed to get frame: timeout" the driver itself logs (see fileLogVprintf()) when it isn't.
-    logf("Free PSRAM before capture: %u bytes (largest block %u)",
-         heap_caps_get_free_size(MALLOC_CAP_SPIRAM), heap_caps_get_largest_free_block(MALLOC_CAP_SPIRAM));
-
-    camera_fb_t *frame = esp_camera_fb_get();
-    if (!frame) {
-        logLine("First capture attempt failed, retrying once...");
-        frame = esp_camera_fb_get();
-    }
-
-    if (frame) {
-
-        // Stored under CAMERA_DIR/yyyy/mm/dd/hh/ rather than directly in CAMERA_DIR - keeps
-        // any single directory small no matter how large the backlog grows.
-        String dirPath = String(CAMERA_DIR) + "/" + datedPath.dirPath;
-        ensureDirExists(dirPath);
-
-        String filename = dirPath + "/" + datedPath.leafName + ".jpeg";
-
-        uint32_t startTime = millis();
-        File jpg = SD.open(filename, "w");
-        if (jpg) {
-            logf("JPG created successfully,filename:%s write image data,framesize:%u * %u", filename.c_str(), frame->width, frame->height);
-            jpg.write(frame->buf, frame->len);
-            logf("JPG was written successfully, taking %lu ms", millis() - startTime);
-            counts.pendingImages++;
-        } else {
-            logLine("JPG created failed!");
-        }
-        jpg.close();
-
-        // Purely for runSetupApWindow()'s status page ("last recorded capture") - the AP window's
-        // own live view is a direct camera stream (see "/stream"), not this file.
-        lastCaptureTimestamp = getISO8601Timestamp();
-
-        esp_camera_fb_return(frame);
-    } else {
-        logLine("Capturing camera failed!");
-    }
+    // See capturePhoto() - grabs the warmed-up frame, writes it to CAMERA_DIR, and schedules
+    // nextCaptureDueMs off this capture's own timestamp for captureIfDueDuringUpload()/loop() to
+    // use, in support mode.
+    DatedPath datedPath = capturePhoto(counts);
 
     // Only actually powers on the modem and takes a fix once deviceConfig.geoIntervalS has
     // elapsed since the last one - see updateGeoLocationIfDue(). Checked here (after the photo,
@@ -2889,8 +2955,19 @@ void loop()
     // deep-sleep path instead, same as if support mode were off.
     uint8_t batteryPercent = get_battery_percent(get_battery_voltage());
     if (deviceConfig.supportMode && batteryPercent >= BATTERY_LOW_PERCENT_15) {
-        logf("Support mode active - repeating wake cycle in %u seconds instead of deep-sleeping", deviceConfig.cameraIntervalS);
-        delay(deviceConfig.cameraIntervalS * 1000UL);
+        // Waits only what's left until nextCaptureDueMs (set by capturePhoto() off the capture
+        // this cycle already took, further up the stack in runWakeCycle()) rather than a flat
+        // cameraIntervalS - the telemetry/image uploads and any GPS fix in between eat into that
+        // budget, so a fixed delay on top would drift the actual interval between captures later
+        // by however long each cycle's own work took. Rollover-safe subtraction, same as
+        // captureIfDueDuringUpload().
+        int32_t remainingMs = (int32_t)(nextCaptureDueMs - millis());
+        if (remainingMs > 0) {
+            logf("Support mode active - waiting %ld ms to keep captures ~%u s apart", (long)remainingMs, deviceConfig.cameraIntervalS);
+            delay((uint32_t)remainingMs);
+        } else {
+            logLine("Support mode active - already past due for the next capture, continuing immediately");
+        }
         runWakeCycle();
         return;
     } else if (deviceConfig.supportMode) {
