@@ -191,6 +191,16 @@
 #define GEO_MODEM_BOOT_RETRIES       30      // testAT() attempts before re-pulsing PWRKEY
 #define GEO_FIX_TIMEOUT_MS           120000  // Give up on a GPS fix after this long, this cycle
 
+// Fastest-first AT+IPR values to try for the modem's own AT/data UART - see negotiateModemBaud().
+// 600-460800 is the *complete* <speed> range AT+IPR's write command accepts (SIM767XX Series AT
+// Command Manual V1.01 s8.2.3) - there is no value anywhere near the SIM7670G's separately quoted
+// "5Mbps" spec, because that number is the LTE Cat-1bis radio's over-the-air uplink rate to the
+// tower, not this local wire between the ESP32 and the modem chip. 460800 (4x MODEM_BAUDRATE) is
+// the actual ceiling available here. MODEM_BAUDRATE itself is deliberately not in this list -
+// negotiateModemBaud() already falls back to it as the guaranteed-working rate once modemPowerOn()
+// has confirmed the modem answers AT there.
+static const uint32_t MODEM_FAST_BAUDRATES[] = {460800, 230400};
+
 RTC_DATA_ATTR int bootCount = 0;
 
 struct TelemetryCounts {
@@ -2044,6 +2054,40 @@ bool uplinkConnected()
     }
 }
 
+// Tries to move the modem's AT/data UART up from MODEM_BAUDRATE to the fastest rate in
+// MODEM_FAST_BAUDRATES that actually holds up over the wire, backing off to the next slower
+// candidate (and eventually back to MODEM_BAUDRATE) if a faster one doesn't. A value the datasheet
+// lists as supported is no guarantee this board's wiring/signal integrity handles it cleanly at
+// speed, hence verifying each candidate rather than trusting AT+IPR's own OK response.
+//
+// AT+IPR's change is temporary - the modem reverts to MODEM_BAUDRATE (its AT+IPREX-configured
+// boot value) on its own next power-on, per the datasheet - so this is safe to call fresh every
+// modemPowerOn() rather than ever touching AT+IPREX permanently: a modem that's ever unreachable
+// after a failed attempt here still comes back at the known-good MODEM_BAUDRATE after its next
+// PWRKEY pulse/power-on, same as modemPowerOn()'s own existing repower retry.
+//
+// Every upload this cycle - and any AT chatter, e.g. GPS - benefits once this is done, since they
+// all share the same gsmClient/SerialAT link (see uploadPendingImages()/uploadPendingTelemetry()).
+void negotiateModemBaud()
+{
+    for (uint32_t candidate : MODEM_FAST_BAUDRATES) {
+        logf("Trying modem UART at %u baud (currently %u)...", candidate, MODEM_BAUDRATE);
+        modem.setBaud(candidate);   // AT+IPR=<candidate> - acknowledged at the OLD baud, takes effect immediately after
+        delay(50);                  // let the modem's UART peripheral actually switch over
+        SerialAT.updateBaudRate(candidate);
+
+        if (modem.testAT(300)) {
+            logf("Modem UART now running at %u baud", candidate);
+            return;
+        }
+
+        logf("%u baud didn't hold - reverting to %u", candidate, MODEM_BAUDRATE);
+        SerialAT.updateBaudRate(MODEM_BAUDRATE);
+        modem.testAT(1000);   // re-sync past any bytes garbled by the failed switch before the next candidate (or returning)
+    }
+    logf("Modem UART staying at default %u baud - no faster rate held up", MODEM_BAUDRATE);
+}
+
 // Brings the modem chip up over SerialAT and waits for it to answer AT. Idempotent - the
 // PWRKEY pulse only happens on the first call of a wake cycle (tracked by g_modemPoweredOn), so
 // GPS (updateGeoLocationIfDue) and the cellular uplink (cellularConnect) can both call it.
@@ -2081,6 +2125,8 @@ bool modemPowerOn()
             retry = 0;
         }
     }
+
+    negotiateModemBaud();
 
     g_modemPoweredOn = true;
     return true;
