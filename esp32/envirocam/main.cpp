@@ -188,6 +188,12 @@
 // matches LilyGo's own reference examples for the SIM7670G-S3 (e.g. LilyGo-Modem-Series/examples/Traccar).
 #define MODEM_POWERON_PULSE_WIDTH_MS 100
 
+// SIM7672X Series Hardware Design (SIMCom, s3.2.2/Table 13): forcing the module off by holding
+// PWRKEY low needs >= 2.5s (Toff), a completely different pulse width to the ~100ms power-ON
+// pulse above. Used by modemPowerOff() as the fallback when the modem never answered AT this
+// cycle, since that path can't reach it with AT+CPOF. A little margin over the 2.5s minimum.
+#define MODEM_POWEROFF_PULSE_WIDTH_MS 2600
+
 #define GEO_MODEM_BOOT_RETRIES       30      // testAT() attempts before re-pulsing PWRKEY
 #define GEO_FIX_TIMEOUT_MS           120000  // Give up on a GPS fix after this long, this cycle
 
@@ -298,6 +304,13 @@ UplinkKind g_uplink = UPLINK_NONE;
 // draining the battery. modemPowerOn() is idempotent so GPS and the cellular uplink can both ask
 // for it in the same cycle without a double power-on pulse.
 bool g_modemPoweredOn = false;
+
+// True as soon as PWRKEY has been pulsed this wake cycle, even if the modem never answered AT
+// (g_modemPoweredOn stays false in that case). modemPowerOff() needs this - not g_modemPoweredOn -
+// to decide whether it has anything to power down: a modem that never came up is still drawing
+// current from VBAT and has to be forced off via a hardware PWRKEY hold, since it can't be reached
+// with AT+CPOF (see modemPowerOff()).
+bool g_modemPowerOnAttempted = false;
 
 // Defined further down (grouped with updateGeoLocationIfDue(), since they share the modem) but
 // referenced earlier by connectApiClient() / the upload functions / runWakeCycle().
@@ -2108,6 +2121,11 @@ bool modemPowerOn()
     delay(MODEM_POWERON_PULSE_WIDTH_MS);
     digitalWrite(BOARD_PWRKEY_PIN, LOW);
 
+    // Set as soon as PWRKEY has actually been pulsed, not after AT succeeds - modemPowerOff() needs
+    // to know a power-on was attempted even when the modem below never answers, so it can force the
+    // chip off via a hardware PWRKEY hold instead of silently leaving it running (see modemPowerOff()).
+    g_modemPowerOnAttempted = true;
+
     uint32_t start = millis();
     int retry = 0;
     while (!modem.testAT(1000)) {
@@ -2133,18 +2151,36 @@ bool modemPowerOn()
 }
 
 // Powers the modem chip fully down. AT+CPOF cleanly powers the whole modem down (documented
-// SIMCom behaviour) rather than fumbling with PWRKEY pulse timing again, which differs between
-// power-on and power-off. Best-effort - the ESP32 is usually about to deep-sleep anyway, at
-// which point SerialAT goes away regardless. Must run on every path that called modemPowerOn(),
-// or the modem keeps draining the battery through deep sleep.
+// SIMCom behaviour) when the modem is actually answering AT. Best-effort - the ESP32 is usually
+// about to deep-sleep anyway, at which point SerialAT goes away regardless. Must run on every path
+// that called modemPowerOn(), or the modem keeps draining the battery through deep sleep - this
+// includes a modemPowerOn() that never got an AT response (see the PWRKEY-hold branch below):
+// gating on g_modemPoweredOn there would skip power-off entirely, leaving a modem that failed to
+// boot running at full current for the rest of the sleep window.
 void modemPowerOff()
 {
-    if (!g_modemPoweredOn) {
+    if (!g_modemPowerOnAttempted) {
         return;
     }
-    modem.poweroff();
-    delay(2000);
+
+    if (g_modemPoweredOn) {
+        modem.poweroff();
+        delay(2000);
+    } else {
+        // AT+CPOF has nothing to talk to - the modem never answered plain AT this cycle, so it
+        // won't answer this either. Per the SIM7672X hardware design guide (s3.2.2/Table 13), the
+        // only power-off path that doesn't depend on the AT channel is a hardware PWRKEY hold of
+        // >= 2.5s (Toff) - a much longer pulse than the ~100ms one modemPowerOn() uses to power on.
+        logLine("Modem never came up - forcing it off via PWRKEY hold");
+        pinMode(BOARD_PWRKEY_PIN, OUTPUT);
+        digitalWrite(BOARD_PWRKEY_PIN, HIGH);   // inverted drive, same as modemPowerOn()'s pulse
+        delay(MODEM_POWEROFF_PULSE_WIDTH_MS);
+        digitalWrite(BOARD_PWRKEY_PIN, LOW);
+        delay(500);
+    }
+
     g_modemPoweredOn = false;
+    g_modemPowerOnAttempted = false;
 }
 
 // Brings up an LTE data connection on the modem, for use when WiFi association has failed. Locks
