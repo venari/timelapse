@@ -1,6 +1,6 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Battery, Thermometer, HardDrive, Camera, Pencil } from 'lucide-react';
+import { Battery, Thermometer, HardDrive, Camera, Pencil, ScrollText } from 'lucide-react';
 import type { Device } from '@/types';
 import { formatDistanceToNow } from 'date-fns';
 import { Link } from 'react-router-dom';
@@ -128,12 +128,21 @@ export function DeviceCard({ device }: DeviceCardProps) {
                   Updated {formatDistanceToNow(new Date(telemetry.timestamp), { addSuffix: true })}
                 </p>
 
-                <Link
-                  to={`/telemetry/${device.id}`}
-                  className="text-sm text-primary hover:underline inline-block"
-                >
-                  View detailed charts →
-                </Link>
+                <div className="flex items-center gap-4">
+                  <Link
+                    to={`/telemetry/${device.id}`}
+                    className="text-sm text-primary hover:underline inline-block"
+                  >
+                    View detailed charts →
+                  </Link>
+                  <Link
+                    to={`/logs/${device.id}`}
+                    className="text-sm text-primary hover:underline inline-flex items-center gap-1"
+                  >
+                    <ScrollText className="h-3.5 w-3.5" />
+                    Logs
+                  </Link>
+                </div>
               </div>
             ) : (
               <p className="text-sm text-muted-foreground">No telemetry available</p>

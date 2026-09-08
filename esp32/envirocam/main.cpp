@@ -18,6 +18,8 @@
 #include <esp_log.h>
 #include <esp_heap_caps.h>
 #include <esp_system.h>
+#include <esp_core_dump.h>
+#include <esp_partition.h>
 #include <math.h>
 #include <Wire.h>
 #include <FS.h>
@@ -86,6 +88,10 @@
 #define LOG_DIR                  "/logs"
 #define LOG_FILE                 "/logs/envirocam.log"  // Active day's log - see rotateLogIfNeeded()
 #define LOG_RETENTION_DAYS       30                      // Rotated logs older than this get deleted
+
+#define COREDUMP_DIR             "/logs/coredumps"       // Core dumps extracted from flash, pending upload - see checkAndLogCoreDump()/uploadPendingCoreDumps()
+#define LOG_UPLOAD_STATE_FILE    "/logs/log_upload_state.txt"  // "<date>,<bytes already pushed>" - see uploadPendingLogs()
+#define LOG_UPLOAD_SCRATCH_FILE  "/logs/log_chunk.tmp"    // Staging copy of the chunk currently being uploaded - see uploadPendingLogs()
 
 // A temporary local WiFi hotspot + status/photo web page - see runSetupApWindow() - so an
 // installer can confirm the camera's working right after power-on with zero cellular/internet
@@ -506,6 +512,106 @@ const char *resetReasonName(esp_reset_reason_t reason)
     case ESP_RST_SDIO:      return "SDIO";
     default:                return "UNKNOWN";
     }
+}
+
+// Called once per boot, right after the "Reset reason" line (see runWakeCycle()) - if the
+// previous boot panicked, CONFIG_ESP_COREDUMP_ENABLE_TO_FLASH=y (already the default in this
+// arduino-esp32 build - see tools/sdk/esp32s3/sdkconfig in the framework package - and the
+// "coredump" partition already present in app3M_fat9M_16MB.csv, this board's partition table)
+// means the panic handler already wrote a full ELF-format core dump to flash before rebooting.
+// Nothing needed it turned on - this just gets it off the device before something overwrites it:
+// the coredump partition holds exactly one dump at a time, so the next panic silently clobbers
+// whatever's there.
+//
+// Two things come out of a found dump:
+//   1. A one-line summary (crashing task, PC, exception cause, backtrace addresses) via logLine()/
+//      logf() - lands straight in envirocam.log, so it rides along with uploadPendingLogs() and
+//      reaches the server without anyone needing SD-card access, which was the whole point of
+//      pairing this with that. The addresses alone are enough to pin down the crashing line with
+//      `xtensa-esp32s3-elf-addr2line -e <matching .pio build's firmware.elf> <address>` once
+//      app_elf_sha256 confirms it's a match for the build in hand.
+//   2. The raw dump, copied byte-for-byte from the coredump partition to COREDUMP_DIR, queued for
+//      upload the same way images/telemetry are (see uploadPendingCoreDumps()). That's the more
+//      useful artifact: fed to `espcoredump.py info_corefile -t elf` (or `idf.py coredump-info`)
+//      together with the matching firmware.elf, it gives a full GDB-style backtrace with local
+//      variables, not just a handful of addresses.
+//
+// Either half failing (malloc, SD write) still falls through to the erase at the end - a summary
+// or partial dump that made it out is worth more than leaving a bad one in flash forever, and a
+// stuck partition would otherwise mean every future crash goes uninspected too.
+//
+// Forward-declared (defined further down, alongside setupSD()) since this needs it before then.
+void ensureDirExists(const String &path);
+
+void checkAndLogCoreDump()
+{
+    esp_err_t checkErr = esp_core_dump_image_check();
+    if (checkErr != ESP_OK) {
+        return;   // ESP_ERR_NOT_FOUND is the normal case - no crash since the last upload/erase
+    }
+
+    logLine("Core dump found from a previous crash - extracting...");
+
+    esp_core_dump_summary_t *summary = (esp_core_dump_summary_t *)malloc(sizeof(esp_core_dump_summary_t));
+    if (summary != nullptr) {
+        if (esp_core_dump_get_summary(summary) == ESP_OK) {
+            char backtrace[200] = {0};
+            int pos = 0;
+            for (uint32_t i = 0; i < summary->exc_bt_info.depth && i < 16 && pos < (int)sizeof(backtrace) - 12; i++) {
+                pos += snprintf(backtrace + pos, sizeof(backtrace) - pos, "0x%08x ", summary->exc_bt_info.bt[i]);
+            }
+
+            logf("Core dump: task=\"%s\" exc_pc=0x%08x exc_cause=%u exc_vaddr=0x%08x elf_sha256=%s backtrace=[%s]%s",
+                 summary->exc_task, summary->exc_pc,
+                 summary->ex_info.exc_cause, summary->ex_info.exc_vaddr,
+                 summary->app_elf_sha256, backtrace,
+                 summary->exc_bt_info.corrupted ? " (backtrace flagged corrupted)" : "");
+        } else {
+            logLine("Core dump present but esp_core_dump_get_summary() failed - saving raw dump only");
+        }
+        free(summary);
+    }
+
+    size_t dumpAddr = 0, dumpSize = 0;
+    if (esp_core_dump_image_get(&dumpAddr, &dumpSize) == ESP_OK && dumpSize > 0) {
+        const esp_partition_t *coredumpPartition =
+            esp_partition_find_first(ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_DATA_COREDUMP, nullptr);
+
+        if (coredumpPartition != nullptr) {
+            ensureDirExists(COREDUMP_DIR);
+            char filename[64];
+            snprintf(filename, sizeof(filename), "%s/coredump-%lu.elf", COREDUMP_DIR, (unsigned long)millis());
+
+            File dumpFile = SD.open(filename, "w");
+            if (dumpFile) {
+                uint8_t buf[512];
+                size_t remaining = dumpSize;
+                size_t offset = 0;
+                bool readOk = true;
+                while (remaining > 0) {
+                    size_t chunk = remaining < sizeof(buf) ? remaining : sizeof(buf);
+                    if (esp_partition_read(coredumpPartition, offset, buf, chunk) != ESP_OK) {
+                        readOk = false;
+                        break;
+                    }
+                    dumpFile.write(buf, chunk);
+                    offset += chunk;
+                    remaining -= chunk;
+                }
+                dumpFile.close();
+                logf("Core dump saved to %s (%u bytes)%s", filename, (unsigned)dumpSize,
+                     readOk ? "" : " - READ ERROR, file is truncated");
+            } else {
+                logLine("Failed to open core dump file on SD for writing!");
+            }
+        } else {
+            logLine("No coredump partition found - can't extract raw dump (summary above is all we have)");
+        }
+    }
+
+    // The partition only ever holds one dump - erase now that we've pulled what we can out of it,
+    // so the next crash (if any) isn't silently lost behind this one.
+    esp_core_dump_image_erase();
 }
 
 bool setCameraPower(bool enable)
@@ -1343,8 +1449,18 @@ Client *connectApiClient(ApiConnection &conn, const ParsedUrl &api)
 // tracks Content-Length (or Transfer-Encoding: chunked, already framed unambiguously) - if a
 // response has neither, or the server explicitly asks to close, or the body read comes up short,
 // the connection is closed here rather than reused, and the next call just reconnects.
+// fileLength: bytes to actually send from `file`, starting at its current position - defaults to
+// 0, meaning "the whole file from wherever it's currently seeked" (file->size(), same as before
+// this parameter existed - every existing caller passes a fresh, unseeked file and wants that).
+// uploadPendingLogs() is the one caller that needs an explicit value: it seeks `file` to a byte
+// offset first and may only want part of what's left (see its own maxChunk comment), so
+// file->size() (the whole file, ignoring both the seek and the cap) would be wrong there.
+//
+// contentType: written into the file part's Content-Type header - defaults to "image/jpeg" since
+// that's what every caller before uploadPendingLogs()/uploadPendingCoreDumps() sends.
 int postMultipartForm(ApiConnection &conn, const String &apiUrl, const String &endpoint, const std::vector<HttpFormField> &fields,
-                       const String &fileFieldName, const String &fileName, File *file, String &responseBody)
+                       const String &fileFieldName, const String &fileName, File *file, String &responseBody,
+                       size_t fileLength = 0, const String &contentType = "image/jpeg")
 {
     ParsedUrl api = parseApiUrl(apiUrl);
     String path = api.path;
@@ -1362,12 +1478,13 @@ int postMultipartForm(ApiConnection &conn, const String &apiUrl, const String &e
         startPart += field.value + "\r\n";
     }
 
-    size_t fileLength = 0;
     if (file != nullptr) {
-        fileLength = file->size();
+        if (fileLength == 0) {
+            fileLength = file->size();
+        }
         startPart += "--" + boundary + "\r\n";
         startPart += "Content-Disposition: form-data; name=\"" + fileFieldName + "\"; filename=\"" + fileName + "\"\r\n";
-        startPart += "Content-Type: image/jpeg\r\n\r\n";
+        startPart += "Content-Type: " + contentType + "\r\n\r\n";
     }
     String endPart = "\r\n--" + boundary + "--\r\n";
 
@@ -1391,9 +1508,11 @@ int postMultipartForm(ApiConnection &conn, const String &apiUrl, const String &e
 
     if (file != nullptr) {
         uint8_t buffer[1024];
-        while (file->available()) {
-            size_t len = file->read(buffer, sizeof(buffer));
+        size_t sent = 0;
+        while (sent < fileLength && file->available()) {
+            size_t len = file->read(buffer, min(sizeof(buffer), fileLength - sent));
             client.write(buffer, len);
+            sent += len;
         }
     }
     client.print(endPart);
@@ -1835,6 +1954,239 @@ bool uploadPendingImages(const String &deviceId, TelemetryCounts &counts, Device
     conn.plainClient.stop();
     conn.gsmClient.stop();
     return backlogExcessive;
+}
+
+// Uploads every file still sitting in COREDUMP_DIR (see checkAndLogCoreDump()) to the API,
+// deleting each one once acknowledged with 200 OK - same delete-on-ack pattern as
+// uploadPendingImages()/uploadPendingTelemetry(), so a dump that fails to upload (offline, API
+// down) just retries next cycle rather than being lost. In practice this is almost always zero or
+// one file - a dump only exists here right after a crash, and checkAndLogCoreDump() only ever
+// writes one before the next boot's erase.
+void uploadPendingCoreDumps(const String &deviceId, DeviceConfig &config)
+{
+    if (!uplinkConnected()) {
+        return;
+    }
+
+    std::vector<String> filePaths;
+    listFilesRecursive(COREDUMP_DIR, filePaths);
+    if (filePaths.empty()) {
+        return;
+    }
+
+    static ApiConnection conn;
+
+    for (const String &filePath : filePaths) {
+        File file = SD.open(filePath, "r");
+        if (!file) {
+            continue;
+        }
+
+        size_t fileSize = file.size();
+        if (fileSize == 0) {
+            file.close();
+            SD.remove(filePath);
+            continue;
+        }
+
+        std::vector<HttpFormField> fields = {
+            {"SerialNumber", deviceId},
+        };
+
+        logf("Posting core dump: %s (%u bytes)", filePath.c_str(), (unsigned)fileSize);
+
+        String responseBody;
+        int statusCode = postMultipartForm(conn, config.apiUrl, "Log/CoreDump", fields, "File", fileBaseName(filePath),
+                                            &file, responseBody, fileSize, "application/octet-stream");
+        file.close();
+
+        logf("Core dump upload response (status %d): %s", statusCode, responseBody.c_str());
+
+        if (statusCode == 200) {
+            SD.remove(filePath);
+            logf("Uploaded and deleted %s", filePath.c_str());
+        } else {
+            logf("Failed to upload %s (status %d), will retry next time", filePath.c_str(), statusCode);
+            break;   // same reasoning as uploadPendingImages() - leave the rest queued rather than risk reordering
+        }
+    }
+
+    conn.secureClient.stop();
+    conn.plainClient.stop();
+    conn.gsmClient.stop();
+}
+
+// How far into a given calendar day's log content uploadPendingLogs() has already pushed to the
+// API - "<date>,<bytes>", read/written as a single line in LOG_UPLOAD_STATE_FILE. Tracked
+// separately from the SD-side rotation (see rotateLogIfNeeded()): the byte offset stays valid
+// across a rotation because rotation only renames the file (LOG_FILE -> the dated path), it never
+// touches the bytes already written, so "date" here is what tells uploadPendingLogs() which file
+// currently holds them.
+struct LogUploadState {
+    String date;
+    size_t offset = 0;
+};
+
+LogUploadState readLogUploadState()
+{
+    LogUploadState state;
+
+    File stateFile = SD.open(LOG_UPLOAD_STATE_FILE, "r");
+    if (stateFile) {
+        String line = stateFile.readStringUntil('\n');
+        stateFile.close();
+        int comma = line.indexOf(',');
+        if (comma > 0) {
+            state.date = line.substring(0, comma);
+            state.offset = (size_t)line.substring(comma + 1).toInt();
+            return state;
+        }
+    }
+
+    // No state file yet (fresh SD card, or this is the first boot with this feature) - start from
+    // the end of whatever's already in today's log rather than re-uploading this unit's whole
+    // history the first time it runs.
+    struct tm timeinfo;
+    if (getLocalTime(&timeinfo, 0)) {
+        char today[11];
+        strftime(today, sizeof(today), "%Y-%m-%d", &timeinfo);
+        state.date = String(today);
+    }
+    File logFile = SD.open(LOG_FILE, "r");
+    if (logFile) {
+        state.offset = logFile.size();
+        logFile.close();
+    }
+    return state;
+}
+
+void writeLogUploadState(const LogUploadState &state)
+{
+    File stateFile = SD.open(LOG_UPLOAD_STATE_FILE, "w");
+    if (stateFile) {
+        stateFile.print(state.date + "," + String((uint32_t)state.offset));
+        stateFile.close();
+    }
+}
+
+// Pushes whatever log content hasn't been sent yet, one chunk at a time, so a unit's recent
+// activity - including a checkAndLogCoreDump() summary - can be read from the server without
+// needing to pull the SD card. That's the point: the crash-loops that motivated this are exactly
+// the situation where someone would otherwise have to open the enclosure to find out what
+// happened. Safe to call every wake - a quiet cycle just finds nothing past the stored offset and
+// returns immediately.
+//
+// Appended server-side to one blob per device per calendar day (see LogController.Post) rather
+// than re-uploading the whole growing file every time - cellular data isn't free and this file
+// only ever grows across a day. See LogUploadState's comment for how the offset survives rotation.
+void uploadPendingLogs(const String &deviceId, DeviceConfig &config)
+{
+    if (!uplinkConnected()) {
+        return;
+    }
+
+    LogUploadState state = readLogUploadState();
+    if (state.date.length() == 0) {
+        return;   // clock not synced yet - nothing sensible to date this upload with, try again next wake
+    }
+
+    struct tm timeinfo;
+    char today[11] = "";
+    if (getLocalTime(&timeinfo, 0)) {
+        strftime(today, sizeof(today), "%Y-%m-%d", &timeinfo);
+    }
+
+    // rotateLogIfNeeded() (called from setupSD(), before this) already renamed LOG_FILE to the
+    // dated path if today's entries would otherwise have landed in yesterday's file - so whichever
+    // one of those actually holds state.date's content depends on whether it's still today.
+    bool isToday = state.date == String(today);
+    String sourcePath = isToday ? String(LOG_FILE) : (String(LOG_DIR) + "/envirocam-" + state.date + ".log");
+
+    File source = SD.open(sourcePath, "r");
+    if (!source) {
+        // Most likely state.date's rotated file already aged out via pruneOldLogs() - nothing left
+        // to send for it. Move on to today so this doesn't get stuck retrying a file that's gone.
+        state.date = String(today);
+        state.offset = 0;
+        writeLogUploadState(state);
+        return;
+    }
+
+    size_t fileSize = source.size();
+    if (state.offset > fileSize) {
+        state.offset = 0;   // stored offset is stale (e.g. state file predates a card swap) - resync from the start
+    }
+
+    // Caps how much one wake sends - after several offline days a backlog could be several MB,
+    // and this drains it over several wakes rather than holding the modem/HTTP link open (and
+    // this cycle's battery draw) for one huge POST.
+    const size_t maxChunkBytes = 32768;
+    size_t available = fileSize - state.offset;
+    size_t toSend = available < maxChunkBytes ? available : maxChunkBytes;
+
+    if (toSend > 0) {
+        // Copied to a scratch file rather than streamed straight from `source`: when isToday,
+        // source IS LOG_FILE, and postMultipartForm() calls logf() internally (its "POST ..."
+        // line) partway through - which would open a second, concurrent handle on that same file
+        // via logLine()'s own SD.open(LOG_FILE, FILE_APPEND) while source is still mid-read. The
+        // SD library doesn't guarantee that's safe. Uploading from a distinct scratch file instead
+        // means nothing logf() touches while this function runs is a file this function also has open.
+        source.seek(state.offset);
+        File scratch = SD.open(LOG_UPLOAD_SCRATCH_FILE, "w");
+        if (scratch) {
+            uint8_t buf[512];
+            size_t remaining = toSend;
+            while (remaining > 0) {
+                size_t chunk = remaining < sizeof(buf) ? remaining : sizeof(buf);
+                size_t got = source.read(buf, chunk);
+                if (got == 0) {
+                    break;
+                }
+                scratch.write(buf, got);
+                remaining -= got;
+            }
+            scratch.close();
+        }
+        source.close();
+
+        if (scratch) {
+            File chunkFile = SD.open(LOG_UPLOAD_SCRATCH_FILE, "r");
+            if (chunkFile) {
+                std::vector<HttpFormField> fields = {
+                    {"SerialNumber", deviceId},
+                    {"Date", state.date},
+                    {"Offset", String((uint32_t)state.offset)},
+                };
+
+                static ApiConnection conn;
+                String responseBody;
+                int statusCode = postMultipartForm(conn, config.apiUrl, "Log", fields, "File", state.date + ".log",
+                                                    &chunkFile, responseBody, toSend, "text/plain");
+                conn.secureClient.stop();
+                conn.plainClient.stop();
+                conn.gsmClient.stop();
+                chunkFile.close();
+                SD.remove(LOG_UPLOAD_SCRATCH_FILE);
+
+                if (statusCode == 200) {
+                    state.offset += toSend;
+                    writeLogUploadState(state);
+                } else {
+                    logf("Log upload failed (status %d), will retry next time", statusCode);
+                }
+            }
+        }
+    } else {
+        source.close();
+    }
+
+    // Fully caught up on a rotated (no longer active) day - move on to today so the next wake
+    // starts sending its content instead of re-checking an exhausted dated file every time.
+    if (!isToday && state.offset >= fileSize) {
+        state.date = String(today);
+        state.offset = 0;
+        writeLogUploadState(state);
+    }
 }
 
 // --- Sunrise/sunset calculation -------------------------------------------------------------
@@ -2523,9 +2875,11 @@ DatedPath capturePhoto(TelemetryCounts &counts)
 // (see loop(), which only tears the camera down after runWakeCycle() returns).
 void captureIfDueDuringUpload(TelemetryCounts &counts)
 {
-    if (!deviceConfig.supportMode) {
-        return;
-    }
+    // LGH - I'm not sure about this logic...
+    // if (!deviceConfig.supportMode) {
+    //     return;
+    // }
+    
     // Unsigned-subtraction "is it due" check - tolerates millis() wrapping every ~49 days, unlike
     // a direct millis() >= nextCaptureDueMs comparison.
     if ((int32_t)(millis() - nextCaptureDueMs) >= 0) {
@@ -2572,6 +2926,11 @@ void runWakeCycle()
     // reset happens before app code runs, so this is the only trace of *why* such a reset
     // happened - bootCount (RTC_DATA_ATTR) just tells us one occurred, via dropping back down.
     logf("Reset reason: %s", resetReasonName(esp_reset_reason()));
+
+    // Right after logging *that* a reset happened, and before anything else runs that could
+    // itself panic - see checkAndLogCoreDump()'s comment for why a PANIC reset reason above
+    // usually means there's a core dump sitting in flash worth pulling off now.
+    checkAndLogCoreDump();
 
     // Kept up to date incrementally below rather than re-scanned from disk each wake,
     // since scanning directories with thousands of backlogged files gets slow
@@ -2795,6 +3154,14 @@ void runWakeCycle()
                                                 (uint32_t)(millis() / 1000),
                                                 deviceConfig.geoLat, deviceConfig.geoLon, deviceConfig.geoTimeRecorded, counts);
     writeTelemetryFile(thirdDatedPath, telemetryJson3);
+
+    // Pushes any core dump (see checkAndLogCoreDump()) and any not-yet-sent log lines - including
+    // the three telemetry snapshots and everything else logged so far this cycle - up to the API
+    // while the uplink is still open, right before it gets torn down below. Deliberately after all
+    // the telemetry/image upload work above rather than before it: those are the reason this
+    // firmware exists, log delivery is a debugging nicety that shouldn't delay or crowd them out.
+    uploadPendingCoreDumps(deviceId, deviceConfig);
+    uploadPendingLogs(deviceId, deviceConfig);
 
     // See the comment by needsSync above. FORCE_SYNC_FILE set here means next boot resyncs
     // regardless of autoSyncPeriodS; cleared once a cycle finally gets through without either

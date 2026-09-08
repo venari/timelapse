@@ -186,6 +186,36 @@ export const api = {
       throw error;
     }
   },
+
+  // Logs (see LogController - the device's SD-card log pushed up via uploadPendingLogs())
+  async getLogDates(deviceId: number): Promise<string[]> {
+    const response = await apiClient.get<string[]>(`/api/Log/Dates?deviceId=${deviceId}`);
+    return response.data;
+  },
+
+  async getLog(deviceId: number, date: string): Promise<string> {
+    try {
+      const response = await apiClient.get<string>(`/api/Log?deviceId=${deviceId}&date=${date}`, {
+        // Log content is plain text, not JSON - without this axios's default response
+        // transform tries (and, for most log content, fails) to JSON.parse() the body.
+        responseType: 'text',
+        transformResponse: (data) => data,
+      });
+      return response.data;
+    } catch (error) {
+      // 404 means nothing's been pushed for that date yet (e.g. today, before the
+      // device's first wake) - treat as an empty log rather than an error.
+      if (axios.isAxiosError(error) && error.response?.status === 404) {
+        return '';
+      }
+      throw error;
+    }
+  },
+
+  async getCoreDumps(deviceId: number): Promise<string[]> {
+    const response = await apiClient.get<string[]>(`/api/Log/CoreDump?deviceId=${deviceId}`);
+    return response.data;
+  },
 };
 
 export default apiClient;

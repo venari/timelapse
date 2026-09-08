@@ -4,6 +4,7 @@ import { Layout } from '@/components/Layout';
 import { Dashboard } from '@/pages/Dashboard';
 import { ImageView } from '@/pages/ImageView';
 import { TelemetryGraph } from '@/pages/TelemetryGraph';
+import { LogViewer } from '@/pages/LogViewer';
 import { DeviceEdit } from '@/pages/DeviceEdit';
 import { Login } from '@/pages/Login';
 import { EventsIndex } from '@/pages/EventsIndex';
@@ -33,6 +34,7 @@ function App() {
             <Route path="/device/:deviceId/edit" element={<DeviceEdit />} />
             <Route path="/image-view/:deviceId" element={<ImageView />} />
             <Route path="/telemetry/:deviceId" element={<TelemetryGraph />} />
+            <Route path="/logs/:deviceId" element={<LogViewer />} />
             <Route path="/event" element={<EventsIndex />} />
             <Route path="/event/new/:imageId" element={<EventCreate />} />
             <Route path="/event/:eventId" element={<EventDetail />} />

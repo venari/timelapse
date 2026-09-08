@@ -5,6 +5,7 @@ using System.Linq;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Caching.Memory;
+using Azure.Storage.Blobs.Specialized;   // GetAppendBlobClient() is an extension method - needs this using to resolve even though everything else here is fully-qualified
 
 namespace timelapse.api.Helpers
 {
@@ -76,6 +77,64 @@ namespace timelapse.api.Helpers
             }
             catch(Exception ex){
                 _logger.LogError($"Error trying to access blob {blobName}");
+                _logger.LogError(ex.ToString());
+                throw;
+            }
+        }
+
+        // Appends `text` to blobName, creating it as an append blob first if it doesn't exist yet.
+        // Used by LogController.Post() for the ESP32 units' periodic log push - an append blob
+        // (rather than Upload(), which always replaces the whole blob) means each device only ever
+        // sends the bytes it hasn't sent before, not its whole growing log file every time.
+        public bool AppendText(string blobName, string text){
+            try{
+                _logger.LogDebug($"AppendText(\"{blobName}\")");
+                Azure.Storage.Blobs.Specialized.AppendBlobClient appendBlobClient = blobContainerClient.GetAppendBlobClient(blobName);
+                appendBlobClient.CreateIfNotExists();
+
+                byte[] bytes = System.Text.Encoding.UTF8.GetBytes(text);
+                using(MemoryStream stream = new MemoryStream(bytes)){
+                    appendBlobClient.AppendBlock(stream);
+                }
+                return true;
+            }
+            catch(Exception ex){
+                _logger.LogError($"Error trying to append to blob {blobName}");
+                _logger.LogError(ex.ToString());
+                throw;
+            }
+        }
+
+        // Reads a whole blob back into memory - used by LogController's read endpoints to proxy a
+        // device's log/core dump content straight through rather than handing out a SAS URL, since
+        // (unlike images) these are small text/binary files a browser or curl should just get directly.
+        public byte[] DownloadBytes(string blobName){
+            try{
+                _logger.LogDebug($"DownloadBytes(\"{blobName}\")");
+                Azure.Storage.Blobs.BlobClient blobClient = blobContainerClient.GetBlobClient(blobName);
+                if(!blobClient.Exists()){
+                    return null;
+                }
+                Azure.Storage.Blobs.Models.BlobDownloadResult result = blobClient.DownloadContent();
+                return result.Content.ToArray();
+            }
+            catch(Exception ex){
+                _logger.LogError($"Error trying to download blob {blobName}");
+                _logger.LogError(ex.ToString());
+                throw;
+            }
+        }
+
+        // Lists blob names under `prefix` - used by LogController to list which days/core dumps
+        // are available for a device without needing a DB table to track them (the blob container
+        // is the authoritative list).
+        public List<string> ListBlobNames(string prefix){
+            try{
+                _logger.LogDebug($"ListBlobNames(\"{prefix}\")");
+                return blobContainerClient.GetBlobs(prefix: prefix).Select(b => b.Name).ToList();
+            }
+            catch(Exception ex){
+                _logger.LogError($"Error trying to list blobs with prefix {prefix}");
                 _logger.LogError(ex.ToString());
                 throw;
             }
