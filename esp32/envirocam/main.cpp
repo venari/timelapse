@@ -1962,9 +1962,12 @@ bool uploadPendingImages(const String &deviceId, TelemetryCounts &counts, Device
 // down) just retries next cycle rather than being lost. In practice this is almost always zero or
 // one file - a dump only exists here right after a crash, and checkAndLogCoreDump() only ever
 // writes one before the next boot's erase.
-void uploadPendingCoreDumps(const String &deviceId, DeviceConfig &config)
+// uplinkIsUp: caller-supplied rather than a fresh uplinkConnected() call here - see the comment
+// on the equivalent parameter in uploadPendingLogs() below for why.
+void uploadPendingCoreDumps(const String &deviceId, DeviceConfig &config, bool uplinkIsUp)
 {
-    if (!uplinkConnected()) {
+    if (!uplinkIsUp) {
+        logLine("Uplink down - skipping core dump upload this cycle");
         return;
     }
 
@@ -2027,6 +2030,10 @@ struct LogUploadState {
     size_t offset = 0;
 };
 
+// Forward-declared - readLogUploadState() below needs to persist its bootstrap fallback
+// immediately (see its comment there), before writeLogUploadState()'s own definition further down.
+void writeLogUploadState(const LogUploadState &state);
+
 LogUploadState readLogUploadState()
 {
     LogUploadState state;
@@ -2039,8 +2046,16 @@ LogUploadState readLogUploadState()
         if (comma > 0) {
             state.date = line.substring(0, comma);
             state.offset = (size_t)line.substring(comma + 1).toInt();
+            logf("Log upload state: read \"%s\" from %s", line.c_str(), LOG_UPLOAD_STATE_FILE);
             return state;
         }
+        // Temporary - pinning down why this file never seems to advance. Malformed content is
+        // otherwise silently treated the same as "no file at all" below.
+        logf("Log upload state: %s exists but content unparseable: \"%s\" (%u bytes)",
+             LOG_UPLOAD_STATE_FILE, line.c_str(), (unsigned)line.length());
+    } else {
+        // Temporary, same reason.
+        logf("Log upload state: %s not found", LOG_UPLOAD_STATE_FILE);
     }
 
     // No state file yet (fresh SD card, or this is the first boot with this feature) - start from
@@ -2057,6 +2072,17 @@ LogUploadState readLogUploadState()
         state.offset = logFile.size();
         logFile.close();
     }
+
+    // Persisted immediately, not just after the first successful send: this fallback runs from
+    // inside uploadPendingLogs(), well after most of this cycle's own lines are already written,
+    // so state.offset lands close to LOG_FILE's *current* end almost every time it's computed.
+    // Without writing it out here, a boot that finds no state file (this one) but then also has
+    // nothing new to send (toSend == 0, since offset ~= current EOF) never reaches the write in
+    // uploadPendingLogs() either - so the next boot finds no state file again, recomputes the same
+    // "now-ish" offset again, and the bootstrap point keeps sliding forever without ever letting
+    // any real backlog accumulate for the next boot to see. Writing it here pins the baseline once,
+    // so growth after this moment is what the next boot actually finds.
+    writeLogUploadState(state);
     return state;
 }
 
@@ -2079,15 +2105,28 @@ void writeLogUploadState(const LogUploadState &state)
 // Appended server-side to one blob per device per calendar day (see LogController.Post) rather
 // than re-uploading the whole growing file every time - cellular data isn't free and this file
 // only ever grows across a day. See LogUploadState's comment for how the offset survives rotation.
-void uploadPendingLogs(const String &deviceId, DeviceConfig &config)
+//
+// uplinkIsUp: caller-supplied (computed once in runWakeCycle(), reused for both this and
+// uploadPendingCoreDumps()) rather than this function calling uplinkConnected() itself. That
+// function does a live check on cellular - modem.isGprsConnected() sends two AT commands
+// (AT+CGATT? then a localIP() query) - and this is the last of four call sites in one wake cycle
+// (after uploadPendingTelemetry()/uploadPendingImages(), which each also call it) that would
+// otherwise each independently re-verify the exact same thing via a fresh round trip on modem UART
+// traffic already established elsewhere in this codebase as not perfectly reliable. A single flaky
+// response to *this* one - the very last check in the cycle - silently skipped every log upload
+// with no error logged anywhere: readLogUploadState() (and the state-file bootstrap it persists -
+// see its comment) never even ran, since it's called after this check, not before it.
+void uploadPendingLogs(const String &deviceId, DeviceConfig &config, bool uplinkIsUp)
 {
-    if (!uplinkConnected()) {
+    if (!uplinkIsUp) {
+        logLine("Uplink down - skipping log upload this cycle");
         return;
     }
 
     LogUploadState state = readLogUploadState();
     if (state.date.length() == 0) {
-        return;   // clock not synced yet - nothing sensible to date this upload with, try again next wake
+        logLine("Log upload: clock not synced yet, skipping");
+        return;   // nothing sensible to date this upload with, try again next wake
     }
 
     struct tm timeinfo;
@@ -2106,6 +2145,7 @@ void uploadPendingLogs(const String &deviceId, DeviceConfig &config)
     if (!source) {
         // Most likely state.date's rotated file already aged out via pruneOldLogs() - nothing left
         // to send for it. Move on to today so this doesn't get stuck retrying a file that's gone.
+        logf("Log upload: couldn't open %s (state date=%s), resetting to today", sourcePath.c_str(), state.date.c_str());
         state.date = String(today);
         state.offset = 0;
         writeLogUploadState(state);
@@ -2124,6 +2164,11 @@ void uploadPendingLogs(const String &deviceId, DeviceConfig &config)
     size_t available = fileSize - state.offset;
     size_t toSend = available < maxChunkBytes ? available : maxChunkBytes;
 
+    // Temporary - pinning down why toSend keeps landing at 0. Cheap (one line, once per cycle),
+    // leaving it in doesn't hurt anything even once this is diagnosed.
+    logf("Log upload: date=%s offset=%u fileSize=%u toSend=%u", state.date.c_str(),
+         (unsigned)state.offset, (unsigned)fileSize, (unsigned)toSend);
+
     if (toSend > 0) {
         // Copied to a scratch file rather than streamed straight from `source`: when isToday,
         // source IS LOG_FILE, and postMultipartForm() calls logf() internally (its "POST ..."
@@ -2133,6 +2178,13 @@ void uploadPendingLogs(const String &deviceId, DeviceConfig &config)
         // means nothing logf() touches while this function runs is a file this function also has open.
         source.seek(state.offset);
         File scratch = SD.open(LOG_UPLOAD_SCRATCH_FILE, "w");
+        // Captured before close() - File::close() nulls the object's internal handle, and its
+        // operator bool() reflects that, so re-checking `scratch` itself after closing it (as
+        // this used to) is always false regardless of whether the write actually succeeded. That
+        // silently skipped the upload below on every single call where there was something to
+        // send - see the "Log upload: date=... toSend=..." diagnostic line landing with a
+        // legitimately nonzero toSend and nothing at all after it.
+        bool scratchWriteOk = false;
         if (scratch) {
             uint8_t buf[512];
             size_t remaining = toSend;
@@ -2145,11 +2197,12 @@ void uploadPendingLogs(const String &deviceId, DeviceConfig &config)
                 scratch.write(buf, got);
                 remaining -= got;
             }
+            scratchWriteOk = (remaining == 0);
             scratch.close();
         }
         source.close();
 
-        if (scratch) {
+        if (scratchWriteOk) {
             File chunkFile = SD.open(LOG_UPLOAD_SCRATCH_FILE, "r");
             if (chunkFile) {
                 std::vector<HttpFormField> fields = {
@@ -3160,8 +3213,14 @@ void runWakeCycle()
     // while the uplink is still open, right before it gets torn down below. Deliberately after all
     // the telemetry/image upload work above rather than before it: those are the reason this
     // firmware exists, log delivery is a debugging nicety that shouldn't delay or crowd them out.
-    uploadPendingCoreDumps(deviceId, deviceConfig);
-    uploadPendingLogs(deviceId, deviceConfig);
+    //
+    // Checked once here and passed to both, rather than each calling uplinkConnected() itself -
+    // see uploadPendingLogs()'s comment on its uplinkIsUp parameter for why: on cellular that call
+    // is two live AT round trips, and this is already the third/fourth time in this cycle
+    // something would otherwise independently re-verify the exact same connection.
+    bool uplinkIsUp = uplinkConnected();
+    uploadPendingCoreDumps(deviceId, deviceConfig, uplinkIsUp);
+    uploadPendingLogs(deviceId, deviceConfig, uplinkIsUp);
 
     // See the comment by needsSync above. FORCE_SYNC_FILE set here means next boot resyncs
     // regardless of autoSyncPeriodS; cleared once a cycle finally gets through without either
@@ -3269,28 +3328,59 @@ void runSetupApWindow()
     pAdvertising->setName(ssid.c_str());
     pAdvertising->start();
     logf("BLE advertising started as \"%s\"", ssid.c_str());
-    // Guarded with isAdvertising()/softAPgetStationNum() rather than toggling unconditionally on
-    // every event - ARDUINO_EVENT_WIFI_AP_STACONNECTED has been observed firing twice in a row in
-    // the field for what's a single flaky phone reconnect, with no STADISCONNECTED between. Without
-    // this guard that meant two back-to-back stop() calls (each issuing an HCI "set advertising
-    // enable" command into the BT controller), which lines up with a Guru Meditation double
-    // exception (stack corruption, backtrace unwind corrupted) seen shortly after in the field -
-    // the BT controller isn't guaranteed to tolerate a second start/stop command landing before the
-    // first one's completion event has been processed. softAPgetStationNum() also means a second
-    // station's disconnect can't resume advertising while a first station is still connected.
-    wifi_event_id_t bleAdvertisingEventId = WiFi.onEvent([pAdvertising](WiFiEvent_t event, WiFiEventInfo_t info) {
-        if (event == ARDUINO_EVENT_WIFI_AP_STACONNECTED) {
+
+    // Was previously the earlier decision - isAdvertising()/softAPgetStationNum() guarded, done
+    // right there in the WiFi event handler below - but that handler runs on ESP-IDF's shared
+    // "sys_evt" task, which the prebuilt Arduino framework sizes at just 2048 bytes
+    // (CONFIG_ESP_SYSTEM_EVENT_TASK_STACK_SIZE - baked into the framework's precompiled libs, not
+    // something a plain "framework = arduino" build can resize). NimBLEAdvertising::stop()/start()
+    // call several layers deep into the NimBLE host and BT controller HCI code on top of whatever
+    // the WiFi driver's own event dispatch has already used - a field crash decoded straight to a
+    // "Double exception" (stack corruption, EXCCAUSE=InstructionFetchError, EXCVADDR near NULL) on
+    // that exact task, right after this handler had just run, matches a stack overflow far better
+    // than the HCI-command-timing theory this comment used to describe. (That theory was plausible
+    // too, and this change happens to also fix it as a side effect - see below - but the tiny task
+    // stack is the more likely culprit, and isn't something a bit more guarding could ever fix.)
+    //
+    // Fix: the handler itself now only sets a flag - no NimBLE calls on the sys_evt stack at all.
+    // syncAdvertisingToStationCount() below does the actual work, called only from the while()
+    // loop further down, which runs on this function's own call stack (the normal Arduino loop
+    // task, sized in the tens of KB) - the flag is just an optimisation to skip the check on most
+    // iterations, not what the decision is based on (see that function's comment for why).
+    //
+    // This also happens to close the original race this comment described: stop()/start() calls
+    // now only ever originate from one place, one loop iteration apart at minimum, instead of
+    // potentially from both the event handler and this function's own teardown in close succession.
+    volatile bool stationCountChanged = false;
+    wifi_event_id_t bleAdvertisingEventId = WiFi.onEvent([&stationCountChanged](WiFiEvent_t event, WiFiEventInfo_t info) {
+        if (event == ARDUINO_EVENT_WIFI_AP_STACONNECTED || event == ARDUINO_EVENT_WIFI_AP_STADISCONNECTED) {
+            stationCountChanged = true;
+        }
+    });
+
+    // Brings pAdvertising's on/off state in line with whatever WiFi.softAPgetStationNum() actually
+    // is right now - idempotent (isAdvertising() guards both branches, same as the old handler),
+    // so it's cheap and safe to call on every loop iteration once stationCountChanged is seen,
+    // rather than trying to track exactly which event fired. That matters here specifically
+    // because acting on the flag is inherently deferred (at least one loop iteration, up to ~10ms,
+    // after the event) - by the time this runs, several STACONNECTED/STADISCONNECTED events could
+    // have landed in a rapid connect/reconnect (the "observed firing twice in the field" case the
+    // old comment above described), and re-deriving from the live station count rather than
+    // replaying each event's own remembered intent is what stays correct regardless of how many
+    // fired or in what order.
+    auto syncAdvertisingToStationCount = [pAdvertising]() {
+        if (WiFi.softAPgetStationNum() > 0) {
             if (pAdvertising->isAdvertising()) {
                 pAdvertising->stop();
                 logLine("Station connected - BLE advertising stopped");
             }
-        } else if (event == ARDUINO_EVENT_WIFI_AP_STADISCONNECTED) {
-            if (WiFi.softAPgetStationNum() == 0 && !pAdvertising->isAdvertising()) {
+        } else {
+            if (!pAdvertising->isAdvertising()) {
                 pAdvertising->start();
                 logLine("Station disconnected - BLE advertising resumed");
             }
         }
-    });
+    };
 
     uint32_t start = millis();
 
@@ -3328,6 +3418,10 @@ void runSetupApWindow()
 
     while (millis() - start < SETUP_AP_WINDOW_MS) {
         server.handleClient();
+        if (stationCountChanged) {
+            stationCountChanged = false;
+            syncAdvertisingToStationCount();
+        }
         delay(10);
     }
 
@@ -3344,12 +3438,20 @@ void runSetupApWindow()
     writeCounts(counts);
 
     server.close();
-    // Unregister before touching BLE/WiFi teardown - softAPdisconnect() below forcibly drops
-    // any connected station, which fires STADISCONNECTED, and a still-registered handler calling
-    // through pAdvertising after it's gone would crash the same way NimBLEDevice::deinit() does
-    // below (was, until this change - see next comment).
+    // Unregistered before touching BLE/WiFi teardown mainly so softAPdisconnect() below (which
+    // forcibly drops any connected station, firing one last STADISCONNECTED) doesn't set
+    // stationCountChanged on a variable that's about to go out of scope - the handler itself no
+    // longer touches pAdvertising directly (see its comment above), so this is a smaller concern
+    // than it used to be, but there's no reason to leave it registered any longer than needed either.
     WiFi.removeEvent(bleAdvertisingEventId);
-    pAdvertising->stop();
+    // Called here too (guarded, same as syncAdvertisingToStationCount()) in case a final
+    // stationCountChanged landed in the last few milliseconds before the loop's own deadline
+    // check and never got processed - isAdvertising() makes this a no-op if the loop already
+    // stopped it (or it was never advertising, e.g. a station was connected right up to the
+    // window closing).
+    if (pAdvertising->isAdvertising()) {
+        pAdvertising->stop();
+    }
 
     // Deliberately NOT calling NimBLEDevice::deinit() here. It signals NimBLE's separate host
     // FreeRTOS task to unwind out of nimble_port_run() and returns immediately, without waiting
