@@ -2180,8 +2180,12 @@ void uploadPendingLogs(const String &deviceId, DeviceConfig &config, bool uplink
 
     // Caps how much one wake sends - after several offline days a backlog could be several MB,
     // and this drains it over several wakes rather than holding the modem/HTTP link open (and
-    // this cycle's battery draw) for one huge POST.
-    const size_t maxChunkBytes = 32768;
+    // this cycle's battery draw) for one huge POST. Not a technical ceiling - postMultipartForm()
+    // streams the body in 1KB reads regardless of total size, same as the uncapped whole-JPEG
+    // uploads in uploadPendingImages() - just a deliberate per-wake time/battery budget. Progress
+    // (state.offset) only persists once a chunk fully succeeds, so a bigger value also means more
+    // lost progress to resend if the connection drops mid-chunk.
+    const size_t maxChunkBytes = 1024 * 1024;
     size_t available = fileSize - state.offset;
     size_t toSend = available < maxChunkBytes ? available : maxChunkBytes;
 
@@ -3527,7 +3531,7 @@ void runSetupApWindow()
 
 void loop()
 {
-    logLine("Disbale camera");
+    logLine("Disable camera");
     esp_camera_deinit();
 
     logLine("Power off camera");
