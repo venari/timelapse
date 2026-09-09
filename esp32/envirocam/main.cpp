@@ -203,6 +203,14 @@
 #define GEO_MODEM_BOOT_RETRIES       30      // testAT() attempts before re-pulsing PWRKEY
 #define GEO_FIX_TIMEOUT_MS           120000  // Give up on a GPS fix after this long, this cycle
 
+// A unit with no sky visibility (or a modem that's stopped answering AT) will otherwise burn a
+// full GEO_FIX_TIMEOUT_MS - plus a modem power-on - every single time GPS is due, forever. After
+// GPS_FAILURE_BACKOFF_THRESHOLD consecutive failures, skip the next GPS_FAILURE_BACKOFF_SKIPS due
+// checks outright (see updateGeoLocationIfDue()) before trying again - counted in attempts rather
+// than wall-clock time so it scales with geoIntervalS instead of needing its own clock.
+#define GPS_FAILURE_BACKOFF_THRESHOLD 3
+#define GPS_FAILURE_BACKOFF_SKIPS     10
+
 // Fastest-first AT+IPR values to try for the modem's own AT/data UART - see negotiateModemBaud().
 // 600-460800 is the *complete* <speed> range AT+IPR's write command accepts (SIM767XX Series AT
 // Command Manual V1.01 s8.2.3) - there is no value anywhere near the SIM7670G's separately quoted
@@ -214,6 +222,12 @@
 static const uint32_t MODEM_FAST_BAUDRATES[] = {460800, 230400};
 
 RTC_DATA_ATTR int bootCount = 0;
+
+// Consecutive GPS-fix failure count and remaining backoff skips - see GPS_FAILURE_BACKOFF_THRESHOLD
+// above. RTC memory rather than CONFIG_FILE: only needs to survive deep sleep between wake cycles,
+// not a real power loss, and a device that's just power-cycled deserves a fresh attempt anyway.
+RTC_DATA_ATTR int gpsConsecutiveFailures = 0;
+RTC_DATA_ATTR int gpsBackoffSkipsRemaining = 0;
 
 struct TelemetryCounts {
     int pendingImages;
@@ -1385,6 +1399,22 @@ String fieldsToJson(const std::vector<HttpFormField> &fields)
     return json;
 }
 
+// Stops whichever of conn's clients is actually open. secureClient/plainClient are safe to stop
+// unconditionally even when never connected (WiFiClient/WiFiClientSecure tolerate that fine), but
+// gsmClient is NOT: TinyGsm's GsmClient::stop() dereferences its modem pointer ("at") unconditionally,
+// and that pointer is only set by gsmClient.init() - deferred until the first cellular use (see
+// conn.gsmClientInited). Calling stop() on a never-inited gsmClient (e.g. every wake that only ever
+// used WiFi) crashes with a LoadProhibited panic inside TinyGsmModem::streamClear(). Discovered
+// 2026-09-09 from a field coredump backtrace ending in uploadPendingTelemetry() -> gsmClient.stop().
+void closeApiConnection(ApiConnection &conn)
+{
+    conn.secureClient.stop();
+    conn.plainClient.stop();
+    if (conn.gsmClientInited) {
+        conn.gsmClient.stop();
+    }
+}
+
 // Returns a Client& already connected to api.host:api.port - reusing conn's existing connection
 // if it's still alive and already pointed at the same host/port/scheme (the common case within
 // one upload batch), otherwise (re)connecting. Returns nullptr if a fresh connect() fails.
@@ -1405,11 +1435,8 @@ Client *connectApiClient(ApiConnection &conn, const ParsedUrl &api)
 
     if (conn.isOpen) {
         // Either talking to a different host/port/scheme than last time, or the old connection
-        // has died - drop it before opening a new one. Stopping whichever of the clients wasn't
-        // the one actually open is a harmless no-op.
-        conn.secureClient.stop();
-        conn.plainClient.stop();
-        conn.gsmClient.stop();
+        // has died - drop it before opening a new one.
+        closeApiConnection(conn);
         conn.isOpen = false;
     }
 
@@ -1838,9 +1865,7 @@ bool uploadPendingTelemetry(const String &deviceId, TelemetryCounts &counts, Dev
     // authoritative scan of what's really pending, so this is the natural place to correct that
     // drift, without needing a second scan just to do it.
     counts.pendingTelemetry = (int)filePaths.size() - filesRemoved;
-    conn.secureClient.stop();
-    conn.plainClient.stop();
-    conn.gsmClient.stop();
+    closeApiConnection(conn);
     return backlogExcessive;
 }
 
@@ -1950,9 +1975,7 @@ bool uploadPendingImages(const String &deviceId, TelemetryCounts &counts, Device
     // See the matching comment in uploadPendingTelemetry() - reconciles counts.pendingImages
     // against the authoritative scan above rather than trusting the cheap ++/-- bookkeeping.
     counts.pendingImages = (int)filePaths.size() - filesRemoved;
-    conn.secureClient.stop();
-    conn.plainClient.stop();
-    conn.gsmClient.stop();
+    closeApiConnection(conn);
     return backlogExcessive;
 }
 
@@ -2014,9 +2037,7 @@ void uploadPendingCoreDumps(const String &deviceId, DeviceConfig &config, bool u
         }
     }
 
-    conn.secureClient.stop();
-    conn.plainClient.stop();
-    conn.gsmClient.stop();
+    closeApiConnection(conn);
 }
 
 // How far into a given calendar day's log content uploadPendingLogs() has already pushed to the
@@ -2215,9 +2236,7 @@ void uploadPendingLogs(const String &deviceId, DeviceConfig &config, bool uplink
                 String responseBody;
                 int statusCode = postMultipartForm(conn, config.apiUrl, "Log", fields, "File", state.date + ".log",
                                                     &chunkFile, responseBody, toSend, "text/plain");
-                conn.secureClient.stop();
-                conn.plainClient.stop();
-                conn.gsmClient.stop();
+                closeApiConnection(conn);
                 chunkFile.close();
                 SD.remove(LOG_UPLOAD_SCRATCH_FILE);
 
@@ -2679,6 +2698,20 @@ bool cellularSyncTime()
     return true;
 }
 
+// Bumps gpsConsecutiveFailures and, once it reaches GPS_FAILURE_BACKOFF_THRESHOLD, (re)arms the
+// backoff for another GPS_FAILURE_BACKOFF_SKIPS due checks. >= rather than == so a unit that's
+// still failing after a backoff period elapses and it retries goes straight back into backoff,
+// rather than reverting to trying (and failing) every single geoIntervalS forever.
+void recordGpsFailure()
+{
+    ++gpsConsecutiveFailures;
+    if (gpsConsecutiveFailures >= GPS_FAILURE_BACKOFF_THRESHOLD) {
+        gpsBackoffSkipsRemaining = GPS_FAILURE_BACKOFF_SKIPS;
+        logf("GPS failed %d times in a row - backing off for the next %d due checks",
+             gpsConsecutiveFailures, GPS_FAILURE_BACKOFF_SKIPS);
+    }
+}
+
 // Powers on the SIM7670G's modem/GNSS chip (a separate radio from the ESP32's own WiFi, which is
 // still what uploads go out over), waits for a GPS fix, and updates
 // config.geoLat/geoLon/geoTimeRecorded - but only once config.geoIntervalS has actually elapsed
@@ -2688,7 +2721,10 @@ bool cellularSyncTime()
 //
 // Bounded by GEO_FIX_TIMEOUT_MS throughout, so a unit with poor sky visibility (or none, e.g.
 // deployed indoors during testing) can't block a whole wake cycle indefinitely - it just keeps
-// the last known position and tries again next time this interval elapses.
+// the last known position and tries again next time this interval elapses. A run of
+// GPS_FAILURE_BACKOFF_THRESHOLD consecutive failures (recordGpsFailure()) instead backs off for
+// GPS_FAILURE_BACKOFF_SKIPS due checks, so a unit with no sky visibility at all stops repeatedly
+// paying the modem power-on + GEO_FIX_TIMEOUT_MS cost every single geoIntervalS.
 void updateGeoLocationIfDue(DeviceConfig &config)
 {
     time_t now = time(nullptr);
@@ -2697,8 +2733,16 @@ void updateGeoLocationIfDue(DeviceConfig &config)
         return;   // not due yet
     }
 
+    if (gpsBackoffSkipsRemaining > 0) {
+        --gpsBackoffSkipsRemaining;
+        logf("Skipping GPS fix - backed off after %d consecutive failures (%d attempts left before retry)",
+             gpsConsecutiveFailures, gpsBackoffSkipsRemaining);
+        return;
+    }
+
     logLine("Checking GPS position...");
     if (!modemPowerOn()) {
+        recordGpsFailure();
         return;   // modem not responding - modemPowerOn() already logged it
     }
     uint32_t start = millis();
@@ -2753,8 +2797,13 @@ void updateGeoLocationIfDue(DeviceConfig &config)
         config.geoTimeRecorded = getISO8601Timestamp();
         writeDeviceConfig(config);
         logf("GPS fix recorded: %.6f, %.6f", config.geoLat, config.geoLon);
-    } else if (gpsEnabled) {
-        logLine("No GPS fix within timeout - keeping last known location");
+        gpsConsecutiveFailures = 0;
+        gpsBackoffSkipsRemaining = 0;
+    } else {
+        if (gpsEnabled) {
+            logLine("No GPS fix within timeout - keeping last known location");
+        }
+        recordGpsFailure();
     }
 
     // Leave the modem powered on - the cellular uplink (if WiFi failed) still needs it, and
