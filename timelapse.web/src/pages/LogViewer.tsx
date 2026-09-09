@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/api/client';
@@ -6,6 +6,8 @@ import { getLogUrl, getCoreDumpUrl } from '@/lib/logUtils';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 import {
   Select,
   SelectContent,
@@ -15,12 +17,66 @@ import {
 } from '@/components/ui/select';
 import { Loader2, Download, RefreshCw, FileWarning } from 'lucide-react';
 
+const WORD_WRAP_STORAGE_KEY = 'logViewer.wordWrap';
+
+// A per-browser display preference, not device data - localStorage rather than component state
+// alone so it survives a refresh/revisit. Guarded against private-browsing/blocked storage.
+function loadWordWrapPreference(): boolean {
+  try {
+    return localStorage.getItem(WORD_WRAP_STORAGE_KEY) !== 'off';
+  } catch {
+    return true;
+  }
+}
+
+// Splits `line` on (case-insensitive) occurrences of `needle`, wrapping matches in <mark>.
+// Returns plain phrasing content (strings/<mark>) so it stays valid nested inside the <pre>.
+function highlightMatches(line: string, needle: string) {
+  if (!needle) {
+    return line;
+  }
+  const lower = line.toLowerCase();
+  const parts: ReactNode[] = [];
+  let start = 0;
+  let idx = lower.indexOf(needle);
+  if (idx === -1) {
+    return line;
+  }
+  let key = 0;
+  while (idx !== -1) {
+    if (idx > start) {
+      parts.push(line.slice(start, idx));
+    }
+    parts.push(
+      <mark key={key++} className="bg-yellow-300 text-black rounded-sm">
+        {line.slice(idx, idx + needle.length)}
+      </mark>
+    );
+    start = idx + needle.length;
+    idx = lower.indexOf(needle, start);
+  }
+  if (start < line.length) {
+    parts.push(line.slice(start));
+  }
+  return parts;
+}
+
 export function LogViewer() {
   const { deviceId } = useParams<{ deviceId: string }>();
   const id = Number(deviceId);
 
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [filter, setFilter] = useState('');
+  const [wordWrap, setWordWrap] = useState(loadWordWrapPreference);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(WORD_WRAP_STORAGE_KEY, wordWrap ? 'on' : 'off');
+    } catch {
+      // Private browsing / blocked storage - the toggle still works for this session, it just
+      // won't be remembered next visit.
+    }
+  }, [wordWrap]);
 
   const { data: device } = useQuery({
     queryKey: ['device', deviceId],
@@ -108,6 +164,12 @@ export function LogViewer() {
                 onChange={(e) => setFilter(e.target.value)}
                 className="w-[200px]"
               />
+              <div className="flex items-center gap-2">
+                <Switch id="word-wrap" checked={wordWrap} onCheckedChange={setWordWrap} />
+                <Label htmlFor="word-wrap" className="cursor-pointer">
+                  Wrap
+                </Label>
+              </div>
               <Button variant="outline" size="sm" onClick={() => refetchLog()} disabled={logFetching}>
                 <RefreshCw className={`h-4 w-4 ${logFetching ? 'animate-spin' : ''}`} />
               </Button>
@@ -131,8 +193,19 @@ export function LogViewer() {
             <p className="text-muted-foreground text-sm">No logs have been pushed for this device yet.</p>
           ) : (
             <>
-              <pre className="bg-muted rounded-md p-4 text-xs leading-relaxed overflow-auto max-h-[65vh] whitespace-pre-wrap break-all">
-                {filteredLines.length > 0 ? filteredLines.join('\n') : 'No lines match the filter.'}
+              <pre
+                className={`bg-muted rounded-md p-4 text-xs leading-relaxed overflow-auto max-h-[65vh] ${
+                  wordWrap ? 'whitespace-pre-wrap break-all' : 'whitespace-pre'
+                }`}
+              >
+                {filteredLines.length > 0
+                  ? filteredLines.map((line, i) => (
+                      <span key={i}>
+                        {highlightMatches(line, filter.trim().toLowerCase())}
+                        {i < filteredLines.length - 1 ? '\n' : ''}
+                      </span>
+                    ))
+                  : 'No lines match the filter.'}
               </pre>
               <p className="text-xs text-muted-foreground mt-2">
                 {filter.trim()
