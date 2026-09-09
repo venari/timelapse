@@ -99,7 +99,17 @@
 // DeviceConfig::supportMode (API-driven, needs a working uplink) can't help. bootCount is RTC
 // memory - survives a deep-sleep wake but not a real power cycle - so this only ever runs across
 // a fresh install's first few boots, never costing battery on a camera that's already deployed.
+//
+// bootCount alone isn't enough to gate this, though: a panic reset can wipe RTC memory back
+// toward 0 (see resetReasonName()'s comment), and this window has a field-confirmed crash of its
+// own (SoftAP's automatic ARP announce null-derefing inside the WiFi driver, shortly after
+// WiFi.softAP() - see runSetupApWindow()) that could otherwise re-arm the exact same window every
+// single reboot forever: crash -> bootCount wiped -> "fresh install" looks true again -> same
+// window runs -> same crash. SETUP_AP_ATTEMPTS_FILE below is the safety net - unlike bootCount, a
+// plain SD file survives that reset, so once SETUP_AP_MAX_BOOT_COUNT attempts have actually run,
+// they stay counted no matter what wipes bootCount in between.
 #define SETUP_AP_MAX_BOOT_COUNT  3
+#define SETUP_AP_ATTEMPTS_FILE   "/setup_ap_attempts.txt"
 #define SETUP_AP_NEXT_BOOT_DELAY_S 1   // See loop() - replaces the normal cameraIntervalS wait while
                                         // still inside the setup window's boot budget above, so the
                                         // next boot's setup window is available right away rather
@@ -110,6 +120,20 @@
 #define SETUP_AP_STREAM_FRAME_INTERVAL_MS (300UL)      // Paces "/stream" frames - keeps the softAP link comfortable
 #define SETUP_AP_SSID_PREFIX     "EnviroCam-"
 #define SETUP_AP_PASSWORD        "envirocam"          // Shared across all units - keep it out of range of anyone but the install crew
+
+// Off for now (2026-09-10) - BLE advertising in runSetupApWindow() has been the source of three
+// separate field crashes in as many days ([[esp32-ble-adv-double-exception]],
+// [[esp32-setup-ap-wifi-teardown-sys-evt]]), all landing on ESP-IDF's fixed 2KB sys_evt task stack,
+// which a plain "framework = arduino" build can't resize. None of the fixes tried so far (moving
+// NimBLE calls off that stack, cutting a redundant WiFi teardown call) have stopped it recurring.
+// Rather than keep chasing individual crash signatures in a subsystem that isn't essential to the
+// setup window actually working (the status/photo page and the AP itself are plain WiFi/WebServer,
+// no BLE involved), turning BLE off entirely until the rest of the firmware (GPS backoff, cellular
+// fallback, modem power-off) is confirmed stable in the field. An installer without BLE just needs
+// to type the AP's SSID (still logged/shown same as always) instead of it being discovered
+// automatically - a usability regression, not a functional one. Flip this back to 1 to re-enable;
+// every BLE call site below is still intact, just compiled out.
+#define SETUP_AP_ENABLE_BLE_ADVERTISING 0
 
 // Defaults used until a config.json exists (i.e. before the API has ever handed back a
 // Device row - see applyDeviceConfigFromApiResponse). Names match the Device model's JSON
@@ -850,6 +874,30 @@ void clearForceSyncFlag()
 {
     if (SD.exists(FORCE_SYNC_FILE)) {
         SD.remove(FORCE_SYNC_FILE);
+    }
+}
+
+// See SETUP_AP_ATTEMPTS_FILE's comment above - counts how many times runSetupApWindow() has
+// actually run, independent of bootCount (RTC memory, which a panic can wipe).
+int readSetupApAttempts()
+{
+    File file = SD.open(SETUP_AP_ATTEMPTS_FILE, "r");
+    if (!file) {
+        return 0;
+    }
+    int attempts = file.parseInt();
+    file.close();
+    return attempts;
+}
+
+void writeSetupApAttempts(int attempts)
+{
+    File file = SD.open(SETUP_AP_ATTEMPTS_FILE, "w");
+    if (file) {
+        file.println(attempts);
+        file.close();
+    } else {
+        logLine("Failed to write setup AP attempts count!");
     }
 }
 
@@ -2579,10 +2627,17 @@ bool modemPowerOn()
 }
 
 // Powers the modem chip fully down. AT+CPOF cleanly powers the whole modem down (documented
-// SIMCom behaviour) when the modem is actually answering AT. Best-effort - the ESP32 is usually
-// about to deep-sleep anyway, at which point SerialAT goes away regardless. Must run on every path
-// that called modemPowerOn(), or the modem keeps draining the battery through deep sleep - this
-// includes a modemPowerOn() that never got an AT response (see the PWRKEY-hold branch below):
+// SIMCom behaviour) when the modem is actually answering AT and acknowledges it - but that ack is
+// just a normal AT response, bound by GsmClient's default 1000ms waitResponse() timeout, and CPOF
+// can plausibly take longer than that to reply if the modem needs to detach from the network
+// first. Discovered 2026-09-09 from a field report of the NET/STATUS LEDs still cycling through a
+// boot-like sequence well after the board should have been asleep - modem.poweroff()'s return
+// value used to be discarded entirely, so a timed-out (but not necessarily failed) CPOF looked
+// identical to a successful one and left the modem drawing full current, with no PWRKEY fallback
+// to actually force it off the way the "never came up at all" branch below already had. Best-effort
+// beyond that - the ESP32 is usually about to deep-sleep anyway, at which point SerialAT goes away
+// regardless. Must run on every path that called modemPowerOn(), or the modem keeps draining the
+// battery through deep sleep - this includes a modemPowerOn() that never got an AT response at all:
 // gating on g_modemPoweredOn there would skip power-off entirely, leaving a modem that failed to
 // boot running at full current for the rest of the sleep window.
 void modemPowerOff()
@@ -2591,15 +2646,19 @@ void modemPowerOff()
         return;
     }
 
-    if (g_modemPoweredOn) {
-        modem.poweroff();
+    bool cleanShutdown = g_modemPoweredOn && modem.poweroff();
+    if (cleanShutdown) {
         delay(2000);
     } else {
-        // AT+CPOF has nothing to talk to - the modem never answered plain AT this cycle, so it
-        // won't answer this either. Per the SIM7672X hardware design guide (s3.2.2/Table 13), the
-        // only power-off path that doesn't depend on the AT channel is a hardware PWRKEY hold of
-        // >= 2.5s (Toff) - a much longer pulse than the ~100ms one modemPowerOn() uses to power on.
-        logLine("Modem never came up - forcing it off via PWRKEY hold");
+        // Either AT+CPOF was never sent (modem never answered plain AT this cycle) or it was sent
+        // but not acknowledged in time - either way, don't just trust an unverified soft command
+        // and leave the modem powered. Per the SIM7672X hardware design guide (s3.2.2/Table 13),
+        // the only power-off path that doesn't depend on the AT channel at all is a hardware
+        // PWRKEY hold of >= 2.5s (Toff) - a much longer pulse than the ~100ms one modemPowerOn()
+        // uses to power on, and safe to issue even if the modem is already off (the mismatched
+        // pulse width is exactly what keeps a power-on pulse from a power-off hold).
+        logf("%s - forcing modem off via PWRKEY hold",
+             g_modemPoweredOn ? "AT+CPOF not acknowledged" : "Modem never came up");
         pinMode(BOARD_PWRKEY_PIN, OUTPUT);
         digitalWrite(BOARD_PWRKEY_PIN, HIGH);   // inverted drive, same as modemPowerOn()'s pulse
         delay(MODEM_POWEROFF_PULSE_WIDTH_MS);
@@ -2640,7 +2699,15 @@ bool cellularConnect(const DeviceConfig &config)
 
     logLine("Waiting for LTE network registration...");
     if (!modem.waitForNetwork(CELLULAR_NET_TIMEOUT_MS)) {
-        logLine("No LTE network within timeout - staying offline this cycle");
+        // getRegistrationStatus()/getSignalQuality() are also just AT queries, so they're safe to
+        // ask even though attach failed - this is the only place that logs *why* it failed (vs.
+        // just "it did"), which matters for telling a real signal blackout (REG_SEARCHING, low
+        // CSQ) apart from a SIM/network-side reject (REG_DENIED) or a modem that's otherwise
+        // healthy but not attaching for some other reason (decent CSQ, status stuck at
+        // REG_SEARCHING/REG_UNKNOWN throughout).
+        logf("No LTE network within timeout - registration status=%d (0=unregistered 2=searching "
+             "3=denied 4=unknown 6=SMS-only), CSQ=%d (0-31, 99=unknown) - staying offline this cycle",
+             (int)modem.getRegistrationStatus(), modem.getSignalQuality());
         return false;
     }
     logf("LTE registered, signal quality (CSQ): %d", modem.getSignalQuality());
@@ -2847,9 +2914,17 @@ void setup()
 
     // Fresh install only (see SETUP_AP_MAX_BOOT_COUNT/runSetupApWindow()) - gives an installer a
     // window to confirm the camera's working, right there in the field, with no cellular/internet
-    // WiFi needed for it.
+    // WiFi needed for it. Gated on both bootCount AND the SD-backed attempt count (see
+    // SETUP_AP_ATTEMPTS_FILE) - bootCount alone would let a crash inside this exact window re-arm
+    // itself forever if it wipes RTC memory on the way down.
     if (bootCount <= SETUP_AP_MAX_BOOT_COUNT) {
-        runSetupApWindow();
+        int attempts = readSetupApAttempts();
+        if (attempts < SETUP_AP_MAX_BOOT_COUNT) {
+            writeSetupApAttempts(attempts + 1);
+            runSetupApWindow();
+        } else {
+            logLine("Setup AP window already used its attempt budget (SD-tracked) - skipping");
+        }
     }
 }
 
@@ -3367,6 +3442,7 @@ void runSetupApWindow()
     logf("Setup AP \"%s\" (password \"%s\") up at %s for %lu seconds - connect to check status",
          ssid.c_str(), SETUP_AP_PASSWORD, WiFi.softAPIP().toString().c_str(), SETUP_AP_WINDOW_MS / 1000);
 
+#if SETUP_AP_ENABLE_BLE_ADVERTISING
     // Advertises under the same name as the AP SSID so a companion app can discover which
     // physical unit is which without the installer having to read/type it - the app then joins
     // the AP itself using that name plus the fixed SETUP_AP_PASSWORD above, so nothing secret
@@ -3381,7 +3457,9 @@ void runSetupApWindow()
     pAdvertising->setName(ssid.c_str());
     pAdvertising->start();
     logf("BLE advertising started as \"%s\"", ssid.c_str());
+#endif
 
+#if SETUP_AP_ENABLE_BLE_ADVERTISING
     // Was previously the earlier decision - isAdvertising()/softAPgetStationNum() guarded, done
     // right there in the WiFi event handler below - but that handler runs on ESP-IDF's shared
     // "sys_evt" task, which the prebuilt Arduino framework sizes at just 2048 bytes
@@ -3404,6 +3482,9 @@ void runSetupApWindow()
     // This also happens to close the original race this comment described: stop()/start() calls
     // now only ever originate from one place, one loop iteration apart at minimum, instead of
     // potentially from both the event handler and this function's own teardown in close succession.
+    //
+    // (2026-09-10: this whole approach still wasn't enough - see SETUP_AP_ENABLE_BLE_ADVERTISING's
+    // comment. Left intact, just compiled out, for whenever BLE gets revisited.)
     volatile bool stationCountChanged = false;
     wifi_event_id_t bleAdvertisingEventId = WiFi.onEvent([&stationCountChanged](WiFiEvent_t event, WiFiEventInfo_t info) {
         if (event == ARDUINO_EVENT_WIFI_AP_STACONNECTED || event == ARDUINO_EVENT_WIFI_AP_STADISCONNECTED) {
@@ -3434,6 +3515,7 @@ void runSetupApWindow()
             }
         }
     };
+#endif
 
     uint32_t start = millis();
 
@@ -3471,10 +3553,12 @@ void runSetupApWindow()
 
     while (millis() - start < SETUP_AP_WINDOW_MS) {
         server.handleClient();
+#if SETUP_AP_ENABLE_BLE_ADVERTISING
         if (stationCountChanged) {
             stationCountChanged = false;
             syncAdvertisingToStationCount();
         }
+#endif
         delay(10);
     }
 
@@ -3491,6 +3575,7 @@ void runSetupApWindow()
     writeCounts(counts);
 
     server.close();
+#if SETUP_AP_ENABLE_BLE_ADVERTISING
     // Unregistered before touching BLE/WiFi teardown mainly so softAPdisconnect() below (which
     // forcibly drops any connected station, firing one last STADISCONNECTED) doesn't set
     // stationCountChanged on a variable that's about to go out of scope - the handler itself no
@@ -3524,8 +3609,23 @@ void runSetupApWindow()
     // above already silences the actual over-the-air advertising; leaving the host task/BT
     // controller nominally "initialized" but idle until the chip sleeps is a smaller risk than a
     // guaranteed crash on every setup/support-mode boot.
-    WiFi.softAPdisconnect(true);
-    WiFi.mode(WIFI_OFF);
+#endif
+    // Deliberately NOT calling WiFi.softAPdisconnect()/WiFi.mode(WIFI_OFF) here (whether or not
+    // SETUP_AP_ENABLE_BLE_ADVERTISING is on) - found 2026-09-10 when a field panic decoded to the
+    // exact same signature as the NimBLEDevice::deinit() one above (Double exception,
+    // task="sys_evt", PC in FreeRTOS's _xt_context_save - i.e. that 2KB stack overflowing again)
+    // landed right around here, even though this handler no longer touches NimBLE at all (see
+    // above) and NimBLEDevice::deinit() is never called. Every normal (non-setup-AP) wake cycle
+    // calls WiFi.mode(WIFI_OFF) too (see
+    // loop(), a few lines after this function returns) with no such crash ever seen there - the one
+    // thing different here is that NimBLE's BT controller is still live at this exact moment (by
+    // the design above), so WiFi/BT coexistence event handling on top of an already-tight sys_evt
+    // stack is the leading theory. loop() calls WiFi.disconnect(true); WiFi.mode(WIFI_OFF); itself,
+    // unconditionally, moments after this function returns either way - so doing it again here was
+    // always redundant, and cutting it is a free way to shrink exposure to this even if it doesn't
+    // fully explain it. If a "Double exception"/sys_evt panic recurs even after this, the BT
+    // controller staying live through to loop()'s own WiFi.mode(WIFI_OFF) call is the next thing to
+    // chase - not something to fix here without hardware to confirm it against.
     logLine("Setup AP window closed");
 }
 
