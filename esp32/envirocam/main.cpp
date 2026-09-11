@@ -157,6 +157,15 @@
 // of the night lands on it naturally.
 #define NIGHT_CHECKIN_MIN_SLEEP_S    (5UL * 60)
 
+// A night check-in wake is already online for telemetry/config/OTA (see nightCheckin in
+// runWakeCycle()) and, with sleepDuringNight only capturing once an hour overnight instead of
+// every cameraIntervalS, has far more slack than a daytime wake to spend on draining any upload
+// backlog before the next capture is due. Multiplies the flat per-cycle batch caps in
+// uploadPendingTelemetry()/uploadPendingImages() on those wakes only - daytime wakes, and the
+// "5x expected" excessive-backlog threshold that keeps reconnecting every cycle until a genuinely
+// oversized backlog is back to normal, are unaffected.
+#define NIGHT_CHECKIN_UPLOAD_BATCH_MULTIPLIER 20
+
 // Fixed local-time offset from UTC, in minutes, used only for interpreting
 // daytimeStartsAtH/daytimeEndsAtH as wall-clock local time (see utcToLocalTm()/
 // isOutsideWorkingHours()) - a real IANA timezone database isn't available on this hardware, and
@@ -778,7 +787,7 @@ void rotateLogIfNeeded();
 // captureIfDueDuringUpload(), which calls capturePhoto() - both defined near runWakeCycle()
 // further down still.
 DatedPath capturePhoto(TelemetryCounts &counts);
-void captureIfDueDuringUpload(TelemetryCounts &counts);
+void captureIfDueDuringUpload(TelemetryCounts &counts, bool nightCheckin);
 
 // One capture+telemetry+upload cycle - see runWakeCycle() further down. setup() runs it once on
 // every real boot; loop() calls it again, repeatedly, while parked awake in support mode (see
@@ -1729,8 +1738,18 @@ int postMultipartForm(ApiConnection &conn, const String &apiUrl, const String &e
 // while) - see the "5x expected" checks in uploadPendingTelemetry()/uploadPendingImages() - so a
 // single sync doesn't try to drain an enormous queue in one go, and instead keeps at it every
 // cycle (see the didConnectWiFi handling in setup()) until it's caught up.
-uint32_t expectedImagesPerSync(const DeviceConfig &config)
+//
+// nightCheckin: the cameraIntervalS/autoSyncPeriodS cadence below is a daytime assumption -
+// overnight, sleepDuringNight wakes the device roughly once an hour regardless of either setting
+// (see computeSleepSeconds()), and nightCheckin (see runWakeCycle()) forces a sync on every one of
+// those wakes. So exactly one photo - this wake's own capture - accumulates between one night
+// sync and the next, not whatever the daytime ratio would otherwise suggest.
+uint32_t expectedImagesPerSync(const DeviceConfig &config, bool nightCheckin)
 {
+    if (nightCheckin) {
+        return 1;
+    }
+
     if (config.cameraIntervalS == 0) {
         return 1;
     }
@@ -1753,7 +1772,11 @@ uint32_t expectedImagesPerSync(const DeviceConfig &config)
 // Returns true if it had to break off early because far more than expectedImagesPerSync()*3
 // telemetry records have already gone out this cycle - see the didConnectWiFi handling in
 // setup(), which uses this to keep reconnecting every cycle until the backlog is back to normal.
-bool uploadPendingTelemetry(const String &deviceId, TelemetryCounts &counts, DeviceConfig &config)
+//
+// nightCheckin: see NIGHT_CHECKIN_UPLOAD_BATCH_MULTIPLIER - widens the flat per-cycle batch cap
+// below on overnight check-in wakes, which have far more slack to drain a backlog than a normal
+// daytime wake does.
+bool uploadPendingTelemetry(const String &deviceId, TelemetryCounts &counts, DeviceConfig &config, bool nightCheckin)
 {
     if (!uplinkConnected()) {
         return false;
@@ -1768,9 +1791,20 @@ bool uploadPendingTelemetry(const String &deviceId, TelemetryCounts &counts, Dev
     listFilesRecursive(TELEMETRY_DIR, filePaths);
     std::sort(filePaths.rbegin(), filePaths.rend());
 
-    // *3 since three telemetry snapshots get written per capture cycle (see setup()).
-    uint32_t expectedTelemetry = expectedImagesPerSync(config) * 3;
+    // *3 since three telemetry snapshots get written per capture cycle (see setup()). At night
+    // this correctly collapses to 3 (see expectedImagesPerSync()'s nightCheckin case) rather than
+    // the daytime cameraIntervalS/autoSyncPeriodS ratio.
+    uint32_t expectedTelemetry = expectedImagesPerSync(config, nightCheckin) * 3;
     bool backlogExcessive = false;
+
+    uint32_t telemetryBatchLimit = 100 * (nightCheckin ? NIGHT_CHECKIN_UPLOAD_BATCH_MULTIPLIER : 1);
+
+    // std::max, not a straight expectedTelemetry*5, so the widened night batch cap above always
+    // gets to bind first: with expectedTelemetry now correctly small overnight (3, not whatever
+    // the daytime ratio would give), 5x that is smaller than telemetryBatchLimit - without this,
+    // this "genuinely excessive" check would fire before the deliberately-widened night cap ever
+    // gets used, right back to the bug this replaced.
+    uint32_t excessiveTelemetryThreshold = std::max(telemetryBatchLimit, expectedTelemetry * 5);
 
     // Reused across every request below (see ApiConnection/connectApiClient()) rather than
     // opening a fresh TCP+TLS connection per record. static so the ~2 KB modem RX FIFO inside
@@ -1781,21 +1815,22 @@ bool uploadPendingTelemetry(const String &deviceId, TelemetryCounts &counts, Dev
     int filesRemoved = 0;   // uploaded, empty, or unparseable - anything gone from disk afterwards
     int filesUploaded = 0;
     for (const String &filePath : filePaths) {
-        // Support mode only - see captureIfDueDuringUpload(). A large telemetry backlog can take
-        // a while to drain; this keeps captures on schedule rather than letting them all wait
-        // behind it.
-        captureIfDueDuringUpload(counts);
+        // Support mode only, and skipped entirely during a night check-in - see
+        // captureIfDueDuringUpload(). A large telemetry backlog can take a while to drain; this
+        // keeps captures on schedule rather than letting them all wait behind it.
+        captureIfDueDuringUpload(counts, nightCheckin);
 
-        // Process in batches of 100, same as the Pi's uploadPendingTelemetry()
-        if (filesUploaded >= 100) {
+        // Process in batches of 100 (same as the Pi's uploadPendingTelemetry()), widened on an
+        // overnight check-in wake - see NIGHT_CHECKIN_UPLOAD_BATCH_MULTIPLIER.
+        if ((uint32_t)filesUploaded >= telemetryBatchLimit) {
             logLine("Hit upload batch limit - remaining telemetry will upload next cycle");
             break;
         }
 
-        if ((uint32_t)filesUploaded >= expectedTelemetry * 5) {
-            logf("Uploaded %d telemetry records this cycle - 5x the ~%u expected per sync - "
-                 "stopping early, will keep syncing every cycle until the backlog is back to normal",
-                 filesUploaded, expectedTelemetry);
+        if ((uint32_t)filesUploaded >= excessiveTelemetryThreshold) {
+            logf("Uploaded %d telemetry records this cycle - beyond the %u allowed (~%u expected "
+                 "per sync) - stopping early, will keep syncing every cycle until the backlog is "
+                 "back to normal", filesUploaded, excessiveTelemetryThreshold, expectedTelemetry);
             backlogExcessive = true;
             break;
         }
@@ -1927,7 +1962,11 @@ bool uploadPendingTelemetry(const String &deviceId, TelemetryCounts &counts, Dev
 //
 // Returns true if it had to break off early because far more than expectedImagesPerSync()*5
 // images have already gone out this cycle - see the didConnectWiFi handling in setup().
-bool uploadPendingImages(const String &deviceId, TelemetryCounts &counts, DeviceConfig &config)
+//
+// nightCheckin: see NIGHT_CHECKIN_UPLOAD_BATCH_MULTIPLIER - widens the flat per-cycle batch cap
+// below on overnight check-in wakes, which have far more slack to drain a backlog than a normal
+// daytime wake does.
+bool uploadPendingImages(const String &deviceId, TelemetryCounts &counts, DeviceConfig &config, bool nightCheckin)
 {
     if (!uplinkConnected()) {
         return false;
@@ -1937,8 +1976,18 @@ bool uploadPendingImages(const String &deviceId, TelemetryCounts &counts, Device
     listFilesRecursive(CAMERA_DIR, filePaths);
     std::sort(filePaths.rbegin(), filePaths.rend());
 
-    uint32_t expectedImages = expectedImagesPerSync(config);
+    // At night this correctly collapses to 1 (see expectedImagesPerSync()'s nightCheckin case)
+    // rather than the daytime cameraIntervalS/autoSyncPeriodS ratio.
+    uint32_t expectedImages = expectedImagesPerSync(config, nightCheckin);
     bool backlogExcessive = false;
+
+    uint32_t imageBatchLimit = 10 * (nightCheckin ? NIGHT_CHECKIN_UPLOAD_BATCH_MULTIPLIER : 1);
+
+    // std::max - see the matching comment in uploadPendingTelemetry(): with expectedImages now
+    // correctly small overnight (1, not whatever the daytime ratio would give), 5x that is smaller
+    // than imageBatchLimit, so without this the "genuinely excessive" check would fire before the
+    // deliberately-widened night cap ever gets used.
+    uint32_t excessiveImagesThreshold = std::max(imageBatchLimit, expectedImages * 5);
 
     // Reused across every request below (see ApiConnection/connectApiClient()) rather than
     // opening a fresh TCP+TLS connection per image. static - see the matching note in
@@ -1948,21 +1997,22 @@ bool uploadPendingImages(const String &deviceId, TelemetryCounts &counts, Device
     int filesRemoved = 0;   // uploaded or empty - anything gone from disk afterwards
     int filesUploaded = 0;
     for (const String &filePath : filePaths) {
-        // Support mode only - see captureIfDueDuringUpload(). A large image backlog can take a
-        // while to drain, especially over cellular; this keeps captures on schedule rather than
-        // letting them all wait behind it.
-        captureIfDueDuringUpload(counts);
+        // Support mode only, and skipped entirely during a night check-in - see
+        // captureIfDueDuringUpload(). A large image backlog can take a while to drain, especially
+        // over cellular; this keeps captures on schedule rather than letting them all wait behind it.
+        captureIfDueDuringUpload(counts, nightCheckin);
 
-        // Process in batches of 10, same as the Pi's uploadPendingPhotos()
-        if (filesUploaded >= 10) {
+        // Process in batches of 10 (same as the Pi's uploadPendingPhotos()), widened on an
+        // overnight check-in wake - see NIGHT_CHECKIN_UPLOAD_BATCH_MULTIPLIER.
+        if ((uint32_t)filesUploaded >= imageBatchLimit) {
             logLine("Hit upload batch limit - remaining images will upload next cycle");
             break;
         }
 
-        if ((uint32_t)filesUploaded >= expectedImages * 5) {
-            logf("Uploaded %d images this cycle - 5x the ~%u expected per sync - stopping early, "
-                 "will keep syncing every cycle until the backlog is back to normal",
-                 filesUploaded, expectedImages);
+        if ((uint32_t)filesUploaded >= excessiveImagesThreshold) {
+            logf("Uploaded %d images this cycle - beyond the %u allowed (~%u expected per sync) - "
+                 "stopping early, will keep syncing every cycle until the backlog is back to normal",
+                 filesUploaded, excessiveImagesThreshold, expectedImages);
             backlogExcessive = true;
             break;
         }
@@ -3054,13 +3104,23 @@ DatedPath capturePhoto(TelemetryCounts &counts)
 // to keep to there. Safe to call capturePhoto() directly here - the camera stays powered and
 // initialised for the whole of runWakeCycle() regardless of how many extra captures this takes
 // (see loop(), which only tears the camera down after runWakeCycle() returns).
-void captureIfDueDuringUpload(TelemetryCounts &counts)
+void captureIfDueDuringUpload(TelemetryCounts &counts, bool nightCheckin)
 {
+    // A night check-in wake is defined to take exactly one photo (see runWakeCycle()) -
+    // sleepDuringNight's whole point is fewer captures overnight, and
+    // NIGHT_CHECKIN_UPLOAD_BATCH_MULTIPLIER deliberately lets these uploads run well past
+    // cameraIntervalS to use that slack draining the backlog. Without this guard, a long-running
+    // night upload would trip the "due" check below on cameraIntervalS's (daytime) cadence anyway
+    // and take extra photos - defeating the point of both.
+    if (nightCheckin) {
+        return;
+    }
+
     // LGH - I'm not sure about this logic...
     // if (!deviceConfig.supportMode) {
     //     return;
     // }
-    
+
     // Unsigned-subtraction "is it due" check - tolerates millis() wrapping every ~49 days, unlike
     // a direct millis() >= nextCaptureDueMs comparison.
     if ((int32_t)(millis() - nextCaptureDueMs) >= 0) {
@@ -3310,7 +3370,7 @@ void runWakeCycle()
                                                (uint32_t)(millis() / 1000),
                                                deviceConfig.geoLat, deviceConfig.geoLon, deviceConfig.geoTimeRecorded, counts);
     writeTelemetryFile(datedPath, telemetryJson);
-    bool telemetryBacklogExcessive = uploadPendingTelemetry(deviceId, counts, deviceConfig);
+    bool telemetryBacklogExcessive = uploadPendingTelemetry(deviceId, counts, deviceConfig, nightCheckin);
 
     // A second telemetry snapshot, captured after uploading telemetry (and any GPS fix) have finished -
     // comparing its uptimeSeconds/timestamp against the first snapshot's (written before any of
@@ -3326,7 +3386,7 @@ void runWakeCycle()
 
     writeTelemetryFile(secondDatedPath, telemetryJson2);
 
-    bool imagesBacklogExcessive = uploadPendingImages(deviceId, counts, deviceConfig);
+    bool imagesBacklogExcessive = uploadPendingImages(deviceId, counts, deviceConfig, nightCheckin);
 
     // A third telemetry snapshot, captured after imagery uploads have finished -
     DatedPath thirdDatedPath = getDatedPath();
