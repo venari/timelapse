@@ -164,7 +164,7 @@
 // uploadPendingTelemetry()/uploadPendingImages() on those wakes only - daytime wakes, and the
 // "5x expected" excessive-backlog threshold that keeps reconnecting every cycle until a genuinely
 // oversized backlog is back to normal, are unaffected.
-#define NIGHT_CHECKIN_UPLOAD_BATCH_MULTIPLIER 20
+#define NIGHT_CHECKIN_UPLOAD_BATCH_MULTIPLIER 5
 
 // Fixed local-time offset from UTC, in minutes, used only for interpreting
 // daytimeStartsAtH/daytimeEndsAtH as wall-clock local time (see utcToLocalTm()/
