@@ -244,6 +244,15 @@
 #define GPS_FAILURE_BACKOFF_THRESHOLD 3
 #define GPS_FAILURE_BACKOFF_SKIPS     10
 
+// Same idea for gpsSyncTime() - the no-WiFi/no-cellular/no-clock last resort - but counted
+// separately from the location backoff above: a unit that's backed off from routine position
+// fixes still needs to be able to try to recover its clock. Skips are counted in wake cycles.
+#define GPS_CLOCK_FAILURE_BACKOFF_THRESHOLD 3
+#define GPS_CLOCK_FAILURE_BACKOFF_SKIPS     5
+// Any clock earlier than this is treated as "never set" (a fresh power-on starts at 1970), same
+// 2024 floor cellularSyncTime() uses to reject implausible network time. 2024-01-01T00:00:00Z.
+#define CLOCK_PLAUSIBLE_AFTER_EPOCH  1704067200
+
 // Fastest-first AT+IPR values to try for the modem's own AT/data UART - see negotiateModemBaud().
 // 600-460800 is the *complete* <speed> range AT+IPR's write command accepts (SIM767XX Series AT
 // Command Manual V1.01 s8.2.3) - there is no value anywhere near the SIM7670G's separately quoted
@@ -261,6 +270,8 @@ RTC_DATA_ATTR int bootCount = 0;
 // not a real power loss, and a device that's just power-cycled deserves a fresh attempt anyway.
 RTC_DATA_ATTR int gpsConsecutiveFailures = 0;
 RTC_DATA_ATTR int gpsBackoffSkipsRemaining = 0;
+RTC_DATA_ATTR int gpsClockConsecutiveFailures = 0;
+RTC_DATA_ATTR int gpsClockBackoffSkipsRemaining = 0;
 
 struct TelemetryCounts {
     int pendingImages;
@@ -373,6 +384,7 @@ bool modemPowerOn();
 void modemPowerOff();
 bool cellularConnect(const DeviceConfig &config);
 bool cellularSyncTime();
+bool gpsSyncTime(DeviceConfig &config);
 
 // Piecewise-linear state-of-charge curve for a single-cell 3.7V Li-ion (these boards run off a
 // single 3400mAh cell). Mirrors VoltageToPercentageHelper.cs on the API side, so a percentage
@@ -2776,6 +2788,32 @@ bool cellularConnect(const DeviceConfig &config)
     return true;
 }
 
+// Days-from-civil (Howard Hinnant's algorithm) - turns a UTC calendar date into epoch seconds
+// without depending on timegm() (not in ESP-IDF's newlib) or the process TZ (mktime()).
+time_t utcCivilToEpoch(int year, int month, int day, int hour, int minute, int second)
+{
+    int y = year - (month <= 2 ? 1 : 0);
+    int era = (y >= 0 ? y : y - 399) / 400;
+    int yoe = y - era * 400;
+    int doy = (153 * (month + (month > 2 ? -3 : 9)) + 2) / 5 + day - 1;
+    int doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
+    long epochDays = (long)era * 146097 + doe - 719468;
+    return (time_t)epochDays * 86400 + hour * 3600 + minute * 60 + second;
+}
+
+// Sets the system clock to `utc` and logs it, tagged with where the time came from.
+void setSystemClockUtc(time_t utc, const char *source)
+{
+    struct timeval tv = { .tv_sec = utc, .tv_usec = 0 };
+    settimeofday(&tv, nullptr);
+
+    struct tm check;
+    gmtime_r(&utc, &check);
+    logf("Time synced over %s: %04d-%02d-%02d %02d:%02d:%02d UTC", source,
+         check.tm_year + 1900, check.tm_mon + 1, check.tm_mday,
+         check.tm_hour, check.tm_min, check.tm_sec);
+}
+
 // Sets the ESP32 system clock (UTC - the sketch runs GMT_OFFSET_SEC = 0) from the network, for
 // the cellular path - the WiFi path's connectWiFiAndSyncTime() gets this from NTP over IP via
 // configTime(). Asks the modem to NTP-sync its own RTC first, then reads it back with +CCLK?.
@@ -2795,27 +2833,12 @@ bool cellularSyncTime()
         return false;
     }
 
-    // Days-from-civil (Howard Hinnant's algorithm) - turns a UTC calendar date into epoch days
-    // without depending on timegm() (not in ESP-IDF's newlib) or the process TZ (mktime()).
-    int y = year - (month <= 2 ? 1 : 0);
-    int era = (y >= 0 ? y : y - 399) / 400;
-    int yoe = y - era * 400;
-    int doy = (153 * (month + (month > 2 ? -3 : 9)) + 2) / 5 + day - 1;
-    int doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
-    long epochDays = (long)era * 146097 + doe - 719468;
     // getNetworkTime() reports the modem's local time plus its tz offset (in quarter-hours);
     // subtracting the tz offset converts local -> UTC.
-    time_t utc = (time_t)epochDays * 86400 + hour * 3600 + minute * 60 + second
+    time_t utc = utcCivilToEpoch(year, month, day, hour, minute, second)
                  - (time_t)lround(tz * 15 * 60);
 
-    struct timeval tv = { .tv_sec = utc, .tv_usec = 0 };
-    settimeofday(&tv, nullptr);
-
-    struct tm check;
-    gmtime_r(&utc, &check);
-    logf("Time synced over cellular: %04d-%02d-%02d %02d:%02d:%02d UTC",
-         check.tm_year + 1900, check.tm_mon + 1, check.tm_mday,
-         check.tm_hour, check.tm_min, check.tm_sec);
+    setSystemClockUtc(utc, "cellular");
     return true;
 }
 
@@ -2930,6 +2953,91 @@ void updateGeoLocationIfDue(DeviceConfig &config)
     // Leave the modem powered on - the cellular uplink (if WiFi failed) still needs it, and
     // runWakeCycle() powers it down centrally at the end of the cycle via modemPowerOff().
     modem.disableGPS(MODEM_GPS_ENABLE_GPIO, 0);
+}
+
+// Last-resort clock recovery for when WiFi and cellular have both failed and the clock has never
+// been set (or was lost to a power interruption): takes a GNSS fix and sets the system clock from
+// its UTC date/time. Powers the modem on itself (idempotent - already on if cellularConnect() ran
+// first; runWakeCycle() powers it down at the end of the cycle), bounded by GEO_FIX_TIMEOUT_MS.
+//
+// A no-op if the clock already looks valid. Has its own failure backoff (see
+// GPS_CLOCK_FAILURE_BACKOFF_THRESHOLD) separate from the location one, so a unit that's backed off
+// from routine position fixes can still recover its clock, without paying a full fix timeout every
+// single wake if it truly has no sky view.
+//
+// A successful fix also records the position and its timestamp - the same fix updateGeoLocationIfDue()
+// would take later this cycle - so that call sees it as fresh and doesn't power the GNSS up again.
+// Deliberately does NOT touch LAST_SYNC_FILE: that gates needsSync, and a GPS-only clock says
+// nothing about the uplink or the backlog. Returns true if the clock was set.
+bool gpsSyncTime(DeviceConfig &config)
+{
+    if (time(nullptr) >= CLOCK_PLAUSIBLE_AFTER_EPOCH) {
+        return false;   // clock is fine - nothing to recover
+    }
+
+    if (gpsClockBackoffSkipsRemaining > 0) {
+        --gpsClockBackoffSkipsRemaining;
+        logf("Skipping GPS clock sync - backed off after %d consecutive failures (%d attempts left before retry)",
+             gpsClockConsecutiveFailures, gpsClockBackoffSkipsRemaining);
+        return false;
+    }
+
+    logLine("No clock and no uplink - trying to set the clock from GPS...");
+    bool ok = false;
+    if (modemPowerOn()) {
+        uint32_t start = millis();
+        bool gpsEnabled = false;
+        while (millis() - start < GEO_FIX_TIMEOUT_MS) {
+            if (modem.enableGPS(MODEM_GPS_ENABLE_GPIO, MODEM_GPS_ENABLE_LEVEL)) {
+                gpsEnabled = true;
+                break;
+            }
+            delay(500);
+        }
+
+        GPSInfo info;
+        while (gpsEnabled && millis() - start < GEO_FIX_TIMEOUT_MS) {
+            if (modem.getGPS_Ex(info)) {
+                if (info.year >= 2024) {
+                    time_t utc = utcCivilToEpoch(info.year, info.month, info.day,
+                                                 info.hour, info.minute, info.second);
+                    setSystemClockUtc(utc, "GPS");
+                    config.geoLat = info.latitude;
+                    config.geoLon = info.longitude;
+                    config.geoTimeRecorded = getISO8601Timestamp();
+                    writeDeviceConfig(config);
+                    logf("GPS fix recorded: %.6f, %.6f", config.geoLat, config.geoLon);
+                    gpsConsecutiveFailures = 0;
+                    gpsBackoffSkipsRemaining = 0;
+                    ok = true;
+                } else {
+                    logf("GPS time implausible (%04u-%02u-%02u) - not setting clock",
+                         info.year, info.month, info.day);
+                }
+                break;
+            }
+            delay(2000);
+        }
+        if (gpsEnabled) {
+            modem.disableGPS(MODEM_GPS_ENABLE_GPIO, 0);
+        } else {
+            logLine("Failed to enable GPS for clock sync");
+        }
+    }
+
+    if (ok) {
+        gpsClockConsecutiveFailures = 0;
+        gpsClockBackoffSkipsRemaining = 0;
+    } else {
+        logLine("GPS clock sync failed");
+        ++gpsClockConsecutiveFailures;
+        if (gpsClockConsecutiveFailures >= GPS_CLOCK_FAILURE_BACKOFF_THRESHOLD) {
+            gpsClockBackoffSkipsRemaining = GPS_CLOCK_FAILURE_BACKOFF_SKIPS;
+            logf("GPS clock sync failed %d times in a row - backing off for the next %d cycles",
+                 gpsClockConsecutiveFailures, GPS_CLOCK_FAILURE_BACKOFF_SKIPS);
+        }
+    }
+    return ok;
 }
 
 void setup()
@@ -3230,6 +3338,12 @@ void runWakeCycle()
         } else if (cellularConnect(deviceConfig)) {
             g_uplink = UPLINK_CELL;
             didConnectWiFi = cellularSyncTime();
+        }
+        // No network time from WiFi or cellular: as a last resort take it from GPS (a no-op if the
+        // clock is already valid). This does NOT set didConnectWiFi - lastSyncTime must stay stale
+        // so the next wake tries to sync/upload again.
+        if (!didConnectWiFi) {
+            gpsSyncTime(deviceConfig);
         }
         if (!didConnectWiFi) {
             logLine("Continuing without synced time, filenames will use boot count!");
