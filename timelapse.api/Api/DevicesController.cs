@@ -122,6 +122,7 @@ namespace timelapse.api{
                 device.LongExposureXclkHz,
                 device.GeoIntervalS,
                 device.AutoSyncPeriodS,
+                device.ResetSetupApAttempts,
                 LatestTelemetry = latestTelemetry,
                 LatestImage = latestImage,
                 DeviceLocations = deviceLocations

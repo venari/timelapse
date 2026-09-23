@@ -58,6 +58,13 @@ public class Device
     public int GeoIntervalS {get; set;} = 3600;
     public int AutoSyncPeriodS {get; set;} = 300;
 
+    // One-shot trigger, pushed down the same way as the fields above: set this true to clear the
+    // ESP32's SD-tracked setup-AP attempt budget (SETUP_AP_ATTEMPTS_FILE in the .ino), letting a
+    // technician re-enter setup-AP mode on an already-deployed board without pulling its SD card
+    // by hand. The device clears its own copy back to false as soon as it acts on it, so this
+    // field only needs to go true -> false -> true again here to fire a second time.
+    public bool ResetSetupApAttempts {get; set;} = false;
+
     // Deliberately blank, not defaulted to a real URL: the ESP32 only overwrites its local
     // apiUrl when this is non-empty (see applyConfigFields in the .ino). A real default here
     // would mean every device - including ones seeded via SD card to point at a different

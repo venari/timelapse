@@ -60,6 +60,7 @@ const deviceEditSchema = z.object({
   longExposureXclkHz: z.number().int(),
   geoIntervalS: z.number().int(),
   autoSyncPeriodS: z.number().int(),
+  resetSetupApAttempts: z.boolean(),
   location: locationSchema,
 });
 
@@ -88,6 +89,7 @@ const emptyDefaults: DeviceEditForm = {
   longExposureXclkHz: 8000000,
   geoIntervalS: 3600,
   autoSyncPeriodS: 300,
+  resetSetupApAttempts: false,
   location: {
     locationMoved: false,
     description: '',
@@ -164,6 +166,7 @@ export function DeviceEdit() {
       longExposureXclkHz: device.longExposureXclkHz ?? emptyDefaults.longExposureXclkHz,
       geoIntervalS: device.geoIntervalS ?? emptyDefaults.geoIntervalS,
       autoSyncPeriodS: device.autoSyncPeriodS ?? emptyDefaults.autoSyncPeriodS,
+      resetSetupApAttempts: device.resetSetupApAttempts ?? emptyDefaults.resetSetupApAttempts,
       location: {
         locationMoved: false,
         description: currentLocation?.description ?? '',
@@ -350,6 +353,20 @@ export function DeviceEdit() {
               <Label htmlFor="longExposureXclkHz">Long Exposure XCLK (Hz)</Label>
               <Input id="longExposureXclkHz" type="number" {...register('longExposureXclkHz', { valueAsNumber: true })} />
             </div>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="resetSetupApAttempts">Reset Setup AP Attempts</Label>
+              <Controller
+                name="resetSetupApAttempts"
+                control={control}
+                render={({ field: { value, onChange } }) => (
+                  <Switch id="resetSetupApAttempts" checked={value} onCheckedChange={onChange} />
+                )}
+              />
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Lets the device re-enter setup-AP mode next time it power-cycles. Clears itself once
+              the device picks it up.
+            </p>
             <div className="space-y-2">
               <Label htmlFor="apiUrl">API URL</Label>
               <Input id="apiUrl" {...register('apiUrl')} />

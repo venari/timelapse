@@ -121,6 +121,7 @@ namespace timelapse.api.Pages
                 LongExposureXclkHz = Device.LongExposureXclkHz,
                 GeoIntervalS = Device.GeoIntervalS,
                 AutoSyncPeriodS = Device.AutoSyncPeriodS,
+                ResetSetupApAttempts = Device.ResetSetupApAttempts,
                 Location = new DeviceLocationUpdateRequest{
                     LocationMoved = LocationMoved,
                     Description = LocationDescription,

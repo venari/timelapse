@@ -29,6 +29,7 @@ namespace timelapse.api{
         public int LongExposureXclkHz {get; set;}
         public int GeoIntervalS {get; set;}
         public int AutoSyncPeriodS {get; set;}
+        public bool ResetSetupApAttempts {get; set;}
 
         public DeviceLocationUpdateRequest? Location {get; set;}
     }

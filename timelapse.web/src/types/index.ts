@@ -24,6 +24,7 @@ export interface Device {
   longExposureXclkHz?: number;
   geoIntervalS?: number;
   autoSyncPeriodS?: number;
+  resetSetupApAttempts?: boolean;
   latestTelemetry?: Telemetry;
   latestImage?: Image;
   deviceLocations?: DeviceLocation[];
@@ -107,6 +108,7 @@ export interface DeviceUpdateRequest {
   longExposureXclkHz: number;
   geoIntervalS: number;
   autoSyncPeriodS: number;
+  resetSetupApAttempts: boolean;
   location?: DeviceLocationUpdateRequest | null;
 }
 

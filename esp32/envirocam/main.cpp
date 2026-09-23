@@ -304,6 +304,14 @@ struct DeviceConfig {
     // (serial/OTA) rather than asleep most of the time.
     bool supportMode = DEFAULT_SUPPORT_MODE;
 
+    // Set remotely via the API - a one-shot trigger (see SETUP_AP_ATTEMPTS_FILE's comment above)
+    // that clears that SD-tracked attempt budget so a technician can re-enter setup-AP mode on an
+    // already-deployed board (e.g. after relocating/re-aiming it) without pulling the SD card by
+    // hand. Consumed and cleared back to false the next boot that sees it set (see setup()) - the
+    // API side is free to leave its own copy true indefinitely, it only has to go false and back
+    // to true again to fire a second time.
+    bool resetSetupApAttempts = false;
+
     // See DEFAULT_ENABLE_LONG_EXPOSURE_AT_NIGHT/DEFAULT_LONG_EXPOSURE_XCLK_HZ above and
     // setupCameraNightExposure() below - OV5640 only, silently ignored on OV2640 (its driver has
     // no equivalent lever - see setupCameraNightExposure()'s comment).
@@ -969,6 +977,7 @@ void applyConfigFields(JsonVariantConst fields, DeviceConfig &config)
     config.vflip            = fields["vflip"] | config.vflip;
     config.autoSyncPeriodS  = fields["autoSyncPeriodS"] | config.autoSyncPeriodS;
     config.supportMode      = fields["supportMode"] | config.supportMode;
+    config.resetSetupApAttempts = fields["resetSetupApAttempts"] | config.resetSetupApAttempts;
     config.geoIntervalS     = fields["geoIntervalS"] | config.geoIntervalS;
     config.geoLat           = fields["geoLat"] | config.geoLat;
     config.geoLon           = fields["geoLon"] | config.geoLon;
@@ -1034,6 +1043,7 @@ void writeDeviceConfig(const DeviceConfig &config)
     doc["vflip"] = config.vflip;
     doc["autoSyncPeriodS"] = config.autoSyncPeriodS;
     doc["supportMode"] = config.supportMode;
+    doc["resetSetupApAttempts"] = config.resetSetupApAttempts;
     doc["geoIntervalS"] = config.geoIntervalS;
     doc["geoLat"] = config.geoLat;
     doc["geoLon"] = config.geoLon;
@@ -1086,6 +1096,7 @@ void applyDeviceConfigFromApiResponse(const String &responseBody, DeviceConfig &
         newConfig.vflip != config.vflip ||
         newConfig.autoSyncPeriodS != config.autoSyncPeriodS ||
         newConfig.supportMode != config.supportMode ||
+        newConfig.resetSetupApAttempts != config.resetSetupApAttempts ||
         newConfig.geoIntervalS !=config.geoIntervalS ||
         newConfig.cameraWarmupFrames != config.cameraWarmupFrames ||
         newConfig.enableLongExposureAtNight != config.enableLongExposureAtNight ||
@@ -3069,6 +3080,17 @@ void setup()
 #endif
 
     runWakeCycle();
+
+    // See DeviceConfig::resetSetupApAttempts's comment - runWakeCycle() above is what actually
+    // pulls this from the API (via applyDeviceConfigFromApiResponse()), so by this point
+    // deviceConfig reflects whatever the API said on this boot's check-in. Cleared back to false
+    // and persisted immediately so it only fires once even if the API leaves its copy set.
+    if (deviceConfig.resetSetupApAttempts) {
+        SD.remove(SETUP_AP_ATTEMPTS_FILE);
+        logLine("Setup AP attempt budget reset via API flag");
+        deviceConfig.resetSetupApAttempts = false;
+        writeDeviceConfig(deviceConfig);
+    }
 
     // Fresh install only (see SETUP_AP_MAX_BOOT_COUNT/runSetupApWindow()) - gives an installer a
     // window to confirm the camera's working, right there in the field, with no cellular/internet

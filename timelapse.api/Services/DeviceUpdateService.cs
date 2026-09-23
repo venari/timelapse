@@ -57,6 +57,7 @@ public class DeviceUpdateService
         device.LongExposureXclkHz = request.LongExposureXclkHz;
         device.GeoIntervalS = request.GeoIntervalS;
         device.AutoSyncPeriodS = request.AutoSyncPeriodS;
+        device.ResetSetupApAttempts = request.ResetSetupApAttempts;
 
         if (loc?.Latitude != null && loc.Longitude != null)
         {
