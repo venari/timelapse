@@ -101,6 +101,8 @@ const emptyDefaults: DeviceEditForm = {
   },
 };
 
+const RECORDED_LOCATIONS_DAYS = 3;
+
 export function DeviceEdit() {
   const { deviceId } = useParams<{ deviceId: string }>();
   const navigate = useNavigate();
@@ -119,6 +121,12 @@ export function DeviceEdit() {
   const { data: basemap } = useQuery({
     queryKey: ['basemap'],
     queryFn: api.getBasemapConfig,
+  });
+
+  const { data: recordedLocations } = useQuery({
+    queryKey: ['recordedLocations', deviceId, RECORDED_LOCATIONS_DAYS],
+    queryFn: () => api.getRecordedLocations(Number(deviceId), RECORDED_LOCATIONS_DAYS),
+    enabled: !!deviceId,
   });
 
   const {
@@ -196,6 +204,12 @@ export function DeviceEdit() {
   const latitude = watch('location.latitude') ?? null;
   const longitude = watch('location.longitude') ?? null;
   const heading = watch('location.heading') ?? null;
+
+  const pickLocation = (lat: number, lon: number) => {
+    setValue('location.latitude', lat, { shouldValidate: true });
+    setValue('location.longitude', lon, { shouldValidate: true });
+    setValue('location.locationMoved', true);
+  };
 
   if (deviceLoading) {
     return (
@@ -385,12 +399,34 @@ export function DeviceEdit() {
               heading={heading}
               wideAngle={wideAngle}
               basemapUrl={basemap?.url ?? null}
-              onLocationPick={(lat, lon) => {
-                setValue('location.latitude', lat, { shouldValidate: true });
-                setValue('location.longitude', lon, { shouldValidate: true });
-                setValue('location.locationMoved', true);
-              }}
+              recordedLocations={recordedLocations}
+              onLocationPick={pickLocation}
             />
+
+            {recordedLocations && recordedLocations.length > 0 && (
+              <div className="space-y-2">
+                <Label>Recently Reported Locations (last {RECORDED_LOCATIONS_DAYS} days)</Label>
+                <p className="text-sm text-muted-foreground">
+                  GPS fixes the device has reported (also shown as blue dots on the map above).
+                  Pick one to use it as the device's location below.
+                </p>
+                <div className="max-h-48 overflow-y-auto rounded-md border divide-y">
+                  {recordedLocations.map((point) => (
+                    <button
+                      key={point.id}
+                      type="button"
+                      onClick={() => pickLocation(point.latitude, point.longitude)}
+                      className="flex w-full items-center justify-between px-3 py-2 text-sm hover:bg-accent"
+                    >
+                      <span>{new Date(point.timestamp).toLocaleString()}</span>
+                      <span className="text-muted-foreground">
+                        {point.latitude.toFixed(6)}, {point.longitude.toFixed(6)}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
 
             <div className="flex items-center justify-between">
               <Label htmlFor="locationMoved">New Location</Label>

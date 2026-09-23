@@ -18,12 +18,20 @@ L.Icon.Default.mergeOptions({
 
 const NZ_CENTER: [number, number] = [-41.288889, 174.777222];
 
+interface RecordedLocationPoint {
+  id: number;
+  latitude: number;
+  longitude: number;
+  timestamp: string;
+}
+
 interface DeviceLocationMapProps {
   latitude: number | null;
   longitude: number | null;
   heading: number | null;
   wideAngle: boolean;
   basemapUrl: string | null;
+  recordedLocations?: RecordedLocationPoint[];
   onLocationPick: (lat: number, lon: number) => void;
 }
 
@@ -51,6 +59,7 @@ export function DeviceLocationMap({
   heading,
   wideAngle,
   basemapUrl,
+  recordedLocations,
   onLocationPick,
 }: DeviceLocationMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -58,6 +67,7 @@ export function DeviceLocationMap({
   const aerialLayerRef = useRef<L.TileLayer | null>(null);
   const markerRef = useRef<L.Marker | null>(null);
   const polygonRef = useRef<L.Polygon | null>(null);
+  const recordedLocationsLayerRef = useRef<L.LayerGroup | null>(null);
   const onLocationPickRef = useRef(onLocationPick);
   onLocationPickRef.current = onLocationPick;
 
@@ -135,6 +145,35 @@ export function DeviceLocationMap({
     }
     map.panTo([latitude, longitude]);
   }, [latitude, longitude, heading, wideAngle]);
+
+  // Recent recorded GPS fixes, shown as small clickable markers - clicking one picks it the same
+  // way clicking anywhere else on the map does (see the map's own 'click' handler above), so
+  // there's a single path for "set the device's location" regardless of where the click came from.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    recordedLocationsLayerRef.current?.remove();
+    recordedLocationsLayerRef.current = null;
+
+    if (!recordedLocations || recordedLocations.length === 0) return;
+
+    const layerGroup = L.layerGroup();
+    for (const point of recordedLocations) {
+      L.circleMarker([point.latitude, point.longitude], {
+        radius: 6,
+        color: '#2563eb',
+        fillColor: '#2563eb',
+        fillOpacity: 0.7,
+        weight: 2,
+      })
+        .bindTooltip(new Date(point.timestamp).toLocaleString())
+        .on('click', () => onLocationPickRef.current(point.latitude, point.longitude))
+        .addTo(layerGroup);
+    }
+    layerGroup.addTo(map);
+    recordedLocationsLayerRef.current = layerGroup;
+  }, [recordedLocations]);
 
   return <div ref={containerRef} className="h-[400px] w-full rounded-md" />;
 }

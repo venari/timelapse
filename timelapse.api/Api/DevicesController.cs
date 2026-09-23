@@ -131,6 +131,24 @@ namespace timelapse.api{
             return result;
         }
 
+        // Raw GPS fixes (see RecordedLocation) for the last `days` days, newest first - the
+        // DeviceEdit page's "recent recorded locations" list, which a technician can promote into
+        // a proper DeviceLocation via PUT above. Not nested inside GetDevice() since it's a
+        // separate, time-bounded query rather than part of the device's own state.
+        [HttpGet("{id}/RecordedLocations")]
+        public ActionResult<IEnumerable<RecordedLocation>> GetRecordedLocations(int id, [FromQuery] int days = 3){
+            _logger.LogInformation($"Get recorded locations for device {id}, last {days} days");
+
+            var cutoff = DateTime.UtcNow.AddDays(-days);
+
+            var recordedLocations = _appDbContext.RecordedLocations
+                .Where(r => r.DeviceId == id && r.Timestamp >= cutoff)
+                .OrderByDescending(r => r.Timestamp)
+                .ToList();
+
+            return recordedLocations;
+        }
+
         // This class doesn't inherit ControllerBase (matches ImageController's style
         // elsewhere in this file), so no NotFound()/Ok()/ModelState helpers are
         // available here - results are constructed explicitly instead.

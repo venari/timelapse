@@ -35,6 +35,7 @@ namespace timelapse.infrastructure
 
         public DbSet<Event> Events { get; set; }
         public DbSet<EventType> EventTypes { get; set; }
+        public DbSet<RecordedLocation> RecordedLocations { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -51,6 +52,7 @@ namespace timelapse.infrastructure
             modelBuilder.Entity<OrganisationUserJoinEntry>().ToTable("organisation_user_join_entry");
             modelBuilder.Entity<Event>().ToTable("events");
             modelBuilder.Entity<EventType>().ToTable("event_types");
+            modelBuilder.Entity<RecordedLocation>().ToTable("recorded_locations");
 
             modelBuilder.Entity<Event>()
                 .HasMany(e => e.EventTypes)
@@ -61,6 +63,11 @@ namespace timelapse.infrastructure
 
             modelBuilder.Entity<Image>()
                 .HasIndex(e => e.Timestamp);
+
+            // Backs both TelemetryController.Post()'s dedupe lookup (latest fix per device) and
+            // DevicesController's "last N days" listing.
+            modelBuilder.Entity<RecordedLocation>()
+                .HasIndex(e => new { e.DeviceId, e.Timestamp });
 
             // modelBuilder.Entity<Event>()
             //     .HasOne(e => e.EventType);

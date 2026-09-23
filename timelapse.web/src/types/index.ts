@@ -75,6 +75,16 @@ export interface DeviceLocation {
   description?: string | null;
 }
 
+// A raw GPS fix reported by the device (see timelapse.core's RecordedLocation) - distinct from
+// DeviceLocation, which is the curated location a technician has confirmed for the device.
+export interface RecordedLocation {
+  id: number;
+  deviceId: number;
+  latitude: number;
+  longitude: number;
+  timestamp: string;
+}
+
 export interface DeviceLocationUpdateRequest {
   locationMoved: boolean;
   description?: string | null;

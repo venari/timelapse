@@ -68,7 +68,44 @@ namespace timelapse.api{
             };
             _appDbContext.Telemetry.Add(telemetry);
             _appDbContext.SaveChanges();
+
+            RecordGpsFixIfNew(device.Id, telemetry);
+
             return telemetry;
+        }
+
+        // Telemetry.GeoLatitude/GeoLongitude/GeoTimeRecorded parse the device's last GPS fix out
+        // of Status - re-sent unchanged (see updateGeoLocationIfDue() in the .ino) in every
+        // Telemetry post between actual fixes, so this only inserts a RecordedLocation when
+        // GeoTimeRecorded is newer than the device's last recorded fix, not on every post. (0, 0)
+        // is DeviceConfig's default before any real fix, so it's treated the same as "no fix yet".
+        private void RecordGpsFixIfNew(int deviceId, Telemetry telemetry)
+        {
+            if (telemetry.GeoLatitude is not double latitude || telemetry.GeoLongitude is not double longitude
+                || telemetry.GeoTimeRecorded is not DateTime fixTime) {
+                return;
+            }
+
+            if (latitude == 0 && longitude == 0) {
+                return;
+            }
+
+            var lastRecorded = _appDbContext.RecordedLocations
+                .Where(r => r.DeviceId == deviceId)
+                .OrderByDescending(r => r.Timestamp)
+                .FirstOrDefault();
+
+            if (lastRecorded != null && lastRecorded.Timestamp >= fixTime) {
+                return;
+            }
+
+            _appDbContext.RecordedLocations.Add(new RecordedLocation {
+                DeviceId = deviceId,
+                Latitude = latitude,
+                Longitude = longitude,
+                Timestamp = fixTime,
+            });
+            _appDbContext.SaveChanges();
         }
 
         [HttpGet("GetLatest24HoursTelemetry")]

@@ -4,6 +4,7 @@ import type {
   Telemetry,
   Image,
   DeviceUpdateRequest,
+  RecordedLocation,
   EventSummary,
   EventDetail,
   EventType,
@@ -85,6 +86,13 @@ export const api = {
 
   async updateDevice(deviceId: number, payload: DeviceUpdateRequest): Promise<Device> {
     const response = await apiClient.put<Device>(`/api/Devices/${deviceId}`, payload);
+    return response.data;
+  },
+
+  async getRecordedLocations(deviceId: number, days = 3): Promise<RecordedLocation[]> {
+    const response = await apiClient.get<RecordedLocation[]>(
+      `/api/Devices/${deviceId}/RecordedLocations?days=${days}`
+    );
     return response.data;
   },
 

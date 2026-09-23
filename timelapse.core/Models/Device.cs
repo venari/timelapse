@@ -180,6 +180,12 @@ public class Device
     [System.Text.Json.Serialization.JsonIgnore]
     public List<DeviceLocation> DeviceLocations { get; } = new List<DeviceLocation>();
 
+    // Raw GPS fixes reported over time - see RecordedLocation's comment. JsonIgnore'd same as
+    // DeviceLocations above: fetched via the dedicated GET /api/Devices/{id}/RecordedLocations
+    // endpoint (bounded by a days window) rather than inflating every Device payload.
+    [System.Text.Json.Serialization.JsonIgnore]
+    public List<RecordedLocation> RecordedLocations { get; } = new List<RecordedLocation>();
+
     [NotMapped]
     [System.Text.Json.Serialization.JsonIgnore]
     public DeviceLocation? CurrentLocation {

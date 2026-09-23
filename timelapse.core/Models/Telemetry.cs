@@ -95,6 +95,23 @@ public class Telemetry
         };
     }
 
+    private static double? TryGetDouble(JsonElement? element, string propertyName)
+    {
+        if (element is not { ValueKind: JsonValueKind.Object } obj) {
+            return null;
+        }
+
+        if (!obj.TryGetProperty(propertyName, out var value)) {
+            return null;
+        }
+
+        return value.ValueKind switch {
+            JsonValueKind.Number when value.TryGetDouble(out var number) => number,
+            JsonValueKind.String when double.TryParse(value.GetString(), out var number) => number,
+            _ => null
+        };
+    }
+
     private static string? TryGetString(JsonElement? element, string propertyName)
     {
         if (element is not { ValueKind: JsonValueKind.Object } obj) {
@@ -138,6 +155,24 @@ public class Telemetry
     }
 
     public int? IOCurrent => TryGetInt(ParsedStatus, "ioCurrent");
+
+    // ESP32-only (see updateGeoLocationIfDue() in the .ino) - the device's last GPS fix, which it
+    // re-sends unchanged in every Telemetry post between actual fixes (paced by GeoIntervalS), not
+    // just the one where the fix was taken. GeoTimeRecorded is the fix's own timestamp, not this
+    // Telemetry row's - that's what TelemetryController.Post() dedupes RecordedLocation rows on.
+    public double? GeoLatitude => TryGetDouble(ParsedStatus, "geo.lat");
+    public double? GeoLongitude => TryGetDouble(ParsedStatus, "geo.lon");
+    public DateTime? GeoTimeRecorded {
+        get {
+            var raw = TryGetString(ParsedStatus, "geo.time-recorded");
+            if (string.IsNullOrEmpty(raw)) {
+                return null;
+            }
+
+            return DateTime.TryParse(raw, null, System.Globalization.DateTimeStyles.AdjustToUniversal
+                | System.Globalization.DateTimeStyles.AssumeUniversal, out var parsed) ? parsed : null;
+        }
+    }
 
     public bool? PowerSwitch {
         get{
