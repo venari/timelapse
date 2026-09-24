@@ -110,6 +110,14 @@
 // they stay counted no matter what wipes bootCount in between.
 #define SETUP_AP_MAX_BOOT_COUNT  3
 #define SETUP_AP_ATTEMPTS_FILE   "/setup_ap_attempts.txt"
+
+// Bench trigger: create this (any contents) in the SD card root and the next modem power-on runs
+// modemFactoryReset() once, then deletes it. An SD file rather than an API flag like
+// resetSetupApAttempts, because the units this is for can't reach the API.
+#define MODEM_FACTORY_RESET_FILE "/modem_factory_reset.flag"
+
+// Same idea for modemBandLockTest().
+#define MODEM_BAND_TEST_FILE     "/modem_band_test.flag"
 #define SETUP_AP_NEXT_BOOT_DELAY_S 1   // See loop() - replaces the normal cameraIntervalS wait while
                                         // still inside the setup window's boot budget above, so the
                                         // next boot's setup window is available right away rather
@@ -229,8 +237,9 @@
 
 // SIM7672X Series Hardware Design (SIMCom, s3.2.2/Table 13): forcing the module off by holding
 // PWRKEY low needs >= 2.5s (Toff), a completely different pulse width to the ~100ms power-ON
-// pulse above. Used by modemPowerOff() as the fallback when the modem never answered AT this
-// cycle, since that path can't reach it with AT+CPOF. A little margin over the 2.5s minimum.
+// pulse above. Used by modemPowerOff() as the fallback when the modem can't be shut down with
+// AT+CPOF. Only safe when the modem is known to be ON - on an off modem the same hold powers it
+// back on (see modemPowerOff()). A little margin over the 2.5s minimum.
 #define MODEM_POWEROFF_PULSE_WIDTH_MS 2600
 
 #define GEO_MODEM_BOOT_RETRIES       30      // testAT() attempts before re-pulsing PWRKEY
@@ -384,11 +393,22 @@ bool g_modemPoweredOn = false;
 // with AT+CPOF (see modemPowerOff()).
 bool g_modemPowerOnAttempted = false;
 
+// The UART rate SerialAT is currently running at (see negotiateModemBaud()), and when it was last
+// switched - so modemDiagnoseSilence() can tell a modem that has reset back to its MODEM_BAUDRATE
+// boot default apart from one that's genuinely hung.
+uint32_t g_modemBaud = MODEM_BAUDRATE;
+uint32_t g_modemBaudSwitchedAtMs = 0;
+
+// modemDiagnoseSilence()'s reboot watch costs ~30s, so only run it once per wake cycle.
+bool g_modemRebootWatchDone = false;
+
 // Defined further down (grouped with updateGeoLocationIfDue(), since they share the modem) but
 // referenced earlier by connectApiClient() / the upload functions / runWakeCycle().
 String effectiveApn(const DeviceConfig &config);
 bool uplinkConnected();
 bool modemPowerOn();
+void modemFactoryReset();
+void modemBandLockTest();
 void modemPowerOff();
 bool cellularConnect(const DeviceConfig &config);
 bool cellularSyncTime();
@@ -2640,6 +2660,8 @@ void negotiateModemBaud()
 
         if (modem.testAT(300)) {
             logf("Modem UART now running at %u baud", candidate);
+            g_modemBaud = candidate;
+            g_modemBaudSwitchedAtMs = millis();
             return;
         }
 
@@ -2662,6 +2684,7 @@ bool modemPowerOn()
     }
 
     SerialAT.begin(MODEM_BAUDRATE, SERIAL_8N1, MODEM_RX_PIN, MODEM_TX_PIN);
+    g_modemBaud = MODEM_BAUDRATE;
 
     pinMode(BOARD_PWRKEY_PIN, OUTPUT);
     digitalWrite(BOARD_PWRKEY_PIN, LOW);
@@ -2693,54 +2716,463 @@ bool modemPowerOn()
         }
     }
 
+    if (SD.exists(MODEM_FACTORY_RESET_FILE)) {
+        SD.remove(MODEM_FACTORY_RESET_FILE);   // before running it, so a crash mid-reset can't make it repeat forever
+        modemFactoryReset();
+        modem.testAT(5000);
+    }
+    if (SD.exists(MODEM_BAND_TEST_FILE)) {
+        SD.remove(MODEM_BAND_TEST_FILE);
+        modemBandLockTest();
+        modem.testAT(5000);
+    }
+
     negotiateModemBaud();
 
     g_modemPoweredOn = true;
     return true;
 }
 
-// Powers the modem chip fully down. AT+CPOF cleanly powers the whole modem down (documented
-// SIMCom behaviour) when the modem is actually answering AT and acknowledges it - but that ack is
-// just a normal AT response, bound by GsmClient's default 1000ms waitResponse() timeout, and CPOF
-// can plausibly take longer than that to reply if the modem needs to detach from the network
-// first. Discovered 2026-09-09 from a field report of the NET/STATUS LEDs still cycling through a
-// boot-like sequence well after the board should have been asleep - modem.poweroff()'s return
-// value used to be discarded entirely, so a timed-out (but not necessarily failed) CPOF looked
-// identical to a successful one and left the modem drawing full current, with no PWRKEY fallback
-// to actually force it off the way the "never came up at all" branch below already had. Best-effort
-// beyond that - the ESP32 is usually about to deep-sleep anyway, at which point SerialAT goes away
-// regardless. Must run on every path that called modemPowerOn(), or the modem keeps draining the
-// battery through deep sleep - this includes a modemPowerOn() that never got an AT response at all:
-// gating on g_modemPoweredOn there would skip power-off entirely, leaving a modem that failed to
-// boot running at full current for the rest of the sleep window.
+// Reads whatever the modem sends for up to ms milliseconds, with CR/LF/non-printables escaped so
+// it fits on one log line. Capped - this is for spotting boot URCs (RDY, *ATREADY, +CPIN, SMS DONE,
+// PB DONE) or baud-mismatch garbage, not for capturing bulk data.
+String readModemRaw(uint32_t ms)
+{
+    String out;
+    uint32_t start = millis();
+    while (millis() - start < ms && out.length() < 240) {
+        while (SerialAT.available() && out.length() < 240) {
+            int c = SerialAT.read();
+            if (c == '\r') {
+                out += "\\r";
+            } else if (c == '\n') {
+                out += "\\n";
+            } else if (c >= 0x20 && c < 0x7F) {
+                out += (char)c;
+            } else {
+                char hex[5];
+                snprintf(hex, sizeof(hex), "\\x%02X", c);
+                out += hex;
+            }
+        }
+        delay(5);
+    }
+    return out;
+}
+
+// Logs every answering/silent transition the modem makes over durationMs. A modem stuck in a
+// reboot loop shows up as a regular silent -> answering cycle (with boot URCs in between); a
+// healthy one stays answering throughout.
+int modemWatchForReboots(uint32_t durationMs)
+{
+    logf("Watching modem for %lus for reboot cycling...", (unsigned long)(durationMs / 1000));
+    uint32_t start = millis();
+    bool lastUp = true;
+    int transitions = 0;
+    while (millis() - start < durationMs) {
+        String raw = readModemRaw(lastUp ? 100 : 500);
+        if (raw.length()) {
+            logf("  +%lums modem sent: %s", (unsigned long)(millis() - start), raw.c_str());
+        }
+        bool up = modem.testAT(300);
+        if (up != lastUp) {
+            logf("  +%lums modem %s", (unsigned long)(millis() - start), up ? "answering AT again" : "went silent");
+            lastUp = up;
+            ++transitions;
+        }
+    }
+    logf("Reboot watch done: %d answering/silent transitions in %lus, modem %s at the end",
+         transitions, (unsigned long)(durationMs / 1000), lastUp ? "answering" : "silent");
+    return transitions;
+}
+
+// Sends a raw AT command and returns the modem's reply, escaped. Retried a few times because a
+// reboot-looping modem is only up for ~1.5s at a time (2026-09-24 unit 1 log).
+String modemQueryRaw(const char *cmd, uint32_t waitMs = 800)
+{
+    for (int i = 0; i < 4; ++i) {
+        readModemRaw(20);
+        SerialAT.print(cmd);
+        SerialAT.print("\r\n");
+        String r = readModemRaw(waitMs);
+        if (r.indexOf("OK") >= 0 || r.indexOf("ERROR") >= 0) {
+            return r;
+        }
+        delay(300);
+    }
+    return "(no response)";
+}
+
+// Counts modem boots (QCRDY URCs - the SIM7670G prints one at the end of every boot) over
+// durationMs without sending anything, unless holdRadioOff: then AT+CFUN=4 (RF off) is re-sent
+// straight after every boot, since it doesn't survive a reset.
+int modemCountBoots(uint32_t durationMs, bool holdRadioOff)
+{
+    const char *marker = "QCRDY";
+    size_t matched = 0;
+    int boots = 0;
+    if (holdRadioOff) {
+        SerialAT.print("AT+CFUN=4\r\n");
+    }
+    uint32_t start = millis();
+    while (millis() - start < durationMs) {
+        while (SerialAT.available()) {
+            char c = (char)SerialAT.read();
+            matched = (c == marker[matched]) ? matched + 1 : (c == marker[0] ? 1 : 0);
+            if (marker[matched] == '\0') {
+                ++boots;
+                matched = 0;
+                if (holdRadioOff) {
+                    delay(50);
+                    SerialAT.print("AT+CFUN=4\r\n");
+                }
+            }
+        }
+        delay(5);
+    }
+    return boots;
+}
+
+// One-shot modem settings reset, for testing whether the 2026-09-24 reboot loop comes from state
+// the modem keeps across power loss (e.g. left behind by a GNSS session torn down in the wrong
+// order - see modemGpsOff()). A looping modem is only up ~1.5s at a time, so it first holds the
+// radio off (AT+CFUN=4 - stops the loop, per modemRebootLoopProbe()) to get a stable window, then:
+// GNSS off and its enable GPIO back to input, AT&F + AT&W (factory defaults for the user-settable
+// parameters, saved to NV), then AT+CRESET for a full modem restart with the radio on, and counts
+// boots for 60s. Every response is logged, so an unsupported command just shows up as ERROR.
+// Note AT&F only covers the settings SIMCom classes as user parameters - it isn't a full NV wipe
+// or firmware reflash (that needs SIMCom's flash tool over the modem's own USB port).
+void modemFactoryReset()
+{
+    logLine("Modem factory reset requested (" MODEM_FACTORY_RESET_FILE ") - holding radio off first...");
+    modemCountBoots(5000, true);
+    logf("  AT+CFUN? -> %s", modemQueryRaw("AT+CFUN?").c_str());
+
+    const char *cmds[] = {"AT+CGNSSPWR=0", "AT+CGDRT=1,0", "AT&F", "AT&W", "AT+IPREX=115200",
+                          "AT+CGNSSPWR?", "AT+CGDCONT?"};
+    for (const char *c : cmds) {
+        logf("  %s -> %s", c, modemQueryRaw(c, 3000).c_str());
+    }
+
+    logf("  AT+CRESET -> %s", modemQueryRaw("AT+CRESET", 3000).c_str());
+    int boots = modemCountBoots(60000, false);
+    logf("Modem factory reset done: %d boots in the 60s after AT+CRESET with radio on "
+         "(1 = the restart itself; more = still looping)", boots);
+    logf("  AT+CPSI? -> %s", modemQueryRaw("AT+CPSI?").c_str());
+    logf("  AT+CEREG? -> %s", modemQueryRaw("AT+CEREG?").c_str());
+}
+
+// Pulls "<a>,<b>" out of an escaped "+CNBP: <a>,<b>\r\n..." reply from modemQueryRaw(). Empty if
+// the reply doesn't contain one.
+String parseCnbp(const String &reply)
+{
+    int start = reply.indexOf("+CNBP: ");
+    if (start < 0) {
+        return "";
+    }
+    start += 7;
+    int end = reply.indexOf('\\', start);   // start of the escaped "\r"
+    return end > start ? reply.substring(start, end) : "";
+}
+
+// Holds the radio off (stops the reboot loop, per modemRebootLoopProbe()) until AT+CFUN? confirms it.
+bool modemHoldRadioOff()
+{
+    modemCountBoots(4000, true);
+    return modemQueryRaw("AT+CFUN?").indexOf("+CFUN: 4") >= 0;
+}
+
+// Sets the band preference and reads it back; true only if the modem now reports exactly `setting`.
+bool modemSetBands(const String &setting)
+{
+    String cmd = "AT+CNBP=" + setting;
+    logf("  %s -> %s", cmd.c_str(), modemQueryRaw(cmd.c_str(), 3000).c_str());
+    String now = parseCnbp(modemQueryRaw("AT+CNBP?"));
+    if (!now.equalsIgnoreCase(setting)) {
+        logf("  band setting didn't take - modem reports %s", now.length() ? now.c_str() : "(nothing)");
+        return false;
+    }
+    return true;
+}
+
+// Bench test for the 2026-09-24 reboot loop, which crashes during cell search before the modem
+// ever camps on a cell (AT+CPSI? always "NO SERVICE"). Locks LTE to one band setting at a time
+// with the radio on for MODEM_BAND_TEST_WINDOW_MS, counting boots, then logs whether it found a
+// cell / registered.
+//
+// First run (2026-09-25, unit 2 indoors, 20s windows): B2/B4 (no NZ networks) = 0 boots, B1/B3/B7
+// = 0 boots but no cell found, B28 = 2 boots, vs 8-12 on all bands - B28 (the 700MHz coverage
+// band) the only one that crashed. This run tests that directly: all bands (baseline, same
+// session), all bands EXCEPT B28 (does it stop looping and register elsewhere? - would also be a
+// workaround), B28 alone, then B3 and B7 alone with longer windows than last time.
+//
+// The original AT+CNBP value is read first and restored at the end (it's stored in NV, so would
+// otherwise survive power-off); aborts without changing anything if it can't be read. The second
+// AT+CNBP field is kept as reported - only the LTE band mask changes.
+#define MODEM_BAND_TEST_WINDOW_MS 60000
+
+void modemBandLockTest()
+{
+    logLine("Modem band lock test requested (" MODEM_BAND_TEST_FILE ") - holding radio off first...");
+    if (!modemHoldRadioOff()) {
+        logLine("Band test: couldn't hold the radio off - aborting without changing anything");
+        return;
+    }
+    String original = parseCnbp(modemQueryRaw("AT+CNBP?"));
+    int comma = original.indexOf(',');
+    if (comma < 0) {
+        logLine("Band test: couldn't read the current AT+CNBP setting - aborting without changing anything");
+        return;
+    }
+    String secondField = original.substring(comma);   // e.g. ",0X02"
+    uint64_t allBands = strtoull(original.substring(0, comma).c_str(), nullptr, 16);
+    const uint64_t B28 = 1ULL << 27;
+    logf("Band test: original band setting %s", original.c_str());
+
+    struct { const char *label; uint64_t mask; } runs[] = {
+        {"all", allBands},
+        {"all-but-B28", allBands & ~B28},
+        {"B28", B28},
+        {"B3", 1ULL << 2},
+        {"B7", 1ULL << 6},
+    };
+    String summary;
+    for (auto &run : runs) {
+        if (!modemHoldRadioOff()) {
+            logf("Band test %s: couldn't hold the radio off - skipping", run.label);
+            continue;
+        }
+        char mask[24];
+        snprintf(mask, sizeof(mask), "0X%016llX", run.mask);
+        if (!modemSetBands(String(mask) + secondField)) {
+            summary += String(" ") + run.label + "=not-set";
+            continue;
+        }
+        modemQueryRaw("AT+CFUN=1");
+        int boots = modemCountBoots(MODEM_BAND_TEST_WINDOW_MS, false);
+        bool held = parseCnbp(modemQueryRaw("AT+CNBP?")).startsWith(mask);
+        logf("Band test %s: %d boots in %lus with radio on; band lock %s", run.label, boots,
+             (unsigned long)(MODEM_BAND_TEST_WINDOW_MS / 1000), held ? "held" : "DID NOT hold (result invalid)");
+        logf("  AT+CPSI? -> %s", modemQueryRaw("AT+CPSI?").c_str());
+        logf("  AT+CEREG? -> %s", modemQueryRaw("AT+CEREG?").c_str());
+        logf("  AT+CSQ -> %s", modemQueryRaw("AT+CSQ").c_str());
+        summary += String(" ") + run.label + "=" + String(boots) + (held ? "" : "(lock lost)");
+    }
+
+    bool restored = false;
+    for (int attempt = 0; attempt < 3 && !restored; ++attempt) {
+        restored = modemHoldRadioOff() && modemSetBands(original);
+    }
+    logf("Band test summary (boots/%lus):%s", (unsigned long)(MODEM_BAND_TEST_WINDOW_MS / 1000), summary.c_str());
+    if (restored) {
+        logf("Band test: original band setting %s restored", original.c_str());
+    } else {
+        logf("Band test: WARNING - FAILED to restore original band setting %s - send AT+CNBP=%s manually",
+             original.c_str(), original.c_str());
+    }
+    modemQueryRaw("AT+CFUN=1");
+}
+
+// Run once a reboot loop has been seen. Separates the likely causes:
+//  - supply: the modem's own view of VBAT (AT+CBC) sagging - brownout during RF bursts
+//  - RF/network-attach phase: boots stop (or slow sharply) with the radio held off (AT+CFUN=4)
+//  - baseband/firmware/stored settings: boots continue at the same rate with the radio off
+// Also dumps the settings this firmware writes that could persist in modem NV (network mode,
+// GNSS enable GPIO direction/level, fixed baud, stored PDP contexts) plus the firmware revision,
+// and the operator/serving cell/band it's on - the loop reproduced on a second unit with a
+// different SIM (2026-09-24), so what network it's attaching to matters.
+void modemRebootLoopProbe()
+{
+    logLine("Reboot loop probe: modem-side supply, temperature and stored settings...");
+    const char *queries[] = {"AT+CBC", "AT+CPMUTEMP", "AT+SIMCOMATI", "AT+CNMP?", "AT+IPREX?",
+                             "AT+CGNSSPWR?", "AT+CGDRT?", "AT+CFUN?", "AT+CGDCONT?", "AT+COPS?",
+                             "AT+CPSI?", "AT+CNBP?", "AT+CBC"};
+    for (const char *q : queries) {
+        logf("  %s -> %s", q, modemQueryRaw(q).c_str());
+    }
+
+    int baseline = modemCountBoots(20000, false);
+    logf("Reboot loop probe: %d boots in 20s, radio left as-is", baseline);
+    int radioOff = modemCountBoots(20000, true);
+    logf("Reboot loop probe: %d boots in 20s with radio held off (AT+CFUN=4)", radioOff);
+    logf("  AT+CBC (after radio-off run) -> %s", modemQueryRaw("AT+CBC").c_str());
+    if (baseline >= 3 && radioOff <= baseline / 3) {
+        logLine("Reboot loop probe: boots largely STOP with RF off - points at the RF/attach phase (supply sag under TX, or network stack)");
+    } else if (baseline >= 3) {
+        logLine("Reboot loop probe: boots CONTINUE with RF off - points at baseband/firmware/stored config, not RF current draw");
+    } else {
+        logLine("Reboot loop probe: loop not active during baseline window - inconclusive");
+    }
+    modemQueryRaw("AT+CFUN=1");
+}
+
+// Called when the modem has stopped responding mid-cycle. Diagnoses the failure pattern seen from
+// 2026-09-23 23:47 on unit 1: the modem answers AT at MODEM_BAUDRATE every wake and accepts the
+// AT+IPR switch, then every later command fails - consistent with it resetting (back to its
+// MODEM_BAUDRATE boot default, since AT+IPR isn't persistent) shortly after the switch. Logs any
+// raw bytes waiting, then retries at MODEM_BAUDRATE. If it answers there, it has reset since the
+// baud switch: SerialAT stays at MODEM_BAUDRATE so the rest of the cycle can still reach it, and
+// (once per cycle) modemWatchForReboots() logs whether it's cycling. Returns true if the modem is
+// answering AT when it returns.
+bool modemDiagnoseSilence(const char *context)
+{
+    String raw = readModemRaw(200);
+    if (raw.length()) {
+        logf("[%s] modem sent at %u baud: %s", context, g_modemBaud, raw.c_str());
+    }
+    if (modem.testAT(500)) {
+        logf("[%s] modem still answering AT at %u baud - not a baud/reset problem", context, g_modemBaud);
+        return true;
+    }
+    if (g_modemBaud == MODEM_BAUDRATE) {
+        logf("[%s] modem silent at default %u baud (no baud switch this cycle to blame)", context, MODEM_BAUDRATE);
+        return false;
+    }
+
+    uint32_t sinceSwitchS = (millis() - g_modemBaudSwitchedAtMs) / 1000;
+    SerialAT.updateBaudRate(MODEM_BAUDRATE);
+    raw = readModemRaw(300);
+    if (raw.length()) {
+        logf("[%s] modem sent at %u baud: %s", context, MODEM_BAUDRATE, raw.c_str());
+    }
+    for (int i = 0; i < 3; ++i) {
+        if (modem.testAT(500)) {
+            logf("[%s] modem silent at %u but answers at default %u baud - it has RESET since the "
+                 "baud switch %lus ago", context, g_modemBaud, MODEM_BAUDRATE, (unsigned long)sinceSwitchS);
+            g_modemBaud = MODEM_BAUDRATE;
+            if (!g_modemRebootWatchDone) {
+                g_modemRebootWatchDone = true;
+                if (modemWatchForReboots(30000) >= 6) {
+                    modemRebootLoopProbe();
+                }
+            }
+            return modem.testAT(500);
+        }
+    }
+    logf("[%s] modem silent at both %u and default %u baud (%lus after baud switch)",
+         context, g_modemBaud, MODEM_BAUDRATE, (unsigned long)sinceSwitchS);
+    SerialAT.updateBaudRate(g_modemBaud);
+    return false;
+}
+
+// Tries to get a wedged modem answering AT again before teardown. The usual way it wedges: an
+// upload stalls, TinyGsm's modemSend() gives up waiting (1000ms) for the CIPSEND/CCHSEND '>' data
+// prompt, but the modem sends the prompt late anyway and sits waiting for the payload bytes - so
+// every command we send after that (NETCLOSE, CPOF) is swallowed as socket payload instead of
+// being run. Seen in the field 2026-09-21: each "AT+CPOF not acknowledged" came right after an
+// image upload ending in status 0, preceded by gprsDisconnect()'s full 60s NETCLOSE timeout.
+// ESC (0x1B) is SIMCom's documented way to abort a pending send prompt.
+bool modemRecoverAtChannel()
+{
+    if (modem.testAT(500)) {
+        return true;
+    }
+    SerialAT.write((uint8_t)0x1B);
+    SerialAT.flush();
+    delay(200);
+    while (SerialAT.available()) {
+        SerialAT.read();
+    }
+    for (int i = 0; i < 3; ++i) {
+        if (modem.testAT(500)) {
+            logLine("Modem AT channel recovered after aborting a pending send prompt");
+            return true;
+        }
+    }
+    logLine("Modem not answering AT even after aborting any pending send prompt");
+    return modemDiagnoseSilence("teardown");
+}
+
+// Shuts the GNSS engine down cleanly. Deliberately not modem.disableGPS(): TinyGsm's version drops
+// the GNSS power rail (AT+CGSETV on MODEM_GPS_ENABLE_GPIO) *before* sending AT+CGNSSPWR=0, cutting
+// power out from under a still-running GNSS engine, and ignores every response with a 1s timeout.
+// This does it the other way round - engine off first, rail second - with room for the engine to
+// actually wind down.
+void modemGpsOff()
+{
+    modem.sendAT(GF("+CGNSSPWR=0"));
+    if (modem.waitResponse(5000L) != 1) {
+        logLine("AT+CGNSSPWR=0 not acknowledged - GNSS engine may not have shut down cleanly");
+    }
+    if (MODEM_GPS_ENABLE_GPIO != -1) {
+        modem.sendAT(GF("+CGSETV="), MODEM_GPS_ENABLE_GPIO, GF(",0"));
+        modem.waitResponse(2000L);
+        modem.sendAT(GF("+CGDRT="), MODEM_GPS_ENABLE_GPIO, GF(",0"));
+        modem.waitResponse(2000L);
+    }
+}
+
+// True once the modem has stopped answering AT for a couple of consecutive polls within
+// timeoutMs - i.e. it has actually powered down, rather than just not having acked a command.
+bool modemStoppedAnswering(uint32_t timeoutMs)
+{
+    uint32_t start = millis();
+    int misses = 0;
+    while (millis() - start < timeoutMs) {
+        if (modem.testAT(500)) {
+            misses = 0;
+            delay(500);
+        } else if (++misses >= 2) {
+            return true;
+        }
+    }
+    return false;
+}
+
+void modemPwrkeyHold()
+{
+    pinMode(BOARD_PWRKEY_PIN, OUTPUT);
+    digitalWrite(BOARD_PWRKEY_PIN, HIGH);   // inverted drive, same as modemPowerOn()'s pulse
+    delay(MODEM_POWEROFF_PULSE_WIDTH_MS);
+    digitalWrite(BOARD_PWRKEY_PIN, LOW);
+    delay(500);
+}
+
+// Powers the modem chip fully down - AT+CPOF when the AT channel works, PWRKEY hold otherwise (see
+// the comments inside for when each is safe). Must run on every path that called modemPowerOn(),
+// including one that never got an AT response at all, or the modem keeps draining the battery
+// through deep sleep.
 void modemPowerOff()
 {
     if (!g_modemPowerOnAttempted) {
         return;
     }
 
-    bool cleanShutdown = g_modemPoweredOn && modem.poweroff();
-    if (cleanShutdown) {
-        delay(2000);
+    // PWRKEY is a toggle, not an "off" line: holding it low powers an *off* module back ON (power-on
+    // only needs >= Ton; a longer hold doesn't stop it booting). So the PWRKEY fallback must only
+    // ever run when we have reason to believe the modem is still on. The old code held PWRKEY
+    // whenever CPOF's OK didn't arrive within 1s - but a CPOF that did its job with a late/lost OK
+    // left an off modem, which that hold then switched straight back on, NET/STATUS LEDs running
+    // through the whole sleep. Now: CPOF's OK is treated as a hint only, and the real test is
+    // whether the modem stops answering AT afterwards.
+    if (g_modemPoweredOn && modemRecoverAtChannel()) {
+        modem.sendAT(GF("+CPOF"));
+        bool acked = modem.waitResponse(10000L) == 1;
+        if (modemStoppedAnswering(10000)) {
+            if (!acked) {
+                logLine("AT+CPOF not acknowledged, but modem has stopped answering AT - treating it as powered down");
+            }
+        } else {
+            logLine("Modem still answering AT after AT+CPOF - forcing it off via PWRKEY hold");
+            modemPwrkeyHold();
+            if (!modemStoppedAnswering(5000)) {
+                logLine("WARNING: modem still answering AT after PWRKEY hold - it will stay powered through sleep");
+            }
+        }
     } else {
-        // Either AT+CPOF was never sent (modem never answered plain AT this cycle) or it was sent
-        // but not acknowledged in time - either way, don't just trust an unverified soft command
-        // and leave the modem powered. Per the SIM7672X hardware design guide (s3.2.2/Table 13),
-        // the only power-off path that doesn't depend on the AT channel at all is a hardware
-        // PWRKEY hold of >= 2.5s (Toff) - a much longer pulse than the ~100ms one modemPowerOn()
-        // uses to power on, and safe to issue even if the modem is already off (the mismatched
-        // pulse width is exactly what keeps a power-on pulse from a power-off hold).
-        logf("%s - forcing modem off via PWRKEY hold",
-             g_modemPoweredOn ? "AT+CPOF not acknowledged" : "Modem never came up");
-        pinMode(BOARD_PWRKEY_PIN, OUTPUT);
-        digitalWrite(BOARD_PWRKEY_PIN, HIGH);   // inverted drive, same as modemPowerOn()'s pulse
-        delay(MODEM_POWEROFF_PULSE_WIDTH_MS);
-        digitalWrite(BOARD_PWRKEY_PIN, LOW);
-        delay(500);
+        // AT channel is dead: either the modem never answered AT this cycle, or it did and then
+        // wedged. Either way it was powered on by us this cycle and hasn't been sent CPOF, so it's
+        // most likely still running - hold PWRKEY (>= 2.5s Toff, SIM7672X hardware design guide
+        // s3.2.2/Table 13), the only power-off path that doesn't depend on the AT channel. Can't
+        // verify the result: a dead AT channel reads the same whether the modem is off or hung.
+        logf("%s - forcing modem off via PWRKEY hold (unverifiable)",
+             g_modemPoweredOn ? "Modem stopped answering AT" : "Modem never came up");
+        modemPwrkeyHold();
     }
 
     g_modemPoweredOn = false;
     g_modemPowerOnAttempted = false;
+    g_modemRebootWatchDone = false;
 }
 
 // Brings up an LTE data connection on the modem, for use when WiFi association has failed. Locks
@@ -2772,6 +3204,7 @@ bool cellularConnect(const DeviceConfig &config)
 
     logLine("Waiting for LTE network registration...");
     if (!modem.waitForNetwork(CELLULAR_NET_TIMEOUT_MS)) {
+        modemDiagnoseSilence("LTE registration timeout");
         // getRegistrationStatus()/getSignalQuality() are also just AT queries, so they're safe to
         // ask even though attach failed - this is the only place that logs *why* it failed (vs.
         // just "it did"), which matters for telling a real signal blackout (REG_SEARCHING, low
@@ -2938,6 +3371,7 @@ void updateGeoLocationIfDue(DeviceConfig &config)
         }
     } else {
         logLine("Failed to enable GPS - giving up on this cycle's GPS fix");
+        modemDiagnoseSilence("GPS enable");
     }
 
     if (haveFix) {
@@ -2957,13 +3391,14 @@ void updateGeoLocationIfDue(DeviceConfig &config)
     } else {
         if (gpsEnabled) {
             logLine("No GPS fix within timeout - keeping last known location");
+            modemDiagnoseSilence("GPS no fix");
         }
         recordGpsFailure();
     }
 
     // Leave the modem powered on - the cellular uplink (if WiFi failed) still needs it, and
     // runWakeCycle() powers it down centrally at the end of the cycle via modemPowerOff().
-    modem.disableGPS(MODEM_GPS_ENABLE_GPIO, 0);
+    modemGpsOff();
 }
 
 // Last-resort clock recovery for when WiFi and cellular have both failed and the clock has never
@@ -3030,9 +3465,10 @@ bool gpsSyncTime(DeviceConfig &config)
             delay(2000);
         }
         if (gpsEnabled) {
-            modem.disableGPS(MODEM_GPS_ENABLE_GPIO, 0);
+            modemGpsOff();
         } else {
             logLine("Failed to enable GPS for clock sync");
+            modemDiagnoseSilence("GPS clock enable");
         }
     }
 
@@ -3565,7 +4001,9 @@ void runWakeCycle()
     // Power the modem down - it may have been brought up for GPS (updateGeoLocationIfDue) and/or
     // the cellular uplink (cellularConnect). No-op if it was never powered on this cycle. It's a
     // separate power domain from the ESP32, so skipping this leaves it draining through deep sleep.
-    if (g_uplink == UPLINK_CELL) {
+    // Unwedge the AT channel first (see modemRecoverAtChannel()) - otherwise a stalled upload's
+    // pending send prompt swallows NETCLOSE and gprsDisconnect() burns its full 60s timeout.
+    if (g_uplink == UPLINK_CELL && modemRecoverAtChannel()) {
         modem.gprsDisconnect();
     }
     modemPowerOff();
