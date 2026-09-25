@@ -2860,6 +2860,7 @@ void modemFactoryReset()
          "(1 = the restart itself; more = still looping)", boots);
     logf("  AT+CPSI? -> %s", modemQueryRaw("AT+CPSI?").c_str());
     logf("  AT+CEREG? -> %s", modemQueryRaw("AT+CEREG?").c_str());
+    logf("  AT+CEER -> %s", modemQueryRaw("AT+CEER").c_str());
 }
 
 // Pulls "<a>,<b>" out of an escaped "+CNBP: <a>,<b>\r\n..." reply from modemQueryRaw(). Empty if
@@ -2905,6 +2906,10 @@ bool modemSetBands(const String &setting)
 // band) the only one that crashed. This run tests that directly: all bands (baseline, same
 // session), all bands EXCEPT B28 (does it stop looping and register elsewhere? - would also be a
 // workaround), B28 alone, then B3 and B7 alone with longer windows than last time.
+//
+// Second run (2026-09-25 08:00-10:00 NZT, unit 2 outdoors, 60s): all=8 all-but-B28=35 B28=7 B3=19
+// B7=0 - so not B28-specific. B7 found a cell and got +CEREG: 0,3 (registration DENIED) without
+// crashing; AT+CEER is logged after each window to capture the network's reject cause.
 //
 // The original AT+CNBP value is read first and restored at the end (it's stored in NV, so would
 // otherwise survive power-off); aborts without changing anything if it can't be read. The second
@@ -2956,6 +2961,7 @@ void modemBandLockTest()
         logf("  AT+CPSI? -> %s", modemQueryRaw("AT+CPSI?").c_str());
         logf("  AT+CEREG? -> %s", modemQueryRaw("AT+CEREG?").c_str());
         logf("  AT+CSQ -> %s", modemQueryRaw("AT+CSQ").c_str());
+        logf("  AT+CEER -> %s", modemQueryRaw("AT+CEER").c_str());
         summary += String(" ") + run.label + "=" + String(boots) + (held ? "" : "(lock lost)");
     }
 
@@ -2986,7 +2992,7 @@ void modemRebootLoopProbe()
     logLine("Reboot loop probe: modem-side supply, temperature and stored settings...");
     const char *queries[] = {"AT+CBC", "AT+CPMUTEMP", "AT+SIMCOMATI", "AT+CNMP?", "AT+IPREX?",
                              "AT+CGNSSPWR?", "AT+CGDRT?", "AT+CFUN?", "AT+CGDCONT?", "AT+COPS?",
-                             "AT+CPSI?", "AT+CNBP?", "AT+CBC"};
+                             "AT+CPSI?", "AT+CNBP?", "AT+CEREG?", "AT+CEER", "AT+CBC"};
     for (const char *q : queries) {
         logf("  %s -> %s", q, modemQueryRaw(q).c_str());
     }
