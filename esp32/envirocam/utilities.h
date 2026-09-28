@@ -80,12 +80,98 @@
 // SIMCOM standard interface series
 // #define LILYGO_SIM7000G_S3_STAN
 // #define LILYGO_SIM7080G_S3_STAN
+// Default for Arduino IDE builds - PlatformIO envs pass their own board define via build_flags, so
+// this is skipped when the Waveshare board has been selected there instead.
+#if !defined(WAVESHARE_ESP32S3_SIM7670G)
 #define LILYGO_SIM7670G_S3_STAN
+#endif
 // #define LILYGO_A7670X_S3_STAN
 // #define LILYGO_SIM7600X_S3_STAN
 
+// Waveshare ESP32-S3-SIM7670G-4G (https://docs.waveshare.com/ESP32-S3-SIM7670G-4G) - not a LilyGo
+// board, see its block below.
+// #define WAVESHARE_ESP32S3_SIM7670G
 
-#if defined(LILYGO_T_A7670)
+
+#if defined(WAVESHARE_ESP32S3_SIM7670G)
+
+    // Pins below are from Waveshare's schematic (ESP32-S3-A-SIM7670X-4G-Sch.pdf, the same PCB for the
+    // SIM7670G and A7670E builds) cross-checked against their CameraWebServer/GNSS/MAX17048 examples -
+    // their docs site doesn't publish a pin table. Chip is an ESP32-S3R2 (2MB quad PSRAM, 16MB
+    // external flash) despite the product page saying R8: the camera uses GPIO34-37, which octal PSRAM
+    // would occupy.
+    //
+    // DIP switch SW2 (back of board) must be: CAM ON, 4G OFF, USB OFF, HUB either way.
+    //  - 4G ON hard-wires the modem supply on, so MODEM_POWER_EN_PIN can't turn the modem off - and it
+    //    fights that pin (3.3V through the switch vs our LOW through 200R) whenever we try to.
+    //  - USB ON routes the modem's USB to the ESP32-S3's own USB pins instead of the Type-C hub; not
+    //    used here (the modem is driven over UART).
+
+    #define MODEM_BAUDRATE                      (115200)
+
+    // MAX17048 fuel gauge (0x36) on this bus. The camera's SCCB is a separate bus (CAMERA_SIOD/SIOC).
+    #define BOARD_SDA_PIN                       (3)
+    #define BOARD_SCL_PIN                       (2)
+    #define BOARD_FUEL_GAUGE_MAX17048
+    #define BOARD_MAX17048_ADDR                 (0x36)
+
+    // Modem UART goes through a TXB0104 1.8V<->3.3V level shifter
+    #define MODEM_RX_PIN                        (17)
+    #define MODEM_TX_PIN                        (18)
+    #define MODEM_DTR_PIN                       (45)
+    #define MODEM_RING_PIN                      (40)
+
+    // No PWRKEY GPIO on this board: a transistor holds the modem's PWRKEY low whenever its supply is
+    // up, so it boots as soon as power is applied. Power is instead switched by a load switch
+    // (FDC6333C) on the modem's VBAT, gated by this pin (HIGH = on). The gate has a 100K pulldown, so
+    // the modem is off while the pin floats - including through deep sleep, where GPIO33 (not an RTC
+    // GPIO) isn't held.
+    #define MODEM_POWER_EN_PIN                  (33)
+
+    // No battery-divider ADC (see BOARD_FUEL_GAUGE_MAX17048) and no solar ADC - the CN3791 solar
+    // charger isn't wired to a GPIO. BOARD_SOLAR_ADC_PIN deliberately left undefined.
+
+    // TF card - wired for SDMMC 1-bit, but driven in SPI mode here to share code with the LilyGo
+    // board (SD SPI mode: DAT3=CS, CMD=MOSI, CLK=SCK, DAT0=MISO).
+    #define BOARD_MISO_PIN                      (6)
+    #define BOARD_MOSI_PIN                      (4)
+    #define BOARD_SCK_PIN                       (5)
+    #define BOARD_SD_CS_PIN                     (46)
+
+    // Camera supply comes from the CAM DIP switch only - there's no software power control, and PWDN
+    // is tied low and RESET to the ESP32's CHIP_PU. See setCameraPower().
+    #define CAMERA_PWDN_PIN                     (-1)
+    #define CAMERA_RESET_PIN                    (-1)
+    #define CAMERA_XCLK_PIN                     (34)
+    #define CAMERA_SIOD_PIN                     (15)
+    #define CAMERA_SIOC_PIN                     (16)
+    #define CAMERA_VSYNC_PIN                    (36)
+    #define CAMERA_HREF_PIN                     (35)
+    #define CAMERA_PCLK_PIN                     (37)
+    #define CAMERA_Y9_PIN                       (14)
+    #define CAMERA_Y8_PIN                       (13)
+    #define CAMERA_Y7_PIN                       (12)
+    #define CAMERA_Y6_PIN                       (11)
+    #define CAMERA_Y5_PIN                       (10)
+    #define CAMERA_Y4_PIN                       (9)
+    #define CAMERA_Y3_PIN                       (8)
+    #define CAMERA_Y2_PIN                       (7)
+
+    #define BOARD_RGB_LED_PIN                   (38)   // WS2812B
+
+    #define SerialAT                            Serial1
+
+    #ifndef TINY_GSM_MODEM_SIM7670G
+        #define TINY_GSM_MODEM_SIM7670G
+    #endif
+    // The module's GNSS_PWRCTL is strapped to one of its own GPIOs through a resistor, but which
+    // AT+CGDRT number that is isn't documented anywhere. Waveshare's own GNSS example only sends
+    // AT+CGNSSPWR=1, so skip the AT+CGDRT/CGSETV step. Revisit if GNSS never gets a fix.
+    #define MODEM_GPS_ENABLE_GPIO               (-1)
+    #define MODEM_GPS_ENABLE_LEVEL              (1)
+    #define PRODUCT_MODEL_NAME                  "Waveshare-ESP32-S3-SIM7670G-4G"
+
+#elif defined(LILYGO_T_A7670)
 
     #define MODEM_BAUDRATE                      (115200)
     #define MODEM_DTR_PIN                       (25)

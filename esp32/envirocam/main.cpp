@@ -45,8 +45,12 @@
 #include <TinyGsmClient.h>
 
 #if !defined(LILYGO_SIM7000G_S3_STAN) && !defined(LILYGO_SIM7080G_S3_STAN) \
-    && !defined(LILYGO_SIM7670G_S3_STAN) && !defined(LILYGO_A7670X_S3_STAN)  && !defined(LILYGO_SIM7600X_S3_STAN)
-#error "This sketch is only applicable to the T-A7670X-S3-Standard,T-SIM7000G-S3-Standard,T-SIM7080G-S3-Standard,T-SIM7670G-S3-Standard,T-SIM7600X-S3-Standard"
+    && !defined(LILYGO_SIM7670G_S3_STAN) && !defined(LILYGO_A7670X_S3_STAN)  && !defined(LILYGO_SIM7600X_S3_STAN) \
+    && !defined(WAVESHARE_ESP32S3_SIM7670G)
+#error "This sketch is only applicable to the T-A7670X-S3-Standard,T-SIM7000G-S3-Standard,T-SIM7080G-S3-Standard,T-SIM7670G-S3-Standard,T-SIM7600X-S3-Standard,Waveshare ESP32-S3-SIM7670G-4G"
+#endif
+#if defined(WAVESHARE_ESP32S3_SIM7670G) && defined(LILYGO_SIM7670G_S3_STAN)
+#error "Both WAVESHARE_ESP32S3_SIM7670G and LILYGO_SIM7670G_S3_STAN are defined - pick one board"
 #endif
 
 #define ENABLE_BATTERY_MON
@@ -703,6 +707,12 @@ void checkAndLogCoreDump()
 
 bool setCameraPower(bool enable)
 {
+#if defined(WAVESHARE_ESP32S3_SIM7670G)
+    // No camera power chip on this board - the supply is on whenever the CAM DIP switch is, so the
+    // camera can't be switched off between captures or reset by power-cycling it here.
+    (void)enable;
+    return true;
+#else
     static bool started = false;
 
     if (!started) {
@@ -749,14 +759,41 @@ bool setCameraPower(bool enable)
         delay(100);
     }
     return true;
+#endif
 }
 
+#if defined(BOARD_FUEL_GAUGE_MAX17048)
+// Returned when the gauge can't be read. Deliberately not 0: setup()'s low-battery check would
+// then deep-sleep the unit on every boot for good. Visibly bogus in telemetry instead, and
+// get_battery_percent() reads it as full.
+#define BATTERY_VOLTAGE_READ_FAILED 0xFFFF
+
+uint16_t get_battery_voltage()
+{
+    static bool wireStarted = false;
+    if (!wireStarted) {
+        Wire.begin(BOARD_SDA_PIN, BOARD_SCL_PIN);
+        wireStarted = true;
+    }
+    Wire.beginTransmission(BOARD_MAX17048_ADDR);
+    Wire.write(0x02);   // VCELL
+    if (Wire.endTransmission(false) != 0 || Wire.requestFrom(BOARD_MAX17048_ADDR, 2) != 2) {
+        logLine("Fuel gauge (MAX17048) not answering - battery voltage unknown");
+        return BATTERY_VOLTAGE_READ_FAILED;
+    }
+    uint16_t raw = (Wire.read() << 8) | Wire.read();
+    uint16_t vol = (uint32_t)raw * 5 / 64;   // 78.125uV/LSB
+    logf("Voltage:%u", vol);
+    return vol;
+}
+#else
 uint16_t get_battery_voltage()
 {
     uint16_t vol = analogReadMilliVolts(BOARD_BAT_ADC_PIN) * 2;
     logf("Voltage:%u", vol);
     return vol;
 }
+#endif
 
 // Returns 0 if the board has no solar ADC pin wired up
 uint16_t get_solar_voltage()
@@ -2672,11 +2709,41 @@ void negotiateModemBaud()
     logf("Modem UART staying at default %u baud - no faster rate held up", MODEM_BAUDRATE);
 }
 
-// Brings the modem chip up over SerialAT and waits for it to answer AT. Idempotent - the
-// PWRKEY pulse only happens on the first call of a wake cycle (tracked by g_modemPoweredOn), so
-// GPS (updateGeoLocationIfDue) and the cellular uplink (cellularConnect) can both call it.
-// Returns false if the modem never responds within GEO_FIX_TIMEOUT_MS. Callers must arrange for
-// modemPowerOff() to run before deep sleep (runWakeCycle() does this centrally).
+#if defined(MODEM_POWER_EN_PIN)
+// Time for the modem's supply rail (2x100uF plus the module's own decoupling) to discharge before
+// powering it back up, so the module sees a real power-on reset rather than a brown-out dip.
+#define MODEM_SUPPLY_OFF_SETTLE_MS 2000
+
+void modemSupplyOff()
+{
+    pinMode(MODEM_POWER_EN_PIN, OUTPUT);
+    digitalWrite(MODEM_POWER_EN_PIN, LOW);
+    delay(MODEM_SUPPLY_OFF_SETTLE_MS);
+}
+#endif
+
+// Starts the modem booting. Boards with a switched modem supply (MODEM_POWER_EN_PIN) boot it by
+// applying power - their PWRKEY is held low in hardware; the LilyGo boards pulse PWRKEY.
+void modemStartBoot()
+{
+#if defined(MODEM_POWER_EN_PIN)
+    pinMode(MODEM_POWER_EN_PIN, OUTPUT);
+    digitalWrite(MODEM_POWER_EN_PIN, HIGH);
+#else
+    pinMode(BOARD_PWRKEY_PIN, OUTPUT);
+    digitalWrite(BOARD_PWRKEY_PIN, LOW);
+    delay(100);
+    digitalWrite(BOARD_PWRKEY_PIN, HIGH);
+    delay(MODEM_POWERON_PULSE_WIDTH_MS);
+    digitalWrite(BOARD_PWRKEY_PIN, LOW);
+#endif
+}
+
+// Brings the modem chip up over SerialAT and waits for it to answer AT. Idempotent - the power-on
+// (see modemStartBoot()) only happens on the first call of a wake cycle (tracked by
+// g_modemPoweredOn), so GPS (updateGeoLocationIfDue) and the cellular uplink (cellularConnect) can
+// both call it. Returns false if the modem never responds within GEO_FIX_TIMEOUT_MS. Callers must
+// arrange for modemPowerOff() to run before deep sleep (runWakeCycle() does this centrally).
 bool modemPowerOn()
 {
     if (g_modemPoweredOn) {
@@ -2686,16 +2753,11 @@ bool modemPowerOn()
     SerialAT.begin(MODEM_BAUDRATE, SERIAL_8N1, MODEM_RX_PIN, MODEM_TX_PIN);
     g_modemBaud = MODEM_BAUDRATE;
 
-    pinMode(BOARD_PWRKEY_PIN, OUTPUT);
-    digitalWrite(BOARD_PWRKEY_PIN, LOW);
-    delay(100);
-    digitalWrite(BOARD_PWRKEY_PIN, HIGH);
-    delay(MODEM_POWERON_PULSE_WIDTH_MS);
-    digitalWrite(BOARD_PWRKEY_PIN, LOW);
+    modemStartBoot();
 
-    // Set as soon as PWRKEY has actually been pulsed, not after AT succeeds - modemPowerOff() needs
-    // to know a power-on was attempted even when the modem below never answers, so it can force the
-    // chip off via a hardware PWRKEY hold instead of silently leaving it running (see modemPowerOff()).
+    // Set as soon as the modem has actually been started, not after AT succeeds - modemPowerOff()
+    // needs to know a power-on was attempted even when the modem below never answers, so it can force
+    // the chip off in hardware instead of silently leaving it running (see modemPowerOff()).
     g_modemPowerOnAttempted = true;
 
     uint32_t start = millis();
@@ -2706,12 +2768,18 @@ bool modemPowerOn()
             return false;
         }
         if (++retry > GEO_MODEM_BOOT_RETRIES) {
+#if defined(MODEM_POWER_EN_PIN)
+            logLine("Modem not responding yet - power-cycling its supply");
+            modemSupplyOff();
+            modemStartBoot();
+#else
             logLine("Modem not responding yet - re-pulsing PWRKEY");
             digitalWrite(BOARD_PWRKEY_PIN, LOW);
             delay(100);
             digitalWrite(BOARD_PWRKEY_PIN, HIGH);
             delay(MODEM_POWERON_PULSE_WIDTH_MS);
             digitalWrite(BOARD_PWRKEY_PIN, LOW);
+#endif
             retry = 0;
         }
     }
@@ -3125,6 +3193,7 @@ bool modemStoppedAnswering(uint32_t timeoutMs)
     return false;
 }
 
+#if !defined(MODEM_POWER_EN_PIN)
 void modemPwrkeyHold()
 {
     pinMode(BOARD_PWRKEY_PIN, OUTPUT);
@@ -3133,9 +3202,11 @@ void modemPwrkeyHold()
     digitalWrite(BOARD_PWRKEY_PIN, LOW);
     delay(500);
 }
+#endif
 
 // Powers the modem chip fully down - AT+CPOF when the AT channel works, PWRKEY hold otherwise (see
-// the comments inside for when each is safe). Must run on every path that called modemPowerOn(),
+// the comments inside for when each is safe), or by cutting its supply on a board that can
+// (MODEM_POWER_EN_PIN). Must run on every path that called modemPowerOn(),
 // including one that never got an AT response at all, or the modem keeps draining the battery
 // through deep sleep.
 void modemPowerOff()
@@ -3144,6 +3215,22 @@ void modemPowerOff()
         return;
     }
 
+#if defined(MODEM_POWER_EN_PIN)
+    // Switched-supply board: PWRKEY is held low in hardware whenever the modem has power, so CPOF on
+    // its own doesn't keep it off - the module just boots again. Cutting the supply is what actually
+    // turns it off, and unlike a PWRKEY toggle it's unconditional. CPOF first anyway when the AT
+    // channel works, so the modem detaches from the network and flushes NV before losing power.
+    if (g_modemPoweredOn && modemRecoverAtChannel()) {
+        modem.sendAT(GF("+CPOF"));
+        if (modem.waitResponse(10000L) != 1) {
+            logLine("AT+CPOF not acknowledged - cutting modem supply anyway");
+        }
+        delay(1000);
+    } else {
+        logf("%s - cutting modem supply", g_modemPoweredOn ? "Modem stopped answering AT" : "Modem never came up");
+    }
+    modemSupplyOff();
+#else
     // PWRKEY is a toggle, not an "off" line: holding it low powers an *off* module back ON (power-on
     // only needs >= Ton; a longer hold doesn't stop it booting). So the PWRKEY fallback must only
     // ever run when we have reason to believe the modem is still on. The old code held PWRKEY
@@ -3175,6 +3262,7 @@ void modemPowerOff()
              g_modemPoweredOn ? "Modem stopped answering AT" : "Modem never came up");
         modemPwrkeyHold();
     }
+#endif
 
     g_modemPoweredOn = false;
     g_modemPowerOnAttempted = false;
@@ -3834,9 +3922,11 @@ void runWakeCycle()
                               && deviceConfig.cameraModel != "OV2640"
                               && isNightForExposure(time(nullptr), deviceConfig.geoLat, deviceConfig.geoLon);
 
+#ifdef BOARD_POWER_SAVE_MODE_PIN
     // Enable / disable power save mode (1 disabled, 0 enabled)
     pinMode(BOARD_POWER_SAVE_MODE_PIN, OUTPUT);
     digitalWrite(BOARD_POWER_SAVE_MODE_PIN, HIGH);
+#endif
 
     camera_config_t config;
     config.ledc_channel = LEDC_CHANNEL_0;

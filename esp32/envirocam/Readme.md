@@ -91,3 +91,13 @@ Both telemetry and images go over HTTP to the same API the Raspberry Pi units al
 - `apiUrl` is itself one of the config fields, so pointing a device at a different API deployment is just an admin-side edit - the device picks it up next time it successfully uploads.
 - `hflip`/`vflip` mirror/flip the sensor image (`set_hmirror`/`set_vflip`), applied at camera init each boot - useful for correcting a camera that's physically mounted upside down or reversed.
 - `enableLongExposureAtNight`/`longExposureXclkHz` are the OV5640-only, much rougher equivalent of the Raspberry Pi units' `camera.enable_long_exposure_at_night`/`camera.long_exposure_time` (see `scripts/savePhotos.py` and `setupCameraNightExposure()` in `main.cpp`) - unlike those two, they're read only from `/config.json` on the SD card, not yet wired into the API's `Device` model/admin UI, so they need editing on the card (or via a config field the API already knows) rather than remotely. Not verified against real hardware yet - see `setupCameraNightExposure()`'s comment before enabling fleet-wide.
+
+
+Waveshare ESP32-S3-SIM7670G
+Flashing when asleep
+- Plug into USB, press and hold Boot, press Reset, release Boot. Will go into download mode.
+DIP siwtches:
+- Cam On
+- Hub On (Off when deployed?)
+- 4G On (Claude suggests off but if I do that, it reboots)
+- USB Off
