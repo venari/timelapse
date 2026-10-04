@@ -64,6 +64,17 @@
 #define WIFI_CONNECT_TIMEOUT_MS 15000       // Give up on WiFi after this long
 #define CELLULAR_NET_TIMEOUT_MS 60000       // Give up waiting for LTE network attach after this long
                                              // (see cellularConnect()) - only reached when WiFi failed
+// Set to 0 to stop the firmware ever using the modem's cellular side - no LTE network attach, no
+// data uplink, no cellular time sync (see cellularConnect()). GPS is unaffected: it still powers
+// the modem on for GNSS fixes and GPS clock recovery (see updateGeoLocationIfDue()/gpsSyncTime()),
+// since that's the same chip and can't be had without it. With this off, a unit that can't reach
+// WiFi just queues everything on SD until it can. Added while chasing the SIM7670G power/reboot-loop
+// issues - see modemPowerOn()/modemPowerOff(). Can also be overridden from platformio.ini with
+// -DCELLULAR_UPLINK_ENABLED=0.
+// Until we have a fix for https://github.com/Xinyuan-LilyGO/LilyGo-Modem-Series/issues/540
+#ifndef CELLULAR_UPLINK_ENABLED
+#define CELLULAR_UPLINK_ENABLED 0
+#endif
 #define NTP_SERVER              "pool.ntp.org"
 #define GMT_OFFSET_SEC           0          // Adjust for local timezone
 #define DAY_LIGHT_OFFSET_SEC     0          // Adjust for daylight saving
@@ -2928,6 +2939,13 @@ void modemPowerOff()
 // network-attach wait.
 bool cellularConnect(const DeviceConfig &config)
 {
+#if !CELLULAR_UPLINK_ENABLED
+    // See CELLULAR_UPLINK_ENABLED. Every other cellular modem call (uplinkConnected(),
+    // gprsDisconnect(), the gsmClient in ApiConnection) is already gated on g_uplink == UPLINK_CELL,
+    // which never gets set if this returns false - so this one early-out covers all of them.
+    logLine("WiFi unavailable - cellular uplink disabled (CELLULAR_UPLINK_ENABLED=0), continuing offline");
+    return false;
+#endif
     logLine("WiFi unavailable - bringing up cellular (LTE) uplink...");
 
     // Drop the failed WiFi association - no point holding the radio on while cellular runs.
