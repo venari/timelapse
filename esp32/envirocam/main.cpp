@@ -79,6 +79,27 @@
 #define TELEMETRY_HOLDING_DIR    "/telemetry/holding"   // Records the API rejected outright (e.g. 400) land here instead - kept for inspection, never retried
 
 #define CAMERA_DIR               "/camera/pending"      // Uploaded images are deleted, not archived - see uploadPendingImages()
+// Images captured while the clock has never been set (fresh power-on, no WiFi/LTE/GPS time yet)
+// - see getDatedPath(). Deliberately outside CAMERA_DIR: they can't be uploaded until their real
+// capture time is known, and keeping them out of there keeps them out of every upload scan.
+// reconcileUnsyncedCaptures() moves them into CAMERA_DIR once that time can be worked out;
+// anything it never can (see CLOCK_SESSION_FILE) just stays here for manual recovery.
+#define UNSYNCED_CAMERA_DIR      "/camera/unsynced"
+// Same idea for telemetry - see writeTelemetryFile(). Also outside TELEMETRY_DIR, for the same reason.
+#define UNSYNCED_TELEMETRY_DIR   "/telemetry/unsynced"
+#define UNSYNCED_OFFSET_FILE     "offset.txt"   // Per-session "real - raw" clock offset, in seconds - see onClockSyncedThisWake()
+#define UNSYNCED_RECONCILE_BATCH 100            // Max renames per wake (images + telemetry) - a long outage's backlog drains over several wakes
+// Running image sequence number, appended to every image's filename (see capturePhoto()). On SD,
+// not RTC memory, so it keeps counting up across power loss - that's what stops a fresh power-on
+// (clock back at 1970) from overwriting images an earlier unsynced run left behind.
+#define IMAGE_SEQ_FILE           "/image_seq.txt"
+// "<session id> <last raw clock seen>" - see updateClockSession(). A "session" is one unbroken run
+// of the RTC since the last power-on: within one, the clock keeps counting up from 1970 across
+// deep sleep (and soft resets), so the images it took are all a fixed offset away from real time,
+// and one sync during that run is enough to recover that offset for all of them. A power loss
+// restarts the clock, which is what starts a new session - and anything the previous one
+// captured without ever syncing has lost its anchor for good.
+#define CLOCK_SESSION_FILE       "/clock_session.txt"
 
 #define COUNTS_FILE              "/counts.txt"  // Running pending/uploaded totals, kept up to date incrementally
                                                  // instead of scanning directories (which gets slow with thousands of files)
@@ -265,6 +286,18 @@ static const uint32_t MODEM_FAST_BAUDRATES[] = {460800, 230400};
 
 RTC_DATA_ATTR int bootCount = 0;
 
+// See CLOCK_SESSION_FILE - set by updateClockSession() at the top of every runWakeCycle(), only
+// meaningful while the clock is unsynced (it picks the UNSYNCED_CAMERA_DIR subdirectory).
+uint32_t clockSessionId = 0;
+
+// Raw clock reading taken at the start of each runWakeCycle(), before any sync attempt - see
+// onClockSyncedThisWake(). wakeClockAnchorMs is gettimeofday() in ms, wakeMillisAnchor is
+// millis() at the same instant, so the raw clock "now" can still be worked out after a sync has
+// overwritten it: wakeClockAnchorMs + (millis() - wakeMillisAnchor).
+int64_t wakeClockAnchorMs = 0;
+uint32_t wakeMillisAnchor = 0;
+bool wakeClockUnsynced = false;
+
 // Consecutive GPS-fix failure count and remaining backoff skips - see GPS_FAILURE_BACKOFF_THRESHOLD
 // above. RTC memory rather than CONFIG_FILE: only needs to survive deep sleep between wake cycles,
 // not a real power loss, and a device that's just power-cycled deserves a fresh attempt anyway.
@@ -432,10 +465,13 @@ const size_t BATTERY_CURVE_LAST = sizeof(BATTERY_CURVE) / sizeof(BATTERY_CURVE[0
 // unambiguous if it ever ends up copied out of its yyyy/mm/dd/hh bucket - e.g. into a flat
 // backup folder - and so two captures inside the same minute don't collide (the capture
 // interval has been as low as 10s in the past).
-// Falls back to a flat "unsynced/boot-N" name if the clock was never synced.
+// Images also carry a "-<sequence>" suffix (see IMAGE_SEQ_FILE), e.g. "20260813-140530-000123".
+// If the clock was never synced, the raw clock value is used as-is (e.g. 1970-01-01 plus however
+// long since power-on) under a "session-NNNN/" prefix and synced = false - see getDatedPath().
 struct DatedPath {
-    String dirPath;    // e.g. "2026/08/13/14", or "unsynced"
-    String leafName;   // e.g. "20260813-140530", or "boot-3"
+    String dirPath;    // e.g. "2026/08/13/14", or "session-0005/1970/01/01/00" when !synced
+    String leafName;   // e.g. "20260813-140530-000123"
+    bool synced;
 };
 
 // Pieces of a parsed apiUrl (e.g. "https://timelapse-dev.azurewebsites.net/api/") - what
@@ -930,6 +966,99 @@ void writeSetupApAttempts(int attempts)
     }
 }
 
+// See IMAGE_SEQ_FILE - claims and persists the next sequence number. Written back before the image
+// itself, so a crash mid-write can only ever leave a gap in the sequence, never a reuse.
+uint32_t nextImageSequence()
+{
+    uint32_t sequence = 0;
+    File file = SD.open(IMAGE_SEQ_FILE, "r");
+    if (file) {
+        sequence = (uint32_t)file.readStringUntil('\n').toInt();
+        file.close();
+    }
+    sequence++;
+
+    file = SD.open(IMAGE_SEQ_FILE, "w");
+    if (file) {
+        file.println(sequence);
+        file.close();
+    } else {
+        logLine("Failed to write image sequence number!");
+    }
+    return sequence;
+}
+
+String fileBaseName(const String &path);   // defined below, with the other path helpers
+
+// Highest N among UNSYNCED_CAMERA_DIR/session-N directories, or 0 if none - lets
+// updateClockSession() pick an unused id if CLOCK_SESSION_FILE itself has gone missing, rather
+// than restarting at 1 and merging new images into an old session (and its offset).
+uint32_t highestUnsyncedSessionId()
+{
+    uint32_t highest = 0;
+    File dir = SD.open(UNSYNCED_CAMERA_DIR);
+    if (!dir) {
+        return 0;
+    }
+    File entry = dir.openNextFile();
+    while (entry) {
+        String name = fileBaseName(entry.name());
+        if (entry.isDirectory() && name.startsWith("session-")) {
+            highest = std::max(highest, (uint32_t)name.substring(8).toInt());
+        }
+        entry.close();
+        entry = dir.openNextFile();
+    }
+    dir.close();
+    return highest;
+}
+
+void writeClockSession(uint32_t sessionId, time_t lastRaw)
+{
+    File file = SD.open(CLOCK_SESSION_FILE, "w");
+    if (file) {
+        file.printf("%u %ld\n", sessionId, (long)lastRaw);
+        file.close();
+    } else {
+        logLine("Failed to write clock session file!");
+    }
+}
+
+// See CLOCK_SESSION_FILE. Called at the top of every runWakeCycle(), before any sync attempt.
+// Only does anything while the clock is unsynced: the RTC only ever counts *up* within a session,
+// so a raw reading below the last one recorded means it restarted - a power loss - and this is
+// a new session. onClockSyncedThisWake() records the (huge) synced time as "last seen" once a
+// session syncs, so the next unsynced power-on always reads as a new session too.
+void updateClockSession()
+{
+    time_t now = time(nullptr);
+    if (now >= CLOCK_PLAUSIBLE_AFTER_EPOCH) {
+        return;
+    }
+
+    uint32_t sessionId = 0;
+    long lastRaw = 0;
+    bool haveFile = false;
+    File file = SD.open(CLOCK_SESSION_FILE, "r");
+    if (file) {
+        String line = file.readStringUntil('\n');
+        file.close();
+        haveFile = sscanf(line.c_str(), "%u %ld", &sessionId, &lastRaw) == 2;
+    }
+
+    if (!haveFile) {
+        sessionId = highestUnsyncedSessionId() + 1;
+        logf("Clock unsynced, no clock session on record - starting session %u", sessionId);
+    } else if ((long)now < lastRaw) {
+        sessionId++;
+        logf("Clock unsynced and restarted since last seen (%ld s -> %ld s) - starting session %u",
+             lastRaw, (long)now, sessionId);
+    }
+
+    writeClockSession(sessionId, now);
+    clockSessionId = sessionId;
+}
+
 // Returns all-zero counts if never written yet (no file, or unreadable)
 TelemetryCounts readCounts()
 {
@@ -1190,43 +1319,71 @@ String fileBaseName(const String &path)
     return (slashIdx >= 0) ? path.substring(slashIdx + 1) : path;
 }
 
-DatedPath getDatedPath()
+// "session-0005" - see CLOCK_SESSION_FILE.
+String clockSessionDirName(uint32_t sessionId)
+{
+    char buf[16];
+    snprintf(buf, sizeof(buf), "session-%04u", sessionId);
+    return String(buf);
+}
+
+// The yyyy/mm/dd/hh bucket and yyyymmdd-hhmmss[-sequence] leaf for `t` (UTC - the sketch runs
+// GMT_OFFSET_SEC = 0). Works on any value, real or not - getDatedPath() relies on that for the
+// unsynced case, and reconcileUnsyncedDir() for re-filing a capture under its corrected time.
+// sequence 0 means "no suffix" (telemetry).
+DatedPath datedPathForTime(time_t t, uint32_t sequence)
 {
     struct tm timeinfo;
-    if (!getLocalTime(&timeinfo, 0)) {
-        DatedPath fallback;
-        fallback.dirPath = "unsynced";
-        fallback.leafName = "boot-" + String(bootCount);
-        return fallback;
-    }
+    gmtime_r(&t, &timeinfo);
 
     char dirBuf[16];
     snprintf(dirBuf, sizeof(dirBuf), "%04d/%02d/%02d/%02d",
               timeinfo.tm_year + 1900, timeinfo.tm_mon + 1, timeinfo.tm_mday, timeinfo.tm_hour);
 
-    char leafBuf[20];
+    char leafBuf[32];
     snprintf(leafBuf, sizeof(leafBuf), "%04d%02d%02d-%02d%02d%02d",
               timeinfo.tm_year + 1900, timeinfo.tm_mon + 1, timeinfo.tm_mday,
               timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
+    if (sequence > 0) {
+        size_t len = strlen(leafBuf);
+        snprintf(leafBuf + len, sizeof(leafBuf) - len, "-%06u", sequence);
+    }
 
     DatedPath result;
     result.dirPath = String(dirBuf);
     result.leafName = String(leafBuf);
+    result.synced = true;
+    return result;
+}
+
+// Unlike the old getLocalTime()-based version (which refused anything before 2016), always uses
+// whatever the clock says - an unsynced clock's 1970-based value is still a usable "seconds since
+// power-on" reading, which is exactly what reconcileUnsyncedDir() needs to recover the real
+// time later. Such a path comes back with synced = false and a session-NNNN/ prefix so callers
+// can keep it apart from real timestamps.
+DatedPath getDatedPath(uint32_t sequence = 0)
+{
+    time_t now = time(nullptr);
+    DatedPath result = datedPathForTime(now, sequence);
+    if (now < CLOCK_PLAUSIBLE_AFTER_EPOCH) {
+        result.dirPath = clockSessionDirName(clockSessionId) + "/" + result.dirPath;
+        result.synced = false;
+    }
     return result;
 }
 
 // Parses a path built from a DatedPath (e.g. ".../2026/08/13/14/20260813-140530.jpeg") back into
 // an ISO8601 timestamp - the inverse of getDatedPath(), needed when uploading images (unlike
 // telemetry, which already carries its own timestamp inside the file). The leaf name alone
-// carries the full yyyymmdd-hhmmss, so this doesn't need to consult the yyyy/mm/dd/hh
-// directory segments at all.
+// carries the full yyyymmdd-hhmmss (any "-<sequence>" suffix after it is ignored), so this doesn't
+// need to consult the yyyy/mm/dd/hh directory segments at all.
 String parseTimestampFromPath(const String &path)
 {
     String leaf = fileBaseName(path);
     int dotIdx = leaf.lastIndexOf('.');
     String stamp = (dotIdx >= 0) ? leaf.substring(0, dotIdx) : leaf;   // "yyyymmdd-hhmmss"
     if (stamp.length() < 15) {
-        return "unknown";   // e.g. the "unsynced/boot-N" fallback name
+        return "unknown";   // e.g. the old "unsynced/boot-N" fallback name from earlier firmware
     }
 
     return stamp.substring(0, 4) + "-" + stamp.substring(4, 6) + "-" + stamp.substring(6, 8)
@@ -1359,6 +1516,20 @@ String getISO8601Timestamp()
     return String(buf);
 }
 
+// Like getISO8601Timestamp(), but never "unknown" - an unsynced clock comes out as its raw
+// 1970-based value (e.g. "1970-01-01T00:12:34Z"), which reconcileUnsyncedDir() later corrects by
+// the session's offset. Telemetry only: anything else that stores a timestamp (geoTimeRecorded,
+// the status page) still wants "unknown" rather than a time that looks real but isn't.
+String getTelemetryTimestamp()
+{
+    time_t now = time(nullptr);
+    struct tm timeinfo;
+    gmtime_r(&now, &timeinfo);
+    char buf[25];
+    strftime(buf, sizeof(buf), "%Y-%m-%dT%H:%M:%SZ", &timeinfo);
+    return String(buf);
+}
+
 // Inverse of getISO8601Timestamp() - used to work out how long it's been since the last GPS fix
 // (see updateGeoLocationIfDue()). Anything that doesn't parse - e.g. geoTimeRecorded's initial
 // empty "never recorded yet" value - maps to 0, same convention as readLastSyncTime()'s "never
@@ -1417,7 +1588,9 @@ String buildTelemetryJson(const String &timestamp, const String &deviceId, uint1
 
 void writeTelemetryFile(const DatedPath &datedPath, const String &json)
 {
-    String dirPath = String(TELEMETRY_DIR) + "/" + datedPath.dirPath;
+    // Unsynced telemetry (raw 1970-based timestamp - see getTelemetryTimestamp()) waits in
+    // UNSYNCED_TELEMETRY_DIR until reconcileUnsyncedDir() can correct and re-file it.
+    String dirPath = String(datedPath.synced ? TELEMETRY_DIR : UNSYNCED_TELEMETRY_DIR) + "/" + datedPath.dirPath;
     ensureDirExists(dirPath);
 
     String filename = dirPath + "/" + datedPath.leafName + ".json";
@@ -1882,10 +2055,11 @@ bool uploadPendingTelemetry(const String &deviceId, TelemetryCounts &counts, Dev
             continue;
         }
 
-        // getISO8601Timestamp() (see buildTelemetryJson()) writes "unknown" here if the clock
-        // wasn't synced yet at capture time - the API rejects that outright, so there's no point
-        // ever attempting this upload. Discard it now rather than let it fail (and block every
-        // older record behind it, since uploads run most-recent-first) every single cycle.
+        // Only expected from earlier firmware, which wrote "unknown" here if the clock wasn't
+        // synced yet at capture time (unsynced telemetry now goes to UNSYNCED_TELEMETRY_DIR
+        // instead, never here). The API rejects that outright and there's no time to recover, so
+        // discard it rather than let it fail (and block every older record behind it, since
+        // uploads run most-recent-first) every single cycle.
         if (doc["timestamp"].as<String>() == "unknown") {
             logLine("Unknown capture time - deleting " + filePath);
             SD.remove(filePath);
@@ -2055,16 +2229,20 @@ bool uploadPendingImages(const String &deviceId, TelemetryCounts &counts, Device
 
         String timestamp = parseTimestampFromPath(filePath);
         if (timestamp == "unknown") {
-            // The clock wasn't synced yet when this was captured (see getDatedPath()'s
-            // "unsynced/boot-N" fallback naming, which parseTimestampFromPath() can't recover a
-            // real timestamp from) - the API rejects an "unknown" Timestamp outright, so there's
-            // no point ever attempting this upload. Discard it now rather than let it fail (and
-            // block every older image behind it, since uploads run most-recent-first) every
-            // single cycle.
-            logLine("Unknown capture time - deleting " + filePath);
+            // Only expected from earlier firmware's "unsynced/boot-N" naming (unsynced captures
+            // now go to UNSYNCED_CAMERA_DIR, never here). The API rejects an "unknown" Timestamp
+            // outright, so there's no point attempting the upload - but don't throw the image
+            // away either: park it under UNSYNCED_CAMERA_DIR/unknown/ for manual recovery, where
+            // it no longer blocks every older image behind it (uploads run most-recent-first).
             file.close();
-            SD.remove(filePath);
+            String parkedPath = String(UNSYNCED_CAMERA_DIR) + "/unknown/" + fileBaseName(filePath);
+            if (SD.exists(parkedPath)) {
+                parkedPath = String(UNSYNCED_CAMERA_DIR) + "/unknown/" + String((uint32_t)millis()) + "-" + fileBaseName(filePath);
+            }
+            ensureDirExists(parentDir(parkedPath));
+            SD.rename(filePath, parkedPath);
             filesRemoved++;
+            logf("Unknown capture time - moved %s to %s", filePath.c_str(), parkedPath.c_str());
             continue;
         }
 
@@ -2825,6 +3003,205 @@ void setSystemClockUtc(time_t utc, const char *source)
          check.tm_hour, check.tm_min, check.tm_sec);
 }
 
+// See wakeClockAnchorMs. Called at the top of runWakeCycle(), before any sync attempt.
+void noteWakeClockAnchor()
+{
+    struct timeval tv;
+    gettimeofday(&tv, nullptr);
+    wakeClockAnchorMs = (int64_t)tv.tv_sec * 1000 + tv.tv_usec / 1000;
+    wakeMillisAnchor = millis();
+    wakeClockUnsynced = tv.tv_sec < CLOCK_PLAUSIBLE_AFTER_EPOCH;
+}
+
+// If the clock started this wake unsynced and is now set (NTP, cellular or GPS - doesn't matter
+// which), works out this session's "real - raw" offset and saves it alongside the session's
+// unsynced images and telemetry for reconcileUnsyncedDir(). The raw clock's current value is
+// reconstructed from the wake-start anchor plus millis() elapsed since, since the sync has
+// overwritten the clock itself. Persisted rather than kept in RAM so re-filing can carry on over
+// later wakes - or after a power loss - without needing the anchor again. Safe to call more than
+// once; acts once per wake.
+void onClockSyncedThisWake()
+{
+    if (!wakeClockUnsynced || time(nullptr) < CLOCK_PLAUSIBLE_AFTER_EPOCH) {
+        return;
+    }
+    wakeClockUnsynced = false;
+
+    struct timeval tv;
+    gettimeofday(&tv, nullptr);
+    int64_t realNowMs = (int64_t)tv.tv_sec * 1000 + tv.tv_usec / 1000;
+    int64_t rawNowMs = wakeClockAnchorMs + (int64_t)(uint32_t)(millis() - wakeMillisAnchor);
+    long offsetS = (long)((realNowMs - rawNowMs + 500) / 1000);
+
+    // Whatever happens below, mark the session as synced so the next unsynced power-on starts a
+    // fresh one (see updateClockSession()).
+    writeClockSession(clockSessionId, tv.tv_sec);
+
+    logf("Clock synced this wake - session %u's raw clock was %ld s behind real time", clockSessionId, offsetS);
+
+    for (const char *unsyncedRoot : {UNSYNCED_CAMERA_DIR, UNSYNCED_TELEMETRY_DIR}) {
+        String sessionDir = String(unsyncedRoot) + "/" + clockSessionDirName(clockSessionId);
+        if (!SD.exists(sessionDir)) {
+            continue;   // nothing captured unsynced this session
+        }
+        File file = SD.open(sessionDir + "/" UNSYNCED_OFFSET_FILE, "w");
+        if (file) {
+            file.println(offsetS);
+            file.close();
+            logf("Queued %s for re-filing", sessionDir.c_str());
+        } else {
+            logf("Failed to write offset file in %s!", sessionDir.c_str());
+        }
+    }
+}
+
+// Telemetry only - rewrites the record's "timestamp" from its raw value to `realTime` while
+// copying it to destPath (uploadPendingTelemetry() posts what's inside the file, not the
+// filename). A timestamp that's already plausible is left alone - it means the clock got set
+// between naming the file and building its JSON, so it's already right.
+bool rewriteTelemetryTimestamp(const String &srcPath, const String &destPath, time_t realTime)
+{
+    File src = SD.open(srcPath, "r");
+    if (!src) {
+        return false;
+    }
+    DynamicJsonDocument doc(512);
+    DeserializationError err = deserializeJson(doc, src);
+    src.close();
+    if (err) {
+        logf("Failed to parse %s: %s", srcPath.c_str(), err.c_str());
+        return false;
+    }
+
+    if (parseISO8601Timestamp(doc["timestamp"].as<String>()) < CLOCK_PLAUSIBLE_AFTER_EPOCH) {
+        struct tm timeinfo;
+        gmtime_r(&realTime, &timeinfo);
+        char buf[25];
+        strftime(buf, sizeof(buf), "%Y-%m-%dT%H:%M:%SZ", &timeinfo);
+        doc["timestamp"] = buf;
+    }
+
+    File dest = SD.open(destPath, "w");
+    if (!dest) {
+        return false;
+    }
+    serializeJson(doc, dest);
+    dest.println();
+    dest.close();
+    return SD.remove(srcPath);
+}
+
+// Re-files everything under any `unsyncedRoot`/session-N that has an UNSYNCED_OFFSET_FILE (see
+// onClockSyncedThisWake()) into `destRoot`, renamed to its real capture time (raw + offset) so it
+// uploads like anything else - telemetry also gets the timestamp inside it corrected (see
+// rewriteTelemetryTimestamp()). Sessions without an offset - power was lost before they ever
+// synced - can't be anchored and are left where they are; raw times (and, for images, sequence
+// numbers) still give their order and spacing for manual recovery. Spends from `budget` (one per
+// file); returns how many files it re-filed.
+//
+// Accuracy: within a session, spacing comes from the RTC across deep sleep, the same clock that
+// keeps time between normal syncs - so expect the same drift (the further a capture is from the
+// sync, the more it can be off), not exact times.
+int reconcileUnsyncedDir(const char *unsyncedRoot, const char *destRoot, bool isTelemetry, int &budget)
+{
+    std::vector<String> sessionDirs;
+    File root = SD.open(unsyncedRoot);
+    if (!root) {
+        return 0;
+    }
+    File entry = root.openNextFile();
+    while (entry) {
+        String name = fileBaseName(entry.name());
+        if (entry.isDirectory() && name.startsWith("session-")) {
+            sessionDirs.push_back(String(unsyncedRoot) + "/" + name);
+        }
+        entry.close();
+        entry = root.openNextFile();
+    }
+    root.close();
+
+    int totalMoved = 0;
+    for (const String &sessionDir : sessionDirs) {
+        String offsetPath = sessionDir + "/" UNSYNCED_OFFSET_FILE;
+        File offsetFile = SD.open(offsetPath, "r");
+        if (!offsetFile) {
+            continue;   // never synced - nothing to anchor it to
+        }
+        long offsetS = offsetFile.readStringUntil('\n').toInt();
+        offsetFile.close();
+
+        std::vector<String> filePaths;
+        listFilesRecursive(sessionDir, filePaths);
+
+        int moved = 0;
+        int stuck = 0;
+        for (const String &filePath : filePaths) {
+            if (filePath == offsetPath) {
+                continue;
+            }
+            if (budget <= 0) {
+                logf("Re-filed %d unsynced files from %s - batch limit hit, rest continue next wake", moved, sessionDir.c_str());
+                return totalMoved + moved;
+            }
+
+            // "yyyymmdd-hhmmss" plus "-<sequence>" on images (telemetry has none).
+            int year, month, day, hour, minute, second;
+            unsigned sequence = 0;
+            String leaf = fileBaseName(filePath);
+            int dotIdx = leaf.lastIndexOf('.');
+            String extension = (dotIdx >= 0) ? leaf.substring(dotIdx) : "";
+            if (sscanf(leaf.c_str(), "%4d%2d%2d-%2d%2d%2d-%u", &year, &month, &day, &hour, &minute, &second, &sequence) < 6) {
+                logf("Unrecognised unsynced file name %s - leaving in place", filePath.c_str());
+                stuck++;
+                continue;
+            }
+
+            time_t realTime = utcCivilToEpoch(year, month, day, hour, minute, second) + offsetS;
+            DatedPath datedPath = datedPathForTime(realTime, sequence);
+            String destDir = String(destRoot) + "/" + datedPath.dirPath;
+            String destPath = destDir + "/" + datedPath.leafName + extension;
+
+            budget--;
+            ensureDirExists(destDir);
+            bool ok = !SD.exists(destPath)
+                      && (isTelemetry ? rewriteTelemetryTimestamp(filePath, destPath, realTime) : SD.rename(filePath, destPath));
+            if (!ok) {
+                logf("Failed to move %s to %s - leaving in place", filePath.c_str(), destPath.c_str());
+                stuck++;
+                continue;
+            }
+            moved++;
+        }
+
+        logf("Re-filed %d unsynced files from %s (offset %ld s)", moved, sessionDir.c_str(), offsetS);
+        totalMoved += moved;
+        if (stuck == 0) {
+            // Everything's out - drop the offset, then let listFilesRecursive() prune the now-empty
+            // bucket directories so the session directory itself can go.
+            SD.remove(offsetPath);
+            std::vector<String> leftovers;
+            listFilesRecursive(sessionDir, leftovers);
+            if (leftovers.empty()) {
+                SD.rmdir(sessionDir);
+            }
+        }
+    }
+    return totalMoved;
+}
+
+// Runs reconcileUnsyncedDir() over both images and telemetry, sharing one UNSYNCED_RECONCILE_BATCH
+// budget. Telemetry first - it's tiny, and its timestamps are what line the re-dated images up
+// against battery/temperature history server-side.
+void reconcileUnsyncedCaptures(TelemetryCounts &counts)
+{
+    if (time(nullptr) < CLOCK_PLAUSIBLE_AFTER_EPOCH) {
+        return;
+    }
+    int budget = UNSYNCED_RECONCILE_BATCH;
+    counts.pendingTelemetry += reconcileUnsyncedDir(UNSYNCED_TELEMETRY_DIR, TELEMETRY_DIR, true, budget);
+    counts.pendingImages += reconcileUnsyncedDir(UNSYNCED_CAMERA_DIR, CAMERA_DIR, false, budget);
+}
+
 // Sets the ESP32 system clock (UTC - the sketch runs GMT_OFFSET_SEC = 0) from the network, for
 // the cellular path - the WiFi path's connectWiFiAndSyncTime() gets this from NTP over IP via
 // configTime(). Asks the modem to NTP-sync its own RTC first, then reads it back with +CCLK?.
@@ -3168,7 +3545,18 @@ DatedPath capturePhoto(TelemetryCounts &counts)
         delay(100);
     }
 
-    DatedPath datedPath = getDatedPath();
+    // See IMAGE_SEQ_FILE. The exists() check is belt-and-braces against a lost/reset sequence
+    // file: an unsynced image's name repeats if the sequence and raw clock both do, and it's
+    // exactly those images that must never be overwritten.
+    DatedPath datedPath = getDatedPath(nextImageSequence());
+    for (int attempt = 0; attempt < 5; attempt++) {
+        String candidate = String(datedPath.synced ? CAMERA_DIR : UNSYNCED_CAMERA_DIR) + "/" + datedPath.dirPath + "/" + datedPath.leafName + ".jpeg";
+        if (!SD.exists(candidate)) {
+            break;
+        }
+        logf("%s already exists - taking the next sequence number", candidate.c_str());
+        datedPath = getDatedPath(nextImageSequence());
+    }
 
     // Capture camera photo. A single retry costs at most one more frame period if the first
     // attempt comes back NULL (timeout, DMA hiccup, transient SCCB error) - cheap insurance
@@ -3191,8 +3579,9 @@ DatedPath capturePhoto(TelemetryCounts &counts)
     if (frame) {
 
         // Stored under CAMERA_DIR/yyyy/mm/dd/hh/ rather than directly in CAMERA_DIR - keeps
-        // any single directory small no matter how large the backlog grows.
-        String dirPath = String(CAMERA_DIR) + "/" + datedPath.dirPath;
+        // any single directory small no matter how large the backlog grows. Unsynced captures
+        // go to UNSYNCED_CAMERA_DIR instead until reconcileUnsyncedCaptures() can date them.
+        String dirPath = String(datedPath.synced ? CAMERA_DIR : UNSYNCED_CAMERA_DIR) + "/" + datedPath.dirPath;
         ensureDirExists(dirPath);
 
         String filename = dirPath + "/" + datedPath.leafName + ".jpeg";
@@ -3303,6 +3692,10 @@ void runWakeCycle()
     // usually means there's a core dump sitting in flash worth pulling off now.
     checkAndLogCoreDump();
 
+    // Both before any sync attempt below - see CLOCK_SESSION_FILE / onClockSyncedThisWake().
+    updateClockSession();
+    noteWakeClockAnchor();
+
     // Kept up to date incrementally below rather than re-scanned from disk each wake,
     // since scanning directories with thousands of backlogged files gets slow
     TelemetryCounts counts = readCounts();
@@ -3367,13 +3760,15 @@ void runWakeCycle()
         if (!didConnectWiFi) {
             gpsSyncTime(deviceConfig);
         }
-        if (!didConnectWiFi) {
-            logLine("Continuing without synced time, filenames will use boot count!");
+        if (time(nullptr) < CLOCK_PLAUSIBLE_AFTER_EPOCH) {
+            logf("Continuing without synced time - images go to " UNSYNCED_CAMERA_DIR "/%s until it is",
+                 clockSessionDirName(clockSessionId).c_str());
         }
     } else {
         logLine("Clock already synced, skipping WiFi connection");
     }
     lastWakeConnectedWiFi = didConnectWiFi;
+    onClockSyncedThisWake();
 
     // See setupCameraNightExposure() below - decided here, ahead of camera_config_t, because
     // xclk_freq_hz has to be picked before esp_camera_init() (it can't be changed afterwards
@@ -3502,10 +3897,17 @@ void runWakeCycle()
 
     counts.pendingTelemetry++;
     String deviceId = getDeviceId();
-    String telemetryJson = buildTelemetryJson(getISO8601Timestamp(), deviceId, get_battery_voltage(), get_solar_voltage(),
+    String telemetryJson = buildTelemetryJson(getTelemetryTimestamp(), deviceId, get_battery_voltage(), get_solar_voltage(),
                                                (uint32_t)(millis() / 1000),
                                                deviceConfig.geoLat, deviceConfig.geoLon, deviceConfig.geoTimeRecorded, counts);
     writeTelemetryFile(datedPath, telemetryJson);
+
+    // Ahead of both uploads so whatever it re-files goes out this same cycle. The repeat
+    // onClockSyncedThisWake() is cheap insurance in case anything after the sync block above
+    // (e.g. updateGeoLocationIfDue()) ever sets the clock too.
+    onClockSyncedThisWake();
+    reconcileUnsyncedCaptures(counts);
+
     bool telemetryBacklogExcessive = uploadPendingTelemetry(deviceId, counts, deviceConfig, nightCheckin);
 
     // A second telemetry snapshot, captured after uploading telemetry (and any GPS fix) have finished -
@@ -3516,7 +3918,7 @@ void runWakeCycle()
     // captured later - that's the point of it.
     DatedPath secondDatedPath = getDatedPath();
     counts.pendingTelemetry++;
-    String telemetryJson2 = buildTelemetryJson(getISO8601Timestamp(), deviceId, get_battery_voltage(), get_solar_voltage(),
+    String telemetryJson2 = buildTelemetryJson(getTelemetryTimestamp(), deviceId, get_battery_voltage(), get_solar_voltage(),
                                                 (uint32_t)(millis() / 1000),
                                                 deviceConfig.geoLat, deviceConfig.geoLon, deviceConfig.geoTimeRecorded, counts);
 
@@ -3527,7 +3929,7 @@ void runWakeCycle()
     // A third telemetry snapshot, captured after imagery uploads have finished -
     DatedPath thirdDatedPath = getDatedPath();
     counts.pendingTelemetry++;
-    String telemetryJson3 = buildTelemetryJson(getISO8601Timestamp(), deviceId, get_battery_voltage(), get_solar_voltage(),
+    String telemetryJson3 = buildTelemetryJson(getTelemetryTimestamp(), deviceId, get_battery_voltage(), get_solar_voltage(),
                                                 (uint32_t)(millis() / 1000),
                                                 deviceConfig.geoLat, deviceConfig.geoLon, deviceConfig.geoTimeRecorded, counts);
     writeTelemetryFile(thirdDatedPath, telemetryJson3);
@@ -3764,7 +4166,7 @@ void runSetupApWindow()
     // whatever runWakeCycle() had already captured before it ever opened.
     TelemetryCounts counts = readCounts();
     counts.pendingTelemetry++;
-    String finalTelemetryJson = buildTelemetryJson(getISO8601Timestamp(), getDeviceId(), get_battery_voltage(), get_solar_voltage(),
+    String finalTelemetryJson = buildTelemetryJson(getTelemetryTimestamp(), getDeviceId(), get_battery_voltage(), get_solar_voltage(),
                                                     (uint32_t)(millis() / 1000),
                                                     deviceConfig.geoLat, deviceConfig.geoLon, deviceConfig.geoTimeRecorded, counts);
     writeTelemetryFile(getDatedPath(), finalTelemetryJson);
