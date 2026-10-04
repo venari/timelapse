@@ -3993,13 +3993,37 @@ String buildStatusHtml(uint32_t windowRemainingS)
     html += "<h1>EnviroCam " + getDeviceId() + "</h1>";
     // "/stream" is a multipart/x-mixed-replace MJPEG feed (see runSetupApWindow()) - browsers
     // render that natively in a plain <img>, no polling/JS needed to keep it live.
-    html += "<img src=\"/stream\" style=\"max-width:100%\"><br>";
+    html += "<img id=\"stream\" src=\"/stream\" style=\"max-width:100%\"><br>";
     html += "<p>Setup window closes (and this boot goes to sleep) in <span id=\"countdown\">" +
             String(windowRemainingS) + "</span>s</p>";
     html += "<script>var t=" + String(windowRemainingS) + ";setInterval(function(){"
             "t=Math.max(0,t-1);document.getElementById('countdown').textContent=t;"
             "},1000);</script>";
     html += "<p>Last recorded capture: " + (lastCaptureTimestamp.length() ? lastCaptureTimestamp : String("none yet")) + "</p>";
+
+    // Lets the installer set the clock from their phone (see the "/settime" handler in
+    // runSetupApWindow()) - the only way to get a real time onto a unit with no WiFi/LTE/GPS
+    // reach. Date.now() is UTC epoch ms whatever the phone's own timezone, matching the device
+    // clock. The drift readout compares against the device clock as of this page being rendered.
+    // The stream <img> is paused around the request: WebServer handles one client at a time and
+    // the "/stream" handler doesn't return while a browser is still watching, so /settime would
+    // otherwise sit queued behind it until the window closes.
+    time_t deviceNow = time(nullptr);
+    bool clockSet = deviceNow >= CLOCK_PLAUSIBLE_AFTER_EPOCH;
+    html += "<p>Device clock: " + (clockSet ? getISO8601Timestamp() + " UTC <span id=\"drift\"></span>" : String("<b>not set</b>")) + "<br>";
+    html += "<button id=\"settime\" style=\"font-size:1em\">" + String(clockSet ? "Re-set" : "Set") + " clock from this phone</button>";
+    html += " <span id=\"settimeResult\"></span></p>";
+    html += "<script>var dev=" + String((long)deviceNow) + ",clockSet=" + String(clockSet ? "true" : "false") + ";"
+            "if(clockSet){document.getElementById('drift').textContent='(phone differs by '+Math.round(Date.now()/1000-dev)+'s)';}"
+            "document.getElementById('settime').onclick=function(){"
+            "if(clockSet&&!confirm('Device clock is already set. Replace it with this phone\\'s time?'))return;"
+            "var r=document.getElementById('settimeResult'),img=document.getElementById('stream');"
+            "r.textContent='Setting...';img.src='data:,';"
+            "fetch('/settime?epoch_ms='+Date.now(),{method:'POST'})"
+            ".then(function(x){return x.text();}).then(function(t){r.textContent=t;})"
+            ".catch(function(e){r.textContent='Failed: '+e;})"
+            ".then(function(){img.src='/stream?'+Date.now();});};</script>";
+
     html += "<ul>";
     html += "<li>Boot number: " + String(bootCount) + "</li>";
     html += "<li>Uptime: " + String(millis() / 1000) + "s</li>";
@@ -4122,6 +4146,25 @@ void runSetupApWindow()
         uint32_t elapsedMs = millis() - start;
         uint32_t remainingS = (elapsedMs < SETUP_AP_WINDOW_MS) ? (SETUP_AP_WINDOW_MS - elapsedMs) / 1000 : 0;
         server.send(200, "text/html", buildStatusHtml(remainingS));
+    });
+    // See buildStatusHtml()'s "Set clock from this phone" button. Treated like the GPS clock
+    // source: sets the clock (so this boot's remaining telemetry and every later capture get real
+    // times), and onClockSyncedThisWake() queues anything captured unsynced this session for
+    // re-dating on the next wake - but LAST_SYNC_FILE is left alone, since a phone-set clock says
+    // nothing about the uplink or the backlog (see gpsSyncTime()), and the next real sync
+    // (NTP/cellular) still corrects whatever small error the phone's own clock had.
+    server.on("/settime", HTTP_POST, [&server]() {
+        long long epochMs = strtoll(server.arg("epoch_ms").c_str(), nullptr, 10);
+        time_t utc = (time_t)(epochMs / 1000);
+        // Upper bound 2100-01-01 - just rejects garbage, not a real limit.
+        if (utc < CLOCK_PLAUSIBLE_AFTER_EPOCH || utc >= 4102444800LL) {
+            logf("Rejected phone clock value \"%s\"", server.arg("epoch_ms").c_str());
+            server.send(400, "text/plain", "Rejected - phone time doesn't look valid");
+            return;
+        }
+        setSystemClockUtc(utc, "phone (setup AP)");
+        onClockSyncedThisWake();
+        server.send(200, "text/plain", "Clock set to " + getISO8601Timestamp() + " UTC");
     });
     server.on("/stream", HTTP_GET, [&server, start]() {
         // Same multipart/x-mixed-replace MJPEG trick the CameraWebServer example uses - a
