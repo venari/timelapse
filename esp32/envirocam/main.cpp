@@ -115,6 +115,7 @@
 #define COUNTS_FILE              "/counts.txt"  // Running pending/uploaded totals, kept up to date incrementally
                                                  // instead of scanning directories (which gets slow with thousands of files)
 
+#define WIFI_CREDENTIALS_FILE    "/wifi.json"   // {"ssid","password"} set from the setup AP page - overrides secrets.cpp's WIFI_SSID/WIFI_PASSWORD when present, see readWifiCredentials()
 #define CONFIG_FILE              "/config.json" // Local cache of the device config the API hands back on every upload
 
 #define LOG_DIR                  "/logs"
@@ -138,8 +139,16 @@
 // WiFi.softAP() - see runSetupApWindow()) that could otherwise re-arm the exact same window every
 // single reboot forever: crash -> bootCount wiped -> "fresh install" looks true again -> same
 // window runs -> same crash. SETUP_AP_ATTEMPTS_FILE below is the safety net - unlike bootCount, a
-// plain SD file survives that reset, so once SETUP_AP_MAX_BOOT_COUNT attempts have actually run,
-// they stay counted no matter what wipes bootCount in between.
+// plain SD file survives that reset. It counts windows that were started but never finished (i.e.
+// crashed): bumped before each window opens, zeroed once one closes cleanly, so after
+// SETUP_AP_MAX_BOOT_COUNT crashed windows in a row the window stops opening.
+//
+// It used to count every window ever opened, and was never zeroed except by the API flag (see
+// DeviceConfig::resetSetupApAttempts) - so once a card had seen 3 windows, the AP never came back,
+// not even after a deliberate power cycle. Now a deliberate reset - POWERON (battery connected,
+// or the EN/RST button) or EXT - also zeroes it (see maybeRunSetupApWindow()): a person re-powering
+// the unit wants the window, and the crash loop this guards against only ever produces PANIC/WDT
+// resets, never those.
 #define SETUP_AP_MAX_BOOT_COUNT  3
 #define SETUP_AP_ATTEMPTS_FILE   "/setup_ap_attempts.txt"
 #define SETUP_AP_NEXT_BOOT_DELAY_S 1   // See loop() - replaces the normal cameraIntervalS wait while
@@ -149,7 +158,7 @@
                                         // just ran for minutes on its own
 #define SETUP_AP_WINDOW_MS       (3UL * 60 * 1000)   // How long the hotspot stays up before continuing on to deep sleep
 #define SETUP_AP_STREAM_FRAMESIZE       FRAMESIZE_SVGA  // Much lighter than the QSXGA capture - plenty to check framing/focus
-#define SETUP_AP_STREAM_FRAME_INTERVAL_MS (300UL)      // Paces "/stream" frames - keeps the softAP link comfortable
+#define SETUP_AP_STREAM_FRAME_INTERVAL_MS (300UL)      // Gap the page leaves between "/frame" requests - keeps the softAP link comfortable
 #define SETUP_AP_SSID_PREFIX     "EnviroCam-"
 #define SETUP_AP_PASSWORD        "envirocam"          // Shared across all units - keep it out of range of anyone but the install crew
 
@@ -349,9 +358,9 @@ struct DeviceConfig {
     bool supportMode = DEFAULT_SUPPORT_MODE;
 
     // Set remotely via the API - a one-shot trigger (see SETUP_AP_ATTEMPTS_FILE's comment above)
-    // that clears that SD-tracked attempt budget so a technician can re-enter setup-AP mode on an
-    // already-deployed board (e.g. after relocating/re-aiming it) without pulling the SD card by
-    // hand. Consumed and cleared back to false the next boot that sees it set (see setup()) - the
+    // that clears that SD-tracked crashed-window count. Mostly redundant now that a deliberate
+    // power cycle clears it too (the window only ever opens on a power cycle's first few boots
+    // anyway), but kept since the API side still has the field. Consumed and cleared back to false the next boot that sees it set (see setup()) - the
     // API side is free to leave its own copy true indefinitely, it only has to go false and back
     // to true again to fire a second time.
     bool resetSetupApAttempts = false;
@@ -390,11 +399,10 @@ struct DeviceConfig {
 
 DeviceConfig deviceConfig;
 
-// Set at the end of each runWakeCycle() - see there - purely so runSetupApWindow()'s status page
-// has something to show for "did this boot's capture/upload actually happen, and when". Not
-// persisted; these only ever need to reflect the boot currently in progress.
-String lastCaptureTimestamp = "";
-bool lastWakeConnectedWiFi = false;
+// Set in setup() - true on the boots that may open the setup AP window (see
+// SETUP_AP_MAX_BOOT_COUNT). Consumed by the first runWakeCycle() of the boot (see
+// maybeRunSetupApWindow()), so support mode's repeat runWakeCycle() calls never reopen it.
+bool setupApEligibleThisBoot = false;
 
 // Set by capturePhoto() to that capture's own timestamp + cameraIntervalS - anchored to when the
 // last shot actually happened rather than a fixed wall-clock grid, so support mode's repeated
@@ -864,6 +872,10 @@ void runWakeCycle();
 // The local, no-connectivity-needed alternative to supportMode for a fresh install - see
 // runSetupApWindow() further down.
 void runSetupApWindow();
+bool initCamera(bool nightLongExposure);
+bool wantNightLongExposure();
+void setupCameraNightExposure(sensor_t *s);
+void maybeRunSetupApWindow();
 
 bool setupSD()
 {
@@ -953,8 +965,8 @@ void clearForceSyncFlag()
     }
 }
 
-// See SETUP_AP_ATTEMPTS_FILE's comment above - counts how many times runSetupApWindow() has
-// actually run, independent of bootCount (RTC memory, which a panic can wipe).
+// See SETUP_AP_ATTEMPTS_FILE's comment above - counts consecutive runSetupApWindow() runs that never
+// finished, independent of bootCount (RTC memory, which a panic can wipe).
 int readSetupApAttempts()
 {
     File file = SD.open(SETUP_AP_ATTEMPTS_FILE, "r");
@@ -1248,11 +1260,39 @@ void applyDeviceConfigFromApiResponse(const String &responseBody, DeviceConfig &
     }
 }
 
+// The WiFi network to join - WIFI_CREDENTIALS_FILE if an installer has set one from the setup AP
+// page (see the "/wifi" handler in runSetupApWindow()), otherwise the compiled-in WIFI_SSID/
+// WIFI_PASSWORD from secrets.cpp. Returns true if the SD override was used. There's deliberately
+// no fallback to the compiled-in network if the override fails to connect - it supersedes it
+// outright. Recovery from a mistyped one is the setup AP page again, or deleting the file.
+bool readWifiCredentials(String &ssid, String &password)
+{
+    ssid = WIFI_SSID;
+    password = WIFI_PASSWORD;
+
+    File file = SD.open(WIFI_CREDENTIALS_FILE, "r");
+    if (!file) {
+        return false;
+    }
+    DynamicJsonDocument doc(256);
+    DeserializationError err = deserializeJson(doc, file);
+    file.close();
+    if (err || doc["ssid"].as<String>().length() == 0) {
+        logf("Ignoring unreadable " WIFI_CREDENTIALS_FILE " (%s) - using built-in WiFi network", err ? err.c_str() : "no ssid");
+        return false;
+    }
+    ssid = doc["ssid"].as<String>();
+    password = doc["password"].as<String>();
+    return true;
+}
+
 bool connectWiFiAndSyncTime()
 {
-    logf("Connecting to WiFi: %s", WIFI_SSID);
+    String ssid, password;
+    bool fromSd = readWifiCredentials(ssid, password);
+    logf("Connecting to WiFi: %s (%s)", ssid.c_str(), fromSd ? "set on device" : "built-in");
     WiFi.mode(WIFI_STA);
-    WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+    WiFi.begin(ssid.c_str(), password.c_str());
 
     uint32_t startTime = millis();
     while (WiFi.status() != WL_CONNECTED) {
@@ -3474,6 +3514,10 @@ void setup()
     }
 #endif
 
+    // See setupApEligibleThisBoot / maybeRunSetupApWindow() - the window itself now opens near
+    // the top of runWakeCycle(), ahead of this boot's sync attempts.
+    setupApEligibleThisBoot = bootCount <= SETUP_AP_MAX_BOOT_COUNT;
+
     runWakeCycle();
 
     // See DeviceConfig::resetSetupApAttempts's comment - runWakeCycle() above is what actually
@@ -3486,21 +3530,182 @@ void setup()
         deviceConfig.resetSetupApAttempts = false;
         writeDeviceConfig(deviceConfig);
     }
+}
 
-    // Fresh install only (see SETUP_AP_MAX_BOOT_COUNT/runSetupApWindow()) - gives an installer a
-    // window to confirm the camera's working, right there in the field, with no cellular/internet
-    // WiFi needed for it. Gated on both bootCount AND the SD-backed attempt count (see
-    // SETUP_AP_ATTEMPTS_FILE) - bootCount alone would let a crash inside this exact window re-arm
-    // itself forever if it wipes RTC memory on the way down.
-    if (bootCount <= SETUP_AP_MAX_BOOT_COUNT) {
-        int attempts = readSetupApAttempts();
-        if (attempts < SETUP_AP_MAX_BOOT_COUNT) {
-            writeSetupApAttempts(attempts + 1);
-            runSetupApWindow();
-        } else {
-            logLine("Setup AP window already used its attempt budget (SD-tracked) - skipping");
-        }
+// Fresh install only (see SETUP_AP_MAX_BOOT_COUNT/runSetupApWindow()) - gives an installer a
+// window to confirm the camera's working, right there in the field, with no cellular/internet
+// WiFi needed for it. Gated on both bootCount AND the SD-backed attempt count (see
+// SETUP_AP_ATTEMPTS_FILE) - bootCount alone would let a crash inside this exact window re-arm
+// itself forever if it wipes RTC memory on the way down.
+//
+// Called near the top of runWakeCycle(), *before* any WiFi/cellular/GPS sync attempt, rather than
+// after the whole wake cycle as it used to be: the installer gets the page straight away instead
+// of waiting out WiFi + LTE + GPS timeouts first (minutes, on a unit with no reach), and whatever
+// they set on it applies to this same boot - a phone-set clock makes gpsSyncTime() a no-op, and a
+// saved WiFi network is what connectWiFiAndSyncTime() tries next.
+//
+// Brings the camera up here and leaves it up for runWakeCycle()'s capture, rather than
+// deinit/re-init around the window: on these 2MB-PSRAM boards QSXGA's two JPEG frame buffers
+// (~960KB each) take nearly all of PSRAM, and only fit as one big contiguous run. Re-initialising
+// after the AP window - with the WebServer/WiFi/String allocations it left scattered through PSRAM
+// - failed outright in the field ("cam_dma_config: frame buffer malloc failed", camera init error
+// 0xffffffff, no capture that boot). One init per boot is what the pre-reorder flow always did.
+// Cost: on these boots the night-exposure xclk choice (see wantNightLongExposure()) is made
+// before this boot's sync rather than after - only matters on a setup boot at night, with no clock.
+//
+// A resetSetupApAttempts flag from the API (see setup()) is only seen at upload time, i.e. after
+// this has already been decided for the boot - so it takes effect from the next eligible boot.
+void maybeRunSetupApWindow()
+{
+    if (!setupApEligibleThisBoot) {
+        return;
     }
+    setupApEligibleThisBoot = false;
+
+    int attempts = readSetupApAttempts();
+    esp_reset_reason_t resetReason = esp_reset_reason();
+    if (attempts > 0 && (resetReason == ESP_RST_POWERON || resetReason == ESP_RST_EXT)) {
+        logf("Deliberate reset (%s) - clearing %d crashed setup AP attempt(s)", resetReasonName(resetReason), attempts);
+        attempts = 0;
+    }
+    if (attempts >= SETUP_AP_MAX_BOOT_COUNT) {
+        logf("Setup AP window crashed %d times in a row - skipping until the next power cycle", attempts);
+        return;
+    }
+    // Counted before the window opens, so a crash inside it (or in the teardown below) stays counted.
+    writeSetupApAttempts(attempts + 1);
+
+    // Still worth opening without a camera - the clock/WiFi settings and status work regardless,
+    // the "/frame" handler just answers 503 when it gets no frame.
+    if (!initCamera(wantNightLongExposure())) {
+        logLine("Camera init failed - setup AP window opening without a live view");
+    }
+    runSetupApWindow();
+
+    // Same teardown loop() does after every wake - must happen before connectWiFiAndSyncTime()
+    // switches to STA. See the long comment at the end of runSetupApWindow() for why that
+    // function doesn't do this itself: the sys_evt crash it describes was with the BT controller
+    // still live, which can't be the case here while SETUP_AP_ENABLE_BLE_ADVERTISING is 0.
+    WiFi.disconnect(true);
+    WiFi.mode(WIFI_OFF);
+
+    // Got all the way through - this attempt didn't crash, so it doesn't count against the budget.
+    writeSetupApAttempts(0);
+}
+
+// See the comment at runWakeCycle()'s initCamera() call.
+bool wantNightLongExposure()
+{
+    return deviceConfig.enableLongExposureAtNight
+           && deviceConfig.cameraModel != "OV2640"
+           && isNightForExposure(time(nullptr), deviceConfig.geoLat, deviceConfig.geoLon);
+}
+
+// Powers up the sensor config, esp_camera_init()s it and applies tuning/orientation - factored
+// out of runWakeCycle() so maybeRunSetupApWindow() can bring the camera up for its live view
+// before this boot's sync, then deinit it again for runWakeCycle() to re-init with the
+// night-exposure choice that needs the synced clock. Camera power (setCameraPower()) must
+// already be on. Returns false if esp_camera_init() failed.
+bool initCamera(bool nightLongExposure)
+{
+    // Enable / disable power save mode (1 disabled, 0 enabled)
+    pinMode(BOARD_POWER_SAVE_MODE_PIN, OUTPUT);
+    digitalWrite(BOARD_POWER_SAVE_MODE_PIN, HIGH);
+
+    camera_config_t config;
+    config.ledc_channel = LEDC_CHANNEL_0;
+    config.ledc_timer = LEDC_TIMER_0;
+    config.pin_d0 = CAMERA_Y2_PIN;
+    config.pin_d1 = CAMERA_Y3_PIN;
+    config.pin_d2 = CAMERA_Y4_PIN;
+    config.pin_d3 = CAMERA_Y5_PIN;
+    config.pin_d4 = CAMERA_Y6_PIN;
+    config.pin_d5 = CAMERA_Y7_PIN;
+    config.pin_d6 = CAMERA_Y8_PIN;
+    config.pin_d7 = CAMERA_Y9_PIN;
+    config.pin_xclk = CAMERA_XCLK_PIN;
+    config.pin_pclk = CAMERA_PCLK_PIN;
+    config.pin_vsync = CAMERA_VSYNC_PIN;
+    config.pin_href = CAMERA_HREF_PIN;
+    config.pin_sccb_sda = CAMERA_SIOD_PIN;
+    config.pin_sccb_scl = CAMERA_SIOC_PIN;
+    config.pin_pwdn = CAMERA_PWDN_PIN;
+    config.pin_reset = CAMERA_RESET_PIN;
+    config.xclk_freq_hz = nightLongExposure ? deviceConfig.longExposureXclkHz : 20000000;
+    // Highest we ever want (OV5640's max). esp_camera_init() probes the sensor internally and
+    // automatically clamps this down to whatever that sensor actually supports (e.g. OV2640 ->
+    // UXGA, its native ~2MP max) *before* sizing the DMA receive buffer for it - so the buffer
+    // and the resolution always agree. Do NOT try to raise the resolution after init via
+    // sensor->set_framesize() instead - the DMA buffer stays sized for whatever was requested
+    // here, so upsizing afterwards overflows it (cam_hal: "FB-OVF", then capture failures).
+    config.frame_size = FRAMESIZE_QSXGA;   // 2560x1920
+    config.pixel_format = PIXFORMAT_JPEG;  // JPEG formart
+    config.grab_mode = CAMERA_GRAB_WHEN_EMPTY;
+    config.fb_location = CAMERA_FB_IN_PSRAM;
+    config.jpeg_quality = 5;
+    config.fb_count = 2;
+
+    // camera init
+    esp_err_t err = esp_camera_init(&config);
+    if (err != ESP_OK) {
+        logf("Camera init failed with error 0x%x", err);
+        return false;
+    }
+
+    sensor_t *s = esp_camera_sensor_get();
+    // initial sensors are flipped vertically and colors are a bit saturated
+    if (s->id.PID == OV3660_PID) {
+        s->set_vflip(s, 1);        // flip it back
+        s->set_brightness(s, 1);   // up the brightness just a bit
+        s->set_saturation(s, -2);  // lower the saturation
+    }
+
+    // Identify the sensor from its PID purely to record it - actual resolution was already
+    // decided by esp_camera_init()'s own clamping (see config.frame_size above), nothing further
+    // to do about that here. deviceConfig.cameraModel is only used as a fallback label for a PID
+    // this firmware doesn't recognise, and is otherwise kept in sync with what's actually
+    // detected so it's visible in CONFIG_FILE without needing a fresh detection pass.
+    String detectedModel;
+    if (s->id.PID == OV5640_PID) {
+        detectedModel = "OV5640";
+    } else if (s->id.PID == OV2640_PID) {
+        detectedModel = "OV2640";
+    } else {
+        logf("Unrecognised camera PID 0x%04x - keeping configured cameraModel (%s)", s->id.PID, deviceConfig.cameraModel.c_str());
+        detectedModel = deviceConfig.cameraModel;
+    }
+    if (detectedModel != deviceConfig.cameraModel) {
+        logf("Camera model detected as %s (config had %s) - updating " CONFIG_FILE, detectedModel.c_str(), deviceConfig.cameraModel.c_str());
+        deviceConfig.cameraModel = detectedModel;
+        writeDeviceConfig(deviceConfig);
+    }
+
+    // AEC/AWB tuning - explicit rather than relying on driver defaults, which have drifted
+    // between esp32-camera versions and differ between the OV5640/OV2640 drivers.
+    s->set_whitebal(s, 1);        // auto white balance on
+    s->set_awb_gain(s, 1);        // let AWB adjust the R/B gains, not just report a mode
+    s->set_exposure_ctrl(s, 1);   // auto exposure on
+    s->set_aec2(s, 1);            // DSP-based AEC - noticeably steadier than the sensor's own AEC
+    s->set_ae_level(s, 0);        // neutral target exposure, no bias
+    s->set_gain_ctrl(s, 1);       // auto gain on
+
+    // Overrides the auto-exposure settings just above - see setupCameraNightExposure()'s comment
+    // for what this does and doesn't achieve compared to the Raspberry Pi units' long exposure.
+    // Gated on the sensor actually detected this boot (detectedModel), not the
+    // nightLongExposure/deviceConfig.cameraModel check that picked config.xclk_freq_hz above -
+    // that one only had last boot's PID detection (or the default) to go on.
+    if (nightLongExposure && detectedModel == "OV5640") {
+        setupCameraNightExposure(s);
+    }
+
+    // Mounting-orientation correction, set centrally on the server (see DeviceConfig /
+    // applyConfigFields) - lets a camera be physically mounted upside down or mirrored without
+    // a firmware change. Applied after the OV3660 fixup above, so it's the final word on
+    // orientation regardless of sensor variant.
+    s->set_vflip(s, deviceConfig.vflip ? 1 : 0);
+    s->set_hmirror(s, deviceConfig.hflip ? 1 : 0);
+
+    return true;
 }
 
 // Switches the sensor from auto exposure to a fixed exposure pinned at its maximum - the closest
@@ -3616,10 +3821,6 @@ DatedPath capturePhoto(TelemetryCounts &counts)
         }
         jpg.close();
 
-        // Purely for runSetupApWindow()'s status page ("last recorded capture") - the AP window's
-        // own live view is a direct camera stream (see "/stream"), not this file.
-        lastCaptureTimestamp = getISO8601Timestamp();
-
         esp_camera_fb_return(frame);
     } else {
         logLine("Capturing camera failed!");
@@ -3714,13 +3915,18 @@ void runWakeCycle()
     updateClockSession();
     noteWakeClockAnchor();
 
-    // Kept up to date incrementally below rather than re-scanned from disk each wake,
-    // since scanning directories with thousands of backlogged files gets slow
-    TelemetryCounts counts = readCounts();
-
     // Reloaded fresh every boot - deep sleep doesn't preserve normal RAM - then refreshed
     // from the API response further down, once WiFi is up.
     deviceConfig = readDeviceConfig();
+
+    // After config (the page shows it, and the camera init needs it) and before any sync attempt
+    // - see maybeRunSetupApWindow()'s comment. Before readCounts() too, since the window writes a
+    // telemetry record and its own updated counts.
+    maybeRunSetupApWindow();
+
+    // Kept up to date incrementally below rather than re-scanned from disk each wake,
+    // since scanning directories with thousands of backlogged files gets slow
+    TelemetryCounts counts = readCounts();
 
     // Deep sleep keeps the RTC running, so the clock usually survives between wake-ups.
     // Only reconnect to WiFi if the clock looks like it was reset by a power interruption
@@ -3753,8 +3959,7 @@ void runWakeCycle()
                       || readForceSyncFlag() || deviceConfig.supportMode || nightCheckin;
 
     // didConnectWiFi is really "reached the internet AND got synced time this cycle" - it gates
-    // writeLastSyncTime()/the force-sync flag further down, and lastWakeConnectedWiFi on the
-    // status page. WiFi is tried first; only if it can't associate do we spin up the modem's LTE
+    // writeLastSyncTime()/the force-sync flag further down. WiFi is tried first; only if it can't associate do we spin up the modem's LTE
     // data path (see cellularConnect()). The actual uploads gate on g_uplink/uplinkConnected(),
     // not on this, so a connection with a failed time sync still drains the backlog.
     bool didConnectWiFi = false;
@@ -3785,7 +3990,6 @@ void runWakeCycle()
     } else {
         logLine("Clock already synced, skipping WiFi connection");
     }
-    lastWakeConnectedWiFi = didConnectWiFi;
     onClockSyncedThisWake();
 
     // See setupCameraNightExposure() below - decided here, ahead of camera_config_t, because
@@ -3801,106 +4005,12 @@ void runWakeCycle()
     // and a fixed clock-hour boundary drifts against real dusk/dawn by up to a couple of hours
     // across the seasons - see isNightForExposure()'s comment for how that already bit this
     // firmware once.
-    bool nightLongExposure = deviceConfig.enableLongExposureAtNight
-                              && deviceConfig.cameraModel != "OV2640"
-                              && isNightForExposure(time(nullptr), deviceConfig.geoLat, deviceConfig.geoLon);
-
-    // Enable / disable power save mode (1 disabled, 0 enabled)
-    pinMode(BOARD_POWER_SAVE_MODE_PIN, OUTPUT);
-    digitalWrite(BOARD_POWER_SAVE_MODE_PIN, HIGH);
-
-    camera_config_t config;
-    config.ledc_channel = LEDC_CHANNEL_0;
-    config.ledc_timer = LEDC_TIMER_0;
-    config.pin_d0 = CAMERA_Y2_PIN;
-    config.pin_d1 = CAMERA_Y3_PIN;
-    config.pin_d2 = CAMERA_Y4_PIN;
-    config.pin_d3 = CAMERA_Y5_PIN;
-    config.pin_d4 = CAMERA_Y6_PIN;
-    config.pin_d5 = CAMERA_Y7_PIN;
-    config.pin_d6 = CAMERA_Y8_PIN;
-    config.pin_d7 = CAMERA_Y9_PIN;
-    config.pin_xclk = CAMERA_XCLK_PIN;
-    config.pin_pclk = CAMERA_PCLK_PIN;
-    config.pin_vsync = CAMERA_VSYNC_PIN;
-    config.pin_href = CAMERA_HREF_PIN;
-    config.pin_sccb_sda = CAMERA_SIOD_PIN;
-    config.pin_sccb_scl = CAMERA_SIOC_PIN;
-    config.pin_pwdn = CAMERA_PWDN_PIN;
-    config.pin_reset = CAMERA_RESET_PIN;
-    config.xclk_freq_hz = nightLongExposure ? deviceConfig.longExposureXclkHz : 20000000;
-    // Highest we ever want (OV5640's max). esp_camera_init() probes the sensor internally and
-    // automatically clamps this down to whatever that sensor actually supports (e.g. OV2640 ->
-    // UXGA, its native ~2MP max) *before* sizing the DMA receive buffer for it - so the buffer
-    // and the resolution always agree. Do NOT try to raise the resolution after init via
-    // sensor->set_framesize() instead - the DMA buffer stays sized for whatever was requested
-    // here, so upsizing afterwards overflows it (cam_hal: "FB-OVF", then capture failures).
-    config.frame_size = FRAMESIZE_QSXGA;   // 2560x1920
-    config.pixel_format = PIXFORMAT_JPEG;  // JPEG formart
-    config.grab_mode = CAMERA_GRAB_WHEN_EMPTY;
-    config.fb_location = CAMERA_FB_IN_PSRAM;
-    config.jpeg_quality = 5;
-    config.fb_count = 2;
-
-    // camera init
-    esp_err_t err = esp_camera_init(&config);
-    if (err != ESP_OK) {
-        logf("Camera init failed with error 0x%x", err);
+    //
+    // Skipped if maybeRunSetupApWindow() already brought the camera up this boot - see its comment
+    // for why it isn't torn down and re-initialised here.
+    if (esp_camera_sensor_get() == nullptr && !initCamera(wantNightLongExposure())) {
         return;
     }
-
-    sensor_t *s = esp_camera_sensor_get();
-    // initial sensors are flipped vertically and colors are a bit saturated
-    if (s->id.PID == OV3660_PID) {
-        s->set_vflip(s, 1);        // flip it back
-        s->set_brightness(s, 1);   // up the brightness just a bit
-        s->set_saturation(s, -2);  // lower the saturation
-    }
-
-    // Identify the sensor from its PID purely to record it - actual resolution was already
-    // decided by esp_camera_init()'s own clamping (see config.frame_size above), nothing further
-    // to do about that here. deviceConfig.cameraModel is only used as a fallback label for a PID
-    // this firmware doesn't recognise, and is otherwise kept in sync with what's actually
-    // detected so it's visible in CONFIG_FILE without needing a fresh detection pass.
-    String detectedModel;
-    if (s->id.PID == OV5640_PID) {
-        detectedModel = "OV5640";
-    } else if (s->id.PID == OV2640_PID) {
-        detectedModel = "OV2640";
-    } else {
-        logf("Unrecognised camera PID 0x%04x - keeping configured cameraModel (%s)", s->id.PID, deviceConfig.cameraModel.c_str());
-        detectedModel = deviceConfig.cameraModel;
-    }
-    if (detectedModel != deviceConfig.cameraModel) {
-        logf("Camera model detected as %s (config had %s) - updating " CONFIG_FILE, detectedModel.c_str(), deviceConfig.cameraModel.c_str());
-        deviceConfig.cameraModel = detectedModel;
-        writeDeviceConfig(deviceConfig);
-    }
-
-    // AEC/AWB tuning - explicit rather than relying on driver defaults, which have drifted
-    // between esp32-camera versions and differ between the OV5640/OV2640 drivers.
-    s->set_whitebal(s, 1);        // auto white balance on
-    s->set_awb_gain(s, 1);        // let AWB adjust the R/B gains, not just report a mode
-    s->set_exposure_ctrl(s, 1);   // auto exposure on
-    s->set_aec2(s, 1);            // DSP-based AEC - noticeably steadier than the sensor's own AEC
-    s->set_ae_level(s, 0);        // neutral target exposure, no bias
-    s->set_gain_ctrl(s, 1);       // auto gain on
-
-    // Overrides the auto-exposure settings just above - see setupCameraNightExposure()'s comment
-    // for what this does and doesn't achieve compared to the Raspberry Pi units' long exposure.
-    // Gated on the sensor actually detected this boot (detectedModel), not the
-    // nightLongExposure/deviceConfig.cameraModel check that picked config.xclk_freq_hz above -
-    // that one only had last boot's PID detection (or the default) to go on.
-    if (nightLongExposure && detectedModel == "OV5640") {
-        setupCameraNightExposure(s);
-    }
-
-    // Mounting-orientation correction, set centrally on the server (see DeviceConfig /
-    // applyConfigFields) - lets a camera be physically mounted upside down or mirrored without
-    // a firmware change. Applied after the OV3660 fixup above, so it's the final word on
-    // orientation regardless of sensor variant.
-    s->set_vflip(s, deviceConfig.vflip ? 1 : 0);
-    s->set_hmirror(s, deviceConfig.hflip ? 1 : 0);
 
     // See capturePhoto() - grabs the warmed-up frame, writes it to CAMERA_DIR, and schedules
     // nextCaptureDueMs off this capture's own timestamp for captureIfDueDuringUpload()/loop() to
@@ -3991,6 +4101,25 @@ void runWakeCycle()
     modemPowerOff();
 }
 
+// Escapes text for safe inclusion in buildStatusHtml()'s markup/attribute values - an SSID can
+// legitimately contain quotes, '<' or '&'.
+String htmlEscape(const String &text)
+{
+    String out;
+    out.reserve(text.length());
+    for (char c : text) {
+        switch (c) {
+            case '&': out += "&amp;"; break;
+            case '<': out += "&lt;"; break;
+            case '>': out += "&gt;"; break;
+            case '"': out += "&quot;"; break;
+            case '\'': out += "&#39;"; break;
+            default: out += c;
+        }
+    }
+    return out;
+}
+
 // The page runSetupApWindow() serves at "/" - just enough for an installer to tell the camera's
 // actually working: battery/solar, GPS fix, whether this boot could reach the internet at all,
 // and the backlog - without needing any of that to actually have gone anywhere yet.
@@ -4009,23 +4138,34 @@ String buildStatusHtml(uint32_t windowRemainingS)
                   "<style>body{font-size:1.4em}</style>"
                   "</head><body>";
     html += "<h1>EnviroCam " + getDeviceId() + "</h1>";
-    // "/stream" is a multipart/x-mixed-replace MJPEG feed (see runSetupApWindow()) - browsers
-    // render that natively in a plain <img>, no polling/JS needed to keep it live.
-    html += "<img id=\"stream\" src=\"/stream\" style=\"max-width:100%\"><br>";
+    // Live view: the <img> re-requests "/frame" (one JPEG per request - see runSetupApWindow())
+    // SETUP_AP_STREAM_FRAME_INTERVAL_MS after each one loads. Deliberately not a continuous
+    // multipart/x-mixed-replace stream, as it used to be: WebServer handles one client at a time
+    // and a stream handler never returns while a browser is watching, so /settime and /wifi sat
+    // queued behind it until the window closed - and browsers (Firefox especially) don't reliably
+    // drop the stream connection when the <img> src is swapped out to make way. One short request
+    // per frame lets those POSTs slot in between frames instead.
+    html += "<img id=\"stream\" src=\"/frame\" style=\"max-width:100%\"><br>";
+    html += "<script>(function(){var img=document.getElementById('stream');"
+            "function load(delay){setTimeout(function(){img.src='/frame?'+Date.now();},delay);}"
+            "img.onload=function(){load(" + String(SETUP_AP_STREAM_FRAME_INTERVAL_MS) + ");};"
+            "img.onerror=function(){load(1000);};})();</script>";
     html += "<p>Setup window closes (and this boot goes to sleep) in <span id=\"countdown\">" +
             String(windowRemainingS) + "</span>s</p>";
     html += "<script>var t=" + String(windowRemainingS) + ";setInterval(function(){"
             "t=Math.max(0,t-1);document.getElementById('countdown').textContent=t;"
             "},1000);</script>";
-    html += "<p>Last recorded capture: " + (lastCaptureTimestamp.length() ? lastCaptureTimestamp : String("none yet")) + "</p>";
 
     // Lets the installer set the clock from their phone (see the "/settime" handler in
     // runSetupApWindow()) - the only way to get a real time onto a unit with no WiFi/LTE/GPS
     // reach. Date.now() is UTC epoch ms whatever the phone's own timezone, matching the device
     // clock. The drift readout compares against the device clock as of this page being rendered.
-    // The stream <img> is paused around the request: WebServer handles one client at a time and
-    // the "/stream" handler doesn't return while a browser is still watching, so /settime would
-    // otherwise sit queued behind it until the window closes.
+    html += "<script>function post(url,body,resultId){"
+            "var r=document.getElementById(resultId);r.textContent='Saving...';"
+            "fetch(url,{method:'POST',body:body})"
+            ".then(function(x){return x.text();}).then(function(t){r.textContent=t;})"
+            ".catch(function(e){r.textContent='Failed: '+e;});}</script>";
+
     time_t deviceNow = time(nullptr);
     bool clockSet = deviceNow >= CLOCK_PLAUSIBLE_AFTER_EPOCH;
     html += "<p>Device clock: " + (clockSet ? getISO8601Timestamp() + " UTC <span id=\"drift\"></span>" : String("<b>not set</b>")) + "<br>";
@@ -4035,12 +4175,27 @@ String buildStatusHtml(uint32_t windowRemainingS)
             "if(clockSet){document.getElementById('drift').textContent='(phone differs by '+Math.round(Date.now()/1000-dev)+'s)';}"
             "document.getElementById('settime').onclick=function(){"
             "if(clockSet&&!confirm('Device clock is already set. Replace it with this phone\\'s time?'))return;"
-            "var r=document.getElementById('settimeResult'),img=document.getElementById('stream');"
-            "r.textContent='Setting...';img.src='data:,';"
-            "fetch('/settime?epoch_ms='+Date.now(),{method:'POST'})"
-            ".then(function(x){return x.text();}).then(function(t){r.textContent=t;})"
-            ".catch(function(e){r.textContent='Failed: '+e;})"
-            ".then(function(){img.src='/stream?'+Date.now();});};</script>";
+            "post('/settime?epoch_ms='+Date.now(),null,'settimeResult');};</script>";
+
+    // WiFi network override - see readWifiCredentials()/the "/wifi" handler. The current password
+    // is never sent back out to the page; saving always takes whatever's in the password box
+    // (blank = open network). Takes effect from the next wake's connection attempt.
+    String wifiSsid, wifiPassword;
+    bool wifiFromSd = readWifiCredentials(wifiSsid, wifiPassword);
+    html += "<p>WiFi network: " + htmlEscape(wifiSsid) + " (" + String(wifiFromSd ? "set on device" : "built-in") + ")<br>"
+            "<input id=\"wifiSsid\" placeholder=\"Network name\" maxlength=\"32\" style=\"font-size:1em\" value=\"" + htmlEscape(wifiSsid) + "\"><br>"
+            "<input id=\"wifiPass\" type=\"password\" placeholder=\"Password (blank if open)\" maxlength=\"64\" style=\"font-size:1em\"><br>"
+            "<button id=\"wifiSave\" style=\"font-size:1em\">Save WiFi</button>";
+    if (wifiFromSd) {
+        html += " <button id=\"wifiReset\" style=\"font-size:1em\">Use built-in network</button>";
+    }
+    html += " <span id=\"wifiResult\"></span></p>";
+    html += "<script>document.getElementById('wifiSave').onclick=function(){"
+            "var b=new URLSearchParams();b.append('ssid',document.getElementById('wifiSsid').value);"
+            "b.append('password',document.getElementById('wifiPass').value);post('/wifi',b,'wifiResult');};"
+            "var wr=document.getElementById('wifiReset');if(wr){wr.onclick=function(){"
+            "if(!confirm('Forget the WiFi network set on this device and go back to the built-in one?'))return;"
+            "var b=new URLSearchParams();b.append('reset','1');post('/wifi',b,'wifiResult');};}</script>";
 
     html += "<ul>";
     html += "<li>Boot number: " + String(bootCount) + "</li>";
@@ -4049,7 +4204,18 @@ String buildStatusHtml(uint32_t windowRemainingS)
     html += "<li>Solar: " + String(get_solar_voltage()) + "mV</li>";
     html += "<li>GPS: " + String(deviceConfig.geoLat, 6) + ", " + String(deviceConfig.geoLon, 6) +
             " (fix recorded " + (deviceConfig.geoTimeRecorded.length() ? deviceConfig.geoTimeRecorded : String("never")) + ")</li>";
-    html += "<li>This boot reached the internet: " + String(lastWakeConnectedWiFi ? "yes" : "no") + "</li>";
+    // The page now runs before this boot's own sync/capture (see maybeRunSetupApWindow()), so this
+    // shows the last time any earlier boot got through, from LAST_SYNC_FILE.
+    time_t lastSync = readLastSyncTime();
+    String lastSyncText = "never";
+    if (lastSync > 0) {
+        struct tm lastSyncTm;
+        gmtime_r(&lastSync, &lastSyncTm);
+        char buf[25];
+        strftime(buf, sizeof(buf), "%Y-%m-%dT%H:%M:%SZ", &lastSyncTm);
+        lastSyncText = buf;
+    }
+    html += "<li>Last successful sync (internet + time): " + lastSyncText + "</li>";
     html += "<li>Pending images: " + String(counts.pendingImages) + "</li>";
     html += "<li>Pending telemetry: " + String(counts.pendingTelemetry) + "</li>";
     html += "<li>Support mode: " + String(deviceConfig.supportMode ? "on" : "off") + "</li>";
@@ -4062,17 +4228,21 @@ String buildStatusHtml(uint32_t windowRemainingS)
 // A temporary local WiFi hotspot + the status page above - entirely offline, no cellular or
 // internet WiFi required - so an installer can confirm the camera's working right where they're
 // standing. See SETUP_AP_* and the comment on setup()'s call to this. Runs for
-// SETUP_AP_WINDOW_MS then returns, letting loop() carry on into its normal deep-sleep decision.
+// SETUP_AP_WINDOW_MS then returns to maybeRunSetupApWindow(), which tears the AP down and
+// lets runWakeCycle() carry on with this boot's normal sync/capture/upload.
 void runSetupApWindow()
 {
     // Dropped to a much lighter resolution for this preview - the QSXGA frames runWakeCycle()
     // captures for real are far more than a live "is it aimed right" view needs, and every one of
     // those bytes has to go out over the softAP link. Safe to lower after esp_camera_init() (only
     // *raising* it afterwards overflows the DMA buffer, which was sized for the larger frame_size
-    // requested at init) - and nothing needs it back at QSXGA, since the camera gets fully
-    // deinitialised in loop() right after this returns regardless.
+    // requested at init). Put back to whatever init settled on (QSXGA, or less if the sensor
+    // clamped it) at the end, since runWakeCycle() captures with this same camera init - see
+    // maybeRunSetupApWindow(). Going back up to the init size is fine; only exceeding it overflows.
     sensor_t *sensor = esp_camera_sensor_get();
+    framesize_t initFramesize = FRAMESIZE_INVALID;
     if (sensor) {
+        initFramesize = sensor->status.framesize;
         sensor->set_framesize(sensor, SETUP_AP_STREAM_FRAMESIZE);
     }
 
@@ -4087,7 +4257,7 @@ void runSetupApWindow()
     // physical unit is which without the installer having to read/type it - the app then joins
     // the AP itself using that name plus the fixed SETUP_AP_PASSWORD above, so nothing secret
     // ever needs to go over BLE. Advertising is stopped for as long as a station is actually
-    // connected (below) since it shares the same 2.4GHz radio as the /stream handler and isn't
+    // connected (below) since it shares the same 2.4GHz radio as the /frame handler and isn't
     // needed once a phone's already joined.
     NimBLEDevice::init(ssid.c_str());
     NimBLEAdvertising *pAdvertising = NimBLEDevice::getAdvertising();
@@ -4184,29 +4354,58 @@ void runSetupApWindow()
         onClockSyncedThisWake();
         server.send(200, "text/plain", "Clock set to " + getISO8601Timestamp() + " UTC");
     });
-    server.on("/stream", HTTP_GET, [&server, start]() {
-        // Same multipart/x-mixed-replace MJPEG trick the CameraWebServer example uses - a
-        // continuous run of JPEG frames a browser renders directly in an <img> tag, no page-side
-        // JS needed. Frames come straight off the camera each time round, never touching SD.
-        //
-        // Bounded by the same SETUP_AP_WINDOW_MS deadline as the outer loop below: once a browser
-        // opens this, the handler doesn't otherwise return - and hence never lets
-        // server.handleClient() regain control - until the client disconnects, which would
-        // otherwise stop the window from ever closing on schedule while a phone's still watching.
-        WiFiClient client = server.client();
-        client.print("HTTP/1.1 200 OK\r\nContent-Type: multipart/x-mixed-replace; boundary=frame\r\n\r\n");
-
-        while (client.connected() && millis() - start < SETUP_AP_WINDOW_MS) {
-            camera_fb_t *frame = esp_camera_fb_get();
-            if (!frame) {
-                break;
-            }
-            client.printf("--frame\r\nContent-Type: image/jpeg\r\nContent-Length: %u\r\n\r\n", frame->len);
-            client.write(frame->buf, frame->len);
-            client.print("\r\n");
-            esp_camera_fb_return(frame);
-            delay(SETUP_AP_STREAM_FRAME_INTERVAL_MS);
+    // See buildStatusHtml()'s WiFi form and readWifiCredentials(). Not tested against the network
+    // here - the radio's busy being the AP - so it's only checked for being well-formed; the next
+    // wake's connectWiFiAndSyncTime() is the real test, and its result shows in the log/telemetry.
+    // The password itself is never logged.
+    server.on("/wifi", HTTP_POST, [&server]() {
+        if (server.hasArg("reset")) {
+            SD.remove(WIFI_CREDENTIALS_FILE);
+            logLine("WiFi override cleared from setup AP - back to built-in network");
+            server.send(200, "text/plain", String("Cleared - will use built-in network \"") + WIFI_SSID + "\" from the next wake");
+            return;
         }
+
+        String ssid = server.arg("ssid");
+        String password = server.arg("password");
+        ssid.trim();
+        // 802.11 SSID max 32 bytes; WPA2 passphrase 8-63 chars, or 64 hex digits for a raw PSK.
+        if (ssid.length() == 0 || ssid.length() > 32) {
+            server.send(400, "text/plain", "Network name must be 1-32 characters");
+            return;
+        }
+        if (password.length() > 0 && (password.length() < 8 || password.length() > 64)) {
+            server.send(400, "text/plain", "Password must be 8-64 characters (or blank for an open network)");
+            return;
+        }
+
+        DynamicJsonDocument doc(256);
+        doc["ssid"] = ssid;
+        doc["password"] = password;
+        File file = SD.open(WIFI_CREDENTIALS_FILE, "w");
+        if (!file) {
+            logLine("Failed to write " WIFI_CREDENTIALS_FILE "!");
+            server.send(500, "text/plain", "Failed to save to SD card");
+            return;
+        }
+        serializeJson(doc, file);
+        file.close();
+        logf("WiFi network set from setup AP: \"%s\" (%s)", ssid.c_str(), password.length() ? "with password" : "open");
+        server.send(200, "text/plain", "Saved - will join \"" + ssid + "\" from the next wake");
+    });
+    server.on("/frame", HTTP_GET, [&server]() {
+        // One JPEG straight off the camera per request, never touching SD - see buildStatusHtml()'s
+        // live view for why this isn't a continuous stream any more.
+        camera_fb_t *frame = esp_camera_fb_get();
+        if (!frame) {
+            server.send(503, "text/plain", "No frame");
+            return;
+        }
+        server.sendHeader("Cache-Control", "no-store");
+        server.setContentLength(frame->len);
+        server.send(200, "image/jpeg", "");
+        server.client().write(frame->buf, frame->len);
+        esp_camera_fb_return(frame);
     });
     server.begin();
 
@@ -4285,6 +4484,18 @@ void runSetupApWindow()
     // fully explain it. If a "Double exception"/sys_evt panic recurs even after this, the BT
     // controller staying live through to loop()'s own WiFi.mode(WIFI_OFF) call is the next thing to
     // chase - not something to fix here without hardware to confirm it against.
+    if (sensor && initFramesize != FRAMESIZE_INVALID) {
+        sensor->set_framesize(sensor, initFramesize);
+        // Flush whatever the frame buffers still hold from preview-size capture, so the next real
+        // capture (and its warmup, which deviceConfig.cameraWarmupFrames can set to 0) starts clean.
+        for (int i = 0; i < 2; i++) {
+            camera_fb_t *stale = esp_camera_fb_get();
+            if (stale) {
+                esp_camera_fb_return(stale);
+            }
+        }
+    }
+
     logLine("Setup AP window closed");
 }
 
