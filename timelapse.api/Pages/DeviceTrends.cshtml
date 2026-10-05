@@ -1,0 +1,480 @@
+﻿@page "{numberOfHoursToDisplay:int?}"
+@using Humanizer
+@model DeviceTrendsModel
+@{
+    ViewData["Title"] = "Device Trends";
+}
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@2.0.1/dist/chartjs-plugin-annotation.min.js"></script>
+@* <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-autocolors"></script> *@
+
+<div class="container">
+  <div class="row">
+    <div class="col">
+        <h4>Displaying @(Model.NumberOfHoursToDisplay) hours data.</h4>
+        @{
+            <a href="/DeviceTrends/1" type="button" class="btn btn-secondary">Last hour</a>
+            <a href="/DeviceTrends/24" type="button" class="btn btn-secondary">Last 24 hours</a>
+            <a href="/DeviceTrends/48" type="button" class="btn btn-secondary">Last 48 hours</a>
+            <a href="/DeviceTrends/168" type="button" class="btn btn-secondary">Last week</a>
+        }
+    </div>
+  </div>
+</div>
+
+
+
+<script>
+    const GetTelemetryBetweenDatesUri = '/api/Telemetry/GetTelemetryBetweenDates'
+
+    const colorScheme = [
+        "#25CCF7","#FD7272","#54a0ff","#00d2d3",
+        "#1abc9c","#2ecc71","#3498db","#9b59b6","#34495e",
+        "#16a085","#27ae60","#2980b9","#8e44ad","#2c3e50",
+        "#f1c40f","#e67e22","#e74c3c","#ecf0f1","#95a5a6",
+        "#f39c12","#d35400","#c0392b","#bdc3c7","#7f8c8d",
+        "#55efc4","#81ecec","#74b9ff","#a29bfe","#dfe6e9",
+        "#00b894","#00cec9","#0984e3","#6c5ce7","#ffeaa7",
+        "#fab1a0","#ff7675","#fd79a8","#fdcb6e","#e17055",
+        "#d63031","#feca57","#5f27cd","#54a0ff","#01a3a4"
+    ]
+    var colorSchemeIndex = 0 ;
+
+    function getTelemetry(deviceId, startDate, endDate, chart, deviceLabel) {
+        fetch(GetTelemetryBetweenDatesUri + '?deviceId=' + deviceId + '&startDate=' + startDate + '&endDate=' + endDate)
+            .then(response => response.json())
+            .then(data => showTelemetry(chart, data, deviceId, deviceLabel))
+            .catch(error => console.error('Unable to get telemetry.', error));
+    }
+
+    function showTelemetry(chart, data, deviceId, deviceLabel){
+
+        const minVoltage = 2000
+        const maxVoltage = 3600
+
+        console.log("showTelemtery");
+        console.log("deviceLabel:")
+        console.log(deviceLabel)
+
+        data = {
+            @* labels: labels, *@
+            datasets: [{
+                label: deviceLabel + " Battery",
+                @* backgroundColor: 'rgb(99, 99, 255)', *@
+                @* borderColor: 'rgb(99, 99, 255)', *@
+
+                backgroundColor: colorScheme[colorSchemeIndex],
+                borderColor: colorScheme[colorSchemeIndex],
+
+                 cubicInterpolationMode: 'monotone',
+                
+                yAxisID: 'y',
+                data: data.map(d => ({x: new Date(d.timestamp), y: d.batteryPercent})),
+            }]
+        };
+
+        ++colorSchemeIndex;
+
+        chart.config.data.datasets = chart.config.data.datasets.concat(data.datasets)
+        chart.update();
+    }
+
+    var dates = [];
+    var startDate = new Date("@(Model.StartDate.ToString("o"))");
+    var endDate = new Date("@(Model.EndDate.ToString("o"))");
+    startDate = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
+    endDate = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate());
+
+    for(var date = startDate; date<=endDate; date.setDate(date.getDate() + 1)){
+        dates.push(new Date(date));
+    }
+
+    annotations = dates
+    .map((l, i) => ({
+        drawTime: 'beforeDatasetsDraw',
+        type: 'box',
+        xScaleID: 'x',
+        yScaleID: 'y',
+        xMin: new Date(l.getFullYear(), l.getMonth(), l.getDate()),
+        xMax: new Date(l.getFullYear(), l.getMonth(), l.getDate()+1),
+        backgroundColor: 'rgba(128, 128, 128, 0.2)',
+        borderColor: 'rgba(128, 128, 128, 0.0)',
+        borderWidth: 1
+    }))
+    @* .filter((l, i) => !(i % 2)) *@
+    .filter(function (l, i) {
+        return (l.xMin.getDate() % 2)
+    })
+
+
+    var previousDateString = null;
+</script>
+
+<div>
+    <table class="table">
+        <thead>
+        </thead>
+        <tbody>
+            <tr>
+                <td>
+                    <canvas id="myChart"></canvas>
+
+                    <script>
+
+                        var config = {
+                            type: 'line',
+                            options: {
+                                plugins: {
+                                    legend: {
+                                        @* display: false, *@
+                                        position: 'bottom'
+                                    },
+                                    annotation: {
+                                        annotations: annotations
+                                    },
+                                    @* autocolors *@
+                                },
+                                scales: {
+                                    x: {
+                                            parsing: false,
+                                            @* display: false, *@
+                                            type: 'time',
+                                            time: {
+                                                unit: 'hour',
+                                                displayFormats: {
+                                                    'millisecond': 'MMM DD',
+                                                    'second': 'MMM DD',
+                                                    'minute': 'MMM DD',
+                                                    'hour': 'E do ha',
+                                                    'day': 'MMM dd HH:mm',
+                                                    'week': 'MMM DD',
+                                                    'month': 'MMM DD',
+                                                    'quarter': 'MMM DD',
+                                                    'year': 'MMM DD'
+                                                }                        
+                                            },
+                                            min: new Date(@(new DateTimeOffset(Model.StartDate).ToUnixTimeMilliseconds())),
+                                            max: new Date(@(new DateTimeOffset(Model.EndDate).ToUnixTimeMilliseconds())),
+                                    },
+                                    y: {
+                                            @* display: false, *@
+                                            beginAtZero: true,
+                                            position: 'left'
+                                    },
+                                    y1: {
+                                            @* display: false, *@
+                                            beginAtZero: false,
+                                            position: 'right'
+                                    }
+                                },
+                                elements: {
+                                    line: {
+                                        borderColor: '#000000',
+                                        borderWidth: 1
+                                    },
+                                        point: {
+                                            radius: 0
+                                    } 
+                                },
+                                animation: false,
+                                @* responsive: false, *@
+                                // https://stackoverflow.com/questions/68353537/is-there-a-way-to-highlight-a-line-on-a-line-graph-with-hover
+                                onHover: (e, activeEls, chart) => {
+                                    if (activeEls.length === 0) {
+                                        chart.data.datasets.forEach((dataset) => {
+                                        dataset.backgroundColor = dataset.backgroundColor.length === 9 ? dataset.backgroundColor.slice(0, -2) : dataset.backgroundColor;
+                                        dataset.borderColor = dataset.borderColor.length === 9 ? dataset.borderColor.slice(0, -2) : dataset.borderColor;
+                                        dataset.borderWidth = 1;
+                                        });
+                                        chart.update();
+                                        return;
+                                    }
+
+                                    const hoveredEl = chart.getElementsAtEventForMode(e, 'point', {
+                                        intersect: true
+                                    }, true)[0]
+
+                                    chart.data.datasets.forEach((dataset, i) => {
+                                        dataset.backgroundColor = (hoveredEl.datasetIndex === i || dataset.backgroundColor.length === 9) ? dataset.backgroundColor : dataset.backgroundColor + '4D';
+                                        dataset.borderColor = (hoveredEl.datasetIndex === i || dataset.borderColor.length === 9) ? dataset.borderColor : dataset.borderColor + '4D';
+                                        dataset.borderWidth = (hoveredEl.datasetIndex === i || dataset.borderWidth.length === 9) ? 3 : 1;
+                                    });
+
+                                    chart.update();
+                                }
+                            }
+                        };
+
+                        config.data={datasets: []};
+
+                        const myChart = new Chart(
+                            document.getElementById('myChart'),
+                            config
+                        );
+
+                        @* myChart.register(autocolors); *@
+
+                        @{foreach(var device in Model.Devices){
+                            <text>
+                                getTelemetry(@(device.Id), '@(Model.StartDate.ToUniversalTime().ToString("o"))', '@(Model.EndDate.ToUniversalTime().ToString("o"))', myChart, "@(device.Name)");
+                            </text>
+                        }}
+                    </script>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+
+<div>
+    <table class="table" id="devicePerformance">
+        <thead>
+            <th nowrap="nowrap">Id</th>
+            <th nowrap="nowrap">Device Name</th>
+            <th nowrap="nowrap"><i class="fa fa-cog" data-toggle="tooltip" title="Support Mode"></i></th>
+            <th nowrap="nowrap"><i class="fa fa-eye" data-toggle="tooltip" title="Monitoring Mode"></i></th>
+            <th nowrap="nowrap"><i class="fa fa-wrench" data-toggle="tooltip" title="Service"></i></th>
+            <th nowrap="nowrap"><i class="fa fa-moon" data-toggle="tooltip" title="Hibernate Mode"></i></th>
+            <th nowrap="nowrap"><i class="fa fa-power-off" data-toggle="tooltip" title="Power Off"></i></th>
+            <th nowrap="nowrap">Description</th>
+            
+
+            @{foreach(var date in Model.DateRange){
+                <th nowrap="nowrap"><script type="text/javascript">
+                    document.write(localizeDateTimeToShortDayAndNumber('@(date.ToString("s"))')); 
+                    daytimeColumns.push(localizeDateTimeIsBetween6And6('@(date.ToString("s"))'));
+                </script></th>
+            }}
+        </thead>
+        <thead>
+            <th nowrap="nowrap"></th>
+            <th nowrap="nowrap"></th>
+            <th nowrap="nowrap"></th>
+            <th nowrap="nowrap"></th>
+            <th nowrap="nowrap"></th>
+            <th nowrap="nowrap"></th>
+            <th nowrap="nowrap"></th>
+            <th nowrap="nowrap">Number of images and pending images</th>
+
+            @{foreach(var date in Model.DateRange){
+                <th nowrap="nowrap"><script type="text/javascript">document.write(localizeDateTimeToHourAndAmPm('@(date.ToString("s"))'));</script></th>
+            }}
+        </thead>
+        <tbody>
+            @{foreach(var summary in Model.PerformanceSummaries){
+            <tr>
+                <td nowrap="nowrap">
+                    <a href="/DeviceEdit/@(summary.DeviceId)">@(summary.DeviceId)</a>
+                </td>
+                <td nowrap="nowrap"><a href="/TelemetryGraph/@(summary.DeviceId)/@(Model.StartDate.ToUniversalTime().ToString("o"))/@(Model.EndDate.ToUniversalTime().ToString("o"))">@(summary.DeviceName)</a></td>
+
+                <td nowrap="nowrap">
+                    @if(summary.DeviceSupportMode){
+                        <i class="fa fa-cog" data-toggle="tooltip" title="Support Mode"></i>
+                    }
+                </td>
+                <td>
+                    @if(summary.DeviceMonitoringMode){
+                        <i class="fa fa-eye" data-toggle="tooltip" title="Monitoring Mode"></i>
+                    }
+                </td>
+                <td>
+                    @if(summary.DeviceService){
+                        <i class="fa fa-wrench" data-toggle="tooltip" title="Service"></i>
+                    }
+                </td>
+                <td>
+                    @if(summary.DeviceHibernateMode){
+                        <i class="fa fa-moon" data-toggle="tooltip" title="Hibernate Mode"></i>
+                    }
+                </td>
+                <td>
+                    @if(summary.DevicePowerOff){
+                        <i class="fa fa-power-off" data-toggle="tooltip" title="Power Off"></i>
+                    }
+                </td>
+
+
+                <td nowrap="nowrap">@(summary.DeviceDescription)</td>
+                @{foreach(var details in summary.PerformanceDetails){
+                    if(summary.DeviceService || summary.DevicePowerOff || summary.DeviceHibernateMode){
+                        <td nowrap="nowrap" style="background-color: #999999;">@(details.TotalImages) P@(details.MaxPendingImages)</td>
+                    } else {
+                        if(details.TotalImages<30 || details.MaxPendingImages > 60){
+                            <td nowrap="nowrap" style="background-color: #ff0000;">@(details.TotalImages) P@(details.MaxPendingImages)</td>
+                        } else {
+                            if(details.TotalImages<45 || details.MaxPendingImages > 45){
+                                <td nowrap="nowrap" style="background-color: #ffcc00;">@(details.TotalImages) P@(details.MaxPendingImages)</td>
+                            } else {
+                                <td nowrap="nowrap">@(details.TotalImages)</td>
+                            }
+                        }                    
+                    }
+                }}
+            </tr>
+            }}
+            <thead>
+                @* <th nowrap="nowrap">Device Name</th> *@
+                <th nowrap="nowrap"></th>
+                <th nowrap="nowrap"></th>
+                <th nowrap="nowrap"><i class="fa fa-cog" data-toggle="tooltip" title="Support Mode"></i></th>
+                <th nowrap="nowrap"><i class="fa fa-eye" data-toggle="tooltip" title="Monitoring Mode"></i></th>
+                <th nowrap="nowrap"><i class="fa fa-wrench" data-toggle="tooltip" title="Service"></i></th>
+                <th nowrap="nowrap"><i class="fa fa-moon" data-toggle="tooltip" title="Hibernate Mode"></i></th>
+                <th nowrap="nowrap"><i class="fa fa-power-off" data-toggle="tooltip" title="Power Off"></i></th>
+                @* <th nowrap="nowrap">Description</th> *@
+                <th nowrap="nowrap"></th>
+                
+
+                @{foreach(var date in Model.DateRange){
+                    <th nowrap="nowrap"><script type="text/javascript">
+                        document.write(localizeDateTimeToShortDayAndNumber('@(date.ToString("s"))')); 
+                        @* daytimeColumns.push(localizeDateTimeIsBetween6And6('@(date.ToString("s"))')); *@
+                    </script></th>
+                }}
+            </thead>
+            <thead>
+                <th nowrap="nowrap"></th>
+                <th nowrap="nowrap"></th>
+                <th nowrap="nowrap"></th>
+                <th nowrap="nowrap"></th>
+                <th nowrap="nowrap"></th>
+                <th nowrap="nowrap"></th>
+                <th nowrap="nowrap"></th>
+                <th nowrap="nowrap">Number of images only</th>
+
+                @{foreach(var date in Model.DateRange){
+                    <th nowrap="nowrap"><script type="text/javascript">document.write(localizeDateTimeToHourAndAmPm('@(date.ToString("s"))'));</script></th>
+                }}
+            </thead>
+            @{foreach(var summary in Model.PerformanceSummaries){
+            <tr>
+
+                <td nowrap="nowrap">
+                    <a href="/DeviceEdit/@(summary.DeviceId)">@(summary.DeviceId)</a>
+                </td>
+
+                <td nowrap="nowrap"><a href="/TelemetryGraph/@(summary.DeviceId)/@(Model.StartDate.ToUniversalTime().ToString("o"))/@(Model.EndDate.ToUniversalTime().ToString("o"))">@(summary.DeviceName)</a></td>
+
+                <td nowrap="nowrap">
+                    @if(summary.DeviceSupportMode){
+                        <i class="fa fa-cog" data-toggle="tooltip" title="Support Mode"></i>
+                    }
+                </td>
+                <td>
+                    @if(summary.DeviceMonitoringMode){
+                        <i class="fa fa-eye" data-toggle="tooltip" title="Monitoring Mode"></i>
+                    }
+                </td>
+                <td>
+                    @if(summary.DeviceService){
+                        <i class="fa fa-wrench" data-toggle="tooltip" title="Service"></i>
+                    }
+                </td>
+                <td>
+                    @if(summary.DeviceHibernateMode){
+                        <i class="fa fa-moon" data-toggle="tooltip" title="Hibernate Mode"></i>
+                    }
+                </td>
+                <td>
+                    @if(summary.DevicePowerOff){
+                        <i class="fa fa-power-off" data-toggle="tooltip" title="Power Off"></i>
+                    }
+                </td>
+
+
+                <td nowrap="nowrap">@(summary.DeviceDescription)</td>
+                @{foreach(var details in summary.PerformanceDetails){
+                    if(summary.DeviceService || summary.DevicePowerOff || summary.DeviceHibernateMode){
+                        <td nowrap="nowrap" style="background-color: #999999;">@(details.TotalImages)</td>
+                    } else {
+                        if(details.TotalImages<30){
+                            <td nowrap="nowrap" style="background-color: #ff0000;">@(details.TotalImages)</td>
+                        } else {
+                            if(details.TotalImages<45){
+                                <td nowrap="nowrap" style="background-color: #ffcc00;">@(details.TotalImages)</td>
+                            } else {
+                                <td nowrap="nowrap">@(details.TotalImages)</td>
+                            }
+                        }                    
+                    }
+                }}
+            </tr>
+            <tr>
+                <td nowrap="nowrap"></td>
+                <td nowrap="nowrap"></td>
+                <td nowrap="nowrap"></td>
+                <td nowrap="nowrap"></td>
+                <td nowrap="nowrap"></td>
+                <td nowrap="nowrap"></td>
+                <td nowrap="nowrap"></td>
+                <td nowrap="nowrap"></td>
+                @{foreach(var details in summary.PerformanceDetails){
+
+                    @if(details.FirstImage!=null){
+                        if(summary.DeviceService || summary.DevicePowerOff || summary.DeviceHibernateMode){
+                            <td nowrap="nowrap" style="background-color: #999999;">
+                                <a href="/ImageView/@(summary.DeviceId)/1/@(details.FirstImage.Timestamp.ToUniversalTime().ToString("o"))"><img src="@(details.FirstImage.BlobUri + Model.SasToken)" width=100></img></a>
+                            </td>
+                        } else {
+                            if(details.TotalImages<30){
+                                <td style="background-color: #ff0000;">
+                                    <a href="/ImageView/@(summary.DeviceId)/1/@(details.FirstImage.Timestamp.ToUniversalTime().ToString("o"))"><img src="@(details.FirstImage.BlobUri + Model.SasToken)" width=100></img></a>
+                                </td>
+                            } else {
+                                if(details.TotalImages<45){
+                                    <td style="background-color: #ffcc00;">
+                                        <a href="/ImageView/@(summary.DeviceId)/1/@(details.FirstImage.Timestamp.ToUniversalTime().ToString("o"))"><img src="@(details.FirstImage.BlobUri + Model.SasToken)" width=100></img></a>
+                                    </td>
+                                } else {
+                                    <td>
+                                        <a href="/ImageView/@(summary.DeviceId)/1/@(details.FirstImage.Timestamp.ToUniversalTime().ToString("o"))"><img src="@(details.FirstImage.BlobUri + Model.SasToken)" width=100></img></a>
+                                    </td>
+                                }
+                            }
+                        }
+                    } else {
+                        <td></td>
+                    }
+                }}
+            </tr>
+            }}
+        </tbody>
+    </table>
+</div>
+
+<script>
+
+    
+    var rows = document.getElementById('devicePerformance').getElementsByTagName('tr');
+
+    for (var i = 0; i < rows.length; i++) {
+
+        var cells = rows[i].getElementsByTagName('th');
+        for (var j = 7; j < cells.length; j++) {
+            // Also clear out cells that show same day as previous
+            var dateString = cells[j].innerText;
+            if(previousDateString==dateString){
+                cells[j].innerText='';
+            } else {
+                previousDateString=dateString;
+            }
+        }
+
+        // check daytimeColumns and for all columns that are 'Night', remove cell highlighting
+        var cells = rows[i].getElementsByTagName('td');
+        for (var j = 7; j < cells.length; j++) {
+            if(daytimeColumns[j]=='Night'){
+                @* cells[j].style.display = 'none'; *@
+                cells[j].style.backgroundColor= '#ffffff';
+            }
+
+            // We will likely not have a full hour's worth of data for latest hour - no point highlighting
+            if(j==cells.length-1){
+                cells[j].style.backgroundColor= '#ffffff';
+            }
+        }
+    }
+</script>

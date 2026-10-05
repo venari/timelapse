@@ -1,28 +1,76 @@
 # timelapse
 A set of tools/scripts to automate the taking and creation of timelapse videos and videos with a Raspberry Pi
 
+# Current status of using PiJuice
+> [!important]
+> In November 2023, I posted an update regards the performance of the PiJuice, even when using PiSupply's own batteries.
+>
+> However, in the last month (November 2024) I've deployed one further camera that is not using a third party modem board [Waveshare SIM7600-H 4G HAT](https://www.waveshare.com/wiki/SIM7600X_4G_%26_LTE_Cat-1_HAT), but instead has reverted back to a USB thumb modem. Since swapping to this modem, the PiJuice board has behaved perfectly with no missed wakeups or random restarts.
+> 
+> In addition the ability to purchase PiSupply's PiJuice batteries seems to have returned (even if stock has not).
+>
+> TL;DR - as long as not combined with either a LiFePO4 battery chemistry or the Waveshare hat above, the PiJuice seems to perform well.
+>
+> As of June 2026, the PiJuice no longer appears to be being manufactured, an PiSupply appears to have been disolved.
+> 
+> This project is being migrated to use the PvPi 12V LiFePO4 solar battery charger.
+> 
+> Documentation will be updated in the coming months.
+
 # PI Setup
 
-For now, use Buster rather than Bullseye - owing to raspicam issues on Pi Zero.
-
-Raspberry Pi OS Lite (Legacy) 
-Debian version 10 - https://downloads.raspberrypi.org/raspios_oldstable_lite_armhf/images/raspios_oldstable_lite_armhf-2022-01-28/2022-01-28-raspios-buster-armhf-lite.zip
-
-
 Raspberry Pi OS Lite (32 bit - Pi Zero W)
-Debian version 11 - https://downloads.raspberrypi.org/raspios_oldstable_lite_armhf/images/raspios_oldstable_lite_armhf-2022-01-28/2022-01-28-raspios-buster-armhf-lite.zip
+Debian Bookworm - https://downloads.raspberrypi.org/raspios_lite_armhf/images/raspios_lite_armhf-2025-05-13/2025-05-13-raspios-bookworm-armhf-lite.img.xz
+
 
 Raspberry Pi OS Lite (64 bit - Pi Zero 2 W
-Debian version 11 - https://downloads.raspberrypi.org/raspios_lite_arm64/images/raspios_lite_arm64-2022-01-28/2022-01-28-raspios-bullseye-arm64-lite.zip
+Debian Bookworm - https://downloads.raspberrypi.org/raspios_lite_arm64/images/raspios_lite_arm64-2025-05-13/2025-05-13-raspios-bookworm-arm64-lite.img.xz
 
-Burn using Etcher.
 
-Mount SD card
+Burn using Pi Imager. Give a default name, but you can change this inthe install script below.
+
+Set username and password, and authentication methods as desired.
+
+## All versions up to Bullseye.
+
+Mount (reinsert) SD card
+<!-- diskutil mount /dev/disk4s1 -->
 ```
-cp ~/wpa_supplicant.conf /Volumes/boot
-touch /Volumes/boot/ssh
-diskutil unmount /Volumes/boot
+cp ~/wpa_supplicant.conf /Volumes/bootfs
+diskutil unmount /Volumes/bootfs
 ```
+
+If updating the wpa_supplicant file, and you have network access:
+```
+scp ~/wpa_supplicant.conf pi@[pi name]:~
+```
+And then on the pi:
+```
+sudo cp ~/wpa_supplicant.conf /etc/wpa_supplicant/wpa_supplicant.conf
+sudo reboot
+```
+
+## Bookworm onwards:
+Bookworm uses NetorkManager rather than WPA Supplicant.
+
+Ensure you have local wifi network access when you burn the image.
+
+Individual network addition:
+```
+sudo nmcli dev wifi connect <wifi-ssid> password "<network-password>"
+```
+
+```
+scp ~/nmcli-connect.sh pi@[pi name]:~
+```
+And then on the pi:
+```
+chmod u+x ~/nmcli-connect.sh
+sudo ./nmcli-connect.sh
+```
+
+Note - this will only connect to WIFI networks that are present, so ensure modem stays with camera.
+
 
 Turn on and find the pi
 Pi Zero W 2:
@@ -38,33 +86,149 @@ raspberrypi.lan (192.168.86.32) at b8:27:eb:94:ac:b1 on en0 ifscope [ethernet]
 
 ```
 
+# Install (or update) software, (LiPo and LiFePO4, sedicam v2 configuration) config & code to new Pi:
 ```
-sudo apt-get update
-sudo apt-get upgrade
-
-# Enable camera interface
-sudo raspi-config nonint do_camera 0
-
-sudo apt-get install git pijuice-base gphoto2 python3-pip -y
-
-pip3 install picamera
-
-# Set timezone
-sudo timedatectl set-timezone Pacific/Auckland
-
-mkdir -p dev
-cd dev
-git clone https://github.com/venari/timelapse.git
-cd timelapse
-```
-
-Add scheduled tasks:
-```
-crontab -e
+sudo apt-get install byobu -y
+byobu-enable
+byobu
 ```
 ```
-@reboot /usr/bin/bash /home/pi/dev/timelapse/scripts/startup.sh
-@reboot /usr/bin/bash /home/pi/dev/timelapse/scripts/uploadPending.sh 
+bash <(curl -fsSL "https://github.com/venari/timelapse/raw/main/install.sh?$RANDOM")
+```
+
+# Connect to intermitently connected Pi and tail log:
+```
+ssh -o ConnectTimeout=60 -o ConnectionAttempts=30 pi@sediment-pi-zero-w-v1-a 'tail -f -n 100 logs/timelapse.log'
+```
+
+Connect to intermitently connected Pi and trigger reboot:
+```
+ssh -o ConnectTimeout=60 -o ConnectionAttempts=30 pi@sediment-pi-zero-w-v1-a 'sudo reboot now'
+```
+
+Copy log files to local machine:
+```
+scp -o ConnectTimeout=60 -o ConnectionAttempts=30 pi@sediment-pi-zero-w-v1-a:/home/pi/logs/*.* .
+```
+
+# Review systemd job status
+```
+watch --color SYSTEMD_COLORS=1 systemctl status enviro*.service
+```
+
+# restart a systemd job
+```
+sudo systemctl restart envirocam-telemetry
+sudo systemctl restart envirocam*
+```
+
+# Waveshare SIM6700X GSM/GPRS/GNSS HAT
+
+- Enable Serial Communication
+```
+sudo raspi-config nonint do_serial 2        # Disable serial login shell and enable serial port hardware
+sudo reboot
+```
+
+https://core-electronics.com.au/guides/raspberry-pi/raspberry-pi-4g-gps-hat/
+```
+sudo apt-get install minicom
+pip3 install pyserial
+wget https://www.waveshare.com/w/upload/2/29/SIM7600X-4G-HAT-Demo.7z
+sudo apt-get install p7zip-full
+
+7z x SIM7600X-4G-HAT-Demo.7z -r -o/home/pi
+
+sudo chmod 777 -R /home/pi/SIM7600X-4G-HAT-Demo
+
+
+
+sudo nano /etc/rc.local
+
+```
+Add following line, just above `exit 0`:
+
+```
+sh /home/pi/SIM7600X-4G-HAT-Demo/Raspberry/c/sim7600_4G_hat_init
+```
+
+```
+cd /home/pi/SIM7600X-4G-HAT-Demo/Raspberry/c/bcm2835
+chmod +x configure && ./configure && sudo make && sudo make install
+```
+
+Plug in USB cable, testing with minicom
+CTRL-A, E to echo
+CTRL-A, Q to exit
+```
+minicom -D /dev/ttyUSB2
+
+AT+CPIN?
++CME ERROR:10 # No SIM card
+```
+
+Switch to RNDIS dial up mode
+https://www.waveshare.com/wiki/Raspberry_Pi_RNDIS_dial-up_Internet_access
+```
+AT+CUSBPIDSWITCH=9011,1,1
+```
+
+Nope - prevents camera from working...
+
+    Disable HDMI:
+    https://picockpit.com/raspberry-pi/raspberry-pi-zero-2-battery/
+
+    sudo raspi-config
+
+    Then, go to Advanced Options -> GL Driver -> Legacy
+
+    Add to /etc/rc.local:
+    /usr/bin/tvservice -o
+
+<!-- `camera.lensposition` - 1/distance in metres
+- '0' - infinity
+- '1': 1m
+- `5`: 20cm
+- `10`: 10cm -->
+
+<!-- `camera.focus_m`: focus in metres -->
+
+<!-- Add following to /boot/config.txt
+```
+dtoverlay=imx708
+``` -->
+
+# Waveshare 1.54" e-Paper Module
+## Not may not work on Bookworm
+
+https://github.com/waveshareteam/e-Paper/blob/master/RaspberryPi_JetsonNano/python/examples/epd_1in54b_V2_test.py
+
+```
+    sudo apt-get update
+    sudo apt-get install python3-pip
+    sudo apt-get install python3-pil
+    sudo pip3 install RPi.GPIO
+    sudo pip3 install waveshare-epaper
+```
+
+Onboard image resizing
+```
+sudo apt-get install imagemagick
+
+convert pic/image.org.jpg -resize 200x200 -background white -gravity center -extent 200x200 pic/image.jpg 
+```
+
+- Enable Serial Communication
+```
+sudo raspi-config nonint do_spi 0        
+sudo reboot
+```
+
+# Uptimed service
+
+```
+sudo apt-get install uptimed
+sudo systemctl enable uptimed
 ```
 
 # preview image over VNC
@@ -85,11 +249,39 @@ Issues in Bullseye on Zero2? https://www.raspberrypi.com/news/bullseye-camera-sy
 - related - possibly not - https://github.com/raspberrypi/libcamera-apps/issues/278
 - 
 
+# Access Hauwei thumb stick web interface (password is fiddly)
+```
+ssh -D 8080 pi@sediment-pi-[machine name]
+```
+
+Use FoxyProxy and setup proxy to localhost:8080
+
+Browse to http://192.168.1.1/html/index.html or http://192.168.8.1/html/index.html
 
 # On board timelapse generation
 
 ```
 ffmpeg -r 30 -f image2 -pattern_type glob -i "./<YYYY-MM-DD>*.jpg" -s 1014x760 -vcodec libx264 <YYYY-MM-DD>.mp4
+```
+
+# Other timelapse generation examples
+
+```
+ffmpeg -r 30 -f image2 -pattern_type glob -i  "*11_2023-01-03*.jpg" -s 3280x1844 -vcodec libx264 output.mp4
+```
+
+## Overlay label and date/time in images:
+```
+mkdir -p mod
+
+label="<Label for bottom left>"
+
+for filename in <filter>_*.jpg; do 
+    date_time="$(echo ${filename:3:10} ${filename:14:2}\\:${filename:16:2})"
+    ffmpeg -i $filename -y -vf "drawtext=fontfile=/System/Library/Fonts/Avenir.ttc:text='$label':fontcolor=white:fontsize=90:box=1:boxcolor=black@0.3:boxborderw=5:x=10:y=h-th-10,drawtext=fontfile=/System/Library/Fonts/Avenir.ttc:text='$date_time':fontcolor=white:fontsize=90:box=1:boxcolor=black@0.3:boxborderw=5:x=w-tw-10:y=h-th-10" -hide_banner -loglevel error mod/$filename
+done
+
+ffmpeg  -pattern_type glob -i "mod/14_*.jpg" -vf "scale='min(1280,iw)':-2,format=yuv420p" -c:v libx264 -preset medium -profile:v main -c:a aac -shortest -movflags +faststart ../Output/<SiteName>.mp4
 ```
 
 # Video stabilization
@@ -121,6 +313,46 @@ brew install pgadmin4
 dotnet tool install --global dotnet-ef
 ```
 
+# Azure CLI install
+```
+curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
+```
+
+# Running creation script
+This will create the infrastructure to run the API and web interface
+```
+az login
+./azure-helpers/create-enviroeyes-dev.sh
+```
+
+# Configure users
+- Browse to [AZURE_APP_NAME].azurewebsite.net, and log in as user `admin@enviroeyes`, password `Enviroeyes123!`.
+- Register new accounts at [AZURE_APP_NAME].azurewebsite.net/Identity/Account/Register
+  - A confirmation email will be sent to this account, click on the link and login as the new user.
+  
+
+# Update camera to enviroeyes-dev
+```
+cd dev/timelapse
+git fetch; git stash; git checkout release/zookeeper; git pull; git stash pop
+sudo systemctl restart envirocam-upload.service envirocam-telemetry.service
+```
+
+```
+sudo hostnamectl set-hostname [hostname]
+sudo tailscale up
+```
+
+# Copy preconfigured local config
+```
+scp ~/config.local.[project-name].json pi@[pi name]:~/dev/timelapse/scripts/config.local.json
+```
+
+# GitHub CLI install
+```
+sudo apt install gh
+```
+
 Postgres DB Server:
 ```
 
@@ -142,6 +374,7 @@ docker exec -it dev-postgres bash
 
 User Secrets:
 ```
+dotnet tool install dotnet-user-secrets
 dotnet user-secrets --project timelapse.api init
 dotnet user-secrets --project timelapse.api set "ConnectionStrings:DefaultConnection" "Host=localhost;Port=5432;User ID=postgres;Password=Pass2020!;Database=timelapse"
 ```
@@ -161,7 +394,7 @@ dotnet ef --project timelapse.api database update
 
 # Enable Wake Up and set RTC Time
 
-Note - Wake up should be automatically enabled in `coreScript.py`.
+Note - Wake up should be automatically enabled in `saveTelemetry.py`, but you will need to set the RTC time during installation.
 ```
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
@@ -224,11 +457,45 @@ Note - Wake up should be automatically enabled in `coreScript.py`.
 
 ```
 
+# Battery min sleep/wake up levels:
 
+```
+░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+░░░░░░░░░░┌───────────────────────── PiJuice CLI ────────────────────────┐░░░░░░░░░░░
+░░░░░░░░░░│  System Task                                                 │░░░░░░░░░░░
+░░░░░░░░░░│                                                              │░░░░░░░░░░░
+░░░░░░░░░░│  [X] System task enabled                                     │░░░░░░░░░░░
+░░░░░░░░░░│                                                              │░░░░░░░░░░░
+░░░░░░░░░░│  [ ] Watchdog            Expire period          [ ] Restore  │░░░░░░░░░░░
+░░░░░░░░░░│                          [minutes]: 4                        │░░░░░░░░░░░
+░░░░░░░░░░│                                                              │░░░░░░░░░░░
+░░░░░░░░░░│  [X] Wakeup on charge    Trigger level [%]: 20  [X] Restore  │░░░░░░░░░░░
+░░░░░░░░░░│                                                              │░░░░░░░░░░░
+░░░░░░░░░░│  [X] Min charge          Threshold [%]: 10                   │░░░░░░░░░░░
+░░░░░░░░░░│                                                              │░░░░░░░░░░░
+░░░░░░░░░░│  [ ] Min battery voltage 3.3                                 │░░░░░░░░░░░
+░░░░░░░░░░│                                                              │░░░░░░░░░░░
+░░░░░░░░░░│  [X] Software Halt Power Delay period [seconds]: 20          │░░░░░░░░░░░
+░░░░░░░░░░│      Off                                                     │░░░░░░░░░░░
+░░░░░░░░░░│                                                              │░░░░░░░░░░░
+░░░░░░░░░░│  < Refresh        >                                          │░░░░░░░░░░░
+░░░░░░░░░░│  < Apply settings >                                          │░░░░░░░░░░░
+░░░░░░░░░░└──────────────────────────────────────────────────────────────┘░░░░░░░░░░░
+░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+```
+
+# System Events
+
+```
+[X] Low Charge : <SYS_FUNC_HALT_POW_OFF>
+
+```
 
 # Battery Profiles
 
-Ali Express, likely-not-really 10,000mAh battery...
+[Headway 38120s 10ah lifepo4 cell](https://evshop.eu/en/batteries/213-headway-lifepo4-38120s-32v-10ah.html)
 
 ```
 
@@ -240,28 +507,28 @@ Ali Express, likely-not-really 10,000mAh battery...
 ░░░░░│  < Profile: CUSTOM       >                                   │░░░░░
 ░░░░░│                                                              │░░░░░
 ░░░░░│  [X] Custom                                                  │░░░░░  <-- Set to Custom
-░░░░░│  Chemistry:                LIPO                              │░░░░░  
-░░░░░│  Capacity [mAh]:           10000                             │░░░░░  <-- Set to 10000
-░░░░░│  Charge current [mA]:      1225                              │░░░░░  <-- Set to 1250 or 1000
+░░░░░│  Chemistry:                LIFEPO4                           │░░░░░  <-- Set to LIFEPO4
+░░░░░│  Capacity [mAh]:           15000                             │░░░░░  <-- Set to 15000
+░░░░░│  Charge current [mA]:      2500                              │░░░░░  <-- Set to 2500
 ░░░░░│  Termination current [mA]: 50                                │░░░░░
-░░░░░│  Regulation voltage [mV]:  4180                              │░░░░░
-░░░░░│  Cutoff voltage [mV]:      3000                              │░░░░░
+░░░░░│  Regulation voltage [mV]:  3600                              │░░░░░  <-- Set to 3600
+░░░░░│  Cutoff voltage [mV]:      2500                              │░░░░░  <-- Set to 2500
 ░░░░░│  Cold temperature [C]:     0                                 │░░░░░
 ░░░░░│  Cool temperature [C]:     2                                 │░░░░░
 ░░░░░│  Warm temperature [C]:     49                                │░░░░░
 ░░░░░│  Hot temperature [C]:      65                                │░░░░░
 ░░░░░│  NTC B constant [1k]:      3450                              │░░░░░
 ░░░░░│  NTC resistance [ohm]:     10000                             │░░░░░
-░░░░░│  OCV10 [mV]:               3743                              │░░░░░
-░░░░░│  OCV50 [mV]:               3933                              │░░░░░
-░░░░░│  OCV90 [mV]:               4057                              │░░░░░
-░░░░░│  R10 [mOhm]:               135.0                             │░░░░░
-░░░░░│  R50 [mOhm]:               133.0                             │░░░░░
-░░░░░│  R90 [mOhm]:               133.0                             │░░░░░
+░░░░░│  OCV10 [mV]:               3131                              │░░░░░  <-- Set to 3131
+░░░░░│  OCV50 [mV]:               3263                              │░░░░░  <-- Set to 3263
+░░░░░│  OCV90 [mV]:               3303                              │░░░░░  <-- Set to 3303
+░░░░░│  R10 [mOhm]:               91.0                              │░░░░░  <-- Set to 91
+░░░░░│  R50 [mOhm]:               83.0                              │░░░░░  <-- Set to 83
+░░░░░│  R90 [mOhm]:               76.0                              │░░░░░  <-- Set to 76
 ░░░░░│                                                              │░░░░░
-░░░░░│  < Temperature sense: ON_BOARD    >                          │░░░░░
+░░░░░│  < Temperature sense: ON_BOARD    >                          │░░░░░  <-- Set to ON_BOARD
 ░░░░░│                                                              │░░░░░
-░░░░░│  < Rsoc estimation: AUTO_DETECT   >                          │░░░░░
+░░░░░│  < Rsoc estimation: DIRECT_BY_MCU >                          │░░░░░  <-- Set to DIRECT_BY_MCU
 ░░░░░│                                                              │░░░░░
 ░░░░░│  < Refresh        >                                          │░░░░░
 ░░░░░│  < Apply settings >                                          │░░░░░
@@ -271,6 +538,60 @@ Ali Express, likely-not-really 10,000mAh battery...
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
 
 ```
+
+# Troubleshooting
+
+## Troubleshooting PiJuice wakeup:
+
+### Enable wakeup logging
+```
+python3 /usr/bin/pijuice_log.py --enable WAKEUP_EVT
+```
+
+## Troubleshooting non-connecting camera:
+- [Tailscale - machines connected in last week](https://login.tailscale.com/admin/machines?refreshed=true&q=lastseen%3A%3C1w)
+- [Device Trends](https://timelapse-dev.azurewebsites.net/DeviceTrends)
+
+### Failing to connect to Tailscale or timelapse-dev.azurewebsites.net:
+- Consult Sediment camera troubleshooting/maintenance checklist.
+- If you have physical access to the Pi.
+  - Connect HDMI and USB adaptors, and connect keyboard and monitor.
+  - Fire up Pi and watch for any error messages, for example complaining about corrupt filesystems, or kernel panics.
+  - Log in as user:`pi`, password:`raspberry`.
+    - Check network connection status:
+      - `ifconfig`
+      - `nmcli`
+      - List devices: `nmcli device`
+      - List known networks: `nmcli connection`
+      - Check wireless is on: `nmcli radio`
+      - List available wireless networks: `sudo nmcli device wifi list`
+      - Connect to CameraAP network: `nmcli device wifi connect CameraAP password GiveMeTheInternets`
+      - Connect to network that's not present: `sudo nmcli connection add type wifi con-name <name> ssid <SSID> 802-11-wireless-security.key-mgmt WPA-PSK 802-11-wireless-security.psk <PASSWORD>`
+    - If `nmcli` isn't available:
+      - List wireless networks: `sudo iwlist wlan0 scan | grep ESSID`
+      - To connect to network, edit the `/etc/wpa_supplicant/wpa_supplicant.conf` file to add a section, and then `sudo reboot` to restart:
+      ````
+      ctrl_interface=DIR=/var/run/wpa_supplicant GROUP=netdev
+      update_config=1
+      country=NZ
+
+      network={
+              ssid="CameraAP"
+              psk="GiveMeTheInternets"
+      }
+      ````
+    - Check tailscale status
+      - `tailscale netcheck`
+  - Further troubleshooting:
+    - Check envirocam logs
+      - `tail -f logs/intent.log`
+      - `tail -f logs/timelapse.log`
+      - `tail -f logs/intent.log`
+      - `journalctl -u envirocam-telemetry.service`
+      - Copy logs to local machine: `ssh pi@envirocam 'journalctl --since today' > journalctl.txt`
+    - Disconnect modem (to rule out data issues) and connect to working WiFi network, with SSID: `CameraAP`, password: `GiveMeTheInternets`.
+    - Disconnect PiJuice to determine if that is causing issues.
+    - Try fresh install of Raspbian on new SD card to rule out Pi Zero hardware issue.
 
 
 # Battery notes
@@ -295,3 +616,146 @@ curl -fsSL https://tailscale.com/install.sh | sh
 ```
 sudo tailscale up
 ```
+
+
+# To access modem/SMS messages
+
+Use SSH to establish a dynamic port forwarding session to the pi.
+
+```
+ssh -D 8080 pi@<device name>
+```
+
+Use FoxyProxy to route local traffic on port 8080 through the SSH tunnel.
+
+![Alt text](images/FoxyProxySettings.png)
+
+Then browse to the modem's IP address (e.g. http://192.168.1.1)
+
+
+# To check code versions
+```
+pssh --hosts ~/dev/venari/timelapse/hosts.txt -t 900 -i 'cd dev/timelapse; git log -1'
+pssh --hosts ~/dev/venari/timelapse/hosts.txt -t 900 -x '-o ConnectTimeout=60 -o ConnectionAttempts=15' -i 'cd dev/timelapse; git log -1;git status'
+pssh --hosts ~/dev/venari/timelapse/hosts.txt -t 900 -x '-o ConnectTimeout=60 -o ConnectionAttempts=15' -i 'cd dev/timelapse; git diff'
+```
+
+
+# Credits
+
+3D models
+
+- Raspberry Pi Camera Module v3 STL files: https://www.printables.com/model/368779-raspberry-pi-camera-module-3-v3/
+
+
+# ESP32 version/links
+
+https://www.waveshare.com/wiki/ESP32-S3-SIM7670G-4G
+
+## Upload issue with CH34X driver
+```
+"/Users/leighhunt/Library/Arduino15/packages/esp32/tools/esptool_py/4.6/esptool" --chip esp32s3 --port "/dev/cu.usbmodem585A0118141" --baud 921600  --before default_reset --after hard_reset write_flash  -z --flash_mode keep --flash_freq keep --flash_size keep 0x0 "/private/var/folders/fx/2h8qyrk51114f5m1_x5dv7yc0000gn/T/arduino/sketches/E83F322CCBA20806EEF325130EA27172/take_photos.ino.bootloader.bin" 0x8000 "/private/var/folders/fx/2h8qyrk51114f5m1_x5dv7yc0000gn/T/arduino/sketches/E83F322CCBA20806EEF325130EA27172/take_photos.ino.partitions.bin" 0xe000 "/Users/leighhunt/Library/Arduino15/packages/esp32/hardware/esp32/3.0.1/tools/partitions/boot_app0.bin" 0x10000 "/private/var/folders/fx/2h8qyrk51114f5m1_x5dv7yc0000gn/T/arduino/sketches/E83F322CCBA20806EEF325130EA27172/take_photos.ino.bin" 
+esptool.py v4.6
+Serial port /dev/cu.usbmodem585A0118141
+Connecting....
+Chip is ESP32-S3 (revision v0.2)
+Features: WiFi, BLE
+Crystal is 40MHz
+MAC: 84:fc:e6:51:84:68
+Uploading stub...
+
+A fatal error occurred: Failed to write to target RAM (result was 01070000: Operation timed out)
+```
+
+CH343 USB chip stuff: https://www.wch.cn/downloads/CH34XSER_MAC_ZIP.html
+Arduino
+- Board - ESP32S3 Dev Module
+- Port - switch from /dev/cu.usbmodem585A0118141 Serial Port to /dev/cu.wchusbserial585A0118141 
+- Serial Moonitor - /dev/cu.wchusbserial585A0118141, 115200 baud
+
+VSCode with ESP-IDF
+- Set board to ESP32S3
+  - OpenOCD Configuration - ESP32-S3 chip (via ESP-PROG-2) seems to work
+- Flash method to UART
+
+
+Terminal attach to serial port:
+```
+screen /dev/cu.wchusbserial585A0118141 115200
+```
+
+
+Setting up ESP-IDF on Windows & WSL
+
+https://docs.espressif.com/projects/vscode-esp-idf-extension/en/latest/additionalfeatures/wsl.html
+
+Windows:
+```
+usbipd list
+```
+
+```
+C:\Users\LeighHunt>usbipd list
+Connected:
+BUSID  VID:PID    DEVICE                                                        STATE
+2-1    25a4:9311  USB C Video Adaptor                                           Not shared
+2-3    413c:301a  USB Input Device                                              Not shared
+2-4    045e:07f8  USB Input Device                                              Not shared
+3-6    04f2:b829  Integrated Camera, Integrated IR Camera, Camera DFU Device    Not shared
+3-9    27c6:659a  Goodix MOC Fingerprint                                        Not shared
+3-10   8087:0033  Intel(R) Wireless Bluetooth(R)                                Not shared
+
+Persisted:
+GUID                                  DEVICE
+
+
+C:\Users\LeighHunt>usbipd list
+Connected:
+BUSID  VID:PID    DEVICE                                                        STATE
+2-1    25a4:9311  USB C Video Adaptor                                           Not shared
+2-3    413c:301a  USB Input Device                                              Not shared
+2-4    045e:07f8  USB Input Device                                              Not shared
+3-6    04f2:b829  Integrated Camera, Integrated IR Camera, Camera DFU Device    Not shared
+3-9    27c6:659a  Goodix MOC Fingerprint                                        Not shared
+3-10   8087:0033  Intel(R) Wireless Bluetooth(R)                                Not shared
+5-3    19d1:0001  Remote NDIS based Internet Sharing Device, USB Serial Dev...  Not shared    <<<<< ~~~
+5-4    1a86:55d3  USB Serial Device (COM3)                                      Not shared    <<<<< ===
+
+Persisted:
+GUID                                  DEVICE
+
+```
+
+In admin command prompt:
+```
+Microsoft Windows [Version 10.0.26200.8893]
+(c) Microsoft Corporation. All rights reserved.
+
+C:\Windows\System32>usbipd bind --busid 5-4
+
+C:\Windows\System32>usbipd attach --wsl --busid 5-4
+usbipd: info: Using WSL distribution 'Ubuntu' to attach; the device will be available in all WSL 2 distributions.
+usbipd: info: Loading vhci_hcd module.
+usbipd: info: Detected networking mode 'nat'.
+usbipd: info: Using IP address 172.23.80.1 to reach the host.
+```
+
+In WSL/Ubuntu:
+
+```
+at 14:09:03 ~
+✗ dmesg | tail
+[ 1813.225907] vhci_hcd vhci_hcd.0: pdev(0) rhport(0) sockfd(3)
+[ 1813.225914] vhci_hcd vhci_hcd.0: devid(327684) speed(2) speed_str(full-speed)
+[ 1813.225966] vhci_hcd vhci_hcd.0: Device attached
+[ 1813.390953] vhci_hcd: vhci_device speed not set
+[ 1813.446912] usb 1-1: new full-speed USB device number 2 using vhci_hcd
+[ 1813.510937] vhci_hcd: vhci_device speed not set
+[ 1813.567064] usb 1-1: SetAddress Request (2) to port 0
+[ 1813.598657] cdc_acm 1-1:1.0: ttyACM0: USB ACM device                                   <<<<< ===
+[ 1813.598688] usbcore: registered new interface driver cdc_acm
+[ 1813.598689] cdc_acm: USB Abstract Control Model driver for USB modems and ISDN adapters
+```
+
+
+sudo usermod -a -G dialout $USER

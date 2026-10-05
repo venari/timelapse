@@ -1,51 +1,64 @@
-﻿@page "{id:int}"
+﻿@page "{id:int}/{numberOfHoursToDisplay:int?}/{seekTo:datetime?}"
 @using Humanizer
 @model ImageViewModel
 @{
     ViewData["Title"] = "Image View";
 }
 
-<script>
-    function localize(t)
-    {
-        var d=new Date(t+"Z");
-        document.write(d.toLocaleString());
-    }
-
-    function localizeDate(t)
-    {
-        var d=new Date(t);
-        return d.toLocaleString();
-    }
-</script>
-
 <div class="text-center">
-    <h1 class="display-4">Welcome</h1>
-    <p>Learn about <a href="https://docs.microsoft.com/aspnet/core">building Web apps with ASP.NET Core</a>.</p>
+    <h1 class="display-4">@(Model.device.Description)</h1>
+    <p id="imageHeader" scope="col">Image for @(Model.device.Name) as at <script type="text/javascript">localizeDateTime('@(Model.SeekTo.ToString("s"))');</script>
+    @* @if (DateTime.UtcNow - Model.device.LatestImage.Timestamp > TimeSpan.FromMinutes(60)){
+        <span class="badge bg-warning text-dark">Warning - @((DateTime.UtcNow - Model.device.LatestImage.Timestamp).Humanize()) old</span>
+    } *@
+    </p>
 </div>
+@* 
+                        <img class="img-fluid" id="image2" src="/api/Image/Latest?deviceId=@(Model.device.Id)"></img> *@
+
+<div class="container">
+  <div class="row">
+    <div class="col">
+        <h4>Displaying @(Model.NumberOfHoursToDisplay) hours imagery.</h4>
+        @{
+            <a href="/ImageView/@(Model.device.Id)/1@(HttpContext.Request.QueryString)" type="button" class="btn btn-secondary">Last hour</a>
+            <a href="/ImageView/@(Model.device.Id)/24@(HttpContext.Request.QueryString)" type="button" class="btn btn-secondary">Last 24 hours</a>
+            <a href="/ImageView/@(Model.device.Id)/48@(HttpContext.Request.QueryString)" type="button" class="btn btn-secondary">Last 48 hours</a>
+            <a href="/ImageView/@(Model.device.Id)/168@(HttpContext.Request.QueryString)" type="button" class="btn btn-secondary">Last week</a>
+            <a href="/ImageHistory/@(Model.device.Id)/168@(HttpContext.Request.QueryString)" type="button" class="btn btn-secondary">History</a>
+            <button class="btn btn-secondary" onclick="navToCreateEvent()">Create Event</button>
+        }
+    </div>
+    @* <div class="col">
+        <div class="float-end">
+            @if(Model.device.LatestImage!=null){
+                <a href="/ImageView/@(Model.device.Id)"><img class="img-thumbnail" src="@(Model.device.LatestImage.BlobUri + Model.SasToken)" width=100></img></a>
+            }
+            @if (Model.device.LatestImage!=null && DateTime.UtcNow - Model.device.LatestImage.Timestamp > TimeSpan.FromMinutes(60)){
+                <span class="badge bg-warning text-dark">Warning - @((DateTime.UtcNow - Model.device.LatestImage.Timestamp).Humanize()) old</span>
+            }
+        </div>
+    </div> *@
+  </div>
+</div>
+
 
 <div>
     <table class="table">
         <thead>
-            <tr>
-            <th id="imageHeader" scope="col">Image for @(Model.device.Name) as at <script type="text/javascript">localize('@(Model.device.LatestImageTimestamp.Value.ToString("s"))');</script>
-            @if (DateTime.UtcNow - Model.device.LatestImage.Timestamp > TimeSpan.FromMinutes(15)){
-                <span class="badge bg-warning text-dark">Warning - @((DateTime.UtcNow - Model.device.LatestImage.Timestamp).Humanize()) old</span>
-            }
-            </th>
-            </tr>
         </thead>
         <tbody>
             <tr>
                 <td>
                     @if(Model.device.LatestImage!=null){
-                        <img class="img-fluid" id="image" src="@(Model.device.LatestImage.BlobUri + Model.SasToken)"></img>
+                        @* <img class="img-fluid" id="image" src="@(Model.device.LatestImage.BlobUri + Model.SasToken)"></img> *@
+                        <img class="img-fluid" id="image"></img>
                     }
                 </td>
             </tr>
             <tr>
                 @* <label id="imageDateSliderValue"></label> *@
-                <input type="range" class="form-range" min="0" max="@(Model.imagesLast24Hours.Count() - 1)" value="@(Model.imagesLast24Hours.Count() - 1)" id="imageDateSlider">
+                <input type="range" class="form-range" min="0" max="@(Model.imagesToShow.Count() - 1)" value="@(Model.imageToSeekTo)" id="imageDateSlider">
                 <button id="togglePlay" onclick="togglePlay()" type="button" class="btn btn-primary"><i class="fa fa-play"></i></button>
             </tr>
         </tbody>
@@ -54,15 +67,15 @@
 
 <script>
 
-    const getImageUri = '/api/Image/GetImage'
-
-    var last24HoursImages = @(Json.Serialize(Model.imagesLast24Hours));
+    var imagesToShow = @(Json.Serialize(Model.imagesToShow));
     var slider = document.getElementById("imageDateSlider")
     var image = document.getElementById("image")
 
     var bPlaying=false
 
     var togglePlayButton = document.getElementById("togglePlay")
+
+    getImage(@(Model.device.Id), @(Model.imageToSeekTo));
 
     function togglePlay(){
         bPlaying=!bPlaying;
@@ -94,15 +107,23 @@
     }
 
     function getImage(deviceId, imageIndex) {
-        imageBlobUri = last24HoursImages[imageIndex].blobUri + '@(Model.SasToken)'.replace(/&amp;/g, '&')
+        imageBlobUri = imagesToShow[imageIndex].blobUri + '@(Model.SasToken)'.replace(/&amp;/g, '&')
         image.src = imageBlobUri
         var imageHeader = document.getElementById("imageHeader");
-        imageHeader.innerHTML = "Image for @(Model.device.Name) as at " + localizeDate(last24HoursImages[imageIndex].timestamp)
+        imageHeader.innerHTML = "Image for @(Model.device.Name) as at " + localizeDateTimeAsString(imagesToShow[imageIndex].timestamp)
     }
 
     // Update the current slider value (each time you drag the slider handle)
     slider.oninput = function() {
         console.log(this.value)
         getImage(@(Model.device.Id), this.value);
+    }
+
+    function navToCreateEvent(){
+        console.log(slider.value);
+        console.log(imagesToShow[slider.value].id);
+        console.log(imagesToShow[slider.value].timestamp);
+        @* var chosenDate = new Date(imagesToShow[slider.value].timestamp); *@
+        window.location.href = "/Events/Create/" + imagesToShow[slider.value].id; //chosenDate.toISOString(); //.getTime();
     }
 </script>

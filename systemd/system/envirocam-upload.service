@@ -1,0 +1,15 @@
+[Unit]
+Description=Envirocam Upload Service
+After=multi-user.target
+
+[Service]
+Type=idle
+User=pi
+#ExecStartPost=/bin/sleep 60
+ExecStart=/usr/bin/python3 %h/dev/timelapse/scripts/uploadPending.py
+Restart=always
+RestartSec=60
+#TimeoutStartSec=120
+
+[Install]
+WantedBy=multi-user.target

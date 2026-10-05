@@ -1,0 +1,11 @@
+[Unit]
+Description=Envirocam SMS Service
+After=envirocam-logging-socket.service
+
+[Service]
+Type=idle
+User=pi
+ExecStart=/usr/bin/python3 %h/dev/timelapse/scripts/handleSMS.py
+
+[Install]
+WantedBy=timers.target

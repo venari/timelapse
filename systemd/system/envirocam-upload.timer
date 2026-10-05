@@ -1,0 +1,8 @@
+[Unit]
+Description=Envirocam Upload Service
+
+[Timer]
+OnBootSec=120
+
+[Install]
+WantedBy=timers.target

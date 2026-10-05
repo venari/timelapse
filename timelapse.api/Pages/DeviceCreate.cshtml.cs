@@ -4,6 +4,7 @@ using timelapse.core.models;
 using timelapse.infrastructure;
 using Microsoft.EntityFrameworkCore;
 using timelapse.api.Helpers;
+using Microsoft.AspNetCore.Authorization;
 
 
 namespace timelapse.api.Pages
@@ -11,6 +12,7 @@ namespace timelapse.api.Pages
 #pragma warning disable CS8618
 #pragma warning disable CS8602
 
+    [Authorize]
     public class DeviceCreateModel : PageModel
     {
         private readonly ILogger<DeviceCreateModel> _logger;

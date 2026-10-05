@@ -1,0 +1,11 @@
+[Unit]
+Description=Envirocam Status Service
+After=multi-user.target
+
+[Service]
+Type=idle
+User=pi
+ExecStart=/usr/bin/python3 %h/dev/timelapse/scripts/updateStatus.py
+
+[Install]
+WantedBy=timers.target

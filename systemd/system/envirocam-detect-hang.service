@@ -1,0 +1,11 @@
+[Unit]
+Description=Envirocam Hang Detection Service
+After=multi-user.target
+
+[Service]
+Type=idle
+User=pi
+ExecStart=/usr/bin/python3 %h/dev/timelapse/scripts/detectHang.py
+
+[Install]
+WantedBy=timers.target

@@ -1,61 +1,218 @@
-﻿@page "{id:int}"
+﻿@* @page "{id:int}/{numberOfHoursToDisplay:int?}/{periodOffset:int?}" *@
+@page "{id:int}/{startDate:datetime?}/{endDate:datetime?}"
 @using Humanizer
 @model TelemetryGraphModel
 @{
     ViewData["Title"] = "Telemetry Graph";
 }
 
-<script>
-    function localize(t)
-    {
-        var d=new Date(t+" UTC");
-        document.write(d.toLocaleString());
-    }
-
-    function localizeDate(t)
-    {
-        var d=new Date(t);
-        return d.toLocaleString();
-    }
-</script>
-
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@2.0.1/dist/chartjs-plugin-annotation.min.js"></script>
 
 <div class="text-center">
-    <h1 class="display-4">Welcome</h1>
-    <p>Learn about <a href="https://docs.microsoft.com/aspnet/core">building Web apps with ASP.NET Core</a>.</p>
+    <h1 class="display-4">
+        @(Model.device.Description)
+    </h1>
 </div>
 
-<script>
-    const latest24HoursTelemetryUri = '/api/Telemetry/GetLatest24HoursTelemetry'
+<div class="container">
+  <div class="row">
+    <div class="col">
+        @* <h4>@(Model.PeriodDescription)</h4> *@
+        @{
+            <a id=btnBack href="#" type="button" class="btn btn-secondary">Previous</a>
+            <a id=btnLastHour href="#" type="button" class="btn btn-secondary">Last hour</a>
+            <a id=btnLast24Hours href="#" type="button" class="btn btn-secondary">Last 24 hours</a>
+            <a id=btnLast48Hours href="#" type="button" class="btn btn-secondary">Last 48 hours</a>
+            <a id=btnLastWeek href="#" type="button" class="btn btn-secondary">Last week</a>
+            <a id=btnForward href="#" type="button" class="btn btn-secondary">Next</a>
+        }
+    </div>
+    <div class="col">
+        <div class="float-end">
+            @if(Model.device.LatestImage!=null){
+                <a href="/ImageView/@(Model.device.Id)"><img class="img-thumbnail" src="@(Model.device.LatestImage.BlobUri + Model.SasToken)" width=100></img></a>
+            }
+            @if (Model.device.LatestImage!=null && DateTime.UtcNow - Model.device.LatestImage.Timestamp > TimeSpan.FromMinutes(60)){
+                <span class="badge bg-warning text-dark">Warning - @((DateTime.UtcNow - Model.device.LatestImage.Timestamp).Humanize()) old</span>
+            }
+        </div>
+    </div>
+  </div>
+</div>
 
-    function getTelemetry(deviceId, chart) {
-        fetch(latest24HoursTelemetryUri + '?deviceId=' + deviceId)
+
+
+<script>
+    var startDate = new Date("@(Model.StartDate.ToString("o"))");
+    var endDate = new Date("@(Model.EndDate.ToString("o"))");
+
+    var date1HourAgo = new Date();
+    date1HourAgo.setHours(date1HourAgo.getHours() - 1);
+
+    var date24HoursAgo = new Date();
+    date24HoursAgo.setHours(date24HoursAgo.getHours() - 24);
+
+    var date48HoursAgo = new Date();
+    date48HoursAgo.setHours(date48HoursAgo.getHours() - 48);
+
+    var date1WeekAgo = new Date();
+    date1WeekAgo.setHours(date1WeekAgo.getHours() - 168);
+
+    var btnBack = document.getElementById("btnBack");
+    var btnLastHour = document.getElementById("btnLastHour");
+    var btnLast24Hours = document.getElementById("btnLast24Hours");
+    var btnLast48Hours = document.getElementById("btnLast48Hours");
+    var btnLastWeek = document.getElementById("btnLastWeek");
+    var btnForward = document.getElementById("btnForward");
+
+    btnBack.href = "/TelemetryGraph/@(Model.device.Id)/@(Model.StartDate.AddHours(-1*Model.WindowInHours).ToString("o"))/@(Model.EndDate.AddHours(-Model.WindowInHours).ToString("o"))";
+    btnLastHour.href = "/TelemetryGraph/@(Model.device.Id)/" + date1HourAgo.toISOString();
+    btnLast24Hours.href = "/TelemetryGraph/@(Model.device.Id)/" + date24HoursAgo.toISOString();
+    btnLast48Hours.href = "/TelemetryGraph/@(Model.device.Id)/" + date48HoursAgo.toISOString();
+    btnLastWeek.href = "/TelemetryGraph/@(Model.device.Id)/" + date1WeekAgo.toISOString();
+
+    if("True"=="@Model.LatestAvailableData"){
+        // disable forward button
+        btnForward.classList.add("disabled");
+    } else {
+        btnForward.href = "/TelemetryGraph/@(Model.device.Id)/@(Model.StartDate.AddHours(Model.WindowInHours).ToString("o"))/@(Model.EndDate.AddHours(Model.WindowInHours).ToString("o"))";
+    }
+
+    const telemetryUri = '/api/Telemetry/GetTelemetryBetweenDates'
+
+    function getTelemetry(deviceId, startDate, endDate, chart) {
+        fetch(telemetryUri + '?deviceId=' + deviceId + '&startDate=' + startDate + '&endDate=' + endDate)
             .then(response => response.json())
             .then(data => showTelemetry(chart, data))
             .catch(error => console.error('Unable to get telemetry.', error));
     }
 
     function showTelemetry(chart, data){
+
+        const minVoltage = 2000
+        const maxVoltage = 3600
+
         console.log("showTelemtery");
-        console.log(data)
+        @* console.log(data) *@
+
+        var lastIndex = 0;
+
+        var lastBatteryPercent = data[0].batteryPercent;
+        var lastTimestamp =  new Date(data[0].timestamp);
+        var smoothedBatteryPercentPerHour; // EMA state, carried across iterations
+        var smoothingAlpha = 0.1; // lower = smoother/slower to react, higher = more responsive
+        data.forEach(function(d, i) {
+            if(i==0){
+                return;
+            }
+            var timeDifference = new Date(d.timestamp) - lastTimestamp;
+            var hoursDifference = timeDifference / 1000 / 60 / 60;
+            var batteryPercentDifference = d.batteryPercent - lastBatteryPercent;
+            // Work out battery percent, but cap to remove unreal bounces.
+            if(hoursDifference>=0.5){
+                var rawBatteryPercentPerHour = Math.min(60, Math.max(-50, batteryPercentDifference / hoursDifference));
+                // Smooth with an exponential moving average so single noisy readings don't spike the graph.
+                smoothedBatteryPercentPerHour = smoothedBatteryPercentPerHour === undefined
+                    ? rawBatteryPercentPerHour
+                    : smoothingAlpha * rawBatteryPercentPerHour + (1 - smoothingAlpha) * smoothedBatteryPercentPerHour;
+                d.batteryPercentPerHour = smoothedBatteryPercentPerHour;
+            }
+
+            while(hoursDifference>1){
+                ++lastIndex;
+                lastBatteryPercent = data[lastIndex].batteryPercent;
+                lastTimestamp = new Date(data[lastIndex].timestamp);
+                timeDifference = new Date(d.timestamp) - lastTimestamp;
+                hoursDifference = timeDifference / 1000 / 60 / 60;
+            }
+
+            @* // Make sure there's an over 2% difference between readings to help smooth things out, and at least 1 hourand no more than 6 hours between readings
+
+            if(hoursDifference > 1 && Math.abs(batteryPercentDifference) > 2){
+                ++lastIndex;
+                lastBatteryPercent = data[lastIndex].batteryPercent;
+                lastTimestamp = new Date(data[lastIndex].timestamp);
+            } else {
+                while(hoursDifference>6){
+                    ++lastIndex;
+                    lastBatteryPercent = data[lastIndex].batteryPercent;
+                    lastTimestamp = new Date(data[lastIndex].timestamp);
+                    hoursDifference = new Date(d.timestamp) - lastTimestamp;
+                    hoursDifference = hoursDifference / 1000 / 60 / 60;
+                }
+
+            } *@
+        });
+
         chart.config.data.datasets[0].data = data.map(d => ({x: new Date(d.timestamp), y: d.batteryPercent}));
         chart.config.data.datasets[1].data = data.map(d => ({x: new Date(d.timestamp), y: d.temperatureC}));
         chart.config.data.datasets[2].data = data.map(d => ({x: new Date(d.timestamp), y: d.diskSpaceFree}));        
+        chart.config.data.datasets[3].data = data.map(d => ({x: new Date(d.timestamp), y: d.pendingImages}));        
+        chart.config.data.datasets[4].data = data.map(d => ({x: new Date(d.timestamp), y: d.pendingTelemetry}));        
+        @* chart.config.data.datasets[5].data = data.map(d => ({x: new Date(d.timestamp), y: Math.max(0, (d.batteryVoltage - minVoltage)/(maxVoltage - minVoltage) * 100)})); *@
+        chart.config.data.datasets[5].data = data.map(d => ({x: new Date(d.timestamp), y: d.batteryVoltage}));
+        chart.config.data.datasets[6].data = data.map(d => ({x: new Date(d.timestamp), y: d.batteryCurrent}));
+        chart.config.data.datasets[7].data = data.map(d => ({x: new Date(d.timestamp), y: d.ioVoltage}));
+        chart.config.data.datasets[8].data = data.map(d => ({x: new Date(d.timestamp), y: d.ioCurrent}));
+        chart.config.data.datasets[9].data = data.map(d => ({x: new Date(d.timestamp), y: d.charging}));        
+        chart.config.data.datasets[10].data = data.map(d => ({x: new Date(d.timestamp), y: d.batteryPercentPerHour}));
+        chart.config.data.datasets[11].data = data.map(d => ({x: new Date(d.timestamp), y: d.uptimeSeconds/60}));
+        chart.config.data.datasets[12].data = data.map(d => ({x: new Date(d.timestamp), y: d.connectedToWirelessNetwork ? 4 : null}));
+        chart.config.data.datasets[13].data = data.map(d => ({x: new Date(d.timestamp), y: d.connectedToInternet ? 5 : null}));
+        chart.config.data.datasets[14].data = data.map(d => ({x: new Date(d.timestamp), y: d.powerSwitch ? 3 : null}));
         chart.update();
     }
+
+    var dates = [];
+
+    @* var daysToDisplay = @(Model.NumberOfHoursToDisplay)/24;
+    var dateFrom = new Date("@(Model.TargetEarliestTelemetryDateTime.Value.ToString("s"))");
+    // Move to midnight boundary
+    dateFrom = new Date(dateFrom.getFullYear(), dateFrom.getMonth(), dateFrom.getDate());
+    // Show day boundaries if 30 days or fewer - gets a bit heavy otherwise.
+    if(daysToDisplay<=30){
+        for(var dateIndex = 0; dateIndex <= daysToDisplay + 1; ++dateIndex){
+            var date = new Date(dateFrom.getTime() + dateIndex * 24 * 60 * 60 * 1000);
+            dates.push(date);
+        }
+    } *@
+
+    // Move to midnight boundaries
+    startDate = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
+    endDate = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate());
+
+    for(var date = startDate; date<=endDate; date.setDate(date.getDate() + 1)){
+        dates.push(new Date(date));
+    }
+
+    annotations = dates
+    .map((l, i) => ({
+        drawTime: 'beforeDatasetsDraw',
+        type: 'box',
+        xScaleID: 'x',
+        yScaleID: 'y',
+        xMin: new Date(l.getFullYear(), l.getMonth(), l.getDate()),
+        xMax: new Date(l.getFullYear(), l.getMonth(), l.getDate()+1),
+        backgroundColor: 'rgba(128, 128, 128, 0.2)',
+        borderColor: 'rgba(128, 128, 128, 0.0)',
+        borderWidth: 1
+    }))
+    @* .filter((l, i) => !(i % 2)) *@
+    .filter(function (l, i) {
+        return (l.xMin.getDate() % 2)
+    })
 </script>
 
 <div>
     <table class="table">
         <thead>
             <tr>
-            <th scope="col">Latest Telemetry for @(Model.device.Name) as at <script type="text/javascript">localize('@(Model.device.LatestTelemetryTimestamp)');</script>
-            @if (Model.device.LatestTelemetry!=null && DateTime.UtcNow - Model.device.LatestTelemetry.Timestamp > TimeSpan.FromMinutes(15)){
-                <span class="badge bg-warning text-dark">Warning - @((DateTime.UtcNow - Model.device.LatestTelemetry.Timestamp).Humanize()) old</span>
-            }
-            </th>
+                <th scope="col">Telemetry for @(Model.device.Name) between <script type="text/javascript">localizeDateTime('@(Model.StartDate.ToString("s"))');</script> and <script type="text/javascript">localizeDateTime('@(Model.EndDate.ToString("s"))');</script>
+                @* @if (Model.device.LatestTelemetry!=null && DateTime.UtcNow - Model.device.LatestTelemetry.Timestamp > TimeSpan.FromMinutes(60)){
+                    <span class="badge bg-warning text-dark">Warning - @((DateTime.UtcNow - Model.device.LatestTelemetry.Timestamp).Humanize()) old</span>
+                } *@
             </tr>
         </thead>
         <tbody>
@@ -71,6 +228,9 @@
                                 plugins: {
                                     legend: {
                                         @* display: false, *@
+                                    },
+                                    annotation: {
+                                        annotations: annotations
                                     }
                                 },
                                 scales: {
@@ -79,11 +239,23 @@
                                             @* display: false, *@
                                             type: 'time',
                                             time: {
-                                                unit: 'hour'
+                                                unit: 'hour',
+                                                // https://date-fns.org/v2.28.0/docs/format
+                                                displayFormats: {
+                                                    'millisecond': 'MMM DD',
+                                                    'second': 'MMM DD',
+                                                    'minute': 'MMM DD',
+                                                    'hour': 'E do ha',
+                                                    'day': 'MMM dd HH:mm',
+                                                    'week': 'MMM DD',
+                                                    'month': 'MMM DD',
+                                                    'quarter': 'MMM DD',
+                                                    'year': 'MMM DD'
+                                                }                        
                                             },
-                                            suggestedMin: new Date(@(new DateTimeOffset(Model.device.LatestTelemetry.Timestamp).AddDays(-2).ToUnixTimeMilliseconds())),
+                                            min: new Date(@(new DateTimeOffset(Model.StartDate).ToUnixTimeMilliseconds())),
                                             @* suggestedMax: new Date(), *@
-                                            suggestedMax: new Date(@(new DateTimeOffset(Model.device.LatestTelemetry.Timestamp).ToUnixTimeMilliseconds())),
+                                            max: new Date(@(new DateTimeOffset(Model.EndDate).ToUnixTimeMilliseconds())),
                                             @* ticks: {
                                                 max: new Date(),
                                                 min: new Date(@(new DateTimeOffset(Model.device.LatestTelemetry.Timestamp).AddDays(-2).ToUnixTimeMilliseconds())),
@@ -91,7 +263,13 @@
                                     },
                                     y: {
                                             @* display: false, *@
-                                            beginAtZero: true
+                                            beginAtZero: true,
+                                            position: 'left'
+                                    },
+                                    y1: {
+                                            @* display: false, *@
+                                            beginAtZero: false,
+                                            position: 'right'
                                     }
                                 },
                                 elements: {
@@ -114,14 +292,89 @@
                                 label: "Battery",
                                 backgroundColor: 'rgb(99, 99, 255)',
                                 borderColor: 'rgb(99, 99, 255)',
+                                yAxisID: 'y',
                             }, {
                                 label: "Temperature",
                                 backgroundColor: 'rgb(255, 99, 132)',
                                 borderColor: 'rgb(255, 99, 132)',
+                                yAxisID: 'y',
                             }, {
                                 label: "Disk Space Free",
                                 backgroundColor: 'rgb(50, 225, 50)',
                                 borderColor: 'rgb(50, 225, 50)',
+                                hidden: true,
+                                yAxisID: 'y',
+                            }, {
+                                label: "Pending Images",
+                                backgroundColor: 'rgb(30, 185, 00)',
+                                borderColor: 'rgb(30, 185, 00)',
+                                hidden: true,
+                                yAxisID: 'y',
+                            }, {
+                                label: "Pending Telemetry",
+                                backgroundColor: 'rgb(00, 165, 20)',
+                                borderColor: 'rgb(00, 165, 20)',
+                                hidden: true,
+                                yAxisID: 'y',
+                            }, {
+                                label: "Battery Voltage",
+                                backgroundColor: 'rgb(99, 99, 255)',
+                                borderColor: 'rgb(99, 99, 255)',
+                                hidden: true,
+                                yAxisID: 'y1',
+                            }, {
+                                label: "Battery Current",
+                                backgroundColor: 'rgb(255, 80, 100)',
+                                borderColor: 'rgb(255, 80, 100)',
+                                hidden: true,
+                                yAxisID: 'y1',
+                            }, {
+                                label: "IO Voltage",
+                                backgroundColor: 'rgb(99, 99, 255)',
+                                borderColor: 'rgb(99, 99, 255)',
+                                hidden: true,
+                                yAxisID: 'y1',
+                            }, {
+                                label: "IO Current",
+                                backgroundColor: 'rgb(255, 80, 100)',
+                                borderColor: 'rgb(255, 80, 100)',
+                                hidden: true,
+                                yAxisID: 'y1',
+                            }, {
+                                label: "Charging",
+                                backgroundColor: 'rgb(00, 165, 20)',
+                                borderColor: 'rgb(00, 165, 20)',
+                                yAxisID: 'y',
+                            }, {
+                                label: "Battery %/hr",
+                                backgroundColor: 'rgb(00, 165, 20)',
+                                borderColor: 'rgb(00, 165, 20)',
+                                hidden: true,
+                                yAxisID: 'y',
+                            }, {
+                                label: "Uptime (minutes)",
+                                backgroundColor: 'rgb(00, 00, 00)',
+                                borderColor: 'rgb(00, 00, 00)',
+                                hidden: true,
+                                yAxisID: 'y',
+                            }, {
+                                label: "Connected to Wireless Network",
+                                backgroundColor: 'rgb(00, 165, 20)',
+                                borderColor: 'rgb(00, 165, 20)',
+                                hidden: true,
+                                yAxisID: 'y',
+                            }, {
+                                label: "Connected to Internet",
+                                backgroundColor: 'rgb(00, 165, 20)',
+                                borderColor: 'rgb(00, 165, 20)',
+                                hidden: true,
+                                yAxisID: 'y',
+                            }, {
+                                label: "Power Switch",
+                                backgroundColor: 'rgb(165, 20, 20)',
+                                borderColor: 'rgb(165, 20, 20)',
+                                hidden: true,
+                                yAxisID: 'y',
                             }]
                         };
 
@@ -132,11 +385,51 @@
                             config
                         );
 
-                        getTelemetry(@(Model.device.Id), myChart_@(Model.device.Id));
+                        @* getTelemetry(@(Model.device.Id), @(Model.NumberOfHoursToDisplay), @(Model.PeriodOffset), myChart_@(Model.device.Id)); *@
+                        getTelemetry(@(Model.device.Id), '@(Model.StartDate.ToUniversalTime().ToString("o"))', '@(Model.EndDate.ToUniversalTime().ToString("o"))', myChart_@(Model.device.Id));
+                        
 
                     </script>
                 </td>
             </tr>
         </tbody>
     </table>
+
+    @if (Model.WirelessSummary != null)
+    {
+        <div class="mt-3">
+            <h5>Connection Summary</h5>
+            <table class="table table-bordered" style="border-radius: 6px; overflow: hidden;">
+                <thead>
+                    <tr>
+                        <th style="padding: 8px;">From</th>
+                        <th style="padding: 8px;">To</th>
+                        <th style="padding: 8px;">Power Switch</th>
+                        <th style="padding: 8px;">Connected to Wireless</th>
+                        <th style="padding: 8px;">SSID</th>
+                        <th style="padding: 8px;">Connected to Internet</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var summary in Model.WirelessSummary)
+                    {
+                        <tr>
+                            <td style="padding: 8px;"><script type="text/javascript">localizeDateTime('@(summary.TimestampStart.ToUniversalTime().ToString("s"))');</script></td>
+                            <td style="padding: 8px;"><script type="text/javascript">localizeDateTime('@(summary.TimestampEnd.HasValue ? summary.TimestampEnd.Value.ToUniversalTime().ToString("s") : "---")');</script></td>
+                            <td style="padding: 8px;">@summary.PowerSwitch</td>
+                            <td style="padding: 8px;">@summary.ConnectedToWirelessNetwork</td>
+                            <td style="padding: 8px;">@summary.WirelessNetworkName</td>
+                            <td style="padding: 8px;">@summary.ConnectedToInternet</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+    else
+    {
+        <div class="alert alert-warning mt-3">
+            No telemetry data available for connection summary.
+        </div>
+    }
 </div>

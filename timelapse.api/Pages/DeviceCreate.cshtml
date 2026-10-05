@@ -29,6 +29,11 @@
                 <span asp-validation-for="Device.Description" class="text-danger"></span>
             </div>
             <div class="form-group">
+                <label asp-for="Device.ShortDescription" class="control-label"></label>
+                <input asp-for="Device.ShortDescription" class="form-control" />
+                <span asp-validation-for="Device.ShortDescription" class="text-danger"></span>
+            </div>
+            <div class="form-group">
                 <input type="submit" value="Create" class="btn btn-primary" />
             </div>
         </form>
