@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Globalization;
 using System.Text;
 using Microsoft.Extensions.Logging;
 using timelapse.core.models; // Add this import
@@ -29,7 +30,7 @@ public class VideoProcessingService
             var outputPath = Path.Combine(tempDirectory, "timelapse.mp4");
             
             // Create image list file and prepare timestamp data
-            var (imageListPath, timestamps) = await CreateImageListFileWithTimestamps(imagePaths, tempDirectory);
+            var (imageListPath, timestamps) = await CreateImageListFileWithTimestamps(imagePaths, device, tempDirectory);
             
             // Build ffmpeg command
             var ffmpegArgs = BuildFFmpegCommand(imageListPath, outputPath, device, timestamps, description, tempDirectory);
@@ -50,7 +51,7 @@ public class VideoProcessingService
         }
     }
 
-    private async Task<(string, List<string>)> CreateImageListFileWithTimestamps(List<string> imagePaths, string tempDirectory)
+    private async Task<(string, List<string>)> CreateImageListFileWithTimestamps(List<string> imagePaths, Device device, string tempDirectory)
     {
         var listFilePath = Path.Combine(tempDirectory, "images.txt");
         var content = new StringBuilder();
@@ -63,7 +64,7 @@ public class VideoProcessingService
             
             // Extract timestamp from filename
             var filename = Path.GetFileNameWithoutExtension(imagePath);
-            var timestamp = ExtractTimestampFromFilename(filename);
+            var timestamp = ExtractTimestampFromFilename(filename, device);
             timestamps.Add(timestamp);
         }
         
@@ -72,13 +73,30 @@ public class VideoProcessingService
         return (listFilePath, timestamps);
     }
     
-    private string ExtractTimestampFromFilename(string filename)
+    private string ExtractTimestampFromFilename(string filename, Device device)
     {
         try
         {
-            // Format: nn_YYYY-MM-DD_hhmmss
-            // Example: 18_2026-01-18_103810
             var parts = filename.Split('_');
+
+            // ESP32 format: deviceId_YYYYMMDD-hhmmss-counter, time in UTC
+            // Example: 41_20261007-035828-002494
+            if (parts.Length == 2)
+            {
+                var dateTimeParts = parts[1].Split('-');
+                if (dateTimeParts.Length >= 2
+                    && DateTime.TryParseExact($"{dateTimeParts[0]}-{dateTimeParts[1]}", "yyyyMMdd-HHmmss",
+                        CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal,
+                        out var utc))
+                {
+                    // Show device local time, using the same fixed offset the ESP32 uses for its schedule
+                    var local = utc.AddMinutes(device.UtcOffsetMinutes);
+                    return local.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture);
+                }
+            }
+
+            // Legacy format: nn_YYYY-MM-DD_hhmmss
+            // Example: 18_2026-01-18_103810
             if (parts.Length >= 3)
             {
                 var date = parts[1]; // YYYY-MM-DD
