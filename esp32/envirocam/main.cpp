@@ -73,7 +73,7 @@
 // -DCELLULAR_UPLINK_ENABLED=0.
 // Until we have a fix for https://github.com/Xinyuan-LilyGO/LilyGo-Modem-Series/issues/540
 #ifndef CELLULAR_UPLINK_ENABLED
-#define CELLULAR_UPLINK_ENABLED 0
+#define CELLULAR_UPLINK_ENABLED 1
 #endif
 #define NTP_SERVER              "pool.ntp.org"
 #define GMT_OFFSET_SEC           0          // Adjust for local timezone
