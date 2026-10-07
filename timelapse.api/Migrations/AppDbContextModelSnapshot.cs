@@ -298,14 +298,51 @@ namespace timelapse.api.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
+                    b.Property<string>("ApiUrl")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("api_url");
+
+                    b.Property<int>("AutoSyncPeriodS")
+                        .HasColumnType("integer")
+                        .HasColumnName("auto_sync_period_s");
+
+                    b.Property<int>("CameraIntervalS")
+                        .HasColumnType("integer")
+                        .HasColumnName("camera_interval_s");
+
+                    b.Property<int>("DaytimeEndsAtH")
+                        .HasColumnType("integer")
+                        .HasColumnName("daytime_ends_at_h");
+
+                    b.Property<int>("DaytimeStartsAtH")
+                        .HasColumnType("integer")
+                        .HasColumnName("daytime_starts_at_h");
+
                     b.Property<string>("Description")
                         .IsRequired()
                         .HasColumnType("text")
                         .HasColumnName("description");
 
+                    b.Property<bool>("EnableLongExposureAtNight")
+                        .HasColumnType("boolean")
+                        .HasColumnName("enable_long_exposure_at_night");
+
+                    b.Property<int>("GeoIntervalS")
+                        .HasColumnType("integer")
+                        .HasColumnName("geo_interval_s");
+
+                    b.Property<bool>("Hflip")
+                        .HasColumnType("boolean")
+                        .HasColumnName("hflip");
+
                     b.Property<bool>("HibernateMode")
                         .HasColumnType("boolean")
                         .HasColumnName("hibernate_mode");
+
+                    b.Property<int>("LongExposureXclkHz")
+                        .HasColumnType("integer")
+                        .HasColumnName("long_exposure_xclk_hz");
 
                     b.Property<bool>("MonitoringMode")
                         .HasColumnType("boolean")
@@ -319,6 +356,10 @@ namespace timelapse.api.Migrations
                     b.Property<bool>("PowerOff")
                         .HasColumnType("boolean")
                         .HasColumnName("power_off");
+
+                    b.Property<bool>("ResetSetupApAttempts")
+                        .HasColumnType("boolean")
+                        .HasColumnName("reset_setup_ap_attempts");
 
                     b.Property<bool>("Retired")
                         .HasColumnType("boolean")
@@ -338,9 +379,21 @@ namespace timelapse.api.Migrations
                         .HasColumnType("text")
                         .HasColumnName("short_description");
 
+                    b.Property<bool>("SleepDuringNight")
+                        .HasColumnType("boolean")
+                        .HasColumnName("sleep_during_night");
+
                     b.Property<bool>("SupportMode")
                         .HasColumnType("boolean")
                         .HasColumnName("support_mode");
+
+                    b.Property<int>("UtcOffsetMinutes")
+                        .HasColumnType("integer")
+                        .HasColumnName("utc_offset_minutes");
+
+                    b.Property<bool>("Vflip")
+                        .HasColumnType("boolean")
+                        .HasColumnName("vflip");
 
                     b.Property<bool>("WideAngle")
                         .HasColumnType("boolean")
@@ -704,6 +757,40 @@ namespace timelapse.api.Migrations
                     b.ToTable("projects", (string)null);
                 });
 
+            modelBuilder.Entity("timelapse.core.models.RecordedLocation", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("DeviceId")
+                        .HasColumnType("integer")
+                        .HasColumnName("device_id");
+
+                    b.Property<double>("Latitude")
+                        .HasColumnType("double precision")
+                        .HasColumnName("latitude");
+
+                    b.Property<double>("Longitude")
+                        .HasColumnType("double precision")
+                        .HasColumnName("longitude");
+
+                    b.Property<DateTime>("Timestamp")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("timestamp");
+
+                    b.HasKey("Id")
+                        .HasName("pk_recorded_locations");
+
+                    b.HasIndex("DeviceId", "Timestamp")
+                        .HasDatabaseName("ix_recorded_locations_device_id_timestamp");
+
+                    b.ToTable("recorded_locations", (string)null);
+                });
+
             modelBuilder.Entity("timelapse.core.models.Telemetry", b =>
                 {
                     b.Property<int>("Id")
@@ -974,6 +1061,18 @@ namespace timelapse.api.Migrations
                     b.Navigation("Organisation");
                 });
 
+            modelBuilder.Entity("timelapse.core.models.RecordedLocation", b =>
+                {
+                    b.HasOne("timelapse.core.models.Device", "Device")
+                        .WithMany("RecordedLocations")
+                        .HasForeignKey("DeviceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_recorded_locations_devices_device_id");
+
+                    b.Navigation("Device");
+                });
+
             modelBuilder.Entity("timelapse.core.models.Telemetry", b =>
                 {
                     b.HasOne("timelapse.core.models.Device", "Device")
@@ -995,6 +1094,8 @@ namespace timelapse.api.Migrations
                     b.Navigation("Events");
 
                     b.Navigation("Images");
+
+                    b.Navigation("RecordedLocations");
 
                     b.Navigation("Telemetries");
                 });

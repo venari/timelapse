@@ -59,7 +59,7 @@ MATCHING_COUNT=$(az webapp list --query "[?name=='$AZURE_APP_NAME'].{name:name}.
 if [ $MATCHING_COUNT = 0 ]
 then
     echo "Creating webapp $AZURE_APP_NAME..."
-    az webapp create --name $AZURE_APP_NAME --resource-group $AZURE_RESOURCE_GROUP  --plan $AZURE_APP_PLAN_NAME --runtime "DOTNET|6.0" 
+    az webapp create --name $AZURE_APP_NAME --resource-group $AZURE_RESOURCE_GROUP  --plan $AZURE_APP_PLAN_NAME --runtime "DOTNET|10.0" 
     # --vnet $VNET_NAME --subnet $SUBNET_NAME
 
 

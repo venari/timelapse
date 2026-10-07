@@ -65,7 +65,7 @@
     }
   },
   "user_functions": {
-    "USER_FUNC1": "/home/pi/dev/timelapse/scripts/indicateStatus.sh",
+    "USER_FUNC1": "",
     "USER_FUNC2": "",
     "USER_FUNC3": "",
     "USER_FUNC4": "",

@@ -3,7 +3,7 @@ Description=Envirocam Photos Service
 
 [Timer]
 #OnBootSec=240
-OnBootSec=120
+OnBootSec=30
 
 [Install]
 WantedBy=timers.target

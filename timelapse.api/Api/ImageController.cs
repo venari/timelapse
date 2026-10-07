@@ -11,7 +11,7 @@ namespace timelapse.api{
 
     [Route("api/[controller]")]
     [ApiController]
-    [AllowAnonymous]
+    [Authorize]
     public class ImageController{
 
         public ImageController(AppDbContext appDbContext, ILogger<ImageController> logger, IConfiguration configuration, IMemoryCache memoryCache){
@@ -24,6 +24,9 @@ namespace timelapse.api{
         private ILogger _logger;
         private StorageHelper _storageHelper;
         
+        // ESP32 devices upload here directly, identified by SerialNumber - no user login
+        // involved, so this stays open regardless of the class-level [Authorize] above.
+        [AllowAnonymous]
         [HttpPost]
         public ActionResult<Image> Post([FromForm] ImagePostModel model){
 
@@ -64,7 +67,10 @@ namespace timelapse.api{
             return image;
         }
 
-        // Return latest image for device as a JPEG
+        // Return latest image for device as a JPEG - gated by its own ThirdPartyApiKeyAuth
+        // filter instead of the class-level [Authorize] (still lets a logged-in user
+        // through too, since that filter checks User.Identity.IsAuthenticated first).
+        [AllowAnonymous]
         [HttpGet("Latest")]
         [ThirdPartyApiKeyAuth]
         public ActionResult GetLatest([FromQuery] int deviceId){
@@ -85,6 +91,19 @@ namespace timelapse.api{
 
             return new RedirectResult(image.BlobUri.ToString() + _storageHelper.SasToken);
         }        
+
+        // Needed by the React Event-creation flow to look up the image (and its
+        // device) the user was viewing when they clicked "Create Event".
+        [HttpGet("{id}")]
+        public ActionResult<Image> GetImage(int id){
+            var image = _appDbContext.Images.FirstOrDefault(i => i.Id == id);
+
+            if(image==null){
+                return new NotFoundResult();
+            }
+
+            return image;
+        }
 
         [HttpGet("GetImageAtOrAround")]
         // [ThirdPartyApiKeyAuth]
@@ -118,6 +137,53 @@ namespace timelapse.api{
             return image;
 
             // return new RedirectResult(image.BlobUri.ToString() + _storageHelper.SasToken);
-        }        
+        }
+
+        [HttpGet("GetImagesBetweenDates")]
+        public ActionResult<IEnumerable<Image>> GetImagesBetweenDates([FromQuery] int deviceId, DateTime startDate, DateTime endDate){
+            Device device = _appDbContext.Devices.FirstOrDefault(d => d.Id == deviceId);
+
+            if(device==null){
+                return new NotFoundResult();
+            }
+
+            var images = _appDbContext.Images
+                .Where(i => i.DeviceId == device.Id && i.Timestamp >= startDate.ToUniversalTime() && i.Timestamp <= endDate.ToUniversalTime())
+                .OrderBy(i => i.Timestamp)
+                .ToList();
+
+            return images;
+        }
+
+        // OPTION 1: Proxy endpoint - serves the image through the API (RECOMMENDED)
+        [HttpGet("Proxy/{imageId}")]
+        public async Task<IActionResult> ProxyImage(int imageId){
+            var image = _appDbContext.Images.FirstOrDefault(i => i.Id == imageId);
+            
+            if(image == null){
+                return new NotFoundResult();
+            }
+
+            // Get the image from blob storage with SAS token
+            var imageUrl = image.BlobUri + _storageHelper.SasToken;
+            
+            using var httpClient = new HttpClient();
+            var response = await httpClient.GetAsync(imageUrl);
+            
+            if (!response.IsSuccessStatusCode){
+                return new StatusCodeResult((int)response.StatusCode);
+            }
+
+            var imageBytes = await response.Content.ReadAsByteArrayAsync();
+            var contentType = response.Content.Headers.ContentType?.ToString() ?? "image/jpeg";
+            
+            return new FileContentResult(imageBytes, contentType);
+        }
+
+        // OPTION 2: Get SAS token endpoint - client appends token to blob URLs
+        [HttpGet("SasToken")]
+        public ActionResult<string> GetSasToken(){
+            return _storageHelper.SasToken;
+        }
     }
 }

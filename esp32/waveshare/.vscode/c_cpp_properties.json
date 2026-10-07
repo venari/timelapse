@@ -1,0 +1,20 @@
+{
+    "configurations": [
+        {
+            "name": "ESP32",
+            "includePath": [
+                "${workspaceFolder}/**",
+                "~/.espressif/v6.0.2/esp-idf/components/**"
+            ],
+            "defines": [],
+            "compilerPath": "~/.espressif/tools/esp-clang/esp-20.1.1_20250829/esp-clang/bin/clang",
+            "cStandard": "c17",
+            "cppStandard": "c++17",
+            "intelliSenseMode": "linux-clang-x64",
+            "compileCommands": [
+                "${workspaceFolder}/build/compile_commands.json"
+            ]
+        }
+    ],
+    "version": 4
+}

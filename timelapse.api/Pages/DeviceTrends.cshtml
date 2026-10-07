@@ -231,6 +231,7 @@
 <div>
     <table class="table" id="devicePerformance">
         <thead>
+            <th nowrap="nowrap">Id</th>
             <th nowrap="nowrap">Device Name</th>
             <th nowrap="nowrap"><i class="fa fa-cog" data-toggle="tooltip" title="Support Mode"></i></th>
             <th nowrap="nowrap"><i class="fa fa-eye" data-toggle="tooltip" title="Monitoring Mode"></i></th>
@@ -254,6 +255,7 @@
             <th nowrap="nowrap"></th>
             <th nowrap="nowrap"></th>
             <th nowrap="nowrap"></th>
+            <th nowrap="nowrap"></th>
             <th nowrap="nowrap">Number of images and pending images</th>
 
             @{foreach(var date in Model.DateRange){
@@ -263,6 +265,9 @@
         <tbody>
             @{foreach(var summary in Model.PerformanceSummaries){
             <tr>
+                <td nowrap="nowrap">
+                    <a href="/DeviceEdit/@(summary.DeviceId)">@(summary.DeviceId)</a>
+                </td>
                 <td nowrap="nowrap"><a href="/TelemetryGraph/@(summary.DeviceId)/@(Model.StartDate.ToUniversalTime().ToString("o"))/@(Model.EndDate.ToUniversalTime().ToString("o"))">@(summary.DeviceName)</a></td>
 
                 <td nowrap="nowrap">
@@ -313,6 +318,7 @@
             <thead>
                 @* <th nowrap="nowrap">Device Name</th> *@
                 <th nowrap="nowrap"></th>
+                <th nowrap="nowrap"></th>
                 <th nowrap="nowrap"><i class="fa fa-cog" data-toggle="tooltip" title="Support Mode"></i></th>
                 <th nowrap="nowrap"><i class="fa fa-eye" data-toggle="tooltip" title="Monitoring Mode"></i></th>
                 <th nowrap="nowrap"><i class="fa fa-wrench" data-toggle="tooltip" title="Service"></i></th>
@@ -336,6 +342,7 @@
                 <th nowrap="nowrap"></th>
                 <th nowrap="nowrap"></th>
                 <th nowrap="nowrap"></th>
+                <th nowrap="nowrap"></th>
                 <th nowrap="nowrap">Number of images only</th>
 
                 @{foreach(var date in Model.DateRange){
@@ -344,6 +351,11 @@
             </thead>
             @{foreach(var summary in Model.PerformanceSummaries){
             <tr>
+
+                <td nowrap="nowrap">
+                    <a href="/DeviceEdit/@(summary.DeviceId)">@(summary.DeviceId)</a>
+                </td>
+
                 <td nowrap="nowrap"><a href="/TelemetryGraph/@(summary.DeviceId)/@(Model.StartDate.ToUniversalTime().ToString("o"))/@(Model.EndDate.ToUniversalTime().ToString("o"))">@(summary.DeviceName)</a></td>
 
                 <td nowrap="nowrap">
@@ -391,6 +403,7 @@
                 }}
             </tr>
             <tr>
+                <td nowrap="nowrap"></td>
                 <td nowrap="nowrap"></td>
                 <td nowrap="nowrap"></td>
                 <td nowrap="nowrap"></td>

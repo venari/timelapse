@@ -22,6 +22,57 @@ public class Device
     public bool Service {get; set;} = false;
     public bool WideAngle {get; set;} = false;
 
+    // ESP32 camera config, pushed to the device over the Device object nested in every
+    // Image/Telemetry POST response (see ImageController/TelemetryController) - the same
+    // mechanism SupportMode etc. above already use. The ESP32 caches these on its SD card
+    // and re-applies them each boot, so a change here takes effect next time it phones home.
+    public bool SleepDuringNight {get; set;} = false;
+    public int DaytimeStartsAtH {get; set;} = 7;
+    public int DaytimeEndsAtH {get; set;} = 17;
+
+    // Fixed offset from UTC, in minutes, the ESP32 uses to interpret DaytimeStartsAtH/
+    // DaytimeEndsAtH as local wall-clock time (they're a working-day schedule, not sunlight -
+    // camera exposure switching is worked out on-device from sunrise/sunset instead, see
+    // isNightForExposure() in the .ino). Not a real timezone/DST lookup - just a plain offset -
+    // so daylight saving currently means updating this by hand twice a year (NZST +720 / NZDT
+    // +780). Defaults to NZST since that's every device deployed so far.
+    public int UtcOffsetMinutes {get; set;} = 720;
+
+    public int CameraIntervalS {get; set;} = 300;
+    public bool Hflip {get; set;} = false;
+    public bool Vflip {get; set;} = false;
+
+    // Whether the ESP32 switches the camera to a slower-clock, fixed-exposure setup at night
+    // (isNightForExposure() in the .ino, based on real sunrise/sunset - see UtcOffsetMinutes'
+    // comment above for why that's a separate thing from DaytimeStartsAtH/DaytimeEndsAtH).
+    // LongExposureXclkHz is the pixel clock (Hz) used while it's active - lower gives a longer
+    // max exposure but hasn't been characterised against every OV5640 unit's PLL tolerance yet
+    // (see setupCameraNightExposure()'s comment in the .ino).
+    public bool EnableLongExposureAtNight {get; set;} = true;
+    public int LongExposureXclkHz {get; set;} = 8000000;
+
+    // How often (in seconds) the device checks GPS position (see updateGeoLocationIfDue() in
+    // the .ino) and how often it reconnects to WiFi to sync its clock and upload its backlog
+    // (see the needsSync check in setup()) - both pushed down the same way as CameraIntervalS
+    // above.
+    public int GeoIntervalS {get; set;} = 3600;
+    public int AutoSyncPeriodS {get; set;} = 300;
+
+    // One-shot trigger, pushed down the same way as the fields above: set this true to clear the
+    // ESP32's SD-tracked setup-AP attempt budget (SETUP_AP_ATTEMPTS_FILE in the .ino), letting a
+    // technician re-enter setup-AP mode on an already-deployed board without pulling its SD card
+    // by hand. The device clears its own copy back to false as soon as it acts on it, so this
+    // field only needs to go true -> false -> true again here to fire a second time.
+    public bool ResetSetupApAttempts {get; set;} = false;
+
+    // Deliberately blank, not defaulted to a real URL: the ESP32 only overwrites its local
+    // apiUrl when this is non-empty (see applyConfigFields in the .ino). A real default here
+    // would mean every device - including ones seeded via SD card to point at a different
+    // environment - gets redirected back to whatever URL this says the first time it uploads,
+    // since a freshly-created Device row would otherwise already have an opinion. Leaving it
+    // blank means the API stays silent on this field until someone deliberately sets it here.
+    public string ApiUrl {get; set;} = "";
+
     [System.Text.Json.Serialization.JsonIgnore]
     public List<Telemetry> Telemetries {get;} = new List<Telemetry>();
 
@@ -128,6 +179,12 @@ public class Device
 
     [System.Text.Json.Serialization.JsonIgnore]
     public List<DeviceLocation> DeviceLocations { get; } = new List<DeviceLocation>();
+
+    // Raw GPS fixes reported over time - see RecordedLocation's comment. JsonIgnore'd same as
+    // DeviceLocations above: fetched via the dedicated GET /api/Devices/{id}/RecordedLocations
+    // endpoint (bounded by a days window) rather than inflating every Device payload.
+    [System.Text.Json.Serialization.JsonIgnore]
+    public List<RecordedLocation> RecordedLocations { get; } = new List<RecordedLocation>();
 
     [NotMapped]
     [System.Text.Json.Serialization.JsonIgnore]

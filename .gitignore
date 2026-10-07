@@ -102,7 +102,8 @@ celerybeat.pid
 *.sage.py
 
 # Environments
-.env
+.env*
+!.env.example
 .venv
 env/
 venv/
@@ -139,3 +140,17 @@ logs
 Untitled-2.sh
 arduino_secrets.h
 arduino_secrets.cpp
+timelapse.functions/local.settings.json
+
+bin/
+obj/
+
+# esp-idf build artefacts
+managed_components/
+esp32/envirocam/main.d
+
+# The generic Python "lib/" rule above would otherwise swallow this - it's a vendored,
+# locally-patched PlatformIO library (see esp32/envirocam/lib/NimBLE-Arduino/src/NimBLEDevice.cpp),
+# not a build artefact, and needs to be tracked so the patch survives a fresh clone.
+!/esp32/envirocam/lib/
+!/esp32/envirocam/lib/**

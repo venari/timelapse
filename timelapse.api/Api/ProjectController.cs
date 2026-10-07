@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using timelapse.infrastructure;
 using timelapse.core.models;
@@ -7,6 +8,9 @@ namespace timelapse.api
 {
     [Route("api/[controller]")]
     [ApiController]
+    // AddMockDevice below is explicitly flagged in its own logging as an "insecure test
+    // function" - Admin-only rather than just a baseline login requirement.
+    [Authorize(Roles = "Admin")]
     public class ProjectController : Controller
     {
         public ProjectController(AppDbContext appDbContext, ILogger<ProjectController> logger){
